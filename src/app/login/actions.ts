@@ -4,6 +4,7 @@ import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getSiteUrl } from "@/lib/site-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { getCooldownMs, isSupabaseRateLimitError } from "./rate-limit";
 import type { LoginState } from "./types";
 
 /**
@@ -15,7 +16,14 @@ import type { LoginState } from "./types";
  * 1. Email non vide + format basique (regex `local@host.tld`).
  * 2. Domaine `@alyosingenierie.fr` (réutilise `isAuthorizedEmail` étape 2).
  *    Refus pré-envoi → on ne consomme pas de magic-link inutile et on ne
- *    laisse pas une fuite d'info sur l'existence d'utilisateurs non Alyos.
+ *    laisse pas une fuite d'info sur l'existence des comptes.
+ *
+ * Détection rate-limit Supabase (renvoyé via `LoginState.rateLimited`) :
+ *  - `error.status === 429` (HTTP) ;
+ *  - `error.code === "over_email_send_rate_limit"` (code Supabase officiel) ;
+ *  - filet regex `/rate.?limit/i.test(error.message)` au cas où Supabase
+ *    change le code en version mineure (résilience).
+ * Voir `./rate-limit.ts` pour le détail (module séparé car non `"use server"`).
  *
  * Si l'utilisateur n'existe pas encore dans Supabase Auth, il sera auto-créé
  * à la confirmation du magic-link (`shouldCreateUser: true` par défaut).
@@ -25,9 +33,10 @@ import type { LoginState } from "./types";
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-// NB : `LoginState` et `initialLoginState` vivent dans `./types.ts`. Un fichier
-// `"use server"` ne peut exporter QUE des async functions. Cf. ce module pour
-// le détail et le lien Next.js correspondant.
+// NB : `LoginState`, `RateLimitedHint`, `initialLoginState` et la constante
+// `RESEND_COOLDOWN_MS` vivent dans `./types.ts`. Un fichier `"use server"` ne
+// peut exporter QUE des async functions. Cf. ce module pour le détail et le
+// lien Next.js correspondant.
 
 export async function signInWithOtpAction(
   _prevState: LoginState,
@@ -68,8 +77,23 @@ export async function signInWithOtpAction(
     });
 
     if (error) {
-      // Erreur Supabase (rate limiting, infra, etc.). On n'expose pas le
-      // détail côté client pour ne pas faciliter le probing.
+      // Détection rate-limit prioritaire : on renvoie une `deadlineMs`
+      // explicite pour que le formulaire affiche un countdown et désactive
+      // le bouton « Renvoyer le lien » jusqu'à l'expiration du cooldown.
+      if (isSupabaseRateLimitError(error)) {
+        const cooldownMs = getCooldownMs();
+        const deadlineMs = Date.now() + cooldownMs;
+        console.warn("[signInWithOtp:rate_limited]", error.message, { email, deadlineMs });
+        return {
+          status: "error",
+          message:
+            "Un lien vient d'être demandé pour cet email. Pas reçu ? Renvoie-toi un lien dans 60 secondes.",
+          rateLimited: { email, deadlineMs },
+        };
+      }
+
+      // Autres erreurs Supabase (infra, config). On n'expose pas le détail
+      // côté client pour ne pas faciliter le probing.
       console.error("[signInWithOtp:error]", error.message, { email });
       return {
         status: "error",

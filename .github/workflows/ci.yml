@@ -89,6 +89,9 @@ jobs:
       NEXT_PUBLIC_APP_ENV: preview
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
       ALLOWED_EMAIL_DOMAIN: alyosingenierie.fr
+      # Override cooldown login pour les tests E2E (sinon 60 s par défaut,
+      # tests trop lents). Voir `src/app/login/rate-limit.ts:getCooldownMs`.
+      LOGIN_RESEND_COOLDOWN_MS: "2000"
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
