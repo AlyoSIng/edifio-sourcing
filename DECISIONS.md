@@ -379,4 +379,32 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 3 : Supabase Auth magic-link branché, 7 tests E2E middleware verts (bloquant Gate 6 levé).*
+## 2026-05-11 — Gate 6 étape 4 (CI + Vercel preview) — exécution
+
+- **2026-05-11 · G6 · CEO Marc · Repo connecté à Vercel + GitHub Secrets posés + branch protection `main` activée.** [BOARD-OK 2026-05-11]
+  *Projet Vercel `edifio-sourcing` importé (compte AlyoS Ingénierie). Env vars Vercel posées sur scope `Preview` + `Development` uniquement (4 vars Supabase preview + `ALLOWED_EMAIL_DOMAIN` + `NEXT_PUBLIC_APP_ENV`). Scope `Production` laissé vide jusqu'à Gate 9. Wildcard `https://*.vercel.app/auth/callback` ajouté aux Redirect URLs Supabase. 4 GitHub Secrets posés (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROJECT_REF`). Branch protection `main` : require PR + 6 CI checks verts + pas de force-push + pas de delete.*
+
+- **2026-05-11 · G6 · DEV Alex · Pipeline CI `.github/workflows/ci.yml` posé — 6 jobs parallélisés.** [DÉCISION DEV]
+  *`ci-lint` + `ci-typecheck` + `ci-test` + `ci-middleware-check` + `ci-e2e` + `ci-build`. Tous parallèles, pas de dépendance. Setup pnpm 11.0.9 + Node 20 via `pnpm/action-setup@v4` + `actions/setup-node@v4`. Cache `pnpm-store` (auto via setup-node) + cache binaires Chromium (~150 MB, clé pnpm-lock.yaml hash) + cache `.next/cache` (clé sources hash).*
+
+- **2026-05-11 · G6 · DEV Alex · `ci-middleware-check` bloquant (spec §5 — migré depuis le draft étape 2).** [LIVRABLE BLOQUANT]
+  *Vérifie `src/middleware.ts` présent (adapté suite au fix étape 3 — racine → `src/`), grep `@alyosingenierie.fr`, grep `isAuthorizedEmail`. Suppression de `.github/middleware-check-draft.yml` (rôle rempli). La désactivation du middleware est INTERDITE per CLAUDE.md — ce job empêche tout merge qui contournerait la garde de domaine.*
+
+- **2026-05-11 · G6 · DEV Alex · `ci-e2e` Playwright bloquant — 7 tests middleware sur Chromium.** [LIVRABLE BLOQUANT]
+  *Env via GitHub Secrets, `pnpm dev` auto-démarré via `webServer` Playwright. Install `--with-deps chromium` au premier run (cache binary partagé entre runs). Upload du rapport HTML + traces en cas d'échec (artefact retention 7 jours). Verify step des secrets pour fail rapide et lisible si un secret manque.*
+
+- **2026-05-11 · G6 · DEV Alex · Helper `src/lib/site-url.ts` — résolution URL multi-environnement.** [DÉCISION DEV]
+  *Priorité : `NEXT_PUBLIC_SITE_URL` (custom domain Gate 7) → `VERCEL_URL` (auto-injecté server-side par Vercel preview/prod) → `http://localhost:3000` (fallback dev). Utilisée dans `signInWithOtpAction` pour `emailRedirectTo` — la valeur DOIT matcher exactement un pattern whitelisté dans Supabase Auth → Redirect URLs (`http://localhost:3000/auth/callback` + `https://*.vercel.app/auth/callback`).*
+
+- **2026-05-11 · G6 · DEV Alex · Concurrency CI — cancel-in-progress par branche.** [DÉCISION DEV]
+  *`concurrency.group: ${{ github.workflow }}-${{ github.ref }}`, `cancel-in-progress: true`. Évite les builds parallèles sur les PR actives (chaque push annule le run précédent). Économise des minutes runner et accélère le feedback.*
+
+- **2026-05-11 · G6 · DEV Alex · Premier preview public déployé sur Vercel (push de la PR `feat/ci-vercel`).** [LIVRABLE]
+  *URL `https://edifio-sourcing-git-feat-ci-vercel-*.vercel.app` (variable par run). Middleware actif sur `/sourcing/*` et `/api/protected/*` depuis l'étape 2, donc l'exposition publique reste safe : tout visiteur hors `@alyosingenierie.fr` est redirigé vers `/login` ou `/forbidden`. Test fonctionnel `/login` à mener une fois la PR ouverte (form actif, magic-link envoyé à un email AlyoS Marc, callback OK).*
+
+- **2026-05-11 · G6 · DEV Alex · `vercel --prod` reste verrouillé.** [GARDE-FOU]
+  *Pattern dans le `deny` de `.claude/settings.local.json`. Toute mise en production passe par OK Board explicite Gate 9 (cf. CLAUDE.md limites strictes). Le scope Vercel `Production` reste vide pour éviter tout déploiement accidentel.*
+
+---
+
+*Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 4 : CI GitHub Actions 6 jobs + Vercel preview auto + branch protection main + premier preview public.*

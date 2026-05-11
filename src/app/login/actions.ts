@@ -1,6 +1,7 @@
 "use server";
 
 import { isAuthorizedEmail } from "@/lib/auth/domain";
+import { getSiteUrl } from "@/lib/site-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -53,12 +54,11 @@ export async function signInWithOtpAction(
   }
 
   const supabase = createSupabaseServerClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${siteUrl}/auth/callback`,
+      emailRedirectTo: `${getSiteUrl()}/auth/callback`,
     },
   });
 
