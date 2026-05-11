@@ -1,0 +1,27 @@
+﻿# === edifio Sourcing - defaults ===
+# Secrets (NEVER commit)
+.env
+.env.local
+.env.*.local
+
+# Build
+node_modules/
+.next/
+dist/
+.turbo/
+.vercel/
+
+# Supabase
+.supabase/
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
