@@ -235,31 +235,104 @@
 
 ---
 
-## 2026-05-11 — Gate 6 (MVP fonctionnel) — démarrage
-
-- **2026-05-11 · G6 · CEO Marc · Plan Gate 6 démarrage validé.** [BOARD-OK 2026-05-11]
-  *Plan 7 étapes posé par [DEV Alex] et validé par le Board : (1) bootstrap Next.js, (2) middleware `@alyosingenierie.fr`, (3) Supabase Auth magic-link, (4) CI GitHub Actions + Vercel preview deploys, (5) spike ORM Drizzle vs Prisma (2 branches sœurs, même périmètre), (6) ADR-0001 choix ORM, (7) première migration métier. Garde-fous fermes : aucune migration committée avant étape 6, aucune route protégée exposée avant étape 2 mergée, middleware actif sur 100 % des routes protégées en CI (bloquant). Branches : `main` + `feat/<step>` par étape, PR + Vercel preview obligatoire par PR. Conventional Commits obligatoires.*
-
-- **2026-05-11 · G6 · CEO Marc · 2 projets Supabase distincts dès J0.** [BOARD-OK 2026-05-11] [SURCLASSE ARBITRAGE 3 OUVERT]
-  *`edifio-sourcing-preview` (utilisé par Vercel previews + dev local) et `edifio-sourcing-prod` (utilisé uniquement après Gate 9). Région Frankfurt `eu-central-1`. Compte AlyoS Ingénierie en plan Pro (place pour les 2 projets). **Aucun partage de clés entre les deux.** Service role key serveur-only, jamais exposée au bundle client. Création de `-preview` à l'étape 3 par [CEO Marc] depuis le dashboard Supabase.*
-
-- **2026-05-11 · G6 · DEV Alex · pnpm activé via Corepack en shim utilisateur.** [DÉCISION DEV]
-  *`corepack enable` standard a échoué (EPERM sur `C:\Program Files\nodejs`) — contournement : shim utilisateur dans `$env:LOCALAPPDATA\pnpm-shims` via `corepack enable --install-directory ...`. Aucune installation système, conforme limite stricte CLAUDE.md « pas d'installation logicielle système ». pnpm 11.0.9 actif. Le shim doit être préfixé au `$env:Path` dans chaque session PowerShell (l'état shell ne persiste pas entre invocations de l'agent) — à documenter pour Yann/manuel.*
-
-- **2026-05-11 · G6 · DEV Alex · Étape 1 : bootstrap Next.js 14 + TS strict + Tailwind 3 + ESLint + Prettier + commitlint + husky + fontsource.** [DÉCISION DEV]
-  *Stack figée : Next 14.2.35, React 18.3.1, TypeScript 5.9 (`strict` + `noUncheckedIndexedAccess` + `noImplicitOverride` + `noFallthroughCasesInSwitch`), Tailwind 3.4 (pas v4 — stabilité 2026, breaking change non justifié au MVP), ESLint 8 avec `next/core-web-vitals` + `next/typescript`. Fontsource self-host (Inter / Space Grotesk / JetBrains Mono) conforme arbitrage Gate 5 (pas d'appel `fonts.googleapis.com`). Hook husky `commit-msg` valide Conventional Commits, hook `pre-commit` lance `prettier --check` + `next lint`. pnpm 11 nécessite `allowBuilds: unrs-resolver: true` dans `pnpm-workspace.yaml` pour autoriser le postinstall (`napi-postinstall`) — sinon install échoue par sécurité (pnpm 11 bloque les scripts inconnus par défaut).*
-
-- **2026-05-11 · G6 · CEO Marc · Allowlist autonomie posée dans `.claude/settings.local.json`.** [BOARD-OK 2026-05-11]
-  *Sur demande Board : allowlist large posée pour les opérations Gate 6 — git (sauf push origin main), pnpm/npx/corepack, supabase, vercel (sauf `--prod`), gh (sauf delete). Deny strict sur `git push origin main` (toute mise à jour de main passe par PR mergée), `vercel --prod` / `vercel deploy --prod` (escalade Board obligatoire), `supabase projects delete`, `gh repo delete`, `git reset --hard`, `rm -rf /*`. Edit/Write scopés à `C:\Dev\edifio-sourcing\**`.*
-
----
-
 ## Arbitrages ouverts à ce stade
 
-1. **ORM Drizzle vs Prisma** — reporté Gate 5, à statuer début Gate 6 par CTO Sophie sur base spike [DEV Alex] (étapes 5 et 6 du plan).
-2. **URL d'accès edifio Sourcing** — Vercel preview `edifio-sourcing.vercel.app` au démarrage ; custom domain `sourcing.alyosingenierie.fr` ou `app.alyosingenierie.fr/sourcing` à arbitrer en Gate 7.
-3. ~~**Projet Supabase** — instance partagée ou dédiée ?~~ **RÉSOLU 2026-05-11** : 2 projets distincts (`-preview` et `-prod`) sans partage de clés.
+1. **ORM Drizzle vs Prisma** — reporté Gate 5, à statuer début Gate 6 par CTO Sophie sur base spike [DEV Alex].
+2. **URL d'accès edifio Sourcing** — `edifio.fr/sourcing/...` (path) ou `app.edifio.fr/sourcing/...` (sous-domaine). À arbitrer en Gate 6.
+3. **Projet Supabase** — instance partagée avec le site existant ou nouveau projet dédié à edifio Sourcing ? À arbitrer en Gate 6 avec [DEV Alex].
 
 ---
 
-*Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 1 : bootstrap Next.js 14 + TS strict + Tailwind + outillage Conventional Commits.*
+## 2026-05-10 — Travail Cowork en parallèle de Gate 6 *(Alex + Yann en exécution)*
+
+> Le Board délègue Gate 6 à Alex/Yann en autonomie et confirme « GO sur tout » pour la production parallèle Cowork. Pas de décision Board nécessaire sur ces livrables — ils dérisquent ou alimentent Gate 6.
+
+- **2026-05-10 · CTO Sophie · Schéma BDD complet livré `specs/schema_v1.sql`.** [LIVRABLE]
+  *22+ tables, types enum, RLS FORCE + politiques, indexes, triggers updated_at, immutabilité audit_logs. Prêt à brancher sur Drizzle ou Prisma après spike ORM Gate 6 par Alex.*
+
+- **2026-05-10 · CTO Sophie · Spec détaillée middleware `@alyosingenierie.fr` livrée `specs/middleware_domain_gate.md`.** [LIVRABLE]
+  *12 cas de comportement (matrice), skeleton TypeScript Next.js 14 + Supabase SSR, tests E2E Playwright bloquants, check CI bloquant. À implémenter par Alex en priorité absolue Gate 6.*
+
+- **2026-05-10 · CTO Sophie · 12 prompts IA versionnés livrés `specs/ai_prompts_v1.md`.** [LIVRABLE]
+  *Stratégie Sonnet/Haiku conforme Gate 2 arbitrage 4/A. Schémas Zod pour validation runtime. Politique versioning + traçabilité ai_runs. Coûts estimés par appel documentés.*
+
+- **2026-05-10 · CMO Léa · Matrice concurrentielle détaillée livrée `design/copy/competitive_matrix_v1.md`.** [LIVRABLE]
+  *Analyse Vecteur Plus, AWS-Achat, Explore-marketing, Doublet. Matrice 13 critères × 5 acteurs. Battlecards pour pitch interne AlyoS. Risques de positionnement anticipés.*
+
+- **2026-05-10 · Graphiste Théo · Variante M4 vouvoiement + toggle TU/VOUS sur M3 livrés `design/maquettes/maquettes_v1_1_vous.html`.** [LIVRABLE]
+  *Action ouverte Gate 4 soldée. Comportement Tandem-only sur le toggle (Solo ne nécessite pas le choix).*
+
+- **2026-05-10 · CEO Marc · PDF Gate 1 et Gate 2 ré-édités en v1.1 avec palette DS Edifio correcte.** [ACTION SOLDÉE]
+  *Palette `alyos-red #FF0033 + ink #0F1A2E + paper-2 #F3F1EC` substituée à la palette inventée v1.0. Action ouverte Gate 3 soldée. Anciens PDF v1.0 conservés pour traçabilité. Nouveaux fichiers : `01_CADRAGE_260507_v1_1.pdf` et `02_SPEC_FONCT_260507_v1_1.pdf`.*
+
+---
+
+## 2026-05-10 — Batch parallèle Cowork n°2 *(suite à validation Board « OK ça me va, continue »)*
+
+- **2026-05-10 · CTO Sophie · Spec audit log détaillée livrée `specs/audit_log_v1.md`.** [LIVRABLE]
+  *13 actions × payload JSON détaillé, helper TypeScript, tests pgTAP bloquants, politique de rétention 5 ans + archivage. Prêt à coder par Alex.*
+
+- **2026-05-10 · CTO Sophie · ADR-001 à ADR-005 livrés `specs/adr_001_to_005.md`.** [LIVRABLE]
+  *Formalisation des 5 arbitrages techniques Gate 5 au format Architecture Decision Record (contexte / décision / conséquences / alternatives rejetées). Convention posée pour les ADR suivants.*
+
+- **2026-05-10 · CEO Marc · Budget infrastructure prévisionnel livré `specs/budget_infra_v1.md`.** [LIVRABLE]
+  *Synthèse mensuelle MVP : ~45-85 €/mois en preview, ~70-110 €/mois après Gate 9. Détail coûts Anthropic par prompt. Plafond Phase 1 acté à 150 €/mois. Alertes et garde-fous documentés. Tableau de suivi mensuel à compléter par PS_OPERATOR.*
+
+- **2026-05-10 · CMO Léa · Onboarding tooltips + push notifications copy livrés `design/copy/onboarding_and_push_v1.md`.** [LIVRABLE]
+  *5 étapes d'onboarding, 12 push notifications, tooltips contextuels par vue, 6 toasts d'erreur, 6 empty states. Strings figées MVP, prêtes pour Alex.*
+
+- **2026-05-10 · Graphiste Théo · Maquettes M7 (login) + M8 (forbidden 403) livrées `design/maquettes/maquettes_v1_2_auth.html`.** [LIVRABLE]
+  *Critiques pour le middleware @alyosingenierie.fr. Login 2 états (initial + magic-link envoyé). Page 403 avec détails techniques pour support et lien de contact IT.*
+
+- **2026-05-10 · Graphiste Théo · Manifest PWA + spec icônes livrés.** [LIVRABLE]
+  *`design/pwa_manifest_v1.json` (manifest complet avec shortcuts et screenshots) + `design/pwa_icons_spec.md` (déclinaisons à produire : favicons, apple-touch, maskable Android, splashscreens iOS, OG image). Source SVG vectoriel défini.*
+
+---
+
+## Chantiers tier 3 encore en file
+
+- [CEO] Plan de recette utilisateur Gate 6 → Gate 7 (préma — à débloquer quand Alex a une preview fonctionnelle)
+- [CEO] Préparation Gate 8 (checklist OWASP + registre RGPD + mentions légales)
+- [CEO] Préparation Gate 9 (plan de bascule + rollback + support)
+- [CTO] ADR-006 à ADR-010 (à ajouter au fil de Gate 6)
+- [CMO] Plan de formation utilisateurs AlyoS + plan de comm interne Gate 9
+- [Graphiste] 4 maquettes restantes (configuration profils, base architectes, bibliothèque, notifications)
+- [Graphiste] Rendu HTML des 8 templates Brevo
+- [Graphiste] Audit RGAA AA détaillé sur les 8 maquettes existantes
+
+---
+
+## 2026-05-10 — Batch parallèle Cowork n°3 *(suite à validation Board « go »)*
+
+- **2026-05-10 · Graphiste Théo · 4 maquettes restantes M9-M12 livrées `design/maquettes/maquettes_v1_3_complete.html`.** [LIVRABLE]
+  *M9 Configuration profil de recherche (édition complète) · M10 Base architectes (liste + actions multiples, import CSV, tutoiement groupé) · M11 Bibliothèque (cartes avec alertes expiration J-7 / J-22 / OK) · M12 Notifications (liste + filtres + paramètres). Layout app avec sidebar standard.*
+
+- **2026-05-10 · Théo + Léa · Rendu HTML des 8 templates Brevo livré `design/copy/brevo_templates_rendered.html`.** [LIVRABLE]
+  *Rendu visuel email-safe avec données d'exemple substituées aux variables Handlebars. Permet validation Board avant push Brevo par Alex en Gate 6.*
+
+- **2026-05-10 · CTO + CEO · Préparation Gate 8 — Checklist OWASP livrée `specs/owasp_checklist_v1.md`.** [LIVRABLE]
+  *48 contrôles sur OWASP Top 10 2021. 18 conformes par défaut, 27 à implémenter Gate 6-7, 3 non couverts (acceptés MVP). Tests bloquants Gate 8 listés.*
+
+- **2026-05-10 · CTO + CEO · Préparation Gate 8 — Registre RGPD des traitements livré `specs/rgpd_registre_v1.md`.** [LIVRABLE]
+  *7 traitements documentés (auth, sourcing AO, base architectes, sollicitation Brevo, IA, audit logs, bibliothèque). 6 DPA sous-traitants à signer (bloquant Gate 9). Procédure violation et droits exerçables documentés.*
+
+- **2026-05-10 · CEO + CTO · Préparation Gate 8 — Template mentions légales livré `specs/mentions_legales_v1.md`.** [LIVRABLE]
+  *Page /legal complète + footer mail Brevo + checklist 14 items à finaliser par TEISSIER (SIREN, adresse, DPO, etc.). À publier Gate 9.*
+
+- **2026-05-10 · DEV Alex (côté Claude Code) · `.prettierignore` créé pour exclure les artefacts Cowork du scope Prettier.** [LIVRABLE EXÉCUTION]
+  *Exclut CLAUDE.md, DECISIONS.md, /gates/, /notes-de-suivi/, /handoff/, /specs/, /design/copy/, /design/maquettes/, /design/*.md, /design/*.json, .claude/. Conformité Prettier rétablie sans dénaturer la matière éditoriale Cowork.*
+
+---
+
+## Chantiers tier 4 encore en file *(non urgents)*
+
+- [CEO] Plan de recette utilisateur Gate 6 → Gate 7 (à débloquer quand Alex aura une preview fonctionnelle)
+- [CEO] Préparation Gate 9 (plan de bascule + rollback + plan de support)
+- [CTO] ADR-006 à ADR-010 (à ajouter au fil de Gate 6 selon décisions)
+- [CMO] Plan de formation utilisateurs AlyoS détaillé
+- [CMO] Plan de comm interne Gate 9
+- [Graphiste] Audit RGAA AA détaillé sur les 12 maquettes existantes
+
+---
+
+*Dernière mise à jour : 2026-05-10 par [CEO Marc] — Batch parallèle Cowork n°3.*

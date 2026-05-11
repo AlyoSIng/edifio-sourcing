@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>edifio Sourcing — Templates Brevo rendus</title>
+<style>
+  body { margin: 0; padding: 24px; background: #E8E5DD; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0F1A2E; }
+  .page-header { max-width: 700px; margin: 0 auto 32px; }
+  .page-header h1 { font-family: 'Inter', sans-serif; font-size: 26px; letter-spacing: -0.5px; margin: 0 0 6px; }
+  .page-header .meta { color: #6B7280; font-size: 13px; }
+  .template-block { max-width: 700px; margin: 0 auto 32px; }
+  .template-label { background: #0F1A2E; color: #FFFFFF; font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px; border-radius: 12px 12px 0 0; }
+  .email-viewer { background: #FAF9F6; padding: 24px; border: 1px solid #E2DFD6; border-top: none; border-radius: 0 0 12px 12px; }
+  .email-header-meta { background: #F3F1EC; border: 1px solid #E2DFD6; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 12.5px; }
+  .email-header-meta strong { color: #0F1A2E; min-width: 80px; display: inline-block; }
+  .email-header-meta .from { font-weight: 600; }
+  .email-header-meta .subject { color: #FF0033; font-weight: 600; }
+
+  /* Email-safe rendering (inline-style mimics) */
+  .email-body { background: #FFFFFF; border: 1px solid #E2DFD6; border-radius: 8px; padding: 24px 28px; }
+  .email-body h1 { font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 14px; color: #0F1A2E; }
+  .email-body p { font-size: 14px; line-height: 1.55; margin: 0 0 12px; color: #1F2937; }
+  .email-body .block-title { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 13px; margin: 14px 0 6px; color: #0F1A2E; }
+  .email-body .block-content { background: #F3F1EC; padding: 10px 14px; border-radius: 6px; font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+  .email-body .cta-row { margin: 18px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+  .email-body .cta { display: inline-block; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; }
+  .email-body .cta-primary { background: #FF0033; color: #FFFFFF; }
+  .email-body .cta-info { background: #1E40AF; color: #FFFFFF; }
+  .email-body .cta-ghost { background: #FFFFFF; border: 1px solid #CFCBC0; color: #0F1A2E; }
+  .email-body .signature { color: #6B7280; font-size: 12px; line-height: 1.5; margin-top: 18px; padding-top: 14px; border-top: 1px solid #E2DFD6; }
+  .email-body .signature .product-tag { font-size: 11px; color: #6B7280; }
+
+  .render-note { background: #DBEAFE; color: #1E40AF; border-left: 3px solid #1E40AF; padding: 8px 12px; margin-top: 12px; font-size: 12px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Templates Brevo — Rendu visuel v1.0</h1>
+  <div class="meta">edifio Sourcing · 2026-05-10 · Théo Renard + Léa Charpentier · pour validation Board avant push Brevo par Alex</div>
+</div>
+
+<!-- ============= D.1 architect_solicitation_TU ============= -->
+<div class="template-block">
+  <div class="template-label">D.1 — architect_solicitation_TU · sollicitation initiale (architecte connu)</div>
+  <div class="email-viewer">
+    <div class="email-header-meta">
+      <div><strong>De :</strong> <span class="from">Sandrine Petit</span> &lt;sandrine@bat-lyonnais.fr&gt;</div>
+      <div><strong>À :</strong> Marc Lefèvre &lt;marc.lefevre@archi-lyon.fr&gt;</div>
+      <div><strong>Sujet :</strong> <span class="subject">[edifio Sourcing] On a un AO sur lequel on aimerait ton avis</span></div>
+    </div>
+    <div class="email-body">
+      <p>Bonjour Marc,</p>
+      <p>L'entreprise <strong>Bâtiment Lyonnais Réhabilitation</strong> envisage de répondre à un AO en cotraitance et te propose le rôle de mandataire MOE. Tu peux répondre en un clic, sans créer de compte.</p>
+      <div class="block-title">▸ L'opération</div>
+      <div class="block-content">Centre hospitalier de Vienne — rénovation des urgences (4 200 m² SHON).<br>Montant prévisionnel : <strong>4,2 M€ HT</strong><br>Remise des plis : <strong>14 juin 2026 · 12h00</strong></div>
+      <div class="block-title">▸ Pourquoi nous t'avons choisi</div>
+      <div class="block-content">Ton score est de <strong>0,91/1</strong>. Tu as déjà signé <strong>2 opérations</strong> similaires avec nous (clinique Givors 2023, EHPAD Décines 2024). Spécialité santé + zone Rhône.</div>
+      <div class="block-title">▸ Tes options</div>
+      <div class="cta-row">
+        <a href="#" class="cta cta-primary">✓ Oui, je suis partant</a>
+        <a href="#" class="cta cta-info">? Plus d'infos</a>
+        <a href="#" class="cta cta-ghost">✕ Non, pas cette fois</a>
+      </div>
+      <div class="signature">
+        À très vite,<br>
+        <strong>Sandrine</strong><br>
+        <span class="product-tag">Bâtiment Lyonnais Réhabilitation — via edifio Sourcing</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= D.2 architect_solicitation_VOUS ============= -->
+<div class="template-block">
+  <div class="template-label">D.2 — architect_solicitation_VOUS · sollicitation initiale (architecte non connu)</div>
+  <div class="email-viewer">
+    <div class="email-header-meta">
+      <div><strong>De :</strong> <span class="from">Sandrine Petit</span> &lt;sandrine@bat-lyonnais.fr&gt;</div>
+      <div><strong>À :</strong> Mme Hélène Garnier &lt;h.garnier@cabinet-garnier.com&gt;</div>
+      <div><strong>Sujet :</strong> <span class="subject">[edifio Sourcing] Votre avis sur un appel d'offres ?</span></div>
+    </div>
+    <div class="email-body">
+      <p>Bonjour Mme Garnier,</p>
+      <p>L'entreprise <strong>Bâtiment Lyonnais Réhabilitation</strong> envisage de répondre à un appel d'offres en cotraitance et vous propose le rôle de mandataire MOE. Vous pouvez répondre en un clic, sans créer de compte.</p>
+      <div class="block-title">▸ L'opération</div>
+      <div class="block-content">Centre logistique industriel — extension 6 000 m² SHON.<br>Montant prévisionnel : <strong>3,5 M€ HT</strong><br>Remise des plis : <strong>21 juin 2026 · 16h00</strong></div>
+      <div class="block-title">▸ Pourquoi vous avez été choisie</div>
+      <div class="block-content">Votre score est de <strong>0,87/1</strong>. Vous n'avez pas encore collaboré avec nous mais votre spécialité industriel + zone Ain correspondent au besoin.</div>
+      <div class="block-title">▸ Vos options</div>
+      <div class="cta-row">
+        <a href="#" class="cta cta-primary">✓ Oui, je suis partante</a>
+        <a href="#" class="cta cta-info">? Plus d'infos</a>
+        <a href="#" class="cta cta-ghost">✕ Non, pas cette fois</a>
+      </div>
+      <div class="signature">
+        Bien cordialement,<br>
+        <strong>Sandrine Petit</strong><br>
+        <span class="product-tag">Bâtiment Lyonnais Réhabilitation — via edifio Sourcing</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= D.3 architect_followup_TU ============= -->
+<div class="template-block">
+  <div class="template-label">D.3 — architect_followup_TU · relance J+3 sans réponse</div>
+  <div class="email-viewer">
+    <div class="email-header-meta">
+      <div><strong>De :</strong> <span class="from">Sandrine Petit</span> &lt;sandrine@bat-lyonnais.fr&gt;</div>
+      <div><strong>À :</strong> Marc Lefèvre &lt;marc.lefevre@archi-lyon.fr&gt;</div>
+      <div><strong>Sujet :</strong> <span class="subject">[edifio Sourcing] Petite relance — AO 25-AO-00131</span></div>
+    </div>
+    <div class="email-body">
+      <p>Hey Marc,</p>
+      <p>Je sais que tu es chargé. Je te relance juste sur l'AO <strong>Centre hospitalier de Vienne</strong> — la remise est dans <strong>9 jours</strong> et on aimerait savoir si tu nous accompagnes pour qu'on s'organise.</p>
+      <div class="cta-row">
+        <a href="#" class="cta cta-primary">✓ Oui</a>
+        <a href="#" class="cta cta-info">? Plus d'infos</a>
+        <a href="#" class="cta cta-ghost">✕ Non</a>
+      </div>
+      <p>Si c'est non, pas de souci — un mot et on passe à l'archi suivant.</p>
+      <div class="signature">
+        À toi,<br>
+        <strong>Sandrine</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= D.4 architect_followup_VOUS ============= -->
+<div class="template-block">
+  <div class="template-label">D.4 — architect_followup_VOUS · relance J+3 sans réponse</div>
+  <div class="email-viewer">
+    <div class="email-header-meta">
+      <div><strong>De :</strong> <span class="from">Sandrine Petit</span> &lt;sandrine@bat-lyonnais.fr&gt;</div>
+      <div><strong>À :</strong> Mme Hélène Garnier &lt;h.garnier@cabinet-garnier.com&gt;</div>
+      <div><strong>Sujet :</strong> <span class="subject">[edifio Sourcing] Relance — AO 25-AO-00138</span></div>
+    </div>
+    <div class="email-body">
+      <p>Bonjour Mme Garnier,</p>
+      <p>Je me permets de revenir vers vous concernant l'AO <strong>Centre logistique industriel</strong>. La remise des plis est dans <strong>11 jours</strong> et nous aimerions connaître votre disponibilité pour finaliser notre dossier.</p>
+      <div class="cta-row">
+        <a href="#" class="cta cta-primary">✓ Oui</a>
+        <a href="#" class="cta cta-info">? Plus d'infos</a>
+        <a href="#" class="cta cta-ghost">✕ Non</a>
+      </div>
+      <p>Sans retour de votre part, nous nous tournerons vers un autre partenaire.</p>
+      <div class="signature">
+        Bien à vous,<br>
+        <strong>Sandrine Petit</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= D.5 dossier_diffusion_TU ============= -->
+<div class="template-block">
+  <div class="template-label">D.5 — dossier_diffusion_TU · diffusion dossier prêt</div>
+  <div class="email-viewer">
+    <div class="email-header-meta">
+      <div><strong>De :</strong> <span class="from">Sandrine Petit</span> &lt;sandrine@bat-lyonnais.fr&gt;</div>
+      <div><strong>À :</strong> Marc Lefèvre &lt;marc.lefevre@archi-lyon.fr&gt;</div>
+      <div><strong>Sujet :</strong> <span class="subject">[edifio Sourcing] Dossier prêt — AO 25-AO-00131</span></div>
+    </div>
+    <div class="email-body">
+      <p>Salut Marc,</p>
+      <p>Le dossier est prêt. Lien sécurisé ci-dessous (valable 30 jours).</p>
+      <div class="block-title">▸ Contenu</div>
+      <div class="block-content">
+        <strong>14 pièces</strong><br>
+        Mémoire technique : <strong>14 pages</strong><br>
+        CERFA pré-remplis : DC1, DC2, DC4, ATTRI1<br>
+        Attestations à jour
+      </div>
+      <div class="block-title">▸ Prochaines étapes</div>
+      <div class="block-content">Visite du site le 22 mai à 14h. Questions à envoyer avant le 28 mai. Remise du pli le 14 juin à 12h.</div>
+      <div class="cta-row">
+        <a href="#" class="cta cta-primary">📂 Ouvrir le dossier</a>
+      </div>
+      <p>Si quoi que ce soit te bloque, écris-moi.</p>
+      <div class="signature">
+        <strong>Sandrine</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= D.6 dossier_diffusion_VOUS ============= -->
+<div class="template-block">
+  <div class="template-label">D.6 — dossier_diffusion_VOUS · diffusion dossier prêt</div>
+  <div class="email-viewer">
+    <div class="email-header-meta">
+      <div><strong>De :</strong> <span class="from">Sandrine Petit</span> &lt;sandrine@bat-lyonnais.fr&gt;</div>
+      <div><strong>À :</strong> Mme Hélène Garnier &lt;h.garnier@cabinet-garnier.com&gt;</div>
+      <div><strong>Sujet :</strong> <span class="subject">[edifio Sourcing] Dossier prêt — AO 25-AO-00138</span></div>
+    </div>
+    <div class="email-body">
+      <p>Bonjour Mme Garnier,</p>
+      <p>Le dossier est désormais prêt. Vous pouvez y accéder via le lien sécurisé ci-dessous (validité 30 jours).</p>
+      <div class="block-title">▸ Contenu</div>
+      <div class="block-content">
+        <strong>12 pièces</strong><br>
+        Mémoire technique : <strong>17 pages</strong><br>
+        CERFA pré-remplis : DC1, DC2, DC4<br>
+        Attestations à jour
+      </div>
+      <div class="block-title">▸ Prochaines étapes</div>
+      <div class="block-content">Visite optionnelle du site le 26 mai. Remise des plis le 21 juin à 16h.</div>
+      <div class="cta-row">
+        <a href="#" class="cta cta-primary">📂 Ouvrir le dossier</a>
+      </div>
+      <p>Pour toute question, n'hésitez pas à revenir vers moi.</p>
+      <div class="signature">
+        <strong>Sandrine Petit</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= D.7 tender_summary_to_user (NEUTRE INTERNE) ============= -->
+<div class="template-block">
+  <div class="template-label">D.7 — tender_summary_to_user · récap interne mode Solo (neutre)</div>
+  <div class="email-viewer">
+    <div class="email-header-meta">
+      <div><strong>De :</strong> <span class="from">edifio Sourcing</span> &lt;no-reply@edifio.fr&gt;</div>
+      <div><strong>À :</strong> Patrick Teissier &lt;patrick@bat-lyonnais.fr&gt;</div>
+      <div><strong>Sujet :</strong> <span class="subject">[edifio Sourcing] 25-AO-00142 — AO sélectionné en Solo</span></div>
+    </div>
+    <div class="email-body">
+      <p>Bonjour,</p>
+      <p>Vous avez sélectionné en Solo l'AO suivant :</p>
+      <div class="block-title">▸ Rénovation école Jean-Moulin — Mairie de Saint-Étienne</div>
+      <div class="block-content">
+        Acheteur : Mairie de Saint-Étienne<br>
+        Montant prévisionnel : <strong>850 k€ HT</strong><br>
+        Remise des plis : <strong>28 mai 2026 · 12h00</strong><br>
+        Plateforme source : BOAMP
+      </div>
+      <div class="block-title">▸ Lien DCE</div>
+      <div class="block-content"><a href="#" style="color: #FF0033;">https://www.boamp.fr/avis/detail/25-XYZ</a></div>
+      <div class="block-title">▸ Échéances clés</div>
+      <div class="block-content">
+        Questions : avant le 21 mai · Visite : 19 mai 14h · Remise : 28 mai 12h
+      </div>
+      <div class="cta-row">
+        <a href="#" class="cta cta-primary">🔗 Voir dans Odoo</a>
+        <a href="#" class="cta cta-ghost">📄 Fiche AO</a>
+      </div>
+      <div class="signature">
+        <span class="product-tag">— edifio Sourcing</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= D.8 architect_decline_acknowledgment ============= -->
+<div class="template-block">
+  <div class="template-label">D.8 — architect_decline_acknowledgment · accusé après refus archi (neutre court)</div>
+  <div class="email-viewer">
+    <div class="email-header-meta">
+      <div><strong>De :</strong> <span class="from">edifio Sourcing</span> &lt;no-reply@edifio.fr&gt;</div>
+      <div><strong>À :</strong> Marc Lefèvre &lt;marc.lefevre@archi-lyon.fr&gt;</div>
+      <div><strong>Sujet :</strong> <span class="subject">[edifio Sourcing] Reçu — merci !</span></div>
+    </div>
+    <div class="email-body">
+      <p>Pas de souci. À très vite sur un autre AO.</p>
+      <div class="signature">
+        <span class="product-tag">— Bâtiment Lyonnais Réhabilitation</span>
+      </div>
+    </div>
+    <div class="render-note">
+      💡 Volontairement minimal : entretient la relation sans investir d'effort. L'architecte n'a pas besoin d'un long mail pour un refus.
+    </div>
+  </div>
+</div>
+
+<div style="max-width: 700px; margin: 32px auto; padding: 16px; background: #F3F1EC; border-radius: 8px; font-size: 12px; color: #6B7280; text-align: center;">
+  <strong>Note technique</strong><br>
+  Ces rendus utilisent les variables Handlebars substituées par des données d'exemple. Dans Brevo, les variables seront résolues automatiquement au moment de l'envoi via l'API.<br>
+  Les CTAs sont des liens tokenisés JWT signés (expiration 30 jours, révocables).
+</div>
+
+</body>
+</html>
