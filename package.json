@@ -5,7 +5,7 @@
   "description": "edifio Sourcing — outil interne AlyoS Ingénierie pour le sourcing automatique de marchés publics BTP",
   "packageManager": "pnpm@11.0.9",
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.13.0",
     "pnpm": ">=11.0.0"
   },
   "scripts": {

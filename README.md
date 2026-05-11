@@ -35,7 +35,7 @@ Gate 6 (MVP fonctionnel) en cours — voir `gates/05_ARCHI/` et `CLAUDE.md`.
 
 ## Démarrage local
 
-Prérequis : Node ≥ 20, pnpm ≥ 11 (via Corepack : `corepack enable pnpm`).
+Prérequis : **Node ≥ 22.13** (pnpm 11 le requiert — cf. `.nvmrc`), **pnpm ≥ 11** (via Corepack : `corepack enable pnpm`).
 
 ```bash
 cp .env.example .env.local      # remplir au minimum les variables [REQUIS G6]

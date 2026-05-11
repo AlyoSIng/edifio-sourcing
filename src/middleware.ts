@@ -31,105 +31,122 @@ export const config = {
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
-  // C1 / C5 — routes publiques : laisser passer sans vérification de session.
-  if (isPublicRoute(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Routes ni publiques ni protégées (par exemple `/random-debug`) : on les
-  // laisse passer. Le contrôle s'applique uniquement aux préfixes `/sourcing`
-  // et `/api/protected`.
-  const requiresAuth = isProtectedUiRoute(pathname) || isProtectedApiRoute(pathname);
-  if (!requiresAuth) {
-    return NextResponse.next();
-  }
-
-  // Garde-fou env — si Supabase n'est pas encore configuré, on traite tout
-  // comme anonyme : redirection vers /login. Évite que le middleware crashe
-  // le serveur dev avant l'install Supabase.
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn(
-      "[middleware] NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY manquant — comportement anonyme par défaut.",
-    );
-    return redirectToLogin(req, pathname);
-  }
-
-  // `supabaseResponse` est réinitialisé à chaque appel de `setAll` (pattern
-  // officiel @supabase/ssr 0.6+). On garde une `let` pour pouvoir lui
-  // réassigner une nouvelle réponse quand les cookies de session sont
-  // rafraîchis par `getUser()`.
-  let supabaseResponse = NextResponse.next({ request: req });
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return req.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => {
-          req.cookies.set(name, value);
-        });
-        supabaseResponse = NextResponse.next({ request: req });
-        cookiesToSet.forEach(({ name, value, options }) => {
-          supabaseResponse.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
-
-  // IMPORTANT : ne PAS exécuter de logique métier entre `createServerClient`
-  // et `supabase.auth.getUser()` (warning officiel Supabase — bogue subtil
-  // de session aléatoirement perdue sinon).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // C2 / C8 / C9 — pas de session valide (anonyme, expirée, JWT tampering) :
-  // redirection vers /login avec la route demandée en query string.
-  if (!user) {
-    return redirectToLogin(req, pathname);
-  }
-
-  // C3 / C4 / C7 / C10 / C11 / C12 — décision sur le domaine email.
-  const email = user.email ?? null;
-  const allowed = isAuthorizedEmail(email);
-
-  // Audit log de la tentative d'accès — succès ET échec (cf. spec §6).
-  void logAccessAttempt({
-    email: email?.toLowerCase() ?? null,
-    pathname,
-    allowed,
-    ip: extractClientIp(req),
-    userAgent: req.headers.get("user-agent"),
-  });
-
-  if (!allowed) {
-    // C4 / C7 — session non Alyos : invalidation immédiate côté Supabase.
-    await supabase.auth.signOut();
-
-    // C7 — route API protégée : réponse JSON 403, pas de redirect.
-    if (isProtectedApiRoute(pathname)) {
-      return new NextResponse(
-        JSON.stringify({
-          error: "forbidden_domain",
-          message: "Accès réservé aux membres AlyoS Ingénierie.",
-        }),
-        {
-          status: 403,
-          headers: { "content-type": "application/json" },
-        },
-      );
+  // Garde-fou défensif — toute erreur non capturée dans la logique métier du
+  // middleware aurait pour effet un 500 MIDDLEWARE_INVOCATION_FAILED sur Vercel
+  // Edge, ce qui exposerait des routes protégées sans contrôle. On préfère
+  // logger + redirect /login (fail-closed) en cas d'imprévu.
+  try {
+    // C1 / C5 — routes publiques : laisser passer sans vérification de session.
+    if (isPublicRoute(pathname)) {
+      return NextResponse.next();
     }
 
-    // C4 — route UI protégée : redirection vers la page /forbidden dédiée.
-    return NextResponse.redirect(new URL("/forbidden", req.url));
-  }
+    // Routes ni publiques ni protégées (par exemple `/random-debug`) : on les
+    // laisse passer. Le contrôle s'applique uniquement aux préfixes `/sourcing`
+    // et `/api/protected`.
+    const requiresAuth = isProtectedUiRoute(pathname) || isProtectedApiRoute(pathname);
+    if (!requiresAuth) {
+      return NextResponse.next();
+    }
 
-  // C3 / C6 — accès autorisé. On renvoie la `supabaseResponse` qui porte
-  // les cookies de session rafraîchis posés par `getUser()`.
-  return supabaseResponse;
+    // Garde-fou env — si Supabase n'est pas encore configuré, on traite tout
+    // comme anonyme : redirection vers /login. Évite que le middleware crashe
+    // le serveur dev avant l'install Supabase.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.warn(
+        "[middleware] NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY manquant — comportement anonyme par défaut.",
+      );
+      return redirectToLogin(req, pathname);
+    }
+
+    // `supabaseResponse` est réinitialisé à chaque appel de `setAll` (pattern
+    // officiel @supabase/ssr 0.6+). On garde une `let` pour pouvoir lui
+    // réassigner une nouvelle réponse quand les cookies de session sont
+    // rafraîchis par `getUser()`.
+    let supabaseResponse = NextResponse.next({ request: req });
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => {
+            req.cookies.set(name, value);
+          });
+          supabaseResponse = NextResponse.next({ request: req });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    });
+
+    // IMPORTANT : ne PAS exécuter de logique métier entre `createServerClient`
+    // et `supabase.auth.getUser()` (warning officiel Supabase — bogue subtil
+    // de session aléatoirement perdue sinon).
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // C2 / C8 / C9 — pas de session valide (anonyme, expirée, JWT tampering) :
+    // redirection vers /login avec la route demandée en query string.
+    if (!user) {
+      return redirectToLogin(req, pathname);
+    }
+
+    // C3 / C4 / C7 / C10 / C11 / C12 — décision sur le domaine email.
+    const email = user.email ?? null;
+    const allowed = isAuthorizedEmail(email);
+
+    // Audit log de la tentative d'accès — succès ET échec (cf. spec §6).
+    void logAccessAttempt({
+      email: email?.toLowerCase() ?? null,
+      pathname,
+      allowed,
+      ip: extractClientIp(req),
+      userAgent: req.headers.get("user-agent"),
+    });
+
+    if (!allowed) {
+      // C4 / C7 — session non Alyos : invalidation immédiate côté Supabase.
+      await supabase.auth.signOut();
+
+      // C7 — route API protégée : réponse JSON 403, pas de redirect.
+      if (isProtectedApiRoute(pathname)) {
+        return new NextResponse(
+          JSON.stringify({
+            error: "forbidden_domain",
+            message: "Accès réservé aux membres AlyoS Ingénierie.",
+          }),
+          {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+
+      // C4 — route UI protégée : redirection vers la page /forbidden dédiée.
+      return NextResponse.redirect(new URL("/forbidden", req.url));
+    }
+
+    // C3 / C6 — accès autorisé. On renvoie la `supabaseResponse` qui porte
+    // les cookies de session rafraîchis posés par `getUser()`.
+    return supabaseResponse;
+  } catch (err) {
+    // Fail-closed : on log un maximum d'info pour debug Vercel runtime
+    // logs, puis on redirige sur /login (route publique sûre) plutôt que
+    // de laisser une 500 exposer la route protégée. Si le bug est ailleurs
+    // que dans la session, on saura le voir via les logs.
+    console.error("[middleware:unhandled]", {
+      pathname,
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : null,
+    });
+    return redirectToLogin(req, pathname);
+  }
 }
 
 /**
@@ -143,9 +160,12 @@ function redirectToLogin(req: NextRequest, pathname: string): NextResponse {
 }
 
 /**
- * Extrait l'IP cliente. Sur Vercel Edge, `req.ip` est posée par la
- * plateforme ; en dev local ou derrière un proxy, on retombe sur
- * `x-forwarded-for` (premier IP de la liste).
+ * Extrait l'IP cliente depuis les headers de la requête. On évite
+ * volontairement `req.ip` (déprécié Next 15+, instable sur Edge runtime
+ * dans certaines régions Vercel) au profit de `x-forwarded-for` qui est
+ * posé par Vercel sur toutes les requêtes.
+ *
+ * Ordre : `x-forwarded-for` (premier hop) → `x-real-ip` → null.
  */
 function extractClientIp(req: NextRequest): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
@@ -153,7 +173,7 @@ function extractClientIp(req: NextRequest): string | null {
     const first = forwarded.split(",")[0]?.trim();
     if (first) return first;
   }
-  return req.ip ?? null;
+  return req.headers.get("x-real-ip") ?? null;
 }
 
 /**
