@@ -1,7 +1,10 @@
 "use server";
 
 import { isAuthorizedEmail } from "@/lib/auth/domain";
+import { getSiteUrl } from "@/lib/site-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+import type { LoginState } from "./types";
 
 /**
  * Server Action — envoi du magic-link Supabase Auth.
@@ -22,55 +25,70 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-export type LoginState =
-  | { status: "idle" }
-  | { status: "error"; message: string }
-  | { status: "sent"; email: string };
-
-export const initialLoginState: LoginState = { status: "idle" };
+// NB : `LoginState` et `initialLoginState` vivent dans `./types.ts`. Un fichier
+// `"use server"` ne peut exporter QUE des async functions. Cf. ce module pour
+// le détail et le lien Next.js correspondant.
 
 export async function signInWithOtpAction(
   _prevState: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
-  const emailRaw = formData.get("email");
-  if (typeof emailRaw !== "string" || emailRaw.trim().length === 0) {
-    return { status: "error", message: "Veuillez saisir votre email." };
-  }
+  // Garde-fou défensif global — toute exception non capturée par la logique
+  // ci-dessous (par exemple `requireEnv` qui throw si une var Supabase
+  // manque en runtime Vercel) provoque une 500 Server Components render et
+  // un écran blanc opaque côté utilisateur. On préfère logger côté serveur
+  // et renvoyer un état d'erreur lisible côté UI.
+  try {
+    const emailRaw = formData.get("email");
+    if (typeof emailRaw !== "string" || emailRaw.trim().length === 0) {
+      return { status: "error", message: "Veuillez saisir votre email." };
+    }
 
-  const email = emailRaw.trim().toLowerCase();
+    const email = emailRaw.trim().toLowerCase();
 
-  if (!EMAIL_REGEX.test(email)) {
-    return { status: "error", message: "Adresse email invalide." };
-  }
+    if (!EMAIL_REGEX.test(email)) {
+      return { status: "error", message: "Adresse email invalide." };
+    }
 
-  if (!isAuthorizedEmail(email)) {
+    if (!isAuthorizedEmail(email)) {
+      return {
+        status: "error",
+        message:
+          "Accès réservé aux emails @alyosingenierie.fr. Si tu penses qu'il s'agit d'une erreur, contacte l'équipe IT.",
+      };
+    }
+
+    const supabase = createSupabaseServerClient();
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${getSiteUrl()}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      // Erreur Supabase (rate limiting, infra, etc.). On n'expose pas le
+      // détail côté client pour ne pas faciliter le probing.
+      console.error("[signInWithOtp:error]", error.message, { email });
+      return {
+        status: "error",
+        message: "Impossible d'envoyer le lien pour le moment. Réessaye dans une minute.",
+      };
+    }
+
+    return { status: "sent", email };
+  } catch (err) {
+    // Cible typique : `requireEnv` qui throw parce qu'une var Supabase
+    // n'est pas posée sur le scope Vercel courant (par ex. Preview vs
+    // Production), ou un module Node non compatible serverless.
+    console.error("[signInWithOtpAction:unhandled]", {
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : null,
+    });
     return {
       status: "error",
-      message:
-        "Accès réservé aux emails @alyosingenierie.fr. Si tu penses qu'il s'agit d'une erreur, contacte l'équipe IT.",
+      message: "Erreur technique côté serveur. L'équipe a été notifiée — réessaye dans une minute.",
     };
   }
-
-  const supabase = createSupabaseServerClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${siteUrl}/auth/callback`,
-    },
-  });
-
-  if (error) {
-    // Erreur Supabase (rate limiting, infra, etc.). On n'expose pas le
-    // détail côté client pour ne pas faciliter le probing.
-    console.error("[signInWithOtp:error]", error.message, { email });
-    return {
-      status: "error",
-      message: "Impossible d'envoyer le lien pour le moment. Réessaye dans une minute.",
-    };
-  }
-
-  return { status: "sent", email };
 }

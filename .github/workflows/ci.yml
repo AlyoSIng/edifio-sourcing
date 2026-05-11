@@ -1,0 +1,184 @@
+name: ci
+
+# Triggers — toute PR vers main et tout push direct sur main.
+# Le push direct main est en deny côté allowlist Claude Code ; la CI ici sert
+# de filet pour les merges effectifs (squash) et l'auto-deploy Vercel.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Annule les runs en cours sur la même branche si un nouveau commit arrive.
+# Évite les builds parallèles inutiles sur les PR actives.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Permissions minimales — la CI ne pousse rien, elle lit + commente PR.
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    name: ci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    name: ci-typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  test:
+    name: ci-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:coverage
+
+  # Vérification BLOQUANTE de présence du middleware de domaine
+  # (cf. specs/middleware_domain_gate.md §5). Désactivation du middleware
+  # interdite per CLAUDE.md — ce job échoue si quelqu'un essaie.
+  middleware-check:
+    name: ci-middleware-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify middleware presence + domain guard
+        run: |
+          set -e
+          test -f src/middleware.ts || { echo "::error file=src/middleware.ts::middleware.ts MISSING — REJECTED"; exit 1; }
+          grep -q "@alyosingenierie.fr" src/middleware.ts || { echo "::error file=src/middleware.ts::domain check @alyosingenierie.fr MISSING"; exit 1; }
+          grep -q "isAuthorizedEmail" src/middleware.ts || { echo "::error file=src/middleware.ts::isAuthorizedEmail import MISSING"; exit 1; }
+          echo "✓ middleware présent + garde de domaine câblée"
+
+  e2e:
+    name: ci-e2e
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_ENV: preview
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      ALLOWED_EMAIL_DOMAIN: alyosingenierie.fr
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Cache des binaires Chromium (~150 MB) — clé par version Playwright.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium (with system deps)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Quand le cache hit, on installe juste les system deps Linux nécessaires
+      # (libnss3, libasound2, ...) sans re-télécharger le binaire.
+      - name: Install Chromium system deps (cache hit path)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # Vérifie que les secrets sont disponibles — un fail clair vaut mieux
+      # qu'une cascade d'erreurs Supabase incompréhensibles.
+      - name: Verify Supabase secrets are set
+        run: |
+          set -e
+          [ -n "$NEXT_PUBLIC_SUPABASE_URL" ] || { echo "::error::secret NEXT_PUBLIC_SUPABASE_URL manquant"; exit 1; }
+          [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] || { echo "::error::secret NEXT_PUBLIC_SUPABASE_ANON_KEY manquant"; exit 1; }
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::secret SUPABASE_SERVICE_ROLE_KEY manquant"; exit 1; }
+
+      - name: Run E2E middleware tests
+        run: pnpm test:e2e
+
+      # En cas d'échec, on uploade le rapport HTML + traces Playwright pour
+      # debug — disponibles dans l'onglet Artifacts du run GitHub Actions.
+      - name: Upload Playwright report (failure only)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  build:
+    name: ci-build
+    runs-on: ubuntu-latest
+    env:
+      # Le build Next.js inline les NEXT_PUBLIC_* dans le bundle client.
+      # On utilise les mêmes secrets que pour l'E2E pour produire un bundle
+      # cohérent avec ce que Vercel preview livrera ; sinon le build passe
+      # quand même (les vars sont validées à runtime), juste avec des refs
+      # `undefined` dans le code généré.
+      NEXT_PUBLIC_APP_ENV: preview
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      ALLOWED_EMAIL_DOMAIN: alyosingenierie.fr
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Cache .next/cache pour accélérer les builds incrémentaux.
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**/*.{ts,tsx,css}') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - run: pnpm build
