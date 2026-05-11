@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens de design DTCG (cf. design/tokens.json) à intégrer à l'étape 3
+ * via shadcn/ui hybride + variables CSS. Pour Gate 6 étape 1, on reste
+ * sur la palette Tailwind par défaut + polices fontsource.
+ */

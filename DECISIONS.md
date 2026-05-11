@@ -235,12 +235,31 @@
 
 ---
 
-## Arbitrages ouverts à ce stade
+## 2026-05-11 — Gate 6 (MVP fonctionnel) — démarrage
 
-1. **ORM Drizzle vs Prisma** — reporté Gate 5, à statuer début Gate 6 par CTO Sophie sur base spike [DEV Alex].
-2. **URL d'accès edifio Sourcing** — `edifio.fr/sourcing/...` (path) ou `app.edifio.fr/sourcing/...` (sous-domaine). À arbitrer en Gate 6.
-3. **Projet Supabase** — instance partagée avec le site existant ou nouveau projet dédié à edifio Sourcing ? À arbitrer en Gate 6 avec [DEV Alex].
+- **2026-05-11 · G6 · CEO Marc · Plan Gate 6 démarrage validé.** [BOARD-OK 2026-05-11]
+  *Plan 7 étapes posé par [DEV Alex] et validé par le Board : (1) bootstrap Next.js, (2) middleware `@alyosingenierie.fr`, (3) Supabase Auth magic-link, (4) CI GitHub Actions + Vercel preview deploys, (5) spike ORM Drizzle vs Prisma (2 branches sœurs, même périmètre), (6) ADR-0001 choix ORM, (7) première migration métier. Garde-fous fermes : aucune migration committée avant étape 6, aucune route protégée exposée avant étape 2 mergée, middleware actif sur 100 % des routes protégées en CI (bloquant). Branches : `main` + `feat/<step>` par étape, PR + Vercel preview obligatoire par PR. Conventional Commits obligatoires.*
+
+- **2026-05-11 · G6 · CEO Marc · 2 projets Supabase distincts dès J0.** [BOARD-OK 2026-05-11] [SURCLASSE ARBITRAGE 3 OUVERT]
+  *`edifio-sourcing-preview` (utilisé par Vercel previews + dev local) et `edifio-sourcing-prod` (utilisé uniquement après Gate 9). Région Frankfurt `eu-central-1`. Compte AlyoS Ingénierie en plan Pro (place pour les 2 projets). **Aucun partage de clés entre les deux.** Service role key serveur-only, jamais exposée au bundle client. Création de `-preview` à l'étape 3 par [CEO Marc] depuis le dashboard Supabase.*
+
+- **2026-05-11 · G6 · DEV Alex · pnpm activé via Corepack en shim utilisateur.** [DÉCISION DEV]
+  *`corepack enable` standard a échoué (EPERM sur `C:\Program Files\nodejs`) — contournement : shim utilisateur dans `$env:LOCALAPPDATA\pnpm-shims` via `corepack enable --install-directory ...`. Aucune installation système, conforme limite stricte CLAUDE.md « pas d'installation logicielle système ». pnpm 11.0.9 actif. Le shim doit être préfixé au `$env:Path` dans chaque session PowerShell (l'état shell ne persiste pas entre invocations de l'agent) — à documenter pour Yann/manuel.*
+
+- **2026-05-11 · G6 · DEV Alex · Étape 1 : bootstrap Next.js 14 + TS strict + Tailwind 3 + ESLint + Prettier + commitlint + husky + fontsource.** [DÉCISION DEV]
+  *Stack figée : Next 14.2.35, React 18.3.1, TypeScript 5.9 (`strict` + `noUncheckedIndexedAccess` + `noImplicitOverride` + `noFallthroughCasesInSwitch`), Tailwind 3.4 (pas v4 — stabilité 2026, breaking change non justifié au MVP), ESLint 8 avec `next/core-web-vitals` + `next/typescript`. Fontsource self-host (Inter / Space Grotesk / JetBrains Mono) conforme arbitrage Gate 5 (pas d'appel `fonts.googleapis.com`). Hook husky `commit-msg` valide Conventional Commits, hook `pre-commit` lance `prettier --check` + `next lint`. pnpm 11 nécessite `allowBuilds: unrs-resolver: true` dans `pnpm-workspace.yaml` pour autoriser le postinstall (`napi-postinstall`) — sinon install échoue par sécurité (pnpm 11 bloque les scripts inconnus par défaut).*
+
+- **2026-05-11 · G6 · CEO Marc · Allowlist autonomie posée dans `.claude/settings.local.json`.** [BOARD-OK 2026-05-11]
+  *Sur demande Board : allowlist large posée pour les opérations Gate 6 — git (sauf push origin main), pnpm/npx/corepack, supabase, vercel (sauf `--prod`), gh (sauf delete). Deny strict sur `git push origin main` (toute mise à jour de main passe par PR mergée), `vercel --prod` / `vercel deploy --prod` (escalade Board obligatoire), `supabase projects delete`, `gh repo delete`, `git reset --hard`, `rm -rf /*`. Edit/Write scopés à `C:\Dev\edifio-sourcing\**`.*
 
 ---
 
-*Dernière mise à jour : 2026-05-10 par [CEO Marc] — Pivot FINAL Board : repo dédié `edifio-sourcing`, usage 100 % AlyoS interne, Vercel.*
+## Arbitrages ouverts à ce stade
+
+1. **ORM Drizzle vs Prisma** — reporté Gate 5, à statuer début Gate 6 par CTO Sophie sur base spike [DEV Alex] (étapes 5 et 6 du plan).
+2. **URL d'accès edifio Sourcing** — Vercel preview `edifio-sourcing.vercel.app` au démarrage ; custom domain `sourcing.alyosingenierie.fr` ou `app.alyosingenierie.fr/sourcing` à arbitrer en Gate 7.
+3. ~~**Projet Supabase** — instance partagée ou dédiée ?~~ **RÉSOLU 2026-05-11** : 2 projets distincts (`-preview` et `-prod`) sans partage de clés.
+
+---
+
+*Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 1 : bootstrap Next.js 14 + TS strict + Tailwind + outillage Conventional Commits.*

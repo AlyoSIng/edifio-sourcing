@@ -1,0 +1,26 @@
+# --- Build / dépendances / plateformes ---
+node_modules
+.next
+.vercel
+.supabase
+out
+build
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+
+# --- Assets non formattables ---
+*.min.js
+*.min.css
+gates/**/*.pdf
+design/maquettes/maquettes_v1.html
+
+# --- Markdown auteur humain (Phase 1 baseline + docs métier) ---
+# Prettier sur markdown peut mangler les tableaux ASCII et les sauts de ligne
+# volontaires. On formate uniquement le code (TS, TSX, CSS, JSON sauf tokens).
+*.md
+README.md
+
+# --- Design tokens (structure DTCG sensible) ---
+design/tokens.json

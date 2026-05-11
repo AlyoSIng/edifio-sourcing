@@ -1,0 +1,2 @@
+prettier --check . --log-level warn
+next lint

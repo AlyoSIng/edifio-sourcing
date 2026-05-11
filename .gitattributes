@@ -1,0 +1,21 @@
+# Normalise les fins de ligne en LF dans le repo et au checkout, peu importe
+# l'OS du contributeur (Marc tourne sous Windows avec autocrlf=true par défaut,
+# CI/Vercel sous Linux). Évite la danse CRLF↔LF récurrente avec Prettier.
+
+* text=auto eol=lf
+
+# Binaires : pas de manipulation des EOL
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Lockfile : pas de re-normalisation
+pnpm-lock.yaml -text
