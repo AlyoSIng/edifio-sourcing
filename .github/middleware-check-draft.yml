@@ -1,0 +1,27 @@
+# ============================================================
+# DRAFT — middleware check à intégrer dans .github/workflows/ci.yml
+# à l'étape 4 Gate 6 (CI GitHub Actions + Vercel preview deploys).
+# ============================================================
+#
+# Ce fichier n'est PAS un workflow actif (hors de .github/workflows/).
+# Il sert de référence pour l'étape 4. Source spec :
+# specs/middleware_domain_gate.md §5 (bloquant Gate 6 + CI).
+#
+# Intégration prévue : ajouter ces deux steps au job `lint-typecheck-build`
+# du workflow ci.yml créé à l'étape 4. Si l'un des deux échoue, le merge
+# est bloqué (cf. CLAUDE.md — désactivation du middleware INTERDITE).
+
+jobs:
+  middleware-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify middleware.ts presence + domain guard
+        run: |
+          test -f middleware.ts || (echo "::error::middleware.ts MISSING — REJECTED" && exit 1)
+          grep -q "@alyosingenierie.fr" middleware.ts || (echo "::error::domain check MISSING in middleware" && exit 1)
+          grep -q "isAuthorizedEmail" middleware.ts || (echo "::error::isAuthorizedEmail import MISSING in middleware" && exit 1)
+
+      - name: Run middleware E2E tests
+        # À l'étape 3, retirer les .skip de e2e/middleware-domain.spec.ts
+        # et activer ce step. Bloquant Gate 6.
+        run: pnpm test:e2e -- middleware-domain.spec.ts

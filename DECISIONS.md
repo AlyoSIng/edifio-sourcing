@@ -335,4 +335,26 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-10 par [CEO Marc] — Batch parallèle Cowork n°3.*
+## 2026-05-11 — Gate 6 étape 2 (middleware `@alyosingenierie.fr`) — exécution
+
+- **2026-05-11 · G6 · DEV Alex · Plan 5 sous-étapes validé pour `feat/middleware-domain`.** [BOARD-OK 2026-05-11]
+  *(1) Tooling tests (Vitest + Playwright + Supabase libs). (2) Lib auth pure + tests Vitest. (3) `middleware.ts` racine. (4) Pages stub `/forbidden`, `/login`, `/about` + update `/`. (5) Tests E2E Playwright `.skip` + helpers + draft CI middleware-check. Sync Cowork séparée en `chore/cowork-sync` (PR #2 mergée) pour historique propre.*
+
+- **2026-05-11 · G6 · DEV Alex · Lib `src/lib/auth/{domain,routes}.ts` implémentée.** [DÉCISION DEV]
+  *`isAuthorizedEmail()` fonction pure avec normalisation lowercase + match strict `endsWith("@alyosingenierie.fr")` + garde-fou double `@` (sécurité). `isPublicRoute()` / `isProtectedUiRoute()` / `isProtectedApiRoute()` exportés depuis `routes.ts`. **49 tests Vitest verts, coverage 100 %** sur `src/lib/auth/**` (seuil Gate 5 = 90 %).*
+
+- **2026-05-11 · G6 · DEV Alex · `middleware.ts` racine implémenté conforme spec `specs/middleware_domain_gate.md` §3.1.** [DÉCISION DEV]
+  *Matcher exclut `_next/static`, `_next/image`, `favicon.ico`, assets (svg/png/jpg/jpeg/gif/webp/woff/woff2/ico). 12 cas C1-C12 couverts. Garde-fou env Supabase manquant → fallback anonyme + redirect `/login` (pas de crash en dev avant étape 3). `signOut()` immédiat sur refus. UI → redirect `/forbidden`. API → JSON 403 `{error:"forbidden_domain"}`. Audit log `access_attempt` stubé en `console.warn` (TODO étape 7 quand table `audit_logs` existe).*
+
+- **2026-05-11 · G6 · DEV Alex · Pages stub `/forbidden`, `/login`, `/about` + update `/` livrées.** [DÉCISION DEV]
+  *`/forbidden` conforme M8 (cf. `design/maquettes/maquettes_v1_2_auth.html`) sans détails techniques (privacy — pas d'email en query string). `/login` conforme M7 mais formulaire **désactivé** (Supabase Auth magic-link branché étape 3). `/about` minimal. `/` mis à jour avec UVP slogan Gate 1 + lien vers `/sourcing/ao-du-jour` (route protégée — middleware redirige). Composant réutilisable `EdifioLogo.tsx` (pin rouge + wordmark, naming strict CLAUDE.md).*
+
+- **2026-05-11 · G6 · DEV Alex · Tests E2E Playwright + CI check draft posés.** [DÉCISION DEV]
+  *7 tests `e2e/middleware-domain.spec.ts` conformes spec §4 (C2, C3, C4, C7, C10, C11, C12), **tous marqués `.skip`** — `signInWith()` et `getCookieFor()` (helpers `e2e/helpers/auth.ts`) lèvent une erreur stub tant que l'étape 3 Supabase Auth n'est pas finalisée. `.github/middleware-check-draft.yml` posé hors `workflows/` (non actif) — à intégrer dans `ci.yml` à l'étape 4 (bloquant CI : présence `middleware.ts` + grep `@alyosingenierie.fr` + run E2E).*
+
+- **2026-05-11 · G6 · DEV Alex · Validations locales — toutes vertes.** [DÉCISION DEV]
+  *`pnpm test` 49/49, `pnpm test:coverage` 100 % sur `src/lib/auth/**`, `pnpm typecheck` 0, `pnpm lint` 0 warning (après suppression d'un `aria-disabled` invalide sur `<form>`), `pnpm format:check` clean, `pnpm build` 4 routes statiques (`/`, `/about`, `/forbidden`, `/login`) + middleware compilé (route `/` = 184 B + 96.1 kB First Load JS — léger gonflement vs étape 1 = ajout `@supabase/ssr` côté server).*
+
+---
+
+*Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 2 : middleware `@alyosingenierie.fr` + lib auth + pages stub + tests Vitest (100 % coverage) + E2E `.skip` pending étape 3.*
