@@ -1,27 +1,53 @@
-﻿# === edifio Sourcing - defaults ===
-# Secrets (NEVER commit)
+# === edifio Sourcing — .gitignore ===
+
+# --- Secrets (JAMAIS commit) ---
 .env
 .env.local
 .env.*.local
+.env.development
+.env.preview
+.env.production
 
-# Build
+# --- Dépendances ---
 node_modules/
-.next/
-dist/
-.turbo/
-.vercel/
+.pnp
+.pnp.*
+.yarn/install-state.gz
 
-# Supabase
+# --- Build Next.js ---
+.next/
+out/
+build/
+dist/
+
+# --- Plateformes ---
+.vercel/
+.turbo/
 .supabase/
 
-# Tests
+# --- Tests ---
 coverage/
 playwright-report/
 test-results/
 
-# OS / editors
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- TypeScript ---
+*.tsbuildinfo
+next-env.d.ts
+
+# --- OS / éditeurs ---
 .DS_Store
 Thumbs.db
 *.swp
+*.pem
 .idea/
 .vscode/
+
+# --- Claude Code local (settings.json projet committé, .local non) ---
+.claude/settings.local.json
