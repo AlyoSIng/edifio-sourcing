@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isAuthorizedEmail } from "@/lib/auth/domain";
@@ -13,16 +13,19 @@ import { isProtectedApiRoute, isProtectedUiRoute, isPublicRoute } from "@/lib/au
  * Garde-fou Board (CLAUDE.md — Limites strictes) : la désactivation de ce
  * middleware est INTERDITE. Toute modification de comportement doit faire
  * l'objet d'une PR validée [CTO Sophie] + remontée Board.
+ *
+ * Pattern cookies : API `getAll` / `setAll` de `@supabase/ssr` 0.6+ — le
+ * setAll recrée `supabaseResponse` à chaque batch de cookies pour propager
+ * correctement les rafraîchissements de session côté navigateur (pattern
+ * officiel Supabase pour Next.js 14 App Router).
  */
 
-/**
- * Matcher Next.js — exclut les ressources statiques et les assets
- * du périmètre du middleware (cf. spec §3.1).
- */
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2|ico)$).*)",
-  ],
+  // Applique le middleware partout sauf sur les internals Next (`_next/*`)
+  // et le favicon. Les assets `/public/*.svg|png|...` peuvent passer dans le
+  // middleware sans conséquence : ils ne matchent ni `isPublicRoute` ni
+  // `isProtectedUiRoute` ni `isProtectedApiRoute` → pass-through immédiat.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
@@ -33,43 +36,52 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  // Toute route non publique ET non protégée est laissée passer aussi
-  // (par exemple une route exploratoire en dev). Le contrôle s'applique
-  // uniquement aux préfixes /sourcing et /api/protected.
+  // Routes ni publiques ni protégées (par exemple `/random-debug`) : on les
+  // laisse passer. Le contrôle s'applique uniquement aux préfixes `/sourcing`
+  // et `/api/protected`.
   const requiresAuth = isProtectedUiRoute(pathname) || isProtectedApiRoute(pathname);
   if (!requiresAuth) {
     return NextResponse.next();
   }
 
-  // Garde-fou env — si Supabase n'est pas encore configuré (étape 3 Gate 6
-  // pas terminée), on traite tout comme anonyme : redirection vers /login.
-  // Évite que le middleware crashe le serveur dev avant l'install Supabase.
+  // Garde-fou env — si Supabase n'est pas encore configuré, on traite tout
+  // comme anonyme : redirection vers /login. Évite que le middleware crashe
+  // le serveur dev avant l'install Supabase.
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn(
-      "[middleware] NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY manquant — comportement anonyme par défaut (étape 3 Gate 6 non finalisée ?)",
+      "[middleware] NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY manquant — comportement anonyme par défaut.",
     );
     return redirectToLogin(req, pathname);
   }
 
-  // Récupérer la session via Supabase SSR — pose les cookies de refresh
-  // automatiquement si besoin sur la réponse `res`.
-  const res = NextResponse.next();
+  // `supabaseResponse` est réinitialisé à chaque appel de `setAll` (pattern
+  // officiel @supabase/ssr 0.6+). On garde une `let` pour pouvoir lui
+  // réassigner une nouvelle réponse quand les cookies de session sont
+  // rafraîchis par `getUser()`.
+  let supabaseResponse = NextResponse.next({ request: req });
+
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      get(name: string) {
-        return req.cookies.get(name)?.value;
+      getAll() {
+        return req.cookies.getAll();
       },
-      set(name: string, value: string, options: CookieOptions) {
-        res.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options: CookieOptions) {
-        res.cookies.set({ name, value: "", ...options });
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => {
+          req.cookies.set(name, value);
+        });
+        supabaseResponse = NextResponse.next({ request: req });
+        cookiesToSet.forEach(({ name, value, options }) => {
+          supabaseResponse.cookies.set(name, value, options);
+        });
       },
     },
   });
 
+  // IMPORTANT : ne PAS exécuter de logique métier entre `createServerClient`
+  // et `supabase.auth.getUser()` (warning officiel Supabase — bogue subtil
+  // de session aléatoirement perdue sinon).
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -81,7 +93,6 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   }
 
   // C3 / C4 / C7 / C10 / C11 / C12 — décision sur le domaine email.
-  // Normalisation lowercase + match strict gérés par isAuthorizedEmail.
   const email = user.email ?? null;
   const allowed = isAuthorizedEmail(email);
 
@@ -116,9 +127,9 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL("/forbidden", req.url));
   }
 
-  // C3 / C6 — accès autorisé, on laisse passer la requête (avec les cookies
-  // de refresh éventuellement posés par Supabase sur `res`).
-  return res;
+  // C3 / C6 — accès autorisé. On renvoie la `supabaseResponse` qui porte
+  // les cookies de session rafraîchis posés par `getUser()`.
+  return supabaseResponse;
 }
 
 /**
@@ -146,11 +157,11 @@ function extractClientIp(req: NextRequest): string | null {
 }
 
 /**
- * Stub d'audit log — version étape 2 Gate 6.
+ * Stub d'audit log — version étape 3 Gate 6.
  *
  * À l'étape 7 (post-décision ORM + première migration), brancher l'insertion
  * réelle dans `audit_logs` (action = `access_attempt`, cf. `specs/audit_log_v1.md`
- * et le schéma `specs/schema_v1.sql`). Pour l'instant on log côté serveur uniquement.
+ * et le schéma `specs/schema_v1.sql`).
  */
 async function logAccessAttempt(payload: {
   email: string | null;
