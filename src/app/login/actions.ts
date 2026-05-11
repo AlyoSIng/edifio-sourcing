@@ -4,6 +4,8 @@ import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getSiteUrl } from "@/lib/site-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import type { LoginState } from "./types";
+
 /**
  * Server Action — envoi du magic-link Supabase Auth.
  *
@@ -23,12 +25,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-export type LoginState =
-  | { status: "idle" }
-  | { status: "error"; message: string }
-  | { status: "sent"; email: string };
-
-export const initialLoginState: LoginState = { status: "idle" };
+// NB : `LoginState` et `initialLoginState` vivent dans `./types.ts`. Un fichier
+// `"use server"` ne peut exporter QUE des async functions. Cf. ce module pour
+// le détail et le lien Next.js correspondant.
 
 export async function signInWithOtpAction(
   _prevState: LoginState,

@@ -2,7 +2,8 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 
-import { initialLoginState, type LoginState, signInWithOtpAction } from "./actions";
+import { signInWithOtpAction } from "./actions";
+import { initialLoginState, type LoginState } from "./types";
 
 /**
  * Composant client — formulaire de connexion magic-link.
