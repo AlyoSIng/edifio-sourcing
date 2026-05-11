@@ -335,26 +335,48 @@
 
 ---
 
-## 2026-05-11 — Gate 6 étape 2 (middleware `@alyosingenierie.fr`) — exécution
+## 2026-05-10 — Batch parallèle Cowork n°4 *(pendant qu'Alex code middleware sub-step 5)*
 
-- **2026-05-11 · G6 · DEV Alex · Plan 5 sous-étapes validé pour `feat/middleware-domain`.** [BOARD-OK 2026-05-11]
-  *(1) Tooling tests (Vitest + Playwright + Supabase libs). (2) Lib auth pure + tests Vitest. (3) `middleware.ts` racine. (4) Pages stub `/forbidden`, `/login`, `/about` + update `/`. (5) Tests E2E Playwright `.skip` + helpers + draft CI middleware-check. Sync Cowork séparée en `chore/cowork-sync` (PR #2 mergée) pour historique propre.*
+- **2026-05-10 · Graphiste Théo · Audit RGAA AA détaillé sur 12 maquettes livré `design/rgaa_audit_v1.md`.** [LIVRABLE]
+  *54 critères audités sur 9 thématiques RGAA. 38 conformes par défaut (70 %), 16 actions à intégrer par Alex au fil de Gate 6, 0 non couvert. Mapping action ↔ maquette fourni. Outillage CI bloquant Gate 9 documenté (axe-core + Lighthouse). Solde le bloquant Gate 9.*
 
-- **2026-05-11 · G6 · DEV Alex · Lib `src/lib/auth/{domain,routes}.ts` implémentée.** [DÉCISION DEV]
-  *`isAuthorizedEmail()` fonction pure avec normalisation lowercase + match strict `endsWith("@alyosingenierie.fr")` + garde-fou double `@` (sécurité). `isPublicRoute()` / `isProtectedUiRoute()` / `isProtectedApiRoute()` exportés depuis `routes.ts`. **49 tests Vitest verts, coverage 100 %** sur `src/lib/auth/**` (seuil Gate 5 = 90 %).*
+- **2026-05-10 · PS_OPERATOR Yann côté Cowork · Bootstrap script v2 livré `bootstrap-edifio-sourcing-v2.ps1`.** [LIVRABLE]
+  *Scan dynamique de specs/, design/, gates/, notes-de-suivi/ (au lieu de la liste hardcodée v1). Mode -SyncOnly pour synchroniser uniquement les deltas sans recréer la structure. Évite la désynchro repo ↔ Cowork qu'on a vue ce matin. 100 % ASCII, 29/29 accolades, 0 here-string.*
 
-- **2026-05-11 · G6 · DEV Alex · `middleware.ts` racine implémenté conforme spec `specs/middleware_domain_gate.md` §3.1.** [DÉCISION DEV]
-  *Matcher exclut `_next/static`, `_next/image`, `favicon.ico`, assets (svg/png/jpg/jpeg/gif/webp/woff/woff2/ico). 12 cas C1-C12 couverts. Garde-fou env Supabase manquant → fallback anonyme + redirect `/login` (pas de crash en dev avant étape 3). `signOut()` immédiat sur refus. UI → redirect `/forbidden`. API → JSON 403 `{error:"forbidden_domain"}`. Audit log `access_attempt` stubé en `console.warn` (TODO étape 7 quand table `audit_logs` existe).*
-
-- **2026-05-11 · G6 · DEV Alex · Pages stub `/forbidden`, `/login`, `/about` + update `/` livrées.** [DÉCISION DEV]
-  *`/forbidden` conforme M8 (cf. `design/maquettes/maquettes_v1_2_auth.html`) sans détails techniques (privacy — pas d'email en query string). `/login` conforme M7 mais formulaire **désactivé** (Supabase Auth magic-link branché étape 3). `/about` minimal. `/` mis à jour avec UVP slogan Gate 1 + lien vers `/sourcing/ao-du-jour` (route protégée — middleware redirige). Composant réutilisable `EdifioLogo.tsx` (pin rouge + wordmark, naming strict CLAUDE.md).*
-
-- **2026-05-11 · G6 · DEV Alex · Tests E2E Playwright + CI check draft posés.** [DÉCISION DEV]
-  *7 tests `e2e/middleware-domain.spec.ts` conformes spec §4 (C2, C3, C4, C7, C10, C11, C12), **tous marqués `.skip`** — `signInWith()` et `getCookieFor()` (helpers `e2e/helpers/auth.ts`) lèvent une erreur stub tant que l'étape 3 Supabase Auth n'est pas finalisée. `.github/middleware-check-draft.yml` posé hors `workflows/` (non actif) — à intégrer dans `ci.yml` à l'étape 4 (bloquant CI : présence `middleware.ts` + grep `@alyosingenierie.fr` + run E2E).*
-
-- **2026-05-11 · G6 · DEV Alex · Validations locales — toutes vertes.** [DÉCISION DEV]
-  *`pnpm test` 49/49, `pnpm test:coverage` 100 % sur `src/lib/auth/**`, `pnpm typecheck` 0, `pnpm lint` 0 warning (après suppression d'un `aria-disabled` invalide sur `<form>`), `pnpm format:check` clean, `pnpm build` 4 routes statiques (`/`, `/about`, `/forbidden`, `/login`) + middleware compilé (route `/` = 184 B + 96.1 kB First Load JS — léger gonflement vs étape 1 = ajout `@supabase/ssr` côté server).*
+- **2026-05-10 · CMO Léa · Plan de comm interne Gate 9 livré `design/copy/plan_comm_interne_gate9_v1.md`.** [LIVRABLE]
+  *Calendrier J-7 / J-3 / J0 / J+1 / J+7 / J+30, scripts d'email préformatés, 3 niveaux de support, KPIs de la comm, plan de formation (démo 1h + accompagnement individuel + office hours), risques anticipés et mitigations. Prêt à activer T-7 du go-live.*
 
 ---
 
-*Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 2 : middleware `@alyosingenierie.fr` + lib auth + pages stub + tests Vitest (100 % coverage) + E2E `.skip` pending étape 3.*
+## 2026-05-11 — Gate 6 étape 3 (Supabase Auth magic-link) — exécution
+
+- **2026-05-11 · G6 · CEO Marc · Projet Supabase `edifio-sourcing-preview` créé (Frankfurt eu-central-1, Pro).** [BOARD-OK 2026-05-11]
+  *Clés `anon` / `service_role` posées dans `.env.local` côté Marc (Option A : pas de transit chat). Configuration Auth : magic-link activé, sign-up désactivé (admin-only), URL Configuration avec `http://localhost:3000/auth/callback` whitelisté. La création du projet `-prod` reste différée à Gate 9.*
+
+- **2026-05-11 · G6 · DEV Alex · Helpers Supabase SSR — pattern `getAll`/`setAll` (API @supabase/ssr 0.6+).** [DÉCISION DEV]
+  *`src/lib/supabase/server.ts` expose `createSupabaseServerClient` (Server Actions / Route Handlers / Server Components avec try-catch sur `setAll` pour les SC) et `createSupabaseAdminClient` (service_role, jamais exposé client). `src/lib/supabase/browser.ts` expose `createSupabaseBrowserClient`. L'ancienne API `get/set/remove` était deprecated en 0.6 → migration obligatoire pour propager correctement les cookies de session entre callback et middleware.*
+
+- **2026-05-11 · G6 · DEV Alex · Server Action `signInWithOtpAction` (`src/app/login/actions.ts`).** [DÉCISION DEV]
+  *Validation côté serveur AVANT envoi du magic-link : regex email basique + `isAuthorizedEmail()` (réutilise lib auth étape 2). Refus pré-envoi si domaine non Alyos → économie de magic-link inutile et pas de fuite d'info sur l'existence des comptes. `shouldCreateUser` au défaut (true) — autorisation gérée par le middleware côté serveur.*
+
+- **2026-05-11 · G6 · DEV Alex · Callback `/auth/callback` — dual-flow (PKCE + implicit).** [DÉCISION DEV]
+  *Migré de `route.ts` → `page.tsx` (Server Component) + `ClientCallbackHandler.tsx` (Client Component). Le SC gère le PKCE flow (`?code=` côté serveur) — flow standard du Server Action. Le CC gère l'implicit flow (`#access_token=...` côté browser uniquement) — flow produit par `auth.admin.generateLink` (utilisé par les helpers E2E). Sans ça les tests Playwright étaient impossibles à brancher (admin ne supporte pas PKCE). Garde-fou `sanitizeNext` anti-open-redirect (rejette `//`, `\`, schémas absolus).*
+
+- **2026-05-11 · G6 · DEV Alex · `/login` form wired (Client Component + `useFormState`).** [DÉCISION DEV]
+  *`LoginForm.tsx` Client Component avec `useFormState` consomme la Server Action. Trois états : idle / error / sent. État `sent` conforme M7 (icône check + message). `useFormStatus` pour disable du bouton pendant `pending`. Affichage du `?error=magic_link_invalid` côté page server.*
+
+- **2026-05-11 · G6 · DEV Alex · Bug `middleware.ts` à la racine — déplacé en `src/middleware.ts`.** [INCIDENT FIX]
+  *Avec le mode `src-dir` activé, Next.js cherche `middleware.ts` **dans `src/`**, pas à la racine du repo. Le middleware n'était jamais exécuté à l'étape 2 (les tests E2E auraient échoué Gate 6). Détecté en debug E2E étape 3. À surveiller : la spec `specs/middleware_domain_gate.md` §3.1 dit « à la racine du repo » — l'expression est ambiguë avec `src-dir`. Pas de mise à jour de spec proposée — la convention Next.js prévaut.*
+
+- **2026-05-11 · G6 · DEV Alex · Bug matcher middleware trop strict.** [INCIDENT FIX]
+  *Le matcher proposé en spec §3.1 utilisait un negative lookahead complexe avec `.*\.(?:svg|png|...)$` qui n'est pas supporté par path-to-regexp de Next.js → matcher silencieusement ignoré → middleware inactif. Remplacé par le pattern canonique Next.js `/((?!_next/static|_next/image|favicon.ico).*)`.*
+
+- **2026-05-11 · G6 · DEV Alex · Tooling tests : @supabase/ssr 0.10, vitest 4.1, @playwright/test 1.59, @next/env 16.** [DÉCISION DEV]
+  *Configs `vitest.config.ts` (env node, coverage v8 scopée sur `src/lib/auth/**`) et `playwright.config.ts` (chromium, webServer auto-start `pnpm dev`, env chargée via `@next/env loadEnvConfig` pour que les helpers E2E aient `SUPABASE_SERVICE_ROLE_KEY`). Scripts npm : `test`, `test:watch`, `test:coverage`, `test:e2e`. Chromium installé via `pnpm exec playwright install chromium` (~150 MB cache local).*
+
+- **2026-05-11 · G6 · DEV Alex · 7 tests E2E Playwright actifs et verts (spec §4 bloquant Gate 6).** [LIVRABLE BLOQUANT]
+  *`e2e/middleware-domain.spec.ts` couvre les cas C2, C3, C4, C7, C10, C11, C12 de la matrice spec §2. Helpers `signInWith` / `getCookieFor` (`e2e/helpers/auth.ts`) utilisent `auth.admin.generateLink({type:"magiclink",options:{redirectTo:"/auth/callback?next=/"}})` pour bypasser la boîte mail. **Important** : la `redirectTo=/` pointe sur une route publique pour que le middleware ne déclenche pas `signOut()` prématurément avant que le test puisse vérifier la matrice. Audit log `access_attempt` visible dans les logs serveur (succès ET refus). 7 / 7 verts. Validations locales toutes vertes (49 Vitest, typecheck, lint, format, build).*
+
+---
+
+*Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 3 : Supabase Auth magic-link branché, 7 tests E2E middleware verts (bloquant Gate 6 levé).*
