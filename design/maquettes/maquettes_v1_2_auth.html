@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>edifio Sourcing — Maquettes v1.2 — Auth (login + forbidden)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --alyos-red: #FF0033;
+    --alyos-red-dark: #CC0029;
+    --ink: #0F1A2E;
+    --ink-2: #1F2937;
+    --paper: #FAF9F6;
+    --paper-2: #F3F1EC;
+    --paper-3: #E8E5DD;
+    --line: #E2DFD6;
+    --line-2: #CFCBC0;
+    --muted: #6B7280;
+    --white: #FFFFFF;
+    --error: #B91C1C; --error-bg: #FEE2E2;
+    --info: #1E40AF; --info-bg: #DBEAFE;
+    --success: #15803D; --success-bg: #DCFCE7;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); background: var(--paper-2); color: var(--ink); }
+  .page-wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
+  .page-header h1 { font-family: var(--font-display); font-size: 32px; margin: 0 0 8px; letter-spacing: -1px; }
+  .page-header .meta { color: var(--muted); font-size: 14px; }
+  .mockup { background: var(--white); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 32px; overflow: hidden; box-shadow: 0 2px 12px rgba(15,26,46,0.04); }
+  .mockup-label { background: var(--ink); color: var(--white); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px; }
+  .mockup-frame { padding: 24px; background: var(--paper); display: grid; place-items: center; min-height: 520px; }
+
+  .edifio-logo { display: inline-flex; align-items: center; gap: 8px; }
+  .edifio-pin { width: 36px; height: 36px; border-radius: 50%; background: var(--alyos-red); display: grid; place-items: center; box-shadow: 0 4px 16px rgba(255,0,51,0.18); }
+  .edifio-pin svg { width: 18px; height: 21px; }
+  .edifio-word { font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: -1px; color: var(--ink); }
+  .edifio-suite { font-family: var(--font-body); font-weight: 500; color: var(--muted); font-size: 15px; margin-left: 8px; }
+
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 14px; padding: 12px 18px; border-radius: 6px; border: none; cursor: pointer; }
+  .btn-primary { background: var(--alyos-red); color: var(--white); width: 100%; }
+  .btn-primary:hover { background: var(--alyos-red-dark); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+
+  /* === Maquette 7 — Login magic link === */
+  .auth-card { background: var(--white); border-radius: 12px; padding: 40px 36px; max-width: 440px; width: 100%; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+  .auth-logo { display: flex; justify-content: center; margin-bottom: 28px; }
+  .auth-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; text-align: center; margin: 0 0 8px; letter-spacing: -0.5px; }
+  .auth-sub { color: var(--muted); font-size: 14px; text-align: center; margin: 0 0 28px; }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+  .field label { font-size: 13px; font-weight: 600; }
+  .field input { font-family: var(--font-body); font-size: 14px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--white); }
+  .field input:focus { outline: none; border-color: var(--alyos-red); box-shadow: 0 0 0 3px rgba(255,0,51,0.15); }
+  .field-help { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .auth-footer { font-size: 12px; color: var(--muted); text-align: center; margin-top: 24px; }
+  .auth-footer a { color: var(--ink); }
+  .auth-domain-banner { background: var(--info-bg); color: var(--info); padding: 10px 14px; border-radius: 6px; font-size: 12.5px; margin-bottom: 22px; border-left: 3px solid var(--info); }
+
+  /* État magic-link envoyé */
+  .auth-success-state { text-align: center; }
+  .auth-success-state .check-circle { width: 64px; height: 64px; border-radius: 50%; background: var(--success-bg); display: grid; place-items: center; margin: 0 auto 16px; color: var(--success); font-size: 32px; }
+  .auth-success-state h3 { font-family: var(--font-display); font-size: 18px; margin: 0 0 8px; }
+  .auth-success-state p { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+
+  /* === Maquette 8 — 403 forbidden domain === */
+  .forbidden-card { background: var(--white); border-radius: 12px; padding: 48px 40px; max-width: 520px; width: 100%; box-shadow: 0 4px 24px rgba(0,0,0,0.06); text-align: center; }
+  .forbidden-icon { width: 80px; height: 80px; border-radius: 50%; background: var(--error-bg); display: grid; place-items: center; margin: 0 auto 24px; color: var(--error); font-size: 40px; }
+  .forbidden-title { font-family: var(--font-display); font-size: 26px; font-weight: 700; margin: 0 0 12px; letter-spacing: -0.5px; }
+  .forbidden-sub { color: var(--ink-2); font-size: 14.5px; line-height: 1.55; margin: 0 0 16px; }
+  .forbidden-detail { background: var(--paper-2); padding: 14px 18px; border-radius: 8px; font-size: 13px; color: var(--muted); margin: 24px 0; text-align: left; }
+  .forbidden-detail code { font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--white); padding: 2px 6px; border-radius: 3px; }
+  .forbidden-actions { display: flex; gap: 12px; justify-content: center; margin-top: 24px; }
+  .forbidden-actions .btn { padding: 10px 20px; }
+  .forbidden-footer { font-size: 11px; color: var(--muted); margin-top: 28px; }
+
+  .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 900px) { .two-up { grid-template-columns: 1fr; } }
+  .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <header class="page-header">
+    <div class="edifio-logo">
+      <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+      <span class="edifio-word">edifio</span>
+      <span class="edifio-suite">Sourcing — Maquettes v1.2 (auth)</span>
+    </div>
+    <div class="meta" style="margin-top: 12px;">Gate 6 livrables critiques · 2026-05-10 · Théo Renard, Designer Senior</div>
+  </header>
+
+  <!-- ============= MAQUETTE 7 — LOGIN MAGIC-LINK (2 états) ============= -->
+  <section class="mockup">
+    <div class="mockup-label">Maquette 7 — Login magic-link (Supabase Auth + restriction @alyosingenierie.fr)</div>
+    <div class="mockup-frame" style="background: var(--paper-3);">
+      <div class="two-up" style="max-width: 940px;">
+
+        <!-- État initial -->
+        <div class="auth-card">
+          <div class="auth-logo">
+            <span class="edifio-logo">
+              <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+              <span class="edifio-word">edifio</span>
+              <span class="edifio-suite">Sourcing</span>
+            </span>
+          </div>
+          <div class="auth-domain-banner">
+            🔒 Outil interne AlyoS Ingénierie. Accès réservé aux emails <code style="font-family: var(--font-mono); font-size: 12px;">@alyosingenierie.fr</code>.
+          </div>
+          <h1 class="auth-title">Connectez-vous</h1>
+          <p class="auth-sub">Saisissez votre email AlyoS — vous recevrez un lien de connexion.</p>
+          <div class="field">
+            <label for="email">Email AlyoS</label>
+            <input id="email" type="email" placeholder="prenom.nom@alyosingenierie.fr" autocomplete="email">
+            <span class="field-help">Aucun mot de passe à retenir — un lien sécurisé est envoyé à chaque connexion.</span>
+          </div>
+          <button class="btn btn-primary">Recevoir mon lien de connexion</button>
+          <p class="auth-footer">
+            En vous connectant, vous acceptez la <a href="#">charte interne d'usage</a><br>
+            <span style="font-family: var(--font-mono); font-size: 10px; opacity: 0.6;">© AlyoS Ingénierie 2026 — Outil interne</span>
+          </p>
+        </div>
+
+        <!-- État magic-link envoyé -->
+        <div class="auth-card">
+          <div class="auth-logo">
+            <span class="edifio-logo">
+              <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+              <span class="edifio-word">edifio</span>
+              <span class="edifio-suite">Sourcing</span>
+            </span>
+          </div>
+          <div class="auth-success-state">
+            <div class="check-circle">✓</div>
+            <h3>Lien envoyé à <span style="color: var(--alyos-red);">alice@alyosingenierie.fr</span></h3>
+            <p>Ouvrez votre boîte mail — vous avez 15 minutes pour cliquer sur le lien. Vous pouvez fermer cet onglet, l'app s'ouvrira automatiquement après le clic.</p>
+            <p style="margin-top: 20px; font-size: 12px;">Pas reçu ? Vérifiez vos spams ou <a href="#" style="color: var(--alyos-red);">renvoyer le lien</a>.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============= MAQUETTE 8 — 403 FORBIDDEN DOMAIN ============= -->
+  <section class="mockup">
+    <div class="mockup-label">Maquette 8 — Erreur 403 (utilisateur connecté hors domaine @alyosingenierie.fr)</div>
+    <div class="mockup-frame" style="background: var(--paper-3);">
+      <div class="forbidden-card">
+        <div class="forbidden-icon">🚫</div>
+        <h1 class="forbidden-title">Accès réservé</h1>
+        <p class="forbidden-sub">
+          <strong>edifio Sourcing</strong> est un outil interne réservé aux membres
+          d'<strong>AlyoS Ingénierie</strong> (adresse email en
+          <code style="font-family: var(--font-mono); font-size: 13px; background: var(--paper-2); padding: 2px 6px; border-radius: 3px;">@alyosingenierie.fr</code>).
+        </p>
+        <p class="forbidden-sub" style="margin-bottom: 8px;">
+          Votre session a été clôturée. Si vous pensez qu'il s'agit d'une erreur, contactez l'équipe IT d'AlyoS.
+        </p>
+        <div class="forbidden-detail">
+          <strong style="display: block; margin-bottom: 6px; color: var(--ink);">Détails techniques (pour le support)</strong>
+          Email tenté : <code>bob@gmail.com</code><br>
+          Code retour : <code>403 forbidden_domain</code><br>
+          Heure : <code>2026-05-10 16:42:18 UTC+2</code>
+        </div>
+        <div class="forbidden-actions">
+          <a href="/" class="btn btn-ghost">← Retour à l'accueil</a>
+          <a href="mailto:it@alyosingenierie.fr" class="btn btn-primary" style="width: auto;">Contacter le support</a>
+        </div>
+        <p class="forbidden-footer">
+          Cet incident a été tracé dans le journal d'audit pour la sécurité du système.<br>
+          <span style="font-family: var(--font-mono); font-size: 10px; opacity: 0.7;">© AlyoS Ingénierie 2026</span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">edifio Sourcing — Maquettes v1.2 (auth) · 2026-05-10 · Théo Renard, Designer Senior · AlyoS Ingénierie</div>
+</div>
+</body>
+</html>

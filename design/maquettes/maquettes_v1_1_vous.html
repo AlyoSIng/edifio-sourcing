@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>edifio Sourcing — Maquettes v1.1 — Variantes vouvoiement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --alyos-red: #FF0033;
+    --alyos-red-dark: #CC0029;
+    --ink: #0F1A2E;
+    --ink-2: #1F2937;
+    --paper: #FAF9F6;
+    --paper-2: #F3F1EC;
+    --paper-3: #E8E5DD;
+    --line: #E2DFD6;
+    --line-2: #CFCBC0;
+    --muted: #6B7280;
+    --white: #FFFFFF;
+    --info: #1E40AF; --info-bg: #DBEAFE;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); background: var(--paper-2); color: var(--ink); }
+  .page-wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
+  .page-header h1 { font-family: var(--font-display); font-size: 32px; margin: 0 0 8px; letter-spacing: -1px; }
+  .page-header .meta { color: var(--muted); font-size: 14px; }
+  .mockup { background: var(--white); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 32px; overflow: hidden; box-shadow: 0 2px 12px rgba(15,26,46,0.04); }
+  .mockup-label { background: var(--ink); color: var(--white); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px; }
+  .mockup-frame { padding: 24px; background: var(--paper); }
+
+  .edifio-logo { display: inline-flex; align-items: center; gap: 8px; }
+  .edifio-pin { width: 28px; height: 28px; border-radius: 50%; background: var(--alyos-red); display: grid; place-items: center; }
+  .edifio-pin svg { width: 14px; height: 17px; }
+  .edifio-word { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -1px; color: var(--ink); }
+  .edifio-suite { font-family: var(--font-body); font-weight: 500; color: var(--muted); font-size: 13px; margin-left: 6px; }
+
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 12px; padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; }
+  .btn-primary { background: var(--alyos-red); color: var(--white); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+  .btn-info { background: var(--info); color: var(--white); }
+  .chip { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 4px; }
+  .chip-red { background: rgba(255,0,51,0.1); color: var(--alyos-red); }
+
+  /* === Maquette 3 actualisée avec toggle TU/VOUS === */
+  .modal-backdrop { background: rgba(15,26,46,0.45); padding: 32px 24px; display: flex; justify-content: center; align-items: flex-start; }
+  .modal { background: var(--white); border-radius: 12px; max-width: 560px; width: 100%; box-shadow: 0 12px 48px rgba(0,0,0,0.18); overflow: hidden; }
+  .modal-header { padding: 20px 24px 12px; }
+  .modal-eyebrow { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--alyos-red); letter-spacing: 1.5px; }
+  .modal-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin: 6px 0 4px; }
+  .modal-sub { color: var(--muted); font-size: 14px; }
+  .toggle-row { display: flex; align-items: center; gap: 12px; padding: 0 24px 12px; }
+  .toggle-row .toggle-label { font-size: 13px; color: var(--muted); }
+  .toggle-switch { display: inline-flex; background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+  .toggle-switch button { background: transparent; border: none; padding: 6px 14px; font-family: var(--font-body); font-weight: 600; font-size: 12px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+  .toggle-switch button.active { background: var(--ink); color: var(--white); }
+  .toggle-help { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px 24px 20px; }
+  .mode-card { border: 2px solid var(--line); border-radius: 10px; padding: 18px; cursor: pointer; }
+  .mode-card.recommended { border-color: var(--alyos-red); }
+  .mode-card .mode-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--paper-2); display: grid; place-items: center; margin-bottom: 10px; font-size: 20px; }
+  .mode-card.recommended .mode-icon { background: rgba(255,0,51,0.1); }
+  .mode-card .mode-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; }
+  .mode-card .mode-desc { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .mode-card .mode-tag { display: inline-block; margin-top: 8px; }
+  .modal-footer { padding: 14px 24px; background: var(--paper-2); display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* === Maquette 4 vouvoiement === */
+  .arch-page { background: linear-gradient(135deg, var(--paper-2), var(--paper)); padding: 48px 24px; }
+  .arch-card { max-width: 640px; margin: 0 auto; background: var(--white); border-radius: 12px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.05); }
+  .arch-greeting { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  .arch-title { font-family: var(--font-display); font-size: 26px; font-weight: 700; margin-bottom: 8px; line-height: 1.2; }
+  .arch-pitch { font-size: 14.5px; line-height: 1.55; margin-bottom: 18px; }
+  .arch-block { background: var(--paper-2); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; }
+  .arch-block-title { font-family: var(--font-display); font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .arch-block-content { font-size: 13px; line-height: 1.5; }
+  .arch-cta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 24px; }
+  .arch-cta button { padding: 14px; font-size: 14px; font-family: var(--font-body); font-weight: 600; border: none; border-radius: 6px; cursor: pointer; }
+  .arch-footer { font-size: 11px; color: var(--muted); text-align: center; margin-top: 18px; }
+
+  .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <header class="page-header">
+    <div class="edifio-logo">
+      <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+      <span class="edifio-word">edifio</span>
+      <span class="edifio-suite">Sourcing — Maquettes v1.1 (variantes vouvoiement + toggle)</span>
+    </div>
+    <div class="meta" style="margin-top: 12px;">Gate 4 livrable complémentaire · 2026-05-10 · Théo Renard, Designer Senior</div>
+  </header>
+
+  <!-- ============= MAQUETTE 3 — modale avec toggle TU/VOUS ============= -->
+  <section class="mockup">
+    <div class="mockup-label">Maquette 3 v1.1 — Modale Solo / Tandem AVEC toggle TU / VOUS</div>
+    <div class="mockup-frame" style="background: var(--paper-3);">
+      <div class="modal-backdrop">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-eyebrow">Mode de réponse</div>
+            <div class="modal-title">Comment réponds-tu à cet AO ?</div>
+            <div class="modal-sub">Centre hospitalier de Vienne · 4,2 M€ · Remise 14 juin</div>
+          </div>
+
+          <!-- Toggle TU/VOUS (visible uniquement pour Tandem) -->
+          <div class="toggle-row">
+            <span class="toggle-label">Pour la sollicitation architecte :</span>
+            <span class="toggle-switch">
+              <button>Tutoyer</button>
+              <button class="active">Vouvoyer</button>
+            </span>
+            <span class="toggle-help">Pré-réglé selon la fiche archi · modifiable</span>
+          </div>
+
+          <div class="mode-grid">
+            <div class="mode-card">
+              <div class="mode-icon">🧍</div>
+              <div class="mode-name">Solo</div>
+              <div class="mode-desc">Tu réponds en propre, en mandataire seul. L'AO bascule en pipeline et l'opportunité est créée dans Odoo.</div>
+            </div>
+            <div class="mode-card recommended">
+              <div class="mode-icon">🤝</div>
+              <div class="mode-name">Tandem</div>
+              <div class="mode-desc">Tu mobilises un architecte cotraitant. edifio Sourcing te propose 3 architectes scorés et envoie la sollicitation en vouvoiement.</div>
+              <span class="chip chip-red mode-tag">Recommandé · score MOE 0.91</span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost">Annuler</button>
+            <button class="btn btn-primary">Confirmer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============= MAQUETTE 4 — page tokenisée VOUVOIEMENT ============= -->
+  <section class="mockup">
+    <div class="mockup-label">Maquette 4 v1.1 — Page tokenisée architecte (variante VOUVOIEMENT)</div>
+    <div class="mockup-frame">
+      <div class="arch-page">
+        <div class="arch-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+            <span class="edifio-logo">
+              <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+              <span class="edifio-word">edifio</span>
+              <span class="edifio-suite">Sourcing</span>
+            </span>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--muted);">Lien valide jusqu'au 09/06/26</span>
+          </div>
+          <div class="arch-greeting">Bonjour M. Lefèvre,</div>
+          <div class="arch-title">Nous avons un appel d'offres sur lequel nous aimerions votre avis.</div>
+          <div class="arch-pitch">L'entreprise <strong>Bâtiment Lyonnais Réhabilitation</strong> envisage de répondre en cotraitance et vous propose le rôle de mandataire MOE. Vous pouvez répondre en un clic, sans créer de compte.</div>
+
+          <div class="arch-block">
+            <div class="arch-block-title">L'opération</div>
+            <div class="arch-block-content"><strong>Centre hospitalier de Vienne</strong> — rénovation des urgences (4 200 m² SHON), réfection chauffage, mise en sécurité. Montant prévisionnel <strong>4,2 M€ HT</strong>. Remise des plis : <strong>14 juin 2026, 12h00</strong>.</div>
+          </div>
+          <div class="arch-block">
+            <div class="arch-block-title">Pourquoi vous avez été choisi</div>
+            <div class="arch-block-content">Votre score est de <strong>0,91 / 1</strong>. Vous avez déjà signé deux opérations similaires avec nous (clinique Givors 2023, EHPAD Décines 2024). Spécialité santé + zone Rhône.</div>
+          </div>
+
+          <div class="arch-cta">
+            <button class="btn-primary">✓ Oui, je suis partant</button>
+            <button class="btn-info">? Plus d'infos</button>
+            <button class="btn-ghost">✕ Non, pas cette fois</button>
+          </div>
+          <div class="arch-footer">Token sécurisé · expire dans 30 jours · révocable à tout moment par edifio Sourcing</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">edifio Sourcing — Maquettes v1.1 (vouvoiement + toggle Solo/Tandem) · 2026-05-10 · Théo Renard, Designer Senior · AlyoS Ingénierie</div>
+</div>
+</body>
+</html>

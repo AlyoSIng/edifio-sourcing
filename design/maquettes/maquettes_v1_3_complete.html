@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>edifio Sourcing — Maquettes v1.3 (M9-M12)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --alyos-red: #FF0033; --alyos-red-dark: #CC0029;
+    --ink: #0F1A2E; --ink-2: #1F2937;
+    --paper: #FAF9F6; --paper-2: #F3F1EC; --paper-3: #E8E5DD;
+    --line: #E2DFD6; --line-2: #CFCBC0; --muted: #6B7280; --white: #FFFFFF;
+    --success: #15803D; --success-bg: #DCFCE7;
+    --warn: #B45309; --warn-bg: #FEF3C7;
+    --error: #B91C1C; --error-bg: #FEE2E2;
+    --info: #1E40AF; --info-bg: #DBEAFE;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); background: var(--paper-2); color: var(--ink); }
+  .page-wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
+  .page-header h1 { font-family: var(--font-display); font-size: 32px; margin: 0 0 8px; letter-spacing: -1px; }
+  .page-header .meta { color: var(--muted); font-size: 14px; }
+  .mockup { background: var(--white); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 32px; overflow: hidden; box-shadow: 0 2px 12px rgba(15,26,46,0.04); }
+  .mockup-label { background: var(--ink); color: var(--white); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px; }
+  .mockup-frame { padding: 20px; background: var(--paper); }
+
+  .edifio-logo { display: inline-flex; align-items: center; gap: 8px; }
+  .edifio-pin { width: 28px; height: 28px; border-radius: 50%; background: var(--alyos-red); display: grid; place-items: center; }
+  .edifio-pin svg { width: 14px; height: 17px; }
+  .edifio-word { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -1px; }
+
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 12px; padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; }
+  .btn-primary { background: var(--alyos-red); color: var(--white); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+  .btn-sm { padding: 6px 10px; font-size: 11px; }
+  .chip { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 4px; display: inline-block; }
+  .chip-success { background: var(--success-bg); color: var(--success); }
+  .chip-warn { background: var(--warn-bg); color: var(--warn); }
+  .chip-error { background: var(--error-bg); color: var(--error); }
+  .chip-info { background: var(--info-bg); color: var(--info); }
+  .chip-red { background: rgba(255,0,51,0.1); color: var(--alyos-red); }
+
+  /* App layout */
+  .app-layout { display: grid; grid-template-columns: 220px 1fr; min-height: 600px; background: var(--paper); }
+  .sidebar { background: var(--ink); color: var(--white); padding: 20px 16px; }
+  .sidebar-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
+  .sidebar-logo .edifio-word { color: var(--white); font-size: 20px; }
+  .sidebar-section { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.4); margin: 20px 0 8px; }
+  .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; color: rgba(255,255,255,0.75); font-size: 13px; border-radius: 6px; cursor: pointer; margin-bottom: 2px; }
+  .sidebar-link:hover { background: rgba(255,255,255,0.05); color: var(--white); }
+  .sidebar-link.active { background: var(--alyos-red); color: var(--white); }
+  .sidebar-link .icon { font-size: 14px; opacity: 0.9; }
+  .main-content { padding: 24px 28px; overflow: auto; }
+  .page-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+  .page-subtitle { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .search-input { padding: 7px 12px; border: 1px solid var(--line-2); border-radius: 6px; font-family: var(--font-body); font-size: 12px; width: 220px; }
+
+  /* Tables */
+  .data-table { width: 100%; border-collapse: collapse; background: var(--white); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .data-table th { background: var(--paper-2); padding: 10px 12px; text-align: left; font-size: 11px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .data-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--line); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--paper-2); }
+
+  /* Cards grid */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .info-card { background: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+  .info-card-title { font-family: var(--font-display); font-weight: 600; font-size: 14px; margin: 0 0 4px; }
+  .info-card-meta { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
+  .info-card-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+  /* Form */
+  .form-section { background: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin-bottom: 12px; }
+  .form-section-title { font-family: var(--font-display); font-weight: 600; font-size: 14px; margin: 0 0 12px; }
+  .field-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field-row label { font-size: 12px; font-weight: 600; }
+  .field-row input, .field-row textarea, .field-row select { font-family: var(--font-body); font-size: 13px; padding: 8px 11px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--white); }
+  .field-row textarea { resize: vertical; min-height: 60px; font-family: var(--font-body); }
+  .field-help { font-size: 11px; color: var(--muted); }
+  .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .keyword-chip { display: inline-block; background: var(--paper-2); border: 1px solid var(--line); padding: 3px 8px; border-radius: 999px; font-size: 11px; margin: 2px; }
+  .keyword-chip.positive { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+  .keyword-chip.negative { background: var(--error-bg); color: var(--error); border-color: var(--error); }
+
+  /* Toggle */
+  .toggle-switch { display: inline-flex; background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+  .toggle-switch button { background: transparent; border: none; padding: 5px 10px; font-family: var(--font-body); font-weight: 500; font-size: 11px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+  .toggle-switch button.active { background: var(--ink); color: var(--white); }
+
+  /* Notifications */
+  .notif-item { display: flex; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--white); }
+  .notif-item.unread { background: rgba(255,0,51,0.025); border-left: 3px solid var(--alyos-red); }
+  .notif-icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; font-size: 16px; }
+  .notif-icon.success { background: var(--success-bg); color: var(--success); }
+  .notif-icon.warn { background: var(--warn-bg); color: var(--warn); }
+  .notif-icon.error { background: var(--error-bg); color: var(--error); }
+  .notif-icon.info { background: var(--info-bg); color: var(--info); }
+  .notif-body { flex: 1; }
+  .notif-title { font-family: var(--font-display); font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+  .notif-text { font-size: 12px; color: var(--ink-2); margin-bottom: 4px; }
+  .notif-meta { font-size: 10.5px; color: var(--muted); font-family: var(--font-mono); }
+
+  .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <header class="page-header">
+    <div class="edifio-logo">
+      <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+      <span class="edifio-word">edifio</span>
+      <span style="color: var(--muted); font-size: 13px; margin-left: 6px;">Sourcing — Maquettes v1.3 (M9-M12)</span>
+    </div>
+    <div class="meta" style="margin-top: 12px;">2026-05-10 · Théo Renard, Designer Senior</div>
+  </header>
+
+  <!-- =================================================================== -->
+  <!-- M9 — CONFIGURATION : profils de recherche                            -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">Maquette 9 — Configuration : profil de recherche (édition)</div>
+    <div class="mockup-frame">
+      <div class="app-layout">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <span class="edifio-pin" style="background: var(--alyos-red);"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+            <span class="edifio-word">edifio</span>
+          </div>
+          <div class="sidebar-section">Travail</div>
+          <div class="sidebar-link"><span class="icon">📥</span> AO du jour <span style="margin-left: auto; background: var(--alyos-red); color: white; border-radius: 999px; padding: 1px 6px; font-size: 10px;">7</span></div>
+          <div class="sidebar-link"><span class="icon">📋</span> Pipeline</div>
+          <div class="sidebar-link"><span class="icon">📆</span> Calendrier</div>
+          <div class="sidebar-section">Ressources</div>
+          <div class="sidebar-link"><span class="icon">👥</span> Architectes</div>
+          <div class="sidebar-link"><span class="icon">📚</span> Bibliothèque</div>
+          <div class="sidebar-section">Config</div>
+          <div class="sidebar-link active"><span class="icon">⚙</span> Paramètres</div>
+        </aside>
+        <main class="main-content">
+          <h1 class="page-title">Profil de recherche · ERP travaux</h1>
+          <p class="page-subtitle">Modifie les critères. Le prochain sourcing à 06:30 utilisera la nouvelle config.</p>
+
+          <div class="form-section">
+            <div class="form-section-title">Informations générales</div>
+            <div class="field-grid-2">
+              <div class="field-row">
+                <label>Nom du profil</label>
+                <input value="ERP travaux">
+              </div>
+              <div class="field-row">
+                <label>Statut</label>
+                <select><option>Actif</option><option>Inactif</option></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">Mots-clés</div>
+            <div class="field-row">
+              <label>Mots-clés positifs <span class="field-help">(au moins un doit matcher)</span></label>
+              <div style="padding: 8px; border: 1px solid var(--line-2); border-radius: 6px; min-height: 40px;">
+                <span class="keyword-chip positive">rénovation ✕</span>
+                <span class="keyword-chip positive">scolaire ✕</span>
+                <span class="keyword-chip positive">collège ✕</span>
+                <span class="keyword-chip positive">lycée ✕</span>
+                <span class="keyword-chip positive">école ✕</span>
+                <span class="keyword-chip positive">hôpital ✕</span>
+                <span class="keyword-chip positive">crèche ✕</span>
+                <input style="border: none; padding: 4px; font-size: 12px; width: 100px;" placeholder="+ ajouter">
+              </div>
+            </div>
+            <div class="field-row">
+              <label>Mots-clés négatifs <span class="field-help">(aucun ne doit matcher)</span></label>
+              <div style="padding: 8px; border: 1px solid var(--line-2); border-radius: 6px; min-height: 40px;">
+                <span class="keyword-chip negative">étude ✕</span>
+                <span class="keyword-chip negative">AMO ✕</span>
+                <span class="keyword-chip negative">conseil ✕</span>
+                <input style="border: none; padding: 4px; font-size: 12px; width: 100px;" placeholder="+ ajouter">
+              </div>
+            </div>
+            <div class="field-row">
+              <label>Expressions exactes <span class="field-help">(entre guillemets)</span></label>
+              <div style="padding: 8px; border: 1px solid var(--line-2); border-radius: 6px; min-height: 40px;">
+                <span class="keyword-chip">"site occupé" ✕</span>
+                <span class="keyword-chip">"phasage" ✕</span>
+                <input style="border: none; padding: 4px; font-size: 12px; width: 100px;" placeholder="+ ajouter">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">Filtres marché</div>
+            <div class="field-grid-2">
+              <div class="field-row">
+                <label>Codes CPV (préfixes)</label>
+                <input value="45000, 45200, 45214">
+                <span class="field-help">Préfixes séparés par virgules. Plus précis = moins de résultats.</span>
+              </div>
+              <div class="field-row">
+                <label>Zones géographiques</label>
+                <input value="69, 38, 42, 71">
+                <span class="field-help">Codes département. Vide = tout le territoire.</span>
+              </div>
+              <div class="field-row">
+                <label>Type de marché</label>
+                <select><option>Travaux</option><option>Services</option><option>MOE</option><option>Tous</option></select>
+              </div>
+              <div class="field-row">
+                <label>Montant prévisionnel</label>
+                <div style="display: flex; gap: 8px;">
+                  <input style="width: 50%;" placeholder="Min €" value="100000">
+                  <input style="width: 50%;" placeholder="Max €" value="5000000">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">Planification du sourcing</div>
+            <div class="field-grid-2">
+              <div class="field-row">
+                <label>Heure de run quotidien (Europe/Paris)</label>
+                <input type="time" value="06:30">
+              </div>
+              <div class="field-row">
+                <label>Jours actifs</label>
+                <div style="display: flex; gap: 4px;">
+                  <span class="keyword-chip positive">Lun</span>
+                  <span class="keyword-chip positive">Mar</span>
+                  <span class="keyword-chip positive">Mer</span>
+                  <span class="keyword-chip positive">Jeu</span>
+                  <span class="keyword-chip positive">Ven</span>
+                  <span class="keyword-chip">Sam</span>
+                  <span class="keyword-chip">Dim</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px;">
+            <button class="btn btn-ghost">Annuler</button>
+            <button class="btn btn-primary">Enregistrer les modifications</button>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- M10 — BASE ARCHITECTES                                              -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">Maquette 10 — Base architectes (liste + actions multiples)</div>
+    <div class="mockup-frame">
+      <div class="app-layout">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+            <span class="edifio-word">edifio</span>
+          </div>
+          <div class="sidebar-section">Travail</div>
+          <div class="sidebar-link"><span class="icon">📥</span> AO du jour</div>
+          <div class="sidebar-link"><span class="icon">📋</span> Pipeline</div>
+          <div class="sidebar-link"><span class="icon">📆</span> Calendrier</div>
+          <div class="sidebar-section">Ressources</div>
+          <div class="sidebar-link active"><span class="icon">👥</span> Architectes <span style="margin-left: auto; font-size: 10px; opacity: 0.6;">23</span></div>
+          <div class="sidebar-link"><span class="icon">📚</span> Bibliothèque</div>
+          <div class="sidebar-section">Config</div>
+          <div class="sidebar-link"><span class="icon">⚙</span> Paramètres</div>
+        </aside>
+        <main class="main-content">
+          <h1 class="page-title">Base architectes</h1>
+          <p class="page-subtitle">23 architectes enregistrés. 18 actifs, 3 inactifs, 2 prospects.</p>
+
+          <div class="toolbar">
+            <div style="display: flex; gap: 8px;">
+              <input class="search-input" placeholder="Rechercher (nom, SIRET, spécialité)...">
+              <select style="padding: 7px 10px; border: 1px solid var(--line-2); border-radius: 6px; font-size: 12px;">
+                <option>Toutes spécialités</option>
+                <option>Santé</option>
+                <option>Scolaire</option>
+                <option>Logement</option>
+              </select>
+              <select style="padding: 7px 10px; border: 1px solid var(--line-2); border-radius: 6px; font-size: 12px;">
+                <option>Tous statuts</option>
+                <option>Actif</option>
+                <option>Inactif</option>
+                <option>Prospect</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-ghost btn-sm">📤 Importer CSV</button>
+              <button class="btn btn-ghost btn-sm">📋 Tutoiement groupé</button>
+              <button class="btn btn-primary btn-sm">+ Ajouter</button>
+            </div>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 30px;"><input type="checkbox"></th>
+                <th>Nom</th>
+                <th>Spécialités</th>
+                <th>Zone</th>
+                <th>Statut</th>
+                <th>Registre</th>
+                <th>Collabs</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>Marc Lefèvre</strong><br><span style="font-size: 11px; color: var(--muted);">marc.lefevre@archi-lyon.fr</span></td>
+                <td><span class="chip chip-info">Santé</span> <span class="chip chip-info">Tertiaire</span></td>
+                <td>69, 01, 42</td>
+                <td><span class="chip chip-success">Actif</span></td>
+                <td><span class="chip">Tu</span></td>
+                <td>3</td>
+                <td><button class="btn btn-ghost btn-sm">✏</button></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>Sophie Martin</strong><br><span style="font-size: 11px; color: var(--muted);">s.martin@atelier-martin.com</span></td>
+                <td><span class="chip chip-info">Scolaire</span> <span class="chip chip-info">ERP</span></td>
+                <td>38, 69</td>
+                <td><span class="chip chip-success">Actif</span></td>
+                <td><span class="chip">Vous</span></td>
+                <td>2</td>
+                <td><button class="btn btn-ghost btn-sm">✏</button></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>Pierre Dubois</strong><br><span style="font-size: 11px; color: var(--muted);">p.dubois@dubois-architectes.fr</span></td>
+                <td><span class="chip chip-info">Logement</span> <span class="chip chip-info">Patrimoine</span></td>
+                <td>69, 01, 71</td>
+                <td><span class="chip chip-success">Actif</span></td>
+                <td><span class="chip">Tu</span></td>
+                <td>5</td>
+                <td><button class="btn btn-ghost btn-sm">✏</button></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>Hélène Garnier</strong><br><span style="font-size: 11px; color: var(--muted);">h.garnier@cabinet-garnier.com</span></td>
+                <td><span class="chip chip-info">Industriel</span></td>
+                <td>01, 74</td>
+                <td><span class="chip chip-warn">Prospect</span></td>
+                <td><span class="chip">Vous</span></td>
+                <td>0</td>
+                <td><button class="btn btn-ghost btn-sm">✏</button></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>Julien Roux</strong><br><span style="font-size: 11px; color: var(--muted);">julien@roux-archi.fr</span></td>
+                <td><span class="chip chip-info">Santé</span> <span class="chip chip-info">EHPAD</span></td>
+                <td>69, 38</td>
+                <td><span class="chip chip-error">Inactif</span></td>
+                <td><span class="chip">Tu</span></td>
+                <td>1</td>
+                <td><button class="btn btn-ghost btn-sm">✏</button></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 12px; color: var(--muted);">
+            <span>5 sur 23 affichés</span>
+            <span>‹ 1 2 3 4 5 ›</span>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- M11 — BIBLIOTHÈQUE                                                  -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">Maquette 11 — Bibliothèque (présentations, attestations, références, CV)</div>
+    <div class="mockup-frame">
+      <div class="app-layout">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+            <span class="edifio-word">edifio</span>
+          </div>
+          <div class="sidebar-section">Travail</div>
+          <div class="sidebar-link"><span class="icon">📥</span> AO du jour</div>
+          <div class="sidebar-link"><span class="icon">📋</span> Pipeline</div>
+          <div class="sidebar-link"><span class="icon">📆</span> Calendrier</div>
+          <div class="sidebar-section">Ressources</div>
+          <div class="sidebar-link"><span class="icon">👥</span> Architectes</div>
+          <div class="sidebar-link active"><span class="icon">📚</span> Bibliothèque</div>
+          <div class="sidebar-section">Config</div>
+          <div class="sidebar-link"><span class="icon">⚙</span> Paramètres</div>
+        </aside>
+        <main class="main-content">
+          <h1 class="page-title">Bibliothèque</h1>
+          <p class="page-subtitle">Pièces réutilisables pour vos dossiers. L'IA pioche ici automatiquement.</p>
+
+          <div class="toolbar">
+            <div class="toggle-switch">
+              <button class="active">Tous</button>
+              <button>Présentations</button>
+              <button>Attestations</button>
+              <button>Références</button>
+              <button>CV</button>
+            </div>
+            <button class="btn btn-primary btn-sm">+ Ajouter une pièce</button>
+          </div>
+
+          <div style="background: var(--warn-bg); color: var(--warn); padding: 10px 14px; border-radius: 6px; font-size: 12.5px; margin-bottom: 16px; border-left: 3px solid var(--warn);">
+            ⚠ <strong>2 attestations expirent dans moins de 30 jours</strong> — Qualibat 5123 (J-7) et RC pro 2025 (J-22). Pensez à les renouveler.
+          </div>
+
+          <div class="card-grid">
+            <div class="info-card" style="border-left: 3px solid var(--info);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="chip chip-info">Présentation</span>
+                <span style="font-size: 10px; color: var(--muted); font-family: var(--font-mono);">12 Mo</span>
+              </div>
+              <div class="info-card-title">Plaquette entreprise 2026</div>
+              <div class="info-card-meta">Présentation PDF générale · MAJ il y a 18 jours</div>
+              <div class="info-card-actions">
+                <button class="btn btn-ghost btn-sm">👁 Voir</button>
+                <button class="btn btn-ghost btn-sm">↓ Télécharger</button>
+              </div>
+            </div>
+
+            <div class="info-card" style="border-left: 3px solid var(--error);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="chip chip-error">Attestation</span>
+                <span class="chip chip-error" style="font-size: 9px;">J-7</span>
+              </div>
+              <div class="info-card-title">Qualibat 5123</div>
+              <div class="info-card-meta">Expire le 17/05/2026 · à renouveler urgemment</div>
+              <div class="info-card-actions">
+                <button class="btn btn-ghost btn-sm">👁 Voir</button>
+                <button class="btn btn-primary btn-sm">↻ Renouveler</button>
+              </div>
+            </div>
+
+            <div class="info-card" style="border-left: 3px solid var(--warn);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="chip chip-error">Attestation</span>
+                <span class="chip chip-warn" style="font-size: 9px;">J-22</span>
+              </div>
+              <div class="info-card-title">RC professionnelle 2025</div>
+              <div class="info-card-meta">Expire le 01/06/2026 · à renouveler</div>
+              <div class="info-card-actions">
+                <button class="btn btn-ghost btn-sm">👁 Voir</button>
+                <button class="btn btn-primary btn-sm">↻ Renouveler</button>
+              </div>
+            </div>
+
+            <div class="info-card" style="border-left: 3px solid var(--success);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="chip chip-error">Attestation</span>
+                <span class="chip chip-success" style="font-size: 9px;">OK</span>
+              </div>
+              <div class="info-card-title">Qualibat 2113</div>
+              <div class="info-card-meta">Expire le 12/02/2027 · à jour</div>
+              <div class="info-card-actions">
+                <button class="btn btn-ghost btn-sm">👁 Voir</button>
+                <button class="btn btn-ghost btn-sm">↓ Télécharger</button>
+              </div>
+            </div>
+
+            <div class="info-card" style="border-left: 3px solid var(--success);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="chip chip-success">Référence</span>
+                <span style="font-size: 10px; color: var(--muted); font-family: var(--font-mono);">PDF · 4 pages</span>
+              </div>
+              <div class="info-card-title">Maison de santé Givors</div>
+              <div class="info-card-meta">Réf 2024 · 950 k€ · Santé · ↗ photos + plans</div>
+              <div class="info-card-actions">
+                <button class="btn btn-ghost btn-sm">👁 Voir</button>
+                <button class="btn btn-ghost btn-sm">↓ Télécharger</button>
+              </div>
+            </div>
+
+            <div class="info-card" style="border-left: 3px solid var(--success);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="chip chip-success">Référence</span>
+                <span style="font-size: 10px; color: var(--muted); font-family: var(--font-mono);">PDF · 3 pages</span>
+              </div>
+              <div class="info-card-title">Reconstruction gymnase Bron</div>
+              <div class="info-card-meta">Réf 2024 · 1,8 M€ · Scolaire · ERP</div>
+              <div class="info-card-actions">
+                <button class="btn btn-ghost btn-sm">👁 Voir</button>
+                <button class="btn btn-ghost btn-sm">↓ Télécharger</button>
+              </div>
+            </div>
+
+            <div class="info-card" style="border-left: 3px solid var(--muted);">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="chip" style="background: var(--paper-2); color: var(--muted);">CV</span>
+                <span style="font-size: 10px; color: var(--muted); font-family: var(--font-mono);">PDF · 2 pages</span>
+              </div>
+              <div class="info-card-title">Patrick Teissier — Dirigeant</div>
+              <div class="info-card-meta">CV à jour · MAJ il y a 3 mois</div>
+              <div class="info-card-actions">
+                <button class="btn btn-ghost btn-sm">👁 Voir</button>
+                <button class="btn btn-ghost btn-sm">✏ Éditer</button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- M12 — NOTIFICATIONS                                                 -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">Maquette 12 — Centre de notifications (liste + paramètres)</div>
+    <div class="mockup-frame">
+      <div class="app-layout">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+            <span class="edifio-word">edifio</span>
+          </div>
+          <div class="sidebar-section">Travail</div>
+          <div class="sidebar-link"><span class="icon">📥</span> AO du jour</div>
+          <div class="sidebar-link"><span class="icon">📋</span> Pipeline</div>
+          <div class="sidebar-link"><span class="icon">📆</span> Calendrier</div>
+          <div class="sidebar-section">Ressources</div>
+          <div class="sidebar-link"><span class="icon">👥</span> Architectes</div>
+          <div class="sidebar-link"><span class="icon">📚</span> Bibliothèque</div>
+          <div class="sidebar-section">Config</div>
+          <div class="sidebar-link"><span class="icon">⚙</span> Paramètres</div>
+          <div class="sidebar-link active" style="margin-top: 12px;"><span class="icon">🔔</span> Notifications <span style="margin-left: auto; background: var(--alyos-red); color: white; border-radius: 999px; padding: 1px 6px; font-size: 10px;">4</span></div>
+        </aside>
+        <main class="main-content">
+          <h1 class="page-title">Notifications</h1>
+          <p class="page-subtitle">4 non lues · 23 totales</p>
+
+          <div class="toolbar">
+            <div class="toggle-switch">
+              <button class="active">Toutes</button>
+              <button>Non lues</button>
+              <button>AO</button>
+              <button>Architectes</button>
+              <button>Dossier</button>
+              <button>Alertes</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-ghost btn-sm">✓ Tout marquer lu</button>
+              <button class="btn btn-ghost btn-sm">⚙ Préférences</button>
+            </div>
+          </div>
+
+          <div style="background: var(--white); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;">
+            <div class="notif-item unread">
+              <div class="notif-icon success">✓</div>
+              <div class="notif-body">
+                <div class="notif-title">Marc Lefèvre accepte le Tandem</div>
+                <div class="notif-text">Sur l'AO 25-AO-00131 (Centre hospitalier de Vienne). Vous pouvez démarrer la préparation du dossier.</div>
+                <div class="notif-meta">il y a 12 min · push reçu</div>
+              </div>
+              <button class="btn btn-ghost btn-sm">Ouvrir l'AO →</button>
+            </div>
+
+            <div class="notif-item unread">
+              <div class="notif-icon info">📥</div>
+              <div class="notif-body">
+                <div class="notif-title">7 AO pour vous ce matin</div>
+                <div class="notif-text">Profil ERP travaux. Rénovation école Jean-Moulin (score 94) en tête.</div>
+                <div class="notif-meta">il y a 2 h · digest 06:30</div>
+              </div>
+              <button class="btn btn-ghost btn-sm">Voir le digest →</button>
+            </div>
+
+            <div class="notif-item unread">
+              <div class="notif-icon warn">⚠</div>
+              <div class="notif-body">
+                <div class="notif-title">Attestation Qualibat 5123 expire dans 7 jours</div>
+                <div class="notif-text">Pensez à la renouveler avant le 17/05/2026 — sinon elle bloquera vos prochaines remises.</div>
+                <div class="notif-meta">il y a 5 h · push + email</div>
+              </div>
+              <button class="btn btn-ghost btn-sm">Renouveler →</button>
+            </div>
+
+            <div class="notif-item unread">
+              <div class="notif-icon info">📄</div>
+              <div class="notif-body">
+                <div class="notif-title">Dossier prêt pour revue : Mairie de Vénissieux</div>
+                <div class="notif-text">12 pièces, mémoire de 14 pages. Ouvrez pour valider chaque pièce avant diffusion.</div>
+                <div class="notif-meta">hier · push reçu</div>
+              </div>
+              <button class="btn btn-ghost btn-sm">Réviser →</button>
+            </div>
+
+            <div class="notif-item">
+              <div class="notif-icon success">✓</div>
+              <div class="notif-body">
+                <div class="notif-title">Sophie Martin accepte le Tandem</div>
+                <div class="notif-text">Sur l'AO 25-AO-00128 (Réfection toiture lycée Saint-Just). Opportunité Odoo créée.</div>
+                <div class="notif-meta">il y a 2 jours · lue le 09/05</div>
+              </div>
+            </div>
+
+            <div class="notif-item">
+              <div class="notif-icon error">✕</div>
+              <div class="notif-body">
+                <div class="notif-title">Julien Roux indisponible</div>
+                <div class="notif-text">Sur l'AO 25-AO-00128. Vous pouvez proposer le n°2 de la short-list (Pierre Dubois).</div>
+                <div class="notif-meta">il y a 2 jours · lue le 09/05</div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">edifio Sourcing — Maquettes v1.3 (M9-M12) · 2026-05-10 · Théo Renard, Designer Senior · AlyoS Ingénierie</div>
+</div>
+</body>
+</html>

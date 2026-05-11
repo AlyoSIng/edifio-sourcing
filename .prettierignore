@@ -14,7 +14,8 @@ pnpm-lock.yaml
 *.min.js
 *.min.css
 gates/**/*.pdf
-design/maquettes/maquettes_v1.html
+design/maquettes/*.html
+design/copy/*.html
 
 # --- Markdown auteur humain (Phase 1 baseline + docs métier) ---
 # Prettier sur markdown peut mangler les tableaux ASCII et les sauts de ligne
