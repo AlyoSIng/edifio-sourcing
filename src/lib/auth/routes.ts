@@ -14,13 +14,35 @@
  */
 
 /** Routes publiques — pas de vérification middleware. */
-export const PUBLIC_ROUTES = ["/", "/about", "/login", "/auth/callback", "/forbidden"] as const;
+export const PUBLIC_ROUTES = [
+  "/",
+  "/about",
+  "/login",
+  "/auth/callback",
+  "/forbidden",
+  "/forgot-password",
+  // /reset-password est gérée à part : techniquement publique (un visiteur
+  // arrive depuis un email Resend sans cookie de session), mais le
+  // middleware lui applique une logique spécifique (cf. RESET_PASSWORD_PATH
+  // plus bas). On la met dans PUBLIC_ROUTES pour ne pas la traiter comme
+  // protégée par défaut.
+  "/reset-password",
+] as const;
 
 /** Préfixe des routes UI protégées (sourcing app authentifiée). */
 export const PROTECTED_PREFIX = "/sourcing" as const;
 
+/** Préfixe des routes admin — exige role admin en plus de l'auth Alyos. */
+export const ADMIN_PREFIX = "/sourcing/admin" as const;
+
 /** Préfixe des routes API protégées (réponse JSON 403 si refus). */
 export const PROTECTED_API_PREFIX = "/api/protected" as const;
+
+/** Préfixe des routes API admin — exige role admin. */
+export const ADMIN_API_PREFIX = "/api/admin" as const;
+
+/** Path exact de la page reset-password (utilisé pour le branchement middleware). */
+export const RESET_PASSWORD_PATH = "/reset-password" as const;
 
 /**
  * Retourne `true` si le pathname est une route publique (servie sans
@@ -42,5 +64,15 @@ export function isProtectedUiRoute(pathname: string): boolean {
  * Détermine la forme de la réponse en cas de refus (JSON vs redirect).
  */
 export function isProtectedApiRoute(pathname: string): boolean {
-  return pathname.startsWith(PROTECTED_API_PREFIX);
+  return pathname.startsWith(PROTECTED_API_PREFIX) || pathname.startsWith(ADMIN_API_PREFIX);
+}
+
+/**
+ * Retourne `true` si le pathname requiert le rôle `admin`. C'est un sous-
+ * ensemble des routes protégées (UI ou API) qui ne change pas la nature de
+ * la réponse côté middleware (UI redirect / API JSON 403) — la décision se
+ * fait après celle sur l'authentification + domaine.
+ */
+export function isAdminRoute(pathname: string): boolean {
+  return pathname.startsWith(ADMIN_PREFIX) || pathname.startsWith(ADMIN_API_PREFIX);
 }

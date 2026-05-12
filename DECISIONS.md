@@ -408,3 +408,35 @@
 ---
 
 *Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 4 : CI GitHub Actions 6 jobs + Vercel preview auto + branch protection main + premier preview public.*
+
+---
+
+## 2026-05-12 — Gate 6 étape 5 (pivot auth password — ajustements Board Q1-Q4)
+
+> **4 paramètres Board figés sur la base du pivot password initial 2026-05-11.
+> Toute modification ultérieure passe par escalade Board.**
+
+- **2026-05-12 · G6 · Board · Q1/B — TTL provisoire = 24 heures (au lieu de 7 jours).** [BOARD-OK 2026-05-12]
+  *Justification : un lien sensible ne doit pas dormir une semaine dans une boîte mail. Si le collaborateur n'active pas son compte dans la journée, un admin lui regénère un lien (bouton « Renvoyer » dans `/sourcing/admin/users`). Constante renommée `PROVISIONAL_PASSWORD_TTL_HOURS = 24`. Helper `computeProvisionalExpiresAt(ttlHours)`. Wording email mis à jour. Route `POST /api/admin/users/[id]/regenerate-password` implémentée (réutilise le template welcome au MVP — un template dédié reste possible si Léa le demande). Invariante de sécurité documentée dans `password-server.ts` : le password provisoire ne doit JAMAIS être loggué, audité ou persisté en clair côté serveur après envoi (cycle de vie : RAM → Supabase Auth hash bcrypt → Resend → GC).*
+
+- **2026-05-12 · G6 · Board · Q2/B — Mot de passe définitif : MIN_LENGTH = 16 + check top common-passwords.** [BOARD-OK 2026-05-12]
+  *Constante `MIN_LENGTH` passe de 12 à 16. À exigences de classes inchangées, allonger paie le plus en entropie et encourage les passphrases (plus mémorisables qu'un password court complexe). Ajout d'une liste locale `src/lib/auth/common-passwords.ts` (~100 entrées MVP : top 30 universels, sectoriels AlyoS/edifio, saisons + années récentes). Le check `isCommonPassword` est branché dans `validatePasswordStrength` (code d'erreur `TOO_COMMON`, libellé FR « Mot de passe trop courant, choisis-en un moins évident »). `ResetPasswordForm` affiche une astuce passphrase visible (« Astuce : une passphrase facile à retenir et sûre. Ex. : montagne bleue sourire café 7 ! »). TODO Gate 7 : remplacer le sous-ensemble par la liste 10k complète SecLists (MIT) via API ou chargement lazy — ne PAS commiter directement dans le bundle JS.*
+
+- **2026-05-12 · G6 · Board · Q3/A — MFA admin préparée mais désactivée au MVP.** [BOARD-OK 2026-05-12]
+  *Le Board veut juste réserver la place. Implémentation minimale conformément au brief : champ `mfa_enabled?: boolean` ajouté à `UserMetadata` (non câblé UI/API) + commentaire `TODO Phase 2 MFA TOTP` en tête de `src/app/sourcing/admin/users/page.tsx`. Pas de route `/security` dédiée — la créer pour un toggle désactivé serait du gaspillage. Activation prévue Phase 2 via `supabase.auth.mfa.enroll({ factorType: "totp" })` quand le SaaS multi-clients s'ouvrira.*
+
+- **2026-05-12 · G6 · Board · Q4/A — Rate-limit login 5 / 15 min / 15 min + countdown UI.** [BOARD-OK 2026-05-12]
+  *Configuration côté Supabase Dashboard à régler par [PS_OPERATOR Yann] en parallèle (5 tentatives échouées en 15 min → blocage 15 min). Côté code : helper `isRateLimitError` détecte 429 / `over_request_rate_limit` / message `rate.?limit` (3 signaux selon version SDK). `signInWithPasswordAction` peuple `LoginState.rateLimitedUntil` (timestamp absolu ms). `LoginForm` consomme le hook `useCountdown` (tick 500 ms, lecture `Date.now()` à chaque tick pour éviter la dérive) et affiche un countdown `mm:ss` visible + bouton submit désactivé pendant le cooldown. Anti-énumération préservée pour les 401 (message générique « Email ou mot de passe incorrect »). Constante dédiée `LOGIN_RATE_LIMIT_COOLDOWN_MS`.*
+
+- **2026-05-12 · G6 · DEV Alex · Décision ad hoc — détection rate-limit extraite dans `src/app/login/rate-limit.ts`.** [DÉCISION DEV]
+  *`actions.ts` est tagué `"use server"` et Next.js 14 interdit d'exporter autre chose que des async functions depuis ce type de fichier (`https://nextjs.org/docs/messages/invalid-use-server-value`). Pour rendre `isRateLimitError` testable en Vitest, le helper vit dans un module séparé. Pas d'impact runtime — l'import est interne au flow login.*
+
+- **2026-05-12 · G6 · DEV Alex · Décision ad hoc — hook `useCountdown` testé via fonction pure `computeRemaining`.** [DÉCISION DEV]
+  *Vitest est configuré en environnement `node` (pas `jsdom`) — impossible de monter un hook React. La fonction pure `computeRemaining(deadlineMs, now)` est testable directement (10 cas couverts). Le comportement runtime du hook (`useEffect` / `setInterval`) sera validé en E2E Playwright via le formulaire login (test à ajouter dans `auth-password.spec.ts` quand la config Supabase rate-limit sera réglée — non bloquant Gate 6 étape 5).*
+
+- **2026-05-12 · G6 · DEV Alex · Tests Vitest : 121 verts (49 baseline + 72 ajoutés cumulés sur le pivot + ajustements).** [LIVRABLE]
+  *7 fichiers de tests, coverage 97.05 % statements / 100 % fonctions / 92.95 % branches (seuil 90 % largement tenu). Typecheck OK, lint OK, build OK, prettier OK. E2E couvert par le job `ci-e2e` à l'ouverture de la PR.*
+
+---
+
+*Dernière mise à jour : 2026-05-12 par [DEV Alex] — Gate 6 étape 5 : ajustements Board Q1/B Q2/B Q3/A Q4/A sur le pivot auth password. Aucune migration BDD (spike ORM toujours pas tranché). Aucun commit ni push (Yann gère).*

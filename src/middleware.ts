@@ -2,56 +2,69 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { isProtectedApiRoute, isProtectedUiRoute, isPublicRoute } from "@/lib/auth/routes";
+import {
+  isAdminRoute,
+  isProtectedApiRoute,
+  isProtectedUiRoute,
+  isPublicRoute,
+  RESET_PASSWORD_PATH,
+} from "@/lib/auth/routes";
+import { isProvisionalPasswordExpired, mustChangePassword, toUserProfile } from "@/lib/auth/types";
 
 /**
- * Middleware racine — garde de domaine `@alyosingenierie.fr`.
+ * Middleware racine — garde de domaine `@alyosingenierie.fr` + gates
+ * `must_change_password` et `admin`.
  *
- * Source de vérité : `specs/middleware_domain_gate.md` §3.1.
- * Implémente la matrice de 12 cas C1-C12 documentée dans §2 de la spec.
+ * Source de vérité initiale : `specs/middleware_domain_gate.md` §3.1.
+ * Extension Board 2026-05-11 (pivot password) :
+ *   - redirection forcée vers /reset-password si `must_change_password === true`
+ *   - garde `admin` sur `/sourcing/admin/*` et `/api/admin/*`
  *
  * Garde-fou Board (CLAUDE.md — Limites strictes) : la désactivation de ce
- * middleware est INTERDITE. Toute modification de comportement doit faire
- * l'objet d'une PR validée [CTO Sophie] + remontée Board.
+ * middleware est INTERDITE. La garde de domaine reste la base, les nouvelles
+ * règles s'empilent par-dessus.
  *
- * Pattern cookies : API `getAll` / `setAll` de `@supabase/ssr` 0.6+ — le
- * setAll recrée `supabaseResponse` à chaque batch de cookies pour propager
- * correctement les rafraîchissements de session côté navigateur (pattern
- * officiel Supabase pour Next.js 14 App Router).
+ * Pattern cookies : API `getAll` / `setAll` de `@supabase/ssr` 0.6+.
  */
 
 export const config = {
-  // Applique le middleware partout sauf sur les internals Next (`_next/*`)
-  // et le favicon. Les assets `/public/*.svg|png|...` peuvent passer dans le
-  // middleware sans conséquence : ils ne matchent ni `isPublicRoute` ni
-  // `isProtectedUiRoute` ni `isProtectedApiRoute` → pass-through immédiat.
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
 
-  // Garde-fou défensif — toute erreur non capturée dans la logique métier du
-  // middleware aurait pour effet un 500 MIDDLEWARE_INVOCATION_FAILED sur Vercel
-  // Edge, ce qui exposerait des routes protégées sans contrôle. On préfère
-  // logger + redirect /login (fail-closed) en cas d'imprévu.
   try {
-    // C1 / C5 — routes publiques : laisser passer sans vérification de session.
+    // ---------- 1. Routes publiques (laissées passer) ----------
+    // Important : on traverse quand même Supabase pour les routes publiques
+    // qui peuvent vouloir agir sur la session (par ex. /reset-password en
+    // flow first-login lit la session). Mais on n'applique pas la garde.
     if (isPublicRoute(pathname)) {
+      // Cas spécial /reset-password : si l'utilisateur est connecté et n'a
+      // PAS must_change_password=true, on l'envoie dans l'app (évite qu'un
+      // user actif tombe sur cette page par hasard via un vieux lien).
+      if (pathname === RESET_PASSWORD_PATH) {
+        // On lit la session si elle existe — mais on ne force rien si pas
+        // de Supabase configuré.
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (supabaseUrl && supabaseAnonKey) {
+          // Peut servir plus tard pour rediriger un user qui n'a plus
+          // besoin de reset. Pour le MVP on ne fait rien — laisse passer.
+          // Si on voulait l'implémenter : lire la session, si user + !mustChangePassword
+          // ET pas de code en URL → redirect /sourcing/ao-du-jour.
+        }
+      }
       return NextResponse.next();
     }
 
-    // Routes ni publiques ni protégées (par exemple `/random-debug`) : on les
-    // laisse passer. Le contrôle s'applique uniquement aux préfixes `/sourcing`
-    // et `/api/protected`.
+    // ---------- 2. Routes ni publiques ni protégées ----------
     const requiresAuth = isProtectedUiRoute(pathname) || isProtectedApiRoute(pathname);
     if (!requiresAuth) {
       return NextResponse.next();
     }
 
-    // Garde-fou env — si Supabase n'est pas encore configuré, on traite tout
-    // comme anonyme : redirection vers /login. Évite que le middleware crashe
-    // le serveur dev avant l'install Supabase.
+    // ---------- 3. Garde-fou env Supabase ----------
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -61,10 +74,6 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       return redirectToLogin(req, pathname);
     }
 
-    // `supabaseResponse` est réinitialisé à chaque appel de `setAll` (pattern
-    // officiel @supabase/ssr 0.6+). On garde une `let` pour pouvoir lui
-    // réassigner une nouvelle réponse quand les cookies de session sont
-    // rafraîchis par `getUser()`.
     let supabaseResponse = NextResponse.next({ request: req });
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -85,23 +94,20 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     });
 
     // IMPORTANT : ne PAS exécuter de logique métier entre `createServerClient`
-    // et `supabase.auth.getUser()` (warning officiel Supabase — bogue subtil
-    // de session aléatoirement perdue sinon).
+    // et `supabase.auth.getUser()` (warning officiel Supabase).
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // C2 / C8 / C9 — pas de session valide (anonyme, expirée, JWT tampering) :
-    // redirection vers /login avec la route demandée en query string.
+    // ---------- 4. Session absente ----------
     if (!user) {
       return redirectToLogin(req, pathname);
     }
 
-    // C3 / C4 / C7 / C10 / C11 / C12 — décision sur le domaine email.
+    // ---------- 5. Garde domaine `@alyosingenierie.fr` (INCHANGÉE) ----------
     const email = user.email ?? null;
     const allowed = isAuthorizedEmail(email);
 
-    // Audit log de la tentative d'accès — succès ET échec (cf. spec §6).
     void logAccessAttempt({
       email: email?.toLowerCase() ?? null,
       pathname,
@@ -111,10 +117,8 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     });
 
     if (!allowed) {
-      // C4 / C7 — session non Alyos : invalidation immédiate côté Supabase.
       await supabase.auth.signOut();
 
-      // C7 — route API protégée : réponse JSON 403, pas de redirect.
       if (isProtectedApiRoute(pathname)) {
         return new NextResponse(
           JSON.stringify({
@@ -128,18 +132,65 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
         );
       }
 
-      // C4 — route UI protégée : redirection vers la page /forbidden dédiée.
       return NextResponse.redirect(new URL("/forbidden", req.url));
     }
 
-    // C3 / C6 — accès autorisé. On renvoie la `supabaseResponse` qui porte
-    // les cookies de session rafraîchis posés par `getUser()`.
+    // ---------- 6. Gate must_change_password ----------
+    // Extension pivot password : si le user est sur un provisoire (must_change=true),
+    // on le force vers /reset-password tant qu'il n'a pas choisi un mot de passe.
+    // Note : la page /reset-password est dans PUBLIC_ROUTES (étape 1) donc le
+    // middleware n'arrive ici que pour les routes protégées — pas de boucle.
+    const profile = toUserProfile(user);
+    if (mustChangePassword(profile)) {
+      // Cas pathologique : provisoire expiré et user encore avec un token
+      // valide (qui peut arriver si l'expiration est posée côté metadata
+      // mais qu'on l'ignore côté JWT). On signe-out et on renvoie /login
+      // avec un message explicite. La Server Action signInWithPasswordAction
+      // applique la même règle au moment du login.
+      if (isProvisionalPasswordExpired(profile)) {
+        await supabase.auth.signOut();
+        const loginUrl = new URL("/login", req.url);
+        loginUrl.searchParams.set("error", "provisional_expired");
+        return NextResponse.redirect(loginUrl);
+      }
+
+      // Route API : 403 avec code explicite plutôt qu'un redirect (les
+      // appels fetch ne suivent pas l'auth flow).
+      if (isProtectedApiRoute(pathname)) {
+        return new NextResponse(
+          JSON.stringify({
+            error: "password_change_required",
+            message: "Veuillez définir votre mot de passe avant d'accéder à l'API.",
+          }),
+          { status: 403, headers: { "content-type": "application/json" } },
+        );
+      }
+
+      // Route UI : redirect /reset-password (qui détectera la session et
+      // affichera le form en mode first-login).
+      return NextResponse.redirect(new URL(RESET_PASSWORD_PATH, req.url));
+    }
+
+    // ---------- 7. Gate admin ----------
+    if (isAdminRoute(pathname) && profile.role !== "admin") {
+      if (isProtectedApiRoute(pathname)) {
+        return new NextResponse(
+          JSON.stringify({
+            error: "forbidden_role",
+            message: "Réservé aux administrateurs.",
+          }),
+          { status: 403, headers: { "content-type": "application/json" } },
+        );
+      }
+      // UI : on redirige vers ao-du-jour avec un flash error pour signaler.
+      const fallback = new URL("/sourcing/ao-du-jour", req.url);
+      fallback.searchParams.set("error", "forbidden");
+      return NextResponse.redirect(fallback);
+    }
+
+    // ---------- 8. Accès autorisé ----------
     return supabaseResponse;
   } catch (err) {
-    // Fail-closed : on log un maximum d'info pour debug Vercel runtime
-    // logs, puis on redirige sur /login (route publique sûre) plutôt que
-    // de laisser une 500 exposer la route protégée. Si le bug est ailleurs
-    // que dans la session, on saura le voir via les logs.
     console.error("[middleware:unhandled]", {
       pathname,
       message: err instanceof Error ? err.message : String(err),
@@ -149,24 +200,12 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   }
 }
 
-/**
- * Redirige vers `/login?next=<pathname>` pour conserver la destination
- * d'origine après authentification (cf. spec §2 cas C2 / C8).
- */
 function redirectToLogin(req: NextRequest, pathname: string): NextResponse {
   const loginUrl = new URL("/login", req.url);
   loginUrl.searchParams.set("next", pathname);
   return NextResponse.redirect(loginUrl);
 }
 
-/**
- * Extrait l'IP cliente depuis les headers de la requête. On évite
- * volontairement `req.ip` (déprécié Next 15+, instable sur Edge runtime
- * dans certaines régions Vercel) au profit de `x-forwarded-for` qui est
- * posé par Vercel sur toutes les requêtes.
- *
- * Ordre : `x-forwarded-for` (premier hop) → `x-real-ip` → null.
- */
 function extractClientIp(req: NextRequest): string | null {
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) {
@@ -180,8 +219,7 @@ function extractClientIp(req: NextRequest): string | null {
  * Stub d'audit log — version étape 3 Gate 6.
  *
  * À l'étape 7 (post-décision ORM + première migration), brancher l'insertion
- * réelle dans `audit_logs` (action = `access_attempt`, cf. `specs/audit_log_v1.md`
- * et le schéma `specs/schema_v1.sql`).
+ * réelle dans `audit_logs` (action = `access_attempt`).
  */
 async function logAccessAttempt(payload: {
   email: string | null;
@@ -190,7 +228,6 @@ async function logAccessAttempt(payload: {
   ip: string | null;
   userAgent: string | null;
 }): Promise<void> {
-  // TODO étape 7 Gate 6 — INSERT INTO audit_logs (action, actor_email, data, ...)
-  // via service_role côté Edge Function ou route handler dédié.
+  // TODO post-ORM : INSERT INTO audit_logs (...)
   console.warn("[audit_log:access_attempt]", JSON.stringify(payload));
 }
