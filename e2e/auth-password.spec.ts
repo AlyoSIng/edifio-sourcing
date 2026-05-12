@@ -115,8 +115,9 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
 
     // La Server Action signInWithPasswordAction refuse en pré-validation
     // (garde domaine côté action) — message d'erreur sous le form, pas
-    // de redirect.
-    await expect(page.getByRole("alert")).toContainText(/alyosingenierie\.fr/i);
+    // de redirect. On cible data-testid pour éviter le matching parasite
+    // sur le <div role="alert" id="__next-route-announcer__"> de Next.js.
+    await expect(page.getByTestId("auth-error")).toContainText(/alyosingenierie\.fr/i);
   });
 
   test("S4 — Mot de passe oublié → flow reset complet via lien recovery", async ({ page }) => {
@@ -170,7 +171,7 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     // L'erreur doit s'afficher côté UI (validation serveur) sans changer
     // l'URL (on reste sur /reset-password).
     await expect(page).toHaveURL(/\/reset-password/);
-    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.getByTestId("auth-error")).toBeVisible();
   });
 
   test("S6 — Password provisoire expiré refuse la connexion avec message clair", async ({
@@ -187,7 +188,7 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
 
     // signInWithPasswordAction détecte l'expiration et signOut. L'utilisateur
     // reste sur /login avec un message explicite.
-    await expect(page.getByRole("alert")).toContainText(/expir/i);
-    await expect(page.getByRole("alert")).toContainText(/administrateur/i);
+    await expect(page.getByTestId("auth-error")).toContainText(/expir/i);
+    await expect(page.getByTestId("auth-error")).toContainText(/administrateur/i);
   });
 });

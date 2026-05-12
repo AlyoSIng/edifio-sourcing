@@ -74,6 +74,7 @@ export function LoginForm({ next }: { next?: string }) {
       {state.status === "error" ? (
         <div
           role="alert"
+          data-testid="auth-error"
           className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
         >
           <p>{state.message}</p>
