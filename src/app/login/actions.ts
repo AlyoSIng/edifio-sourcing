@@ -125,8 +125,21 @@ export async function signInWithPasswordAction(
       };
     }
 
-    // Succès : on prépare la redirection hors du try (cf. note redirect).
-    redirectTo = next;
+    // Si l'utilisateur doit changer son mot de passe (flow first-login avec
+    // provisoire valide), on shunte la cible `next` et on l'envoie
+    // directement sur /reset-password. Le middleware sait aussi le faire,
+    // mais le passage par `next` (= /sourcing/ao-du-jour par défaut)
+    // déclenche en pratique une chaîne Server Action → fetch RSC interne
+    // qui n'embarque pas toujours le cookie auth fraîchement posé — résultat,
+    // la redirection arrivait avec plusieurs secondes de retard sur CI
+    // (constaté sur les traces E2E de la PR auth-pivot). On décide
+    // directement ici puisque le profil est déjà chargé : défense en
+    // profondeur + comportement déterministe côté tests.
+    if (mustChangePassword(profile)) {
+      redirectTo = "/reset-password";
+    } else {
+      redirectTo = next;
+    }
   } catch (err) {
     console.error("[signInWithPasswordAction:unhandled]", {
       message: err instanceof Error ? err.message : String(err),
@@ -140,8 +153,9 @@ export async function signInWithPasswordAction(
 
   // `redirect()` throw un `NEXT_REDIRECT` qui doit s'échapper du try/catch.
   // On l'appelle après le bloc try pour ne pas le confondre avec une erreur
-  // imprévue. Le middleware se chargera ensuite de la redirection vers
-  // `/reset-password` si `must_change_password === true`.
+  // imprévue. La cible est résolue plus haut : `/reset-password` pour les
+  // users provisoires, `next` (sanitizé) sinon. Le middleware reste la
+  // ligne de défense pour les accès directs (URL collée, bookmark).
   if (redirectTo) redirect(redirectTo);
   return { status: "idle" };
 }

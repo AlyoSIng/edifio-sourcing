@@ -45,7 +45,14 @@ export async function requestPasswordResetAction(
     }
 
     const admin = createSupabaseAdminClient();
-    const redirectTo = `${getSiteUrl()}/reset-password`;
+    // Route le retour de Supabase via /auth/callback pour que le
+    // ClientCallbackHandler décode le fragment d'URL (#access_token=…) que
+    // /auth/v1/verify pose en mode implicit flow. Sans cette indirection, la
+    // session n'est jamais établie sur localhost (cookies posés côté Supabase
+    // uniquement) et /reset-password affiche "Lien invalide". Une fois la
+    // session posée par setSession, le callback redirige sur /reset-password
+    // qui détecte la session et affiche le form en mode recovery.
+    const redirectTo = `${getSiteUrl()}/auth/callback?next=/reset-password`;
 
     const { data, error } = await admin.auth.admin.generateLink({
       type: "recovery",

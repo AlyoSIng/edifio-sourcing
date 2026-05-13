@@ -13,15 +13,20 @@ export const metadata = {
 /**
  * Page de définition / réinitialisation du mot de passe.
  *
- * Deux contextes :
- *   - `?code=...` ou `?token_hash=...` ou `?token=...` : flow recovery. Le
- *     code arrive depuis le lien Resend → Supabase. On le passe au form qui
- *     le renverra dans la Server Action.
- *   - pas de code mais user authentifié avec must_change_password=true :
- *     flow first-login. Pas de code, le form opère sur la session courante.
+ * Trois entrées valides :
+ *   1. `?code=...` (ou `?token_hash`, `?token`) : flow recovery PKCE. Le code
+ *      arrive en query string, on le passe au form qui le renverra dans la
+ *      Server Action (qui appellera `exchangeCodeForSession`).
+ *   2. Pas de code mais user authentifié avec `must_change_password=true` :
+ *      flow first-login. Le form opère sur la session courante.
+ *   3. Pas de code mais session "fraîche" (recovery en implicit flow — les
+ *      tokens arrivent en fragment d'URL `#access_token=…`, décodés par
+ *      `/auth/callback` qui pose la session puis redirige ici). On accepte
+ *      en mode recovery — sans ce cas, un utilisateur durable cliquant sur
+ *      le lien recovery verrait "Lien invalide".
  *
  * Cas non valide :
- *   - pas de code ET pas de session valide → message + lien forgot-password.
+ *   - pas de code ET pas de session → message + lien forgot-password.
  */
 export default async function ResetPasswordPage({
   searchParams,
@@ -32,9 +37,20 @@ export default async function ResetPasswordPage({
   // de l'auth helper utilisée — on prend le premier non vide.
   const code = searchParams?.code ?? searchParams?.token ?? searchParams?.token_hash;
 
-  // Si pas de code, on vérifie qu'on a une session valide (flow first-login).
-  let firstLoginEligible = false;
-  if (!code) {
+  // Trois entrées valides sur cette page :
+  //   1. `code` en URL (PKCE recovery) → mode "recovery"
+  //   2. Pas de code mais session avec `must_change_password=true` → "first_login"
+  //   3. Pas de code mais session "fraîche" (recovery par hash fragment passé
+  //      par /auth/callback qui a déjà fait setSession) → "recovery"
+  // Cas (3) couvre les projets Supabase qui renvoient les tokens en fragment
+  // d'URL (#access_token=…) que seul le browser peut lire — le flow recovery
+  // de production passe par /auth/callback qui décode le fragment et
+  // redirige ici avec la session déjà posée. Sans cas (3), un utilisateur
+  // durable cliquant sur le lien recovery verrait "Lien invalide".
+  let formMode: "recovery" | "first_login" | null = null;
+  if (code) {
+    formMode = "recovery";
+  } else {
     try {
       const supabase = createSupabaseServerClient();
       const {
@@ -42,17 +58,15 @@ export default async function ResetPasswordPage({
       } = await supabase.auth.getUser();
       if (user) {
         const profile = toUserProfile(user);
-        if (mustChangePassword(profile)) {
-          firstLoginEligible = true;
-        }
+        formMode = mustChangePassword(profile) ? "first_login" : "recovery";
       }
     } catch {
       // Defensive — pas de session, on tombera dans le cas « invalide » plus bas.
     }
   }
 
-  const showForm = Boolean(code) || firstLoginEligible;
-  const mode: "recovery" | "first_login" = code ? "recovery" : "first_login";
+  const showForm = formMode !== null;
+  const mode: "recovery" | "first_login" = formMode ?? "recovery";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-12">

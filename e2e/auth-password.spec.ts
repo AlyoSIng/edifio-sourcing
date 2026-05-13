@@ -132,12 +132,20 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     await expect(page.getByRole("status")).toContainText(/Demande prise en compte/i);
 
     // Récupération du lien recovery (équivalent au lien qu'aurait reçu
-    // l'utilisateur par email).
+    // l'utilisateur par email). On passe par /auth/callback pour que le
+    // ClientCallbackHandler décode le fragment d'URL que Supabase renvoie en
+    // implicit flow (#access_token=…) et établisse la session sur localhost
+    // — sans cette indirection, /reset-password verrait une page sans
+    // session et afficherait "Lien invalide". Cohérent avec
+    // `requestPasswordResetAction` côté production.
     const baseURL = page.url().split("/forgot-password")[0] ?? "http://localhost:3000";
-    const recoveryUrl = await getRecoveryLink(email, `${baseURL}/reset-password`);
+    const recoveryUrl = await getRecoveryLink(
+      email,
+      `${baseURL}/auth/callback?next=/reset-password`,
+    );
 
-    // Suivi du lien — Supabase ajoute un `code` en query string lors du
-    // redirect vers /reset-password.
+    // Suivi du lien — chaîne : Supabase verify → /auth/callback →
+    // setSession (client-side) → /reset-password.
     await page.goto(recoveryUrl);
     await page.waitForURL(/\/reset-password/, { timeout: 10_000 });
 

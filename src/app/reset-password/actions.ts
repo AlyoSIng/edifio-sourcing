@@ -12,16 +12,25 @@ import type { ResetPasswordState } from "./types";
  * Server Action — définit ou réinitialise le mot de passe de l'utilisateur
  * courant.
  *
- * Deux flows :
+ * Trois flows possibles, distingués via `wasFirstLogin` (snapshot des metadata
+ * AVANT update — la présence/absence de `code` ne suffit plus depuis que le
+ * recovery passe par /auth/callback en implicit flow) :
  *
- * 1. **Recovery** — l'utilisateur arrive depuis un lien email avec `code` en
- *    URL. La page passe ce `code` à l'action via le formulaire hidden field.
- *    On échange le code contre une session via `exchangeCodeForSession`, puis
- *    on met à jour le password.
+ * 1. **Recovery PKCE** — l'utilisateur arrive depuis un lien email avec `code`
+ *    en URL. La page passe ce `code` à l'action via un hidden field. On
+ *    échange le code contre une session via `exchangeCodeForSession`, puis on
+ *    met à jour le password.
  *
  * 2. **First-login** — l'utilisateur est déjà connecté (session valide) avec
  *    `must_change_password === true`. Pas de `code`. On met à jour le
- *    password + on remet à zéro les flags metadata.
+ *    password + on remet à zéro les flags metadata + on le laisse connecté
+ *    (redirect direct vers l'app).
+ *
+ * 3. **Recovery implicit flow** — l'utilisateur arrive depuis un lien email
+ *    mais Supabase a posé les tokens en fragment d'URL (`#access_token=…`)
+ *    décodé par /auth/callback qui a fait `setSession` puis redirigé ici.
+ *    Pas de `code` en URL, mais session établie SANS `must_change_password`.
+ *    Traité comme recovery : signOut + redirect login pour re-saisie sécurité.
  *
  * Validation côté serveur : force du mot de passe + confirmation match.
  * Audit log de l'action (TODO étape post-ORM — pour le moment console.warn).
@@ -86,7 +95,12 @@ export async function updatePasswordAction(
     }
 
     // Reset des flags metadata associés au provisoire (s'ils étaient posés).
+    // On capture l'état AVANT update pour distinguer first-login (provisoire)
+    // de recovery (durable) — `code` seul ne suffit pas, car la branche
+    // recovery via fragment d'URL passe par /auth/callback et arrive ici
+    // sans `code` mais avec session établie (cf. ResetPasswordPage cas 3).
     const currentMeta = (user.user_metadata ?? {}) as UserMetadata;
+    const wasFirstLogin = currentMeta.must_change_password === true;
     const nextMeta: UserMetadata = {
       ...currentMeta,
       must_change_password: false,
@@ -112,18 +126,19 @@ export async function updatePasswordAction(
     console.warn("[audit_log:password_updated]", {
       user_id: profile.id,
       email: profile.email,
-      flow: code ? "recovery" : "first_login",
+      flow: wasFirstLogin ? "first_login" : "recovery",
     });
 
-    // Décision : on signe-out l'utilisateur côté recovery (sécurité — il
-    // re-saisira son nouveau mot de passe ; cohérent avec le comportement
-    // des outils SaaS habituels). En flow first-login, on le laisse connecté
-    // et on l'envoie directement dans l'app.
-    if (code) {
+    // Décision : en flow first-login on laisse l'utilisateur connecté et on
+    // l'envoie directement dans l'app (son provisoire est désormais remplacé,
+    // pas besoin de re-saisir). En flow recovery (le user redémarre depuis
+    // un mot de passe oublié) on signe-out par sécurité — il re-saisira son
+    // nouveau mot de passe, cohérent avec les outils SaaS classiques.
+    if (wasFirstLogin) {
+      redirectTo = "/sourcing/ao-du-jour";
+    } else {
       await supabase.auth.signOut();
       redirectTo = "/login?notice=password_updated";
-    } else {
-      redirectTo = "/sourcing/ao-du-jour";
     }
   } catch (err) {
     console.error("[updatePasswordAction:unhandled]", {
