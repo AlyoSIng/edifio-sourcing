@@ -54,9 +54,13 @@ export default async function AuthCallback({
     redirect(next);
   }
 
-  // Erreur explicite renvoyée par Supabase (lien expiré, déjà consommé, etc.).
+  // Erreur explicite renvoyée par Supabase via query string (lien expiré,
+  // déjà consommé, accès refusé, etc.). On redirige vers la page d'erreur
+  // dédiée avec un message UX clair. Cf. ADR-011.
   if (errorParam) {
-    redirect("/login?error=magic_link_invalid");
+    const errorParams = new URLSearchParams();
+    errorParams.set("code", errorParam);
+    redirect(`/auth/error?${errorParams.toString()}`);
   }
 
   // Pas de `code` en query → soit c'est un implicit flow avec tokens dans le

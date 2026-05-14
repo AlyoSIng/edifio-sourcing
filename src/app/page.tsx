@@ -1,17 +1,24 @@
 import Link from "next/link";
 
 import { EdifioLogo } from "@/components/EdifioLogo";
+import { HashErrorHandler } from "@/components/HashErrorHandler";
 
 /**
  * Home publique — affichée à tous, y compris visiteurs anonymes.
  * Si l'utilisateur est connecté avec un email `@alyosingenierie.fr`,
  * le lien « Accéder à edifio Sourcing » pointe vers `/sourcing/ao-du-jour`
  * (protégé par le middleware).
+ *
+ * Inclut `HashErrorHandler` : intercepte le cas où Supabase Auth fait
+ * fallback sur le Site URL (la home) avec un fragment d'erreur
+ * (#error=…&error_code=otp_expired&…) — typiquement après qu'un scanner
+ * email d'entreprise ait pré-cliqué le lien recovery. Cf. ADR-011.
  */
 export default function Home() {
   const year = new Date().getFullYear();
   return (
     <main className="flex min-h-screen flex-col">
+      <HashErrorHandler />
       <header className="border-b border-neutral-200 px-8 py-6">
         <EdifioLogo />
       </header>
