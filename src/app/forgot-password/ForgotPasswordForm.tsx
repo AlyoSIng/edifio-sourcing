@@ -58,7 +58,7 @@ function SubmitButton() {
       disabled={pending}
       className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-400"
     >
-      {pending ? "Envoi…" : "Recevoir un lien de réinitialisation"}
+      {pending ? "Envoi…" : "Recevoir un nouveau mot de passe"}
     </button>
   );
 }
@@ -74,8 +74,8 @@ function SuccessState() {
       </div>
       <h3 className="font-display text-lg font-semibold">Demande prise en compte</h3>
       <p className="text-sm text-neutral-600">
-        Si un compte existe pour cet email, un lien de réinitialisation vient d&apos;être envoyé.
-        Vérifie ta boîte mail.
+        Si un compte existe pour cet email, un nouveau mot de passe provisoire vient d&apos;être
+        envoyé. Vérifie ta boîte mail puis connecte-toi avec ce mot de passe.
       </p>
       <p className="text-xs text-neutral-500">
         Pas reçu ? Vérifie tes spams ou réessaie dans quelques minutes.

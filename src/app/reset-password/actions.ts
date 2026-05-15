@@ -9,31 +9,25 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ResetPasswordState } from "./types";
 
 /**
- * Server Action — définit ou réinitialise le mot de passe de l'utilisateur
- * courant.
+ * Server Action — définit le mot de passe définitif de l'utilisateur courant.
  *
- * Trois flows possibles, distingués via `wasFirstLogin` (snapshot des metadata
- * AVANT update — la présence/absence de `code` ne suffit plus depuis que le
- * recovery passe par /auth/callback en implicit flow) :
+ * **ADR-011 couche 3** : depuis l'abandon du flow recovery tokenisé Supabase
+ * (token consommé par le scanner email d'entreprise AlyoS), il n'existe plus
+ * qu'un seul chemin pour arriver ici — le user vient de se connecter avec
+ * son mot de passe provisoire (issu d'une invitation admin OU d'un
+ * `forgot-password` qui a regénéré un provisoire et l'a envoyé par Resend).
+ * Le middleware le force-redirige sur `/reset-password` parce que
+ * `must_change_password === true`. La session est donc déjà établie en
+ * arrivant sur cette action ; il suffit de :
  *
- * 1. **Recovery PKCE** — l'utilisateur arrive depuis un lien email avec `code`
- *    en URL. La page passe ce `code` à l'action via un hidden field. On
- *    échange le code contre une session via `exchangeCodeForSession`, puis on
- *    met à jour le password.
+ *   1. valider la force du nouveau mot de passe,
+ *   2. update le password + reset les flags metadata,
+ *   3. rediriger vers `/sourcing/ao-du-jour`.
  *
- * 2. **First-login** — l'utilisateur est déjà connecté (session valide) avec
- *    `must_change_password === true`. Pas de `code`. On met à jour le
- *    password + on remet à zéro les flags metadata + on le laisse connecté
- *    (redirect direct vers l'app).
+ * Plus de branche PKCE (`?code`) ni recovery implicit (fragment
+ * `#access_token`) : ces deux chemins sont morts depuis l'ADR-011.
  *
- * 3. **Recovery implicit flow** — l'utilisateur arrive depuis un lien email
- *    mais Supabase a posé les tokens en fragment d'URL (`#access_token=…`)
- *    décodé par /auth/callback qui a fait `setSession` puis redirigé ici.
- *    Pas de `code` en URL, mais session établie SANS `must_change_password`.
- *    Traité comme recovery : signOut + redirect login pour re-saisie sécurité.
- *
- * Validation côté serveur : force du mot de passe + confirmation match.
- * Audit log de l'action (TODO étape post-ORM — pour le moment console.warn).
+ * Cf. `specs/adr_011_auth_strategy_post_scanner.md`.
  */
 export async function updatePasswordAction(
   _prevState: ResetPasswordState,
@@ -44,7 +38,6 @@ export async function updatePasswordAction(
   try {
     const password = formData.get("password");
     const confirm = formData.get("confirm");
-    const code = formData.get("code");
 
     if (typeof password !== "string" || password.length === 0) {
       return { status: "error", message: "Veuillez saisir un nouveau mot de passe." };
@@ -66,41 +59,23 @@ export async function updatePasswordAction(
     }
 
     const supabase = createSupabaseServerClient();
-
-    // Flow 1 : recovery — on échange d'abord le code contre une session.
-    if (typeof code === "string" && code.length > 0) {
-      const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
-      if (exchErr) {
-        console.warn("[reset-password:exchange:fail]", { message: exchErr.message });
-        return {
-          status: "error",
-          message:
-            "Le lien de réinitialisation est invalide ou a expiré. Refaites une demande depuis « Mot de passe oublié ».",
-        };
-      }
-    }
-
-    // À ce stade on doit avoir une session — soit du flow recovery, soit du
-    // flow first-login (user déjà loggé).
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
+      // Session absente / expirée — l'utilisateur doit recommencer depuis
+      // « Mot de passe oublié » qui lui regénèrera un provisoire.
       return {
         status: "error",
-        message:
-          "Session expirée. Recommencez la procédure depuis la page « Mot de passe oublié ».",
+        message: "Session expirée. Recommence la procédure depuis la page « Mot de passe oublié ».",
       };
     }
 
-    // Reset des flags metadata associés au provisoire (s'ils étaient posés).
-    // On capture l'état AVANT update pour distinguer first-login (provisoire)
-    // de recovery (durable) — `code` seul ne suffit pas, car la branche
-    // recovery via fragment d'URL passe par /auth/callback et arrive ici
-    // sans `code` mais avec session établie (cf. ResetPasswordPage cas 3).
+    // Reset des flags metadata associés au provisoire. `password_reset_at`
+    // est conservé tel quel pour la trace audit ; seules les deux clés qui
+    // décrivent l'état « provisoire actif » sont remises à zéro.
     const currentMeta = (user.user_metadata ?? {}) as UserMetadata;
-    const wasFirstLogin = currentMeta.must_change_password === true;
     const nextMeta: UserMetadata = {
       ...currentMeta,
       must_change_password: false,
@@ -126,20 +101,11 @@ export async function updatePasswordAction(
     console.warn("[audit_log:password_updated]", {
       user_id: profile.id,
       email: profile.email,
-      flow: wasFirstLogin ? "first_login" : "recovery",
     });
 
-    // Décision : en flow first-login on laisse l'utilisateur connecté et on
-    // l'envoie directement dans l'app (son provisoire est désormais remplacé,
-    // pas besoin de re-saisir). En flow recovery (le user redémarre depuis
-    // un mot de passe oublié) on signe-out par sécurité — il re-saisira son
-    // nouveau mot de passe, cohérent avec les outils SaaS classiques.
-    if (wasFirstLogin) {
-      redirectTo = "/sourcing/ao-du-jour";
-    } else {
-      await supabase.auth.signOut();
-      redirectTo = "/login?notice=password_updated";
-    }
+    // Le user a remplacé son provisoire par un mot de passe durable — on
+    // l'envoie directement dans l'app, pas besoin de re-saisir.
+    redirectTo = "/sourcing/ao-du-jour";
   } catch (err) {
     console.error("[updatePasswordAction:unhandled]", {
       message: err instanceof Error ? err.message : String(err),

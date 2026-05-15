@@ -30,6 +30,14 @@ export interface UserMetadata {
   must_change_password?: boolean;
   /** ISO 8601 ; null si déjà changé / non applicable. */
   provisional_password_expires_at?: string | null;
+  /**
+   * ISO 8601 — horodatage de la dernière demande de reset password (ADR-011
+   * couche 3, posé par `requestPasswordResetAction`). Permet à l'audit log
+   * post-ORM de distinguer un provisoire « invitation » d'un provisoire
+   * « reset à l'initiative du user ». Optionnel : absent pour les comptes
+   * créés via invitation admin qui n'ont jamais demandé de reset.
+   */
+  password_reset_at?: string | null;
   first_name?: string;
   last_name?: string;
   /**

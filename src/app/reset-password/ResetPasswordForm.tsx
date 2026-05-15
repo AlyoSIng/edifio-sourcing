@@ -10,27 +10,19 @@ import { updatePasswordAction } from "./actions";
 import { initialResetPasswordState, type ResetPasswordState } from "./types";
 
 /**
- * Formulaire de définition / réinitialisation du mot de passe.
+ * Formulaire de définition du mot de passe définitif (ADR-011 couche 3).
  *
- * Deux contextes possibles, signalés via le prop `code` :
- *   - recovery : `code` non vide (token Supabase exchangé côté action)
- *   - first-login : `code` undefined, l'utilisateur est déjà connecté
- *
- * L'UI est identique dans les deux cas. La différence est portée par le
- * hidden field `code` qui pilote le branchement dans la Server Action.
+ * Un seul contexte d'usage : le user vient de se connecter via mot de passe
+ * provisoire et le middleware l'a force-redirigé ici. La session est posée,
+ * `must_change_password === true`. Pas de hidden field `code` ni de mode —
+ * la Server Action n'a plus qu'à update le password sur la session courante.
  *
  * Indicateur de force visuel — on réutilise `validatePasswordStrength` pour
  * la même règle UI / serveur. Affichage live à chaque keystroke (composant
  * controlled). Le bouton submit reste actif même si invalide — la Server
  * Action est la source de vérité (défense en profondeur).
  */
-export function ResetPasswordForm({
-  code,
-  mode,
-}: {
-  code?: string;
-  mode: "recovery" | "first_login";
-}) {
+export function ResetPasswordForm() {
   const [state, formAction] = useFormState<ResetPasswordState, FormData>(
     updatePasswordAction,
     initialResetPasswordState,
@@ -43,14 +35,10 @@ export function ResetPasswordForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      {code ? <input type="hidden" name="code" value={code} /> : null}
-
-      {mode === "first_login" ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Premier accès : choisissez un mot de passe durable. Votre mot de passe provisoire ne sera
-          plus utilisable après ce changement.
-        </div>
-      ) : null}
+      <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        Choisissez un mot de passe durable. Votre mot de passe provisoire ne sera plus utilisable
+        après ce changement.
+      </div>
 
       <div className="flex flex-col gap-1">
         <label htmlFor="password" className="text-sm font-medium text-neutral-700">
