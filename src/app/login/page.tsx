@@ -44,9 +44,7 @@ export default function Login({
           <code className="font-mono">@alyosingenierie.fr</code>.
         </div>
 
-        <h1 className="mb-2 text-center font-display text-2xl font-bold tracking-tight">
-          Connectez-vous
-        </h1>
+        <h1 className="marketing-h1 mb-2 text-center">Connectez-vous</h1>
         <p className="mb-6 text-center text-sm text-neutral-600">
           Saisissez votre email AlyoS et votre mot de passe.
         </p>

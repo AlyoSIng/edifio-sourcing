@@ -40,7 +40,7 @@ export default function AuthErrorPage({
         <div className="mb-6 flex justify-center">
           <EdifioLogo />
         </div>
-        <h1 className="mb-4 text-center font-display text-2xl font-bold tracking-tight">{title}</h1>
+        <h1 className="marketing-h1 mb-4 text-center">{title}</h1>
         <p
           data-testid="auth-error"
           role="alert"

@@ -30,7 +30,7 @@ export default function Forbidden() {
           🚫
         </div>
 
-        <h1 className="mb-4 font-display text-3xl font-bold tracking-tight">Accès réservé</h1>
+        <h1 className="marketing-h1 mb-4">Accès réservé</h1>
 
         <p className="mb-4 text-neutral-700">
           <strong>edifio Sourcing</strong> est un outil interne réservé aux membres d&apos;
