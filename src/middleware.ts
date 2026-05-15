@@ -120,7 +120,12 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       await supabase.auth.signOut();
 
       if (isProtectedApiRoute(pathname)) {
-        return new NextResponse(
+        // Option A : on propage les cookies effacés par `signOut` (cf. setAll
+        // de createServerClient ci-dessus) à la réponse 403 finale. Sans ça,
+        // les cookies sb-* restent côté browser jusqu'à expiration naturelle —
+        // viole `specs/middleware_domain_gate.md` §2 C4 « session invalidée
+        // immédiatement ».
+        const apiResponse = new NextResponse(
           JSON.stringify({
             error: "forbidden_domain",
             message: "Accès réservé aux membres AlyoS Ingénierie.",
@@ -130,9 +135,13 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
             headers: { "content-type": "application/json" },
           },
         );
+        propagateAuthCookies(supabaseResponse, apiResponse);
+        return apiResponse;
       }
 
-      return NextResponse.redirect(new URL("/forbidden", req.url));
+      const redirectResponse = NextResponse.redirect(new URL("/forbidden", req.url));
+      propagateAuthCookies(supabaseResponse, redirectResponse);
+      return redirectResponse;
     }
 
     // ---------- 6. Gate must_change_password ----------
@@ -151,7 +160,12 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
         await supabase.auth.signOut();
         const loginUrl = new URL("/login", req.url);
         loginUrl.searchParams.set("error", "provisional_expired");
-        return NextResponse.redirect(loginUrl);
+        // Même pattern de propagation que la garde domaine — les cookies sb-*
+        // effacés par `signOut` doivent atteindre le browser, sinon la session
+        // locale persiste jusqu'à expiration JWT.
+        const redirectResponse = NextResponse.redirect(loginUrl);
+        propagateAuthCookies(supabaseResponse, redirectResponse);
+        return redirectResponse;
       }
 
       // Route API : 403 avec code explicite plutôt qu'un redirect (les
@@ -204,6 +218,26 @@ function redirectToLogin(req: NextRequest, pathname: string): NextResponse {
   const loginUrl = new URL("/login", req.url);
   loginUrl.searchParams.set("next", pathname);
   return NextResponse.redirect(loginUrl);
+}
+
+/**
+ * Recopie les cookies posés sur `source` (typiquement le `supabaseResponse`
+ * mué par le `setAll` de `createServerClient` après un `signOut`) vers
+ * `target` (la réponse finale renvoyée par le middleware).
+ *
+ * Pourquoi : `supabase.auth.signOut()` efface les cookies sb-* via `setAll`,
+ * mais ces mutations sont posées sur `supabaseResponse`. Si on renvoie un
+ * *autre* `NextResponse` (redirect, 403 JSON), les cookies effacés n'atteignent
+ * jamais le browser → la session locale persiste jusqu'à expiration JWT.
+ *
+ * Option A défensive : on recopie tout ce que Supabase a posé, sans présumer
+ * du nommage (le pattern sb-<projectRef>-auth-token peut évoluer). Cf.
+ * `specs/middleware_domain_gate.md` §2 C4 « session invalidée immédiatement ».
+ */
+function propagateAuthCookies(source: NextResponse, target: NextResponse): void {
+  source.cookies.getAll().forEach((cookie) => {
+    target.cookies.set(cookie);
+  });
 }
 
 function extractClientIp(req: NextRequest): string | null {
