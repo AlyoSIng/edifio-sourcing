@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>edifio Sourcing — Aide-mémoire</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: #0F1A2E; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; min-height: 297mm; padding: 14mm 12mm; page-break-after: always; background: #FAF9F6; }
+  .page:last-child { page-break-after: auto; }
+
+  /* En-tête */
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0F1A2E; padding-bottom: 8px; margin-bottom: 14px; }
+  .logo { display: inline-flex; align-items: center; gap: 8px; }
+  .pin { width: 28px; height: 28px; border-radius: 50%; background: #FF0033; display: grid; place-items: center; }
+  .pin svg { width: 14px; height: 17px; }
+  .word { font-family: 'Space Grotesk'; font-weight: 700; font-size: 22px; letter-spacing: -1px; color: #0F1A2E; }
+  .suite { font-weight: 500; font-size: 14px; color: #6B7280; }
+  .page-title { font-family: 'Space Grotesk'; font-weight: 600; font-size: 12px; color: #6B7280; text-transform: uppercase; letter-spacing: 1.5px; }
+
+  h2 { font-family: 'Space Grotesk'; font-size: 14px; font-weight: 700; margin: 14px 0 6px; color: #FF0033; text-transform: uppercase; letter-spacing: 0.5px; }
+  h3 { font-family: 'Space Grotesk'; font-size: 12.5px; font-weight: 700; margin: 0 0 4px; color: #0F1A2E; }
+  p { font-size: 11.5px; line-height: 1.45; margin: 0 0 6px; }
+
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .step { background: white; border: 1px solid #E2DFD6; border-radius: 8px; padding: 10px; }
+  .step-num { display: inline-block; background: #FF0033; color: white; border-radius: 50%; width: 22px; height: 22px; text-align: center; line-height: 22px; font-family: 'Space Grotesk'; font-weight: 700; font-size: 12px; margin-bottom: 6px; }
+  .step .label { font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; margin-bottom: 4px; display: block; }
+  .step .desc { font-size: 11px; color: #1F2937; line-height: 1.4; }
+
+  .mockup-mini { background: #F3F1EC; border: 1px solid #E2DFD6; border-radius: 6px; padding: 8px; font-size: 10px; line-height: 1.35; min-height: 90px; }
+  .mockup-mini .mock-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 11px; margin-bottom: 5px; color: #0F1A2E; }
+  .mockup-mini .mock-card { background: white; padding: 6px 8px; border-radius: 4px; border: 1px solid #E2DFD6; margin-bottom: 4px; font-size: 10px; }
+  .mockup-mini .mock-tag { font-family: 'JetBrains Mono'; font-size: 8px; background: #DBEAFE; color: #1E40AF; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; }
+
+  .actions-row { display: flex; gap: 6px; margin-top: 6px; }
+  .action-btn { font-size: 9.5px; padding: 4px 8px; border-radius: 4px; font-family: 'Inter'; font-weight: 600; }
+  .btn-primary { background: #FF0033; color: white; }
+  .btn-ghost { background: white; border: 1px solid #CFCBC0; color: #0F1A2E; }
+  .btn-danger { background: white; border: 1px solid #B91C1C; color: #B91C1C; }
+
+  .modes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .mode-card { background: white; border: 2px solid #E2DFD6; border-radius: 8px; padding: 10px; }
+  .mode-card.recommended { border-color: #FF0033; }
+  .mode-card .mode-icon { font-size: 20px; margin-bottom: 4px; }
+  .mode-card .mode-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .mode-card .mode-desc { font-size: 10.5px; color: #1F2937; line-height: 1.45; }
+  .mode-card .mode-when { font-size: 10px; color: #FF0033; font-weight: 600; margin-top: 4px; }
+
+  .ia-flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .ia-step { background: white; border: 1px solid #E2DFD6; border-radius: 6px; padding: 8px 6px; text-align: center; }
+  .ia-step-num { display: block; font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px; color: #FF0033; }
+  .ia-step-label { font-family: 'Space Grotesk'; font-weight: 700; font-size: 10.5px; display: block; margin: 2px 0; }
+  .ia-step-desc { font-size: 9.5px; color: #6B7280; line-height: 1.35; }
+
+  .support-box { background: white; border-left: 3px solid #FF0033; padding: 10px 12px; border-radius: 4px; margin-top: 12px; }
+  .support-box strong { font-family: 'Space Grotesk'; }
+
+  .footer { position: absolute; bottom: 12mm; left: 12mm; right: 12mm; border-top: 1px solid #E2DFD6; padding-top: 6px; display: flex; justify-content: space-between; font-size: 9px; color: #6B7280; font-family: 'JetBrains Mono'; }
+
+  .tip { background: #FEF3C7; color: #B45309; padding: 6px 10px; border-radius: 4px; font-size: 11px; margin-bottom: 8px; border-left: 3px solid #B45309; }
+</style>
+</head>
+<body>
+
+<!-- ============= PAGE 1 — RECTO ============= -->
+<div class="page" style="position: relative;">
+  <div class="header">
+    <div>
+      <div class="logo">
+        <span class="pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+        <span class="word">edifio</span>
+        <span class="suite">Sourcing — Aide-mémoire</span>
+      </div>
+      <div style="font-family: 'Inter', sans-serif; font-size: 11px; color: #6B7280; margin-left: 36px; margin-top: 2px; letter-spacing: 0.2px;">AO publics, du sourcing au pli</div>
+    </div>
+    <span class="page-title">Recto · démarrer</span>
+  </div>
+
+  <h2>Se connecter en 3 étapes</h2>
+  <div class="row3">
+    <div class="step">
+      <span class="step-num">1</span>
+      <span class="label">Ouvrez l'app</span>
+      <span class="desc">Allez sur <strong>edifio-sourcing.vercel.app</strong> (ou bouton du raccourci si vous avez installé la PWA).</span>
+    </div>
+    <div class="step">
+      <span class="step-num">2</span>
+      <span class="label">Saisissez votre email AlyoS</span>
+      <span class="desc">Uniquement les emails en <strong>@alyosingenierie.fr</strong>. Vous recevez un lien magique dans votre boîte.</span>
+    </div>
+    <div class="step">
+      <span class="step-num">3</span>
+      <span class="label">Cliquez sur le lien</span>
+      <span class="desc">Vous êtes connecté. Pas de mot de passe à retenir. La session dure 30 jours.</span>
+    </div>
+  </div>
+
+  <h2>3 vues principales</h2>
+  <div class="row3">
+    <div class="mockup-mini">
+      <div class="mock-title">AO du jour</div>
+      <div class="mock-card">
+        <div><strong>Rénovation école Jean-Moulin</strong></div>
+        <div style="color: #6B7280; margin: 2px 0;">850 k€ · Remise 28 mai</div>
+        <span class="mock-tag">BOAMP</span>
+        <span class="mock-tag">Score 94</span>
+      </div>
+      <div style="font-size: 10px; margin-top: 5px;">→ Le digest du matin. Triable par score, échéance, montant.</div>
+    </div>
+    <div class="mockup-mini">
+      <div class="mock-title">Pipeline (Kanban)</div>
+      <div style="display: flex; gap: 3px;">
+        <div style="background: white; padding: 3px; border-radius: 3px; flex: 1; font-size: 9px; border: 1px solid #E2DFD6;"><strong>En cours</strong><br>14</div>
+        <div style="background: white; padding: 3px; border-radius: 3px; flex: 1; font-size: 9px; border: 1px solid #E2DFD6;"><strong>Diffusé</strong><br>5</div>
+        <div style="background: white; padding: 3px; border-radius: 3px; flex: 1; font-size: 9px; border: 1px solid #E2DFD6;"><strong>Clôturé</strong><br>23</div>
+      </div>
+      <div style="font-size: 10px; margin-top: 5px;">→ Suivi visuel. Glissez les cartes pour changer de statut.</div>
+    </div>
+    <div class="mockup-mini">
+      <div class="mock-title">Fiche AO</div>
+      <div class="mock-card">
+        <div style="font-size: 9px; color: #6B7280;">25-AO-00131 · Tandem</div>
+        <div><strong>CH Vienne — urgences</strong></div>
+        <div style="margin: 3px 0; font-size: 9px;">Timeline · Documents · Communications · Liens</div>
+      </div>
+      <div style="font-size: 10px; margin-top: 5px;">→ Détail consolidé d'un AO sélectionné.</div>
+    </div>
+  </div>
+
+  <h2>3 actions sur chaque AO</h2>
+  <div class="row3">
+    <div class="step">
+      <span class="action-btn btn-primary" style="display: inline-block; margin-bottom: 6px;">✓ Sélectionner</span>
+      <p style="font-size: 10.5px;">Bascule l'AO en pipeline. Vous choisissez ensuite <strong>Solo</strong> ou <strong>Tandem</strong>.</p>
+    </div>
+    <div class="step">
+      <span class="action-btn btn-ghost" style="display: inline-block; margin-bottom: 6px;">⏸ Différer</span>
+      <p style="font-size: 10.5px;">Reporte l'AO de 24h. Il reviendra dans le digest de demain matin.</p>
+    </div>
+    <div class="step">
+      <span class="action-btn btn-danger" style="display: inline-block; margin-bottom: 6px;">✕ Rejeter</span>
+      <p style="font-size: 10.5px;">Rejette l'AO. Indiquez un motif → ça améliore le scoring de demain.</p>
+    </div>
+  </div>
+
+  <div class="tip">💡 <strong>Astuce</strong> : depuis votre téléphone, vous pouvez sélectionner un AO en 2 taps sans même ouvrir le détail. C'est fait pour aller vite.</div>
+
+  <div class="footer">
+    <span>© AlyoS Ingénierie 2026 — Outil interne</span>
+    <span>Aide-mémoire v1.0 · 2026-05-10</span>
+  </div>
+</div>
+
+<!-- ============= PAGE 2 — VERSO ============= -->
+<div class="page" style="position: relative;">
+  <div class="header">
+    <div>
+      <div class="logo">
+        <span class="pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+        <span class="word">edifio</span>
+        <span class="suite">Sourcing — Aide-mémoire</span>
+      </div>
+      <div style="font-family: 'Inter', sans-serif; font-size: 11px; color: #6B7280; margin-left: 36px; margin-top: 2px; letter-spacing: 0.2px;">AO publics, du sourcing au pli</div>
+    </div>
+    <span class="page-title">Verso · répondre</span>
+  </div>
+
+  <h2>Mode Solo vs Tandem — quand choisir quoi ?</h2>
+  <div class="modes-grid">
+    <div class="mode-card">
+      <div class="mode-icon">🧍</div>
+      <div class="mode-name">Solo</div>
+      <div class="mode-desc">Vous répondez en propre, en mandataire seul. L'AO bascule en pipeline et l'opportunité est créée dans Odoo.</div>
+      <div class="mode-when">Quand : marché de travaux pur, montant maîtrisé, équipe interne complète.</div>
+    </div>
+    <div class="mode-card recommended">
+      <div class="mode-icon">🤝</div>
+      <div class="mode-name">Tandem</div>
+      <div class="mode-desc">Vous mobilisez un architecte cotraitant. edifio Sourcing propose 3 architectes scorés et envoie la sollicitation par mail.</div>
+      <div class="mode-when">Quand : MOE requise, ERP, marché complexe, expertise pointue nécessaire.</div>
+    </div>
+  </div>
+
+  <h2>Préparation du dossier IA — 4 étapes</h2>
+  <div class="ia-flow">
+    <div class="ia-step">
+      <span class="ia-step-num">1</span>
+      <span class="ia-step-label">Upload DCE</span>
+      <span class="ia-step-desc">Glissez le RC, CCAP, CCTP, plans dans la fiche AO.</span>
+    </div>
+    <div class="ia-step">
+      <span class="ia-step-num">2</span>
+      <span class="ia-step-label">Préparer auto</span>
+      <span class="ia-step-desc">Tap le bouton « Préparer ». L'IA analyse en 30 secondes.</span>
+    </div>
+    <div class="ia-step">
+      <span class="ia-step-num">3</span>
+      <span class="ia-step-label">Reviser</span>
+      <span class="ia-step-desc">Side-by-side. Validez chaque pièce. Retouchez si besoin.</span>
+    </div>
+    <div class="ia-step">
+      <span class="ia-step-num">4</span>
+      <span class="ia-step-label">Diffuser</span>
+      <span class="ia-step-desc">Compilation ZIP envoyée à l'architecte via lien sécurisé.</span>
+    </div>
+  </div>
+
+  <h2>Statuts d'un AO — la vie complète</h2>
+  <div style="font-size: 10.5px; line-height: 1.6;">
+    <strong>Sourcé</strong> → <strong>Sélectionné (Solo / Tandem)</strong> → <strong>Architecte sollicité</strong> → <strong>Architecte OK</strong> → <strong>Dossier en préparation</strong> → <strong>Dossier prêt</strong> → <strong>Dossier diffusé</strong> → <strong>Remis</strong> → <strong>Gagné</strong> / <strong>Perdu</strong> / <strong>Sans suite</strong>
+  </div>
+  <p style="font-size: 10.5px; color: #6B7280; margin-top: 4px;">Les statuts s'affichent en couleur dans le Kanban. Le système trace toutes les transitions dans la timeline de la fiche.</p>
+
+  <h2>Bonnes pratiques</h2>
+  <div class="row2">
+    <div class="step">
+      <h3>⚠ Validez TOUJOURS l'IA</h3>
+      <p style="font-size: 10.5px;">L'IA peut se tromper. Lisez chaque pièce, chaque ligne du mémoire. Vous êtes responsable du pli signé.</p>
+    </div>
+    <div class="step">
+      <h3>📚 Tenez la bibliothèque à jour</h3>
+      <p style="font-size: 10.5px;">Attestations expirées = pli rejetable. L'app vous alerte J-30 / J-7 / J-1.</p>
+    </div>
+    <div class="step">
+      <h3>👋 Tutoiement par défaut</h3>
+      <p style="font-size: 10.5px;">Les architectes que vous ne connaissez pas reçoivent un mail vouvoyé. Le tutoiement se gagne — vous pouvez le modifier dans leur fiche.</p>
+    </div>
+    <div class="step">
+      <h3>📲 Installez la PWA</h3>
+      <p style="font-size: 10.5px;">iPhone : bouton Partager → « Sur l'écran d'accueil ». Android : « Installer l'application ». Vous gagnez les notifs push.</p>
+    </div>
+  </div>
+
+  <div class="support-box">
+    <strong>Une question, un bug, une suggestion ?</strong><br>
+    <span style="font-size: 11px;">Léa Charpentier · Slack <code style="font-family: 'JetBrains Mono'; font-size: 10px;">#edifio-sourcing</code> · email <strong>lea.charpentier@alyosingenierie.fr</strong> · office hours <strong>vendredi matin 9h-12h</strong>.</span>
+  </div>
+
+  <div class="footer">
+    <span>© AlyoS Ingénierie 2026 — Outil interne</span>
+    <span>Aide-mémoire v1.0 · 2026-05-10</span>
+  </div>
+</div>
+
+</body>
+</html>

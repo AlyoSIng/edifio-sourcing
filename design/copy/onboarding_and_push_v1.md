@@ -11,6 +11,18 @@
 
 Affichée au premier login d'un utilisateur AlyoS dans edifio Sourcing. Skipable à tout moment.
 
+### Étape 0 — Première connexion *(force après création de compte par admin)*
+
+*Pas un écran d'onboarding à proprement parler, mais un préalable obligatoire avant que l'utilisateur n'arrive à l'étape 1.*
+
+- **Contexte** : l'utilisateur clique sur le lien dans son email d'invitation, saisit son email + le mot de passe provisoire qu'il a reçu.
+- **Système détecte** : `user.user_metadata.must_change_password === true`
+- **Force-redirect** vers `/reset-password` (cf. Maquette 13)
+- **Titre écran** : « Bienvenue ! »
+- **Sous-titre** : « C'est votre première connexion. Choisissez votre mot de passe définitif. »
+- **Règles du mot de passe** : min **16 caractères**, 1 maj, 1 min, 1 chiffre, 1 symbole. Affichage dynamique des règles (✓ / ○) au fur et à mesure de la saisie. Astuce affichée : *« Une phrase de passe est plus facile à retenir et plus sûre — ex. "montagne bleue sourire café 7 !" »*
+- **CTA** : « Définir mon mot de passe et continuer » → après validation, redirect vers Étape 1.
+
 ### Étape 1 — Bienvenue
 
 - **Titre** : « Bienvenue dans edifio Sourcing »

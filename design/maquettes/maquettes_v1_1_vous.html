@@ -39,6 +39,7 @@
   .edifio-pin svg { width: 14px; height: 17px; }
   .edifio-word { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -1px; color: var(--ink); }
   .edifio-suite { font-family: var(--font-body); font-weight: 500; color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .edifio-tagline { font-family: var(--font-body); font-weight: 400; font-size: 11.5px; color: var(--muted); margin-left: 38px; margin-top: -2px; letter-spacing: 0.2px; }
 
   .btn { font-family: var(--font-body); font-weight: 600; font-size: 12px; padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; }
   .btn-primary { background: var(--alyos-red); color: var(--white); }
@@ -147,12 +148,15 @@
     <div class="mockup-frame">
       <div class="arch-page">
         <div class="arch-card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-            <span class="edifio-logo">
-              <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
-              <span class="edifio-word">edifio</span>
-              <span class="edifio-suite">Sourcing</span>
-            </span>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px;">
+            <div>
+              <span class="edifio-logo">
+                <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+                <span class="edifio-word">edifio</span>
+                <span class="edifio-suite">Sourcing</span>
+              </span>
+              <div class="edifio-tagline">AO publics, du sourcing au pli</div>
+            </div>
             <span style="font-family: var(--font-mono); font-size: 11px; color: var(--muted);">Lien valide jusqu'au 09/06/26</span>
           </div>
           <div class="arch-greeting">Bonjour M. Lefèvre,</div>

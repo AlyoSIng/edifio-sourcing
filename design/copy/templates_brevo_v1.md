@@ -226,6 +226,121 @@ Pas de souci. À très vite sur un autre AO.
 
 ---
 
+## D.9 — `welcome_provisional_password` *(Resend, neutre, première connexion)*
+
+**Sujet** : `Votre accès edifio Sourcing — mot de passe provisoire`
+
+**Provider** : Resend (template interne neutre, pas Brevo qui est dédié aux architectes)
+
+```
+Bonjour {{user.firstname}},
+
+Vous avez désormais accès à edifio Sourcing, l'outil interne AlyoS Ingénierie
+pour le sourcing d'appels d'offres publics et la cotraitance architecte.
+
+Vos identifiants de connexion :
+
+  Email          : {{user.email}}
+  Mot de passe   : {{user.provisional_password}}
+
+Pour vous connecter :
+
+[Bouton « Me connecter »]
+{{app.login_url}}
+
+À votre première connexion, vous serez invité(e) à choisir votre propre mot
+de passe : **minimum 16 caractères**, contenant au moins 1 majuscule,
+1 minuscule, 1 chiffre et 1 symbole.
+
+💡 Une phrase de passe est plus facile à retenir et plus sûre qu'un mot de
+passe court complexe. Exemple : « montagne bleue sourire café 7 ! » (32
+caractères, à personnaliser).
+
+⏰ **Ce mot de passe provisoire expire dans 24 heures.** Si vous ne pouvez
+pas vous connecter dans ce délai, contactez l'administrateur AlyoS qui vous
+a invité(e) pour qu'il vous en génère un nouveau.
+
+Bonne découverte,
+L'équipe AlyoS Ingénierie
+
+—
+edifio Sourcing — AO publics, du sourcing au pli
+Outil interne réservé aux collaborateurs AlyoS Ingénierie.
+```
+
+**Variables Handlebars** :
+- `{{user.firstname}}`, `{{user.email}}`
+- `{{user.provisional_password}}` (16 caractères URL-safe, alphanumérique + 1 symbole)
+- `{{app.login_url}}` (URL de la page `/login`)
+
+**Sécurité** :
+- Ce mail contient un secret en clair. À envoyer **uniquement** via Resend en TLS strict.
+- L'audit log enregistre la création de compte (`action='membership_change' operation='invite'`) sans le mot de passe.
+- En cas de fuite suspectée (mail forwarded), l'admin peut révoquer + regénérer un nouveau mot de passe provisoire depuis l'interface admin.
+
+---
+
+## D.10 — `password_reset` *(Resend, neutre, mot de passe oublié)*
+
+**Sujet** : `Réinitialisation de votre mot de passe edifio Sourcing`
+
+**Provider** : Resend
+
+```
+Bonjour,
+
+Vous avez demandé la réinitialisation de votre mot de passe edifio Sourcing.
+
+Cliquez sur le lien ci-dessous pour choisir un nouveau mot de passe :
+
+[Bouton « Réinitialiser mon mot de passe »]
+{{app.reset_password_url}}
+
+Ce lien est valide 60 minutes. Au-delà, demandez à nouveau une
+réinitialisation depuis la page de connexion.
+
+Si vous n'êtes pas à l'origine de cette demande, ignorez ce message — votre
+mot de passe actuel reste inchangé.
+
+—
+edifio Sourcing — AO publics, du sourcing au pli
+Outil interne réservé aux collaborateurs AlyoS Ingénierie.
+```
+
+**Variables Handlebars** :
+- `{{app.reset_password_url}}` (URL sécurisée Supabase avec token de reset, 1 usage, expire 60 min)
+
+**Sécurité** :
+- Le lien est tokenisé et signé (Supabase RS256). Pas de mot de passe transitant en clair.
+- Pré-clic scanner email : ce flow utilise un token à usage unique côté Supabase Auth, mais le pré-clic ne permet PAS d'accéder au compte (il ouvre juste la page de saisie du nouveau mot de passe — il faut connaître le mot de passe avant pour le changer, ou disposer du lien complet). Vulnérabilité réduite vs magic-link.
+- Si le user perd définitivement l'accès, l'admin peut regénérer un mot de passe provisoire (D.9).
+
+---
+
+## Logique de sélection du registre
+
+```typescript
+// Pseudo-code mis à jour Gate 6 par [DEV Alex]
+function pickTemplate(base: string, architect?: Architect, override?: boolean): string {
+  // Templates internes neutres (pas de registre TU/VOUS)
+  if (base === "tender_summary_to_user"
+   || base === "architect_decline_acknowledgment"
+   || base === "welcome_provisional_password"
+   || base === "password_reset") {
+    return base;
+  }
+  // Templates architecte : registre TU/VOUS selon archi
+  const useTu = override ?? architect!.tutoiement;
+  return `${base}_${useTu ? "TU" : "VOUS"}`;
+}
+```
+
+---
+
+*Templates v2.0 figés Gate 4 + pivot auth 2026-05-10. Toute évolution copy passe par PR validée par [CMO] avant déploiement Brevo / Resend.*
+
+---
+
 ## Logique de sélection du registre
 
 ```typescript

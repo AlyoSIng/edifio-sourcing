@@ -348,95 +348,169 @@
 
 ---
 
-## 2026-05-11 — Gate 6 étape 3 (Supabase Auth magic-link) — exécution
+## 2026-05-10 — Batch parallèle Cowork n°5 *(suite à validation Board « top 3 »)*
 
-- **2026-05-11 · G6 · CEO Marc · Projet Supabase `edifio-sourcing-preview` créé (Frankfurt eu-central-1, Pro).** [BOARD-OK 2026-05-11]
-  *Clés `anon` / `service_role` posées dans `.env.local` côté Marc (Option A : pas de transit chat). Configuration Auth : magic-link activé, sign-up désactivé (admin-only), URL Configuration avec `http://localhost:3000/auth/callback` whitelisté. La création du projet `-prod` reste différée à Gate 9.*
+- **2026-05-10 · CEO + CTO · Plan de bascule Gate 9 livré `specs/plan_bascule_gate9_v1.md`.** [LIVRABLE]
+  *32 critères pré-flight GO/NO-GO, procédure J0 step-by-step (8 étapes), 4 procédures de rollback distinctes (Vercel, BDD, secrets, comm), plan d'astreinte intensif J+1 à J+7 avec dashboards de monitoring, signature 3 niveaux (CTO + CEO + Board). Plan figé.*
 
-- **2026-05-11 · G6 · DEV Alex · Helpers Supabase SSR — pattern `getAll`/`setAll` (API @supabase/ssr 0.6+).** [DÉCISION DEV]
-  *`src/lib/supabase/server.ts` expose `createSupabaseServerClient` (Server Actions / Route Handlers / Server Components avec try-catch sur `setAll` pour les SC) et `createSupabaseAdminClient` (service_role, jamais exposé client). `src/lib/supabase/browser.ts` expose `createSupabaseBrowserClient`. L'ancienne API `get/set/remove` était deprecated en 0.6 → migration obligatoire pour propager correctement les cookies de session entre callback et middleware.*
+- **2026-05-10 · CTO + CEO · Threat model + Runbook incident livré `specs/threat_model_runbook_v1.md`.** [LIVRABLE]
+  *Solde OWASP A04 (insecure design) et A09 (logging & monitoring). Threat model STRIDE avec 8 scénarios (spoofing AlyoS, fuite données, DoS coût IA, vol JWT archi, compromission sous-traitant, etc.). 7 actions correctives priorisées P0-P2. Runbook 4 niveaux SEV1-SEV4, 4 playbooks types (app down, fuite, dépassement IA, compte compromis), postmortem blameless obligatoire SEV1/SEV2.*
 
-- **2026-05-11 · G6 · DEV Alex · Server Action `signInWithOtpAction` (`src/app/login/actions.ts`).** [DÉCISION DEV]
-  *Validation côté serveur AVANT envoi du magic-link : regex email basique + `isAuthorizedEmail()` (réutilise lib auth étape 2). Refus pré-envoi si domaine non Alyos → économie de magic-link inutile et pas de fuite d'info sur l'existence des comptes. `shouldCreateUser` au défaut (true) — autorisation gérée par le middleware côté serveur.*
-
-- **2026-05-11 · G6 · DEV Alex · Callback `/auth/callback` — dual-flow (PKCE + implicit).** [DÉCISION DEV]
-  *Migré de `route.ts` → `page.tsx` (Server Component) + `ClientCallbackHandler.tsx` (Client Component). Le SC gère le PKCE flow (`?code=` côté serveur) — flow standard du Server Action. Le CC gère l'implicit flow (`#access_token=...` côté browser uniquement) — flow produit par `auth.admin.generateLink` (utilisé par les helpers E2E). Sans ça les tests Playwright étaient impossibles à brancher (admin ne supporte pas PKCE). Garde-fou `sanitizeNext` anti-open-redirect (rejette `//`, `\`, schémas absolus).*
-
-- **2026-05-11 · G6 · DEV Alex · `/login` form wired (Client Component + `useFormState`).** [DÉCISION DEV]
-  *`LoginForm.tsx` Client Component avec `useFormState` consomme la Server Action. Trois états : idle / error / sent. État `sent` conforme M7 (icône check + message). `useFormStatus` pour disable du bouton pendant `pending`. Affichage du `?error=magic_link_invalid` côté page server.*
-
-- **2026-05-11 · G6 · DEV Alex · Bug `middleware.ts` à la racine — déplacé en `src/middleware.ts`.** [INCIDENT FIX]
-  *Avec le mode `src-dir` activé, Next.js cherche `middleware.ts` **dans `src/`**, pas à la racine du repo. Le middleware n'était jamais exécuté à l'étape 2 (les tests E2E auraient échoué Gate 6). Détecté en debug E2E étape 3. À surveiller : la spec `specs/middleware_domain_gate.md` §3.1 dit « à la racine du repo » — l'expression est ambiguë avec `src-dir`. Pas de mise à jour de spec proposée — la convention Next.js prévaut.*
-
-- **2026-05-11 · G6 · DEV Alex · Bug matcher middleware trop strict.** [INCIDENT FIX]
-  *Le matcher proposé en spec §3.1 utilisait un negative lookahead complexe avec `.*\.(?:svg|png|...)$` qui n'est pas supporté par path-to-regexp de Next.js → matcher silencieusement ignoré → middleware inactif. Remplacé par le pattern canonique Next.js `/((?!_next/static|_next/image|favicon.ico).*)`.*
-
-- **2026-05-11 · G6 · DEV Alex · Tooling tests : @supabase/ssr 0.10, vitest 4.1, @playwright/test 1.59, @next/env 16.** [DÉCISION DEV]
-  *Configs `vitest.config.ts` (env node, coverage v8 scopée sur `src/lib/auth/**`) et `playwright.config.ts` (chromium, webServer auto-start `pnpm dev`, env chargée via `@next/env loadEnvConfig` pour que les helpers E2E aient `SUPABASE_SERVICE_ROLE_KEY`). Scripts npm : `test`, `test:watch`, `test:coverage`, `test:e2e`. Chromium installé via `pnpm exec playwright install chromium` (~150 MB cache local).*
-
-- **2026-05-11 · G6 · DEV Alex · 7 tests E2E Playwright actifs et verts (spec §4 bloquant Gate 6).** [LIVRABLE BLOQUANT]
-  *`e2e/middleware-domain.spec.ts` couvre les cas C2, C3, C4, C7, C10, C11, C12 de la matrice spec §2. Helpers `signInWith` / `getCookieFor` (`e2e/helpers/auth.ts`) utilisent `auth.admin.generateLink({type:"magiclink",options:{redirectTo:"/auth/callback?next=/"}})` pour bypasser la boîte mail. **Important** : la `redirectTo=/` pointe sur une route publique pour que le middleware ne déclenche pas `signOut()` prématurément avant que le test puisse vérifier la matrice. Audit log `access_attempt` visible dans les logs serveur (succès ET refus). 7 / 7 verts. Validations locales toutes vertes (49 Vitest, typecheck, lint, format, build).*
+- **2026-05-10 · CEO + CMO · Plan de recette Gate 7 livré `specs/plan_recette_gate7_v1.md`.** [LIVRABLE]
+  *72 tests sur 9 scénarios (S0 Auth/middleware, S1 Solo, S2 Tandem accepté, S3 Tandem VOUS, S4 Préparation IA, S5 Audit log, S6 Performance, S7 Sécurité, S8 8 templates Brevo). Jeux de données complets : 6 comptes utilisateurs test, 3 AO, 5 architectes, 6 pièces bibliothèque, 1 RC test 12 pages. Critères d'acceptation par scénario (bloquants Gate 7 identifiés). Procédure J-1 / J0 / J+1.*
 
 ---
 
-## 2026-05-11 — Gate 6 étape 4 (CI + Vercel preview) — exécution
+## 2026-05-10 — Batch parallèle Cowork n°6 *(tier-4 livrables)*
 
-- **2026-05-11 · G6 · CEO Marc · Repo connecté à Vercel + GitHub Secrets posés + branch protection `main` activée.** [BOARD-OK 2026-05-11]
-  *Projet Vercel `edifio-sourcing` importé (compte AlyoS Ingénierie). Env vars Vercel posées sur scope `Preview` + `Development` uniquement (4 vars Supabase preview + `ALLOWED_EMAIL_DOMAIN` + `NEXT_PUBLIC_APP_ENV`). Scope `Production` laissé vide jusqu'à Gate 9. Wildcard `https://*.vercel.app/auth/callback` ajouté aux Redirect URLs Supabase. 4 GitHub Secrets posés (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROJECT_REF`). Branch protection `main` : require PR + 6 CI checks verts + pas de force-push + pas de delete.*
+- **2026-05-10 · CMO + Graphiste · Guide utilisateur 1 page A4 recto-verso livré `design/copy/guide_utilisateur_1page.html`.** [LIVRABLE]
+  *Page imprimable conforme palette DS Edifio. Recto : connexion 3 étapes, 3 vues principales (AO du jour / Pipeline / Fiche AO), 3 actions (Sélectionner / Différer / Rejeter). Verso : Solo vs Tandem (quand choisir quoi), préparation dossier IA 4 étapes, statuts d'AO, bonnes pratiques, contact support. Prêt à imprimer pour la démo Gate 9.*
 
-- **2026-05-11 · G6 · DEV Alex · Pipeline CI `.github/workflows/ci.yml` posé — 6 jobs parallélisés.** [DÉCISION DEV]
-  *`ci-lint` + `ci-typecheck` + `ci-test` + `ci-middleware-check` + `ci-e2e` + `ci-build`. Tous parallèles, pas de dépendance. Setup pnpm 11.0.9 + Node 20 via `pnpm/action-setup@v4` + `actions/setup-node@v4`. Cache `pnpm-store` (auto via setup-node) + cache binaires Chromium (~150 MB, clé pnpm-lock.yaml hash) + cache `.next/cache` (clé sources hash).*
+- **2026-05-10 · CTO + CEO · Charte d'usage interne IA livrée `specs/charte_usage_ia_v1.md`.** [LIVRABLE]
+  *Principe directeur : IA = copilote, pas pilote. Détail des 7 tâches IA et niveau de validation humaine. Procédure de signalement des hallucinations. Protection des données. Quotas et coûts. Responsabilité juridique. À publier sur /help app + intranet AlyoS + annexe contrat (recommandé). Lue et acceptée par chaque collaborateur au premier login.*
 
-- **2026-05-11 · G6 · DEV Alex · `ci-middleware-check` bloquant (spec §5 — migré depuis le draft étape 2).** [LIVRABLE BLOQUANT]
-  *Vérifie `src/middleware.ts` présent (adapté suite au fix étape 3 — racine → `src/`), grep `@alyosingenierie.fr`, grep `isAuthorizedEmail`. Suppression de `.github/middleware-check-draft.yml` (rôle rempli). La désactivation du middleware est INTERDITE per CLAUDE.md — ce job empêche tout merge qui contournerait la garde de domaine.*
+- **2026-05-10 · CEO + CTO · Backlog Phase 2 priorisé livré `specs/backlog_phase2_v1.md`.** [LIVRABLE]
+  *Méthode MoSCoW : 5 Must (multi-tenancy stricte, facturation Stripe, SSO Edifio/client, onboarding self-service, support externalisable), 5 Should (Odoo bidi tests réels, ML scoring, signature électronique, vues collaboratives, API publique), 5 Could (mobile native, plus de plateformes, veille acheteurs, marketplace archi, RAG mémoires), 5 Won't. Estimation Must+Should = 21-28 sem. Trigger Phase 2 documenté.*
 
-- **2026-05-11 · G6 · DEV Alex · `ci-e2e` Playwright bloquant — 7 tests middleware sur Chromium.** [LIVRABLE BLOQUANT]
-  *Env via GitHub Secrets, `pnpm dev` auto-démarré via `webServer` Playwright. Install `--with-deps chromium` au premier run (cache binary partagé entre runs). Upload du rapport HTML + traces en cas d'échec (artefact retention 7 jours). Verify step des secrets pour fail rapide et lisible si un secret manque.*
-
-- **2026-05-11 · G6 · DEV Alex · Helper `src/lib/site-url.ts` — résolution URL multi-environnement.** [DÉCISION DEV]
-  *Priorité : `NEXT_PUBLIC_SITE_URL` (custom domain Gate 7) → `VERCEL_URL` (auto-injecté server-side par Vercel preview/prod) → `http://localhost:3000` (fallback dev). Utilisée dans `signInWithOtpAction` pour `emailRedirectTo` — la valeur DOIT matcher exactement un pattern whitelisté dans Supabase Auth → Redirect URLs (`http://localhost:3000/auth/callback` + `https://*.vercel.app/auth/callback`).*
-
-- **2026-05-11 · G6 · DEV Alex · Concurrency CI — cancel-in-progress par branche.** [DÉCISION DEV]
-  *`concurrency.group: ${{ github.workflow }}-${{ github.ref }}`, `cancel-in-progress: true`. Évite les builds parallèles sur les PR actives (chaque push annule le run précédent). Économise des minutes runner et accélère le feedback.*
-
-- **2026-05-11 · G6 · DEV Alex · Premier preview public déployé sur Vercel (push de la PR `feat/ci-vercel`).** [LIVRABLE]
-  *URL `https://edifio-sourcing-git-feat-ci-vercel-*.vercel.app` (variable par run). Middleware actif sur `/sourcing/*` et `/api/protected/*` depuis l'étape 2, donc l'exposition publique reste safe : tout visiteur hors `@alyosingenierie.fr` est redirigé vers `/login` ou `/forbidden`. Test fonctionnel `/login` à mener une fois la PR ouverte (form actif, magic-link envoyé à un email AlyoS Marc, callback OK).*
-
-- **2026-05-11 · G6 · DEV Alex · `vercel --prod` reste verrouillé.** [GARDE-FOU]
-  *Pattern dans le `deny` de `.claude/settings.local.json`. Toute mise en production passe par OK Board explicite Gate 9 (cf. CLAUDE.md limites strictes). Le scope Vercel `Production` reste vide pour éviter tout déploiement accidentel.*
+- **2026-05-10 · CTO + PS_OPERATOR · Stratégie backups + procédure de restauration livrée `specs/backups_restore_v1.md`.** [LIVRABLE]
+  *RPO 24h, RTO 4h. Triple sauvegarde : Supabase PITR + export quotidien chiffré OVH + snapshots mensuels Storage. 5 procédures de récupération distinctes (BDD locale, infra Supabase, compromission, perte GitHub, secret API). Calendrier de tests mensuel/trimestriel/annuel. Coût total ~ 30-40 €/mois inclus plafond Phase 1.*
 
 ---
 
-*Dernière mise à jour : 2026-05-11 par [DEV Alex] — Gate 6 étape 4 : CI GitHub Actions 6 jobs + Vercel preview auto + branch protection main + premier preview public.*
+## 2026-05-10 — Premier incident CI Gate 6 *(résolu par Alex)*
+
+- **2026-05-10 · INC-2026-05-10-01 · CI GitHub Actions — 5/6 jobs failed on PR #5 `feat/ci-vercel`.** [INCIDENT SEV3 résolu]
+  *Cause racine : pnpm 11.0.9 utilise le builtin `node:sqlite` disponible uniquement à partir de Node 22. Runner CI configuré sur Node 20.20.2 → `ERR_UNKNOWN_BUILTIN_MODULE` au step `setup-node@v4`. Détection : 5 jobs échouent en 6-10s, seul `ci-middleware-check` passe (job léger sans pnpm install). Fix par [DEV Alex] commit `ba3560e` : node-version 20 → 22 dans 5 jobs CI, `package.json engines.node = ">=22.13.0"`, création `.nvmrc` à 22, README mis à jour. Run suivant `25668827608` reprend OK (>31s = install passe).*
+
+- **2026-05-10 · INC-2026-05-10-01 (bonus) · Middleware fail-closed appliqué.** [LIVRABLE]
+  *Alex profite du fix pour ajouter try-catch global au middleware : si crash interne, redirect `/login` (fail-closed) au lieu de 500. Conforme à threat_model_runbook § A03/A05. Élimine `MIDDLEWARE_INVOCATION_FAILED`.*
+
+- **2026-05-10 · INC-2026-05-10-01 (bonus) · `req.ip` retiré du middleware.** [LIVRABLE]
+  *Déprécié Next 15, instable Edge runtime cdg1. Fallback `x-real-ip` puis `x-forwarded-for`. Renforce la robustesse en production.*
+
+- **2026-05-10 · CTO Sophie · Convention build : versions alignées CI/package/nvmrc/README.** [DÉCISION CTO]
+  *Suite à l'incident INC-2026-05-10-01, toute PR qui touche aux dépendances de build doit vérifier l'alignement : `.github/workflows/*.yml` node-version + `package.json` engines.node + `.nvmrc` + README prérequis. Check à intégrer dans la review de PR.*
 
 ---
 
-## 2026-05-12 — Gate 6 étape 5 (pivot auth password — ajustements Board Q1-Q4)
+## 2026-05-10 — Tagline produit edifio Sourcing validée
 
-> **4 paramètres Board figés sur la base du pivot password initial 2026-05-11.
-> Toute modification ultérieure passe par escalade Board.**
-
-- **2026-05-12 · G6 · Board · Q1/B — TTL provisoire = 24 heures (au lieu de 7 jours).** [BOARD-OK 2026-05-12]
-  *Justification : un lien sensible ne doit pas dormir une semaine dans une boîte mail. Si le collaborateur n'active pas son compte dans la journée, un admin lui regénère un lien (bouton « Renvoyer » dans `/sourcing/admin/users`). Constante renommée `PROVISIONAL_PASSWORD_TTL_HOURS = 24`. Helper `computeProvisionalExpiresAt(ttlHours)`. Wording email mis à jour. Route `POST /api/admin/users/[id]/regenerate-password` implémentée (réutilise le template welcome au MVP — un template dédié reste possible si Léa le demande). Invariante de sécurité documentée dans `password-server.ts` : le password provisoire ne doit JAMAIS être loggué, audité ou persisté en clair côté serveur après envoi (cycle de vie : RAM → Supabase Auth hash bcrypt → Resend → GC).*
-
-- **2026-05-12 · G6 · Board · Q2/B — Mot de passe définitif : MIN_LENGTH = 16 + check top common-passwords.** [BOARD-OK 2026-05-12]
-  *Constante `MIN_LENGTH` passe de 12 à 16. À exigences de classes inchangées, allonger paie le plus en entropie et encourage les passphrases (plus mémorisables qu'un password court complexe). Ajout d'une liste locale `src/lib/auth/common-passwords.ts` (~100 entrées MVP : top 30 universels, sectoriels AlyoS/edifio, saisons + années récentes). Le check `isCommonPassword` est branché dans `validatePasswordStrength` (code d'erreur `TOO_COMMON`, libellé FR « Mot de passe trop courant, choisis-en un moins évident »). `ResetPasswordForm` affiche une astuce passphrase visible (« Astuce : une passphrase facile à retenir et sûre. Ex. : montagne bleue sourire café 7 ! »). TODO Gate 7 : remplacer le sous-ensemble par la liste 10k complète SecLists (MIT) via API ou chargement lazy — ne PAS commiter directement dans le bundle JS.*
-
-- **2026-05-12 · G6 · Board · Q3/A — MFA admin préparée mais désactivée au MVP.** [BOARD-OK 2026-05-12]
-  *Le Board veut juste réserver la place. Implémentation minimale conformément au brief : champ `mfa_enabled?: boolean` ajouté à `UserMetadata` (non câblé UI/API) + commentaire `TODO Phase 2 MFA TOTP` en tête de `src/app/sourcing/admin/users/page.tsx`. Pas de route `/security` dédiée — la créer pour un toggle désactivé serait du gaspillage. Activation prévue Phase 2 via `supabase.auth.mfa.enroll({ factorType: "totp" })` quand le SaaS multi-clients s'ouvrira.*
-
-- **2026-05-12 · G6 · Board · Q4/A — Rate-limit login 5 / 15 min / 15 min + countdown UI.** [BOARD-OK 2026-05-12]
-  *Configuration côté Supabase Dashboard à régler par [PS_OPERATOR Yann] en parallèle (5 tentatives échouées en 15 min → blocage 15 min). Côté code : helper `isRateLimitError` détecte 429 / `over_request_rate_limit` / message `rate.?limit` (3 signaux selon version SDK). `signInWithPasswordAction` peuple `LoginState.rateLimitedUntil` (timestamp absolu ms). `LoginForm` consomme le hook `useCountdown` (tick 500 ms, lecture `Date.now()` à chaque tick pour éviter la dérive) et affiche un countdown `mm:ss` visible + bouton submit désactivé pendant le cooldown. Anti-énumération préservée pour les 401 (message générique « Email ou mot de passe incorrect »). Constante dédiée `LOGIN_RATE_LIMIT_COOLDOWN_MS`.*
-
-- **2026-05-12 · G6 · DEV Alex · Décision ad hoc — détection rate-limit extraite dans `src/app/login/rate-limit.ts`.** [DÉCISION DEV]
-  *`actions.ts` est tagué `"use server"` et Next.js 14 interdit d'exporter autre chose que des async functions depuis ce type de fichier (`https://nextjs.org/docs/messages/invalid-use-server-value`). Pour rendre `isRateLimitError` testable en Vitest, le helper vit dans un module séparé. Pas d'impact runtime — l'import est interne au flow login.*
-
-- **2026-05-12 · G6 · DEV Alex · Décision ad hoc — hook `useCountdown` testé via fonction pure `computeRemaining`.** [DÉCISION DEV]
-  *Vitest est configuré en environnement `node` (pas `jsdom`) — impossible de monter un hook React. La fonction pure `computeRemaining(deadlineMs, now)` est testable directement (10 cas couverts). Le comportement runtime du hook (`useEffect` / `setInterval`) sera validé en E2E Playwright via le formulaire login (test à ajouter dans `auth-password.spec.ts` quand la config Supabase rate-limit sera réglée — non bloquant Gate 6 étape 5).*
-
-- **2026-05-12 · G6 · DEV Alex · Tests Vitest : 121 verts (49 baseline + 72 ajoutés cumulés sur le pivot + ajustements).** [LIVRABLE]
-  *7 fichiers de tests, coverage 97.05 % statements / 100 % fonctions / 92.95 % branches (seuil 90 % largement tenu). Typecheck OK, lint OK, build OK, prettier OK. E2E couvert par le job `ci-e2e` à l'ouverture de la PR.*
+- **2026-05-10 · CMO+CEO+Graphiste+Board · Tagline edifio Sourcing : « AO publics, du sourcing au pli ».** [BOARD-OK 2026-05-10]
+  *Modèle parallèle à « Pilotage de chantier MOE » d'edifio Suivi. Choix Option B (sur 3 propositions : A descriptif, B évocateur, C métier strict). Le Board choisit B pour son ton qui raconte le cycle complet.*
+  *Mise en cohérence effectuée : `design/tokens.json` (nouveau nœud `product`), `design/pwa_manifest_v1.json` (description), `design/maquettes/maquettes_v1.html` (M4 header), `design/maquettes/maquettes_v1_1_vous.html` (M4 vouvoiement header), `design/maquettes/maquettes_v1_2_auth.html` (M7 login + M8 forbidden), `design/copy/guide_utilisateur_1page.html` (header).*
+  *Open Graph image à mettre à jour côté Théo avant Gate 9 (tagline visible).*
 
 ---
 
-*Dernière mise à jour : 2026-05-12 par [DEV Alex] — Gate 6 étape 5 : ajustements Board Q1/B Q2/B Q3/A Q4/A sur le pivot auth password. Aucune migration BDD (spike ORM toujours pas tranché). Aucun commit ni push (Yann gère).*
+## 2026-05-10 — Pivot d'auth : email + mot de passe (au lieu de magic-link)
+
+- **2026-05-10 · Board · Auth = email + mot de passe durable (au lieu de magic-link).** [BOARD-OK 2026-05-10] [SURCLASSE PHASE 0 Q4 + GATE 5 AUTH]
+  *Décision Board suite à 3 problèmes constatés en preview Vercel : (1) magic-link bloqué par scanner email entreprise qui pré-clique le lien et consomme le token, (2) UX moins durable que le pattern edifio Suivi (parité à respecter dans la fratrie), (3) impossible de demander à l'IT AlyoS de whitelister Supabase. Modèle retenu : identique à edifio Suivi.*
+  *Workflow attendu : (a) admin AlyoS crée un compte avec email + nom + rôle, (b) système génère un mot de passe provisoire aléatoire 16 car., (c) email Resend envoyé au futur user avec le mot de passe provisoire + lien login, (d) première connexion → force-redirect vers changement de mot de passe, (e) mot de passe définitif appliqué + session JWT durable. Mot de passe provisoire expire après 7 jours.*
+
+- **2026-05-10 · CTO · Implications doc à actualiser.** [ACTION OUVERTE]
+  *Documents impactés par le pivot auth, à mettre à jour dans le prochain batch Cowork :*
+  *— `specs/middleware_domain_gate.md` (mentionne magic-link, à actualiser)*
+  *— `specs/plan_recette_gate7_v1.md` (scénarios S0 à ré-écrire avec email+password)*
+  *— `design/maquettes/maquettes_v1_2_auth.html` (M7 login → ajouter champ password + lien « Mot de passe oublié »)*
+  *— `design/copy/templates_brevo_v1.md` (ajout D.9 = template mot de passe provisoire)*
+  *— `design/copy/onboarding_and_push_v1.md` (mise à jour étape 2)*
+  *— `specs/charte_usage_ia_v1.md` (légère mise à jour mention auth)*
+  *— `CLAUDE.md` (section auth à reformuler)*
+
+---
+
+## 2026-05-10 — Batch parallèle Cowork n°7 *(implémentation pivot auth)*
+
+- **2026-05-10 · CEO · `CLAUDE.md` section auth mise à jour.** [LIVRABLE]
+  *Section « Décisions d'architecture actées le 2026-05-10 » point 4 reformulée pour décrire le flow email + password (admin-create + provisional + first-login force change). « Premières actions Gate 6 » point 4 actualisé.*
+
+- **2026-05-10 · CMO Léa · 2 nouveaux templates Resend D.9 et D.10.** [LIVRABLE]
+  *`design/copy/templates_brevo_v1.md` enrichi de : D.9 `welcome_provisional_password` (mot de passe provisoire à la création du compte, neutre, sécurité documentée) + D.10 `password_reset` (lien tokenisé Supabase 60 min, usage unique). Logique de sélection mise à jour côté pseudo-code Alex.*
+
+- **2026-05-10 · Graphiste Théo · Maquettes v2 auth livrées `design/maquettes/maquettes_v2_password_auth.html`.** [LIVRABLE]
+  *Supersede maquettes_v1_2_auth.html pour M7 et M8. Contenu : M7 v2 (login email + password + lien « Mot de passe oublié »), M13 (force change password à la première connexion avec règles dynamiques), M13 bis (forgot password), M14 (admin interface gestion utilisateurs avec modale Inviter).*
+
+- **2026-05-10 · CMO Léa · Onboarding mis à jour avec Étape 0 (première connexion).** [LIVRABLE]
+  *`design/copy/onboarding_and_push_v1.md` enrichi d'une Étape 0 préalable à l'Étape 1, qui décrit le force-redirect vers `/reset-password` pour les comptes avec `must_change_password=true`.*
+
+- **2026-05-10 · CEO + CTO · Plan de recette Gate 7 — Scénario S0 réécrit.** [LIVRABLE]
+  *`specs/plan_recette_gate7_v1.md` § S0 : 8 tests → 14 tests, couvrant tout le flow admin-create → invitation → first-login → force change → reconnexions ultérieures + rate-limit + mot de passe oublié + provisional expiré.*
+
+- **2026-05-10 · CTO Sophie · Spec middleware v1.1 mise à jour.** [LIVRABLE]
+  *`specs/middleware_domain_gate.md` : version 1.1, note pivot ajoutée en en-tête, mention magic-link remplacée par pivot email+password dans la section « Risques résiduels ». Le middleware lui-même est inchangé fonctionnellement.*
+
+---
+
+## 2026-05-10 — Paramètres auth password détaillés actés Board
+
+- **2026-05-10 · Q1/B · Board · Mot de passe provisoire expire après 24 heures.** [BOARD-OK 2026-05-10]
+  *Surclasse la reco CTO (7 jours). Sécurité prioritaire : le mot de passe provisoire en clair dans la boîte mail ne doit pas traîner. Conséquence : workflow admin doit prévenir le futur user avant l'invitation. Si user en congé/weekend, admin peut re-générer un nouveau mot de passe via bouton « Renvoyer » dans la liste utilisateurs (M14). À surveiller : taux de renvois en première semaine.*
+
+- **2026-05-10 · Q2/B · Board · Mot de passe définitif min 16 caractères (+1 maj +1 min +1 chiffre +1 symbole).** [BOARD-OK 2026-05-10]
+  *Surclasse la reco CTO (12 caractères, standard NIST 2024). Sécurité renforcée. UI doit encourager les passphrases pour faciliter la mémorisation (ex. exemple affiché : « montagne bleue sourire café 7 », 28 caractères, facile à retenir, conforme aux règles).*
+
+- **2026-05-10 · Q3/A · Board · MFA optionnel pour admin au MVP.** [BOARD-OK 2026-05-10]
+  *Reco CTO+CEO suivie. Activable dans les paramètres user, pas bloquant. À évaluer pour passage en obligatoire en Phase 2 (ouverture multi-clients).*
+
+- **2026-05-10 · Q4/A · Board · Rate-limit 5 tentatives / 15 min.** [BOARD-OK 2026-05-10]
+  *Reco CTO suivie. Default Supabase, équilibre standard industrie.*
+
+---
+
+## 2026-05-10 — Batch parallèle Cowork n°8 *(tier-5 production)*
+
+- **2026-05-10 · CTO Sophie · ADR-006 à ADR-010 livrés `specs/adr_006_to_010.md`.** [LIVRABLE]
+  *Formalise 5 décisions techniques actées dans la journée : ADR-006 repo dédié (pas monorepo), ADR-007 auth email+password (pivot magic-link), ADR-008 Vercel compte perso temporaire à migrer avant Gate 9, ADR-009 domaine Resend `alyosingenierie.fr` avec DKIM/SPF/MX/DMARC, ADR-010 4 paramètres auth (24h provisoire, 16 car, MFA optionnel, rate-limit 5/15).*
+
+- **2026-05-10 · CEO Marc · Index sommaire des livrables Cowork livré `INDEX.md`.** [LIVRABLE]
+  *Navigation par rôle (Pilotage, Gates, Specs, Préparation 7/8/9, Design, Copy, Notes) + section « Navigation par usage » (audit sécu, démo Gate 9, incident, etc.). Statistiques globales : 35+ livrables, 50+ décisions, 350+ lignes SQL, 72 tests recette, 54 critères RGAA. À actualiser à chaque nouveau livrable.*
+
+- **2026-05-10 · CTO Sophie + CEO Marc · Template postmortem livré `specs/postmortem_template_v1.md`.** [LIVRABLE]
+  *Template SEV1/SEV2 obligatoire, format blameless NIST SP 800-61. 12 sections : résumé, impact, chronologie horodatée, root cause (avec 5-whys facultatif), détection, réponse, ce qui a bien/mal fonctionné, actions correctives, apprentissages, diffusion, suivi. Procédure : copier en `notes-de-suivi/POSTMORTEM_INC-YYYY-MM-DD-N.md`, finaliser sous 7 jours.*
+
+---
+
+## 2026-05-13 — DNS Resend basculé chez IONOS (correction ADR-009)
+
+- **2026-05-13 · BOARD + CEO · DNS Resend reposé chez IONOS, pas OVH.** [CORRECTION ADR-009]
+  *Diagnostic Alex 2026-05-13 (note CC_260513_0850) : le domaine `alyosingenierie.fr` est hébergé chez IONOS (NS `ns1016.ui-dns.com`), pas OVH comme supposé en Phase 0. Les records initialement posés chez OVH n'ont jamais propagé.*
+  *Correction effectuée : 4 records ajoutés chez IONOS le 2026-05-13 par le Board avec assistance Cowork (CEO + PS_OPERATOR via DNS-over-HTTPS Google). Stratégie sous-domaine `send.` pour ne pas toucher au SPF racine qui sert Outlook 365 AlyoS.*
+  *Records validés propagés Google DNS public le 2026-05-13 :*
+  *— TXT `resend._domainkey.alyosingenierie.fr` : `v=DKIM1; k=rsa; p=MIGfMA...QIDAQAB`*
+  *— TXT `send.alyosingenierie.fr` : `v=spf1 include:amazonses.com ~all`*
+  *— MX `send.alyosingenierie.fr` : `10 feedback-smtp.eu-west-1.amazonses.com`*
+  *— TXT `_dmarc.alyosingenierie.fr` : `v=DMARC1; p=none;`*
+  *ADR-009 à corriger en v1.1 : remplacer toutes mentions « OVH » par « IONOS » dans le contexte DNS. Au passage : Phase 0 onboarding doc à actualiser (hébergement DNS = IONOS et non OVH).*
+
+---
+
+- **2026-05-13 · BOARD · Resend Domain `alyosingenierie.fr` = Verified.** [BOARD-OK 2026-05-13]
+  *Confirmation Resend dashboard 2026-05-13. Les 4 records DKIM + SPF + MX + DMARC sont validés côté Resend. `sendPasswordResetEmail` et `sendWelcomeProvisionalPassword` peuvent désormais émettre depuis `noreply@alyosingenierie.fr` et autres aliases. Le flow auth bout-en-bout est techniquement débloqué — restera à valider via E2E une fois la PR `feat/auth-password-pivot` mergée.*
+
+---
+
+## 2026-05-14 — Custom SMTP Supabase + Resend opérationnel + bug `https://https://`
+
+- **2026-05-14 · BOARD + CEO · Supabase Custom SMTP configuré avec Resend.** [LIVRABLE]
+  *Diagnostic initial : `Failed to send recovery email` → Auth log a révélé `535 Authentication credentials invalid`. Cause : le mot de passe initialement collé dans Supabase Custom SMTP n'était pas une clé API Resend valide. Correction : création d'une nouvelle clé API Resend dédiée (`Supabase Auth SMTP`, permission Sending access, domain restriction `alyosingenierie.fr`), valeur collée propre dans Supabase Settings → Email → Password. Save → test « Send password recovery » sur user `steissier@alyosingenierie.fr` → email reçu via Resend en moins d'1 minute.*
+
+- **2026-05-14 · INC-2026-05-14-01 · Bug double `https://` dans lien email reset password.** [INCIDENT SEV2 ouvert]
+  *Le lien dans l'email reset arrive sous forme `https://https://edifio-sourcing-3gfzshq1t-teissiers-projects.vercel.app/#access_token=...` (double `https://`). Brave interprète `https` comme hostname → DNS_PROBE_POSSIBLE error. Confirmé aussi dans Auth Log antérieur (referer `https://https://edifio-sourcing...`). Cause à confirmer : Supabase Site URL avec `https://` dupliqué OU helper `getSiteUrl()` côté code qui préfixe 2× OU env var Vercel mal configurée. Workaround utilisateur : copy-paste + cleanup manuel du lien (acceptable pour le test mais inadmissible en prod). Brief Alex envoyé pour fix P0.*
+
+---
+
+## 2026-05-14 — Batch parallèle Cowork n°9 *(pendant qu'Alex code les fixes auth)*
+
+- **2026-05-14 · CTO Sophie · ADR-011 livré `specs/adr_011_auth_strategy_post_scanner.md`.** [LIVRABLE]
+  *Formalise la stratégie auth en 3 couches face au scanner email d'entreprise AlyoS qui consume les tokens recovery. Recommandation : abandonner le `resetPasswordForEmail` standard Supabase au profit d'une regénération de mot de passe provisoire envoyée en clair via Resend (réutilise template D.9 + force change first-login). Page `/auth/error` à ajouter pour les cas où un user clique malgré tout sur un ancien lien. Brief Alex inclus.*
+
+- **2026-05-14 · CTO Sophie + DEV Alex · Spec module sourcing engine livrée `specs/module_sourcing_engine_v1.md`.** [LIVRABLE]
+  *Architecture complète : 4 connecteurs (BOAMP API + PLACE/Francmarchés/MP.info via container Fly.io), orchestrateur Supabase Edge Function, normalisation, dedup hash composite cross-plateformes, scoring V1 règles + scoring IA Haiku, cron Vercel HH:MM Europe/Paris, webhook scraper, tests E2E. Plan de mise en œuvre Alex : ~9-13 jours sur 2-2.5 semaines de Gate 6. Coût opérationnel ~10-25 €/mois. Risques + mitigations documentés.*
+
+- **2026-05-14 · CEO Marc · INDEX.md mis à jour avec les 3 nouveaux livrables.** [LIVRABLE]
+  *Navigation par usage enrichie d'une section « préparer le prochain gros chantier ». ADR-011 et spec module sourcing intégrés à l'index des specs techniques.*
+
+---
+
+*Dernière mise à jour : 2026-05-14 par [CEO Marc] — Batch n°9 : ADR-011 auth post-scanner + spec module sourcing + INDEX à jour.*

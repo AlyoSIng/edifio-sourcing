@@ -30,9 +30,15 @@ et les opérations système via deux sub-agents :
    Le schéma BDD reste multi-tenant (RLS + `organization_id`) pour préparer
    l'ouverture sans dette technique. **1 seule organisation au démarrage : AlyoS.**
 4. **Accès restreint au domaine email `@alyosingenierie.fr`** :
-   - Auth Supabase magic-link
+   - **Auth Supabase email + mot de passe** *(pivot 2026-05-10 — abandon magic-link bloqué par scanner email entreprise, parité edifio Suivi)*
+   - Workflow : admin crée le compte avec email/nom/rôle → mot de passe provisoire 16 car. envoyé via Resend → première connexion force changement de mot de passe → session JWT durable 30 jours
+   - **Mot de passe provisoire expire 24 heures**, régénérable par admin (bouton « Renvoyer » dans interface admin)
+   - **Règles password définitif : min 16 caractères, 1 maj + 1 min + 1 chiffre + 1 symbole** (passphrases encouragées)
+   - Rate-limit login : 5 tentatives échouées → blocage 15 min (default Supabase)
+   - MFA admin optionnel au MVP, activable dans les paramètres user
+   - Lien « Mot de passe oublié » via Supabase reset password flow standard
    - Middleware Next.js (`middleware.ts`) qui rejette toute session dont
-     `email.endsWith('@alyosingenierie.fr') === false`
+     `email.endsWith('@alyosingenierie.fr') === false` *(inchangé)*
    - Audit log de chaque tentative d'accès (autorisée / refusée)
 5. **Déploiement Vercel** : URL initiale `https://edifio-sourcing.vercel.app`
    (ou similaire). Custom domain `sourcing.alyosingenierie.fr` ou
@@ -57,7 +63,7 @@ et les opérations système via deux sub-agents :
   Vercel EU, Brevo, Resend, Anthropic API (Sonnet 4.6 + Haiku 4.5),
   Odoo XML-RPC, Playwright sur container Fly.io EU.
 - **Repo de travail : `AlyoSIng/edifio-sourcing` (greenfield Next.js 14 standalone).**
-- **Auth restreinte au domaine `@alyosingenierie.fr`** (middleware Next.js).
+- **Auth email + mot de passe durable**, restreinte au domaine `@alyosingenierie.fr` (middleware Next.js). Workflow admin-create + mot de passe provisoire Resend.
 - **ORM Drizzle vs Prisma** : décision REPORTÉE → spike de 2 jours par Alex
   en début Gate 6. AUCUNE MIGRATION COMMITTÉE AVANT DÉCISION.
 
@@ -97,9 +103,12 @@ et les opérations système via deux sub-agents :
 3. **`dev`** : architecture du `src/app/` avec route groups :
    `(public)/...` (page d'accueil minimale, login) et `(app)/...` (module Sourcing
    authentifié). Tout sera servi sous `/` puisque le repo est dédié.
-4. **`dev`** : ajouter Supabase Auth (magic-link) + middleware Next.js
+4. **`dev`** : ajouter Supabase Auth (**email + mot de passe**) + middleware Next.js
    `middleware.ts` avec gate sur `@alyosingenierie.fr` pour TOUTES les routes
-   `(app)/*`. Test E2E qui prouve qu'un email hors domaine est rejeté.
+   `(app)/*`. Interface admin `/sourcing/admin/users` pour créer les comptes.
+   Flow first-login obligatoire (force changement password). Test E2E qui prouve
+   qu'un email hors domaine est rejeté et que le flow admin-create + first-login
+   fonctionne.
 5. **`dev`** : spike ORM Drizzle vs Prisma (2 jours). Prototype `tenders`
    + `architects` + `architect_responses` avec RLS strict + JSON columns
    + cron Edge Function exécutant scoring sur 100 AO. Critères pondérés :
