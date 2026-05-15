@@ -513,4 +513,28 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-14 par [CEO Marc] — Batch n°9 : ADR-011 auth post-scanner + spec module sourcing + INDEX à jour.*
+## 2026-05-15 — Implémentation ADR-011 couche 3 (recovery via mot de passe provisoire)
+
+- **2026-05-15 · DEV Alex · Implémentation ADR-011 couche 3 — refacto recovery via mot de passe provisoire.** [LIVRABLE]
+  *Motif : le scanner email d'entreprise AlyoS consume aussi les tokens recovery, pas seulement magic-link. Validé en pratique 2026-05-14 (cf. CC_260514_2256). On abandonne `auth.admin.generateLink({type:"recovery"})` + lien tokenisé Resend au profit d'une regénération de mot de passe provisoire via `admin.updateUserById` (template D.9 réutilisé, variant `reset`).*
+  *Fichiers modifiés :*
+  *— `src/app/forgot-password/actions.ts` (listUsers + filter → updateUserById + sendWelcomeProvisionalPassword variant=reset, anti-énumération préservée)*
+  *— `src/app/reset-password/actions.ts` (suppression flow PKCE + flow recovery implicit, garde uniquement first-login)*
+  *— `src/app/reset-password/page.tsx` + `ResetPasswordForm.tsx` (suppression `code`/`mode`, un seul flow)*
+  *— `src/app/auth/callback/ClientCallbackHandler.tsx` (retire `setSession` fragment access_token, garde fragment #error→/auth/error)*
+  *— `src/app/auth/callback/page.tsx` (route legacy ADR-011, PKCE résiduel conservé pour helpers E2E, erreur → /auth/error)*
+  *— `src/lib/email/templates/welcome-provisional-password.ts` (variant `welcome` | `reset` — sujet + intro adaptés, body identique)*
+  *— `src/lib/email/send.ts` (ajout `sendWelcomeProvisionalPassword`, alias `sendWelcomeEmail` rétrocompat, retrait `sendPasswordResetEmail`)*
+  *— `src/lib/email/templates/password-reset.ts` SUPPRIMÉ (template lien tokenisé obsolète)*
+  *— `src/lib/auth/types.ts` (ajout `password_reset_at?: string | null` au shape `UserMetadata`)*
+  *— `src/app/forgot-password/page.tsx` + `ForgotPasswordForm.tsx` (copy M13-bis : « nouveau mot de passe par email » au lieu de « lien de réinitialisation »)*
+  *— `design/copy/templates_brevo_v1.md` D.10 (template reset documenté nouveau pattern ADR-011)*
+  *— `specs/plan_recette_gate7_v1.md` S0.10 (scénario aligné nouveau flow)*
+  *— `e2e/helpers/auth.ts` (migré magic-link → login UI password durable — middleware-domain tests compatibles)*
+  *— `e2e/helpers/password.ts` (`getRecoveryLink` → `regenerateProvisionalPasswordFor`)*
+  *— `e2e/auth-password.spec.ts` S4 (forgot → regen provisoire → login → force reset → app)*
+  *Validation locale : typecheck OK, lint OK, 141 tests Vitest verts. Playwright non lancé en local (besoin Supabase preview + webServer). Aucune migration BDD. Anti-énumération préservée.*
+
+---
+
+*Dernière mise à jour : 2026-05-15 par [DEV Alex] — ADR-011 couche 3 implémentée, bundlée dans la PR `feat/auth-password-pivot`.*

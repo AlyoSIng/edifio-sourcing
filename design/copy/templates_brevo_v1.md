@@ -280,27 +280,45 @@ Outil interne réservé aux collaborateurs AlyoS Ingénierie.
 
 ---
 
-## D.10 — `password_reset` *(Resend, neutre, mot de passe oublié)*
+## D.10 — `password_reset` *(Resend, neutre, mot de passe oublié — ADR-011)*
 
-**Sujet** : `Réinitialisation de votre mot de passe edifio Sourcing`
+**Sujet** : `Votre nouveau mot de passe — edifio Sourcing`
 
 **Provider** : Resend
 
+**Pivot ADR-011 (2026-05-14)** : on n'envoie plus un lien tokenisé Supabase
+(consommé par le scanner email d'entreprise AlyoS qui pré-clique tous les
+liens). À la place, on réutilise le pipeline D.9 — `requestPasswordResetAction`
+appelle `admin.updateUserById` pour poser un nouveau mot de passe provisoire,
+et l'envoie en clair via Resend avec le **même template** que l'invitation
+admin, simplement en variant `reset` (sujet + intro adaptés).
+
 ```
-Bonjour,
+Bonjour {{user.firstname}},
 
-Vous avez demandé la réinitialisation de votre mot de passe edifio Sourcing.
+Vous avez demandé la réinitialisation de votre mot de passe sur edifio
+Sourcing. Nous vous avons généré un nouveau mot de passe provisoire — votre
+ancien mot de passe ne fonctionne plus.
 
-Cliquez sur le lien ci-dessous pour choisir un nouveau mot de passe :
+Vos nouveaux identifiants :
 
-[Bouton « Réinitialiser mon mot de passe »]
-{{app.reset_password_url}}
+  Email          : {{user.email}}
+  Mot de passe   : {{user.provisional_password}}
 
-Ce lien est valide 60 minutes. Au-delà, demandez à nouveau une
-réinitialisation depuis la page de connexion.
+Pour vous connecter :
 
-Si vous n'êtes pas à l'origine de cette demande, ignorez ce message — votre
-mot de passe actuel reste inchangé.
+[Bouton « Me connecter »]
+{{app.login_url}}
+
+À votre prochaine connexion, vous serez invité(e) à choisir votre propre
+mot de passe : **minimum 16 caractères**, contenant au moins 1 majuscule,
+1 minuscule, 1 chiffre et 1 symbole.
+
+⏰ **Ce mot de passe provisoire expire dans 24 heures.** Si vous ne pouvez
+pas vous connecter dans ce délai, contactez l'administrateur AlyoS qui vous
+a invité(e) pour qu'il vous en génère un nouveau.
+
+Si vous n'êtes pas à l'origine de cette demande, contactez l'équipe IT AlyoS.
 
 —
 edifio Sourcing — AO publics, du sourcing au pli
@@ -308,12 +326,15 @@ Outil interne réservé aux collaborateurs AlyoS Ingénierie.
 ```
 
 **Variables Handlebars** :
-- `{{app.reset_password_url}}` (URL sécurisée Supabase avec token de reset, 1 usage, expire 60 min)
+- `{{user.firstname}}`, `{{user.email}}`
+- `{{user.provisional_password}}` (16 caractères, équivalent D.9)
+- `{{app.login_url}}` (URL de la page `/login`)
 
 **Sécurité** :
-- Le lien est tokenisé et signé (Supabase RS256). Pas de mot de passe transitant en clair.
-- Pré-clic scanner email : ce flow utilise un token à usage unique côté Supabase Auth, mais le pré-clic ne permet PAS d'accéder au compte (il ouvre juste la page de saisie du nouveau mot de passe — il faut connaître le mot de passe avant pour le changer, ou disposer du lien complet). Vulnérabilité réduite vs magic-link.
-- Si le user perd définitivement l'accès, l'admin peut regénérer un mot de passe provisoire (D.9).
+- Pas de token, pas de lien : le scanner email peut « lire » le mail mais ne consume rien (cf. ADR-011 § « Avantages »).
+- Le mot de passe transite en clair par email — atténué par expiration 24 h et force-change à la première utilisation.
+- Audit log enregistré côté serveur (`audit_log:password_reset_requested`) sans le mot de passe en clair (invariante `password-server.ts`).
+- Si le user perd définitivement l'accès, un admin peut regénérer un nouveau provisoire via le bouton « Renvoyer » dans M14.
 
 ---
 
