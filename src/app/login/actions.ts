@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { LOGIN_RATE_LIMIT_COOLDOWN_MS } from "@/lib/auth/constants";
 import { isProvisionalPasswordExpired, mustChangePassword, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -18,9 +17,9 @@ import type { LoginState } from "./types";
  * Garde-fous :
  * 1. Validation format email + présence password AVANT appel Supabase
  *    (économise un round-trip et n'expose pas l'API rate-limit).
- * 2. Garde domaine `@alyosingenierie.fr` côté action — défense en profondeur,
- *    en plus du middleware. Si quelqu'un crée un user hors domaine via le
- *    Dashboard Supabase, on refuse sa connexion ici aussi.
+ * 2. PAS de pré-validation de domaine ici : le contrôle `@alyosingenierie.fr`
+ *    est 100 % à la charge du middleware (cf. `specs/middleware_domain_gate.md`
+ *    §0 — source unique de vérité, anti-divergence).
  * 3. Message d'erreur générique « Email ou mot de passe incorrect » — anti-
  *    énumération (on ne distingue jamais email inconnu / password invalide).
  * 4. Si la connexion réussit mais que `provisional_password_expires_at` est
@@ -73,14 +72,6 @@ export async function signInWithPasswordAction(
     const email = emailRaw.trim().toLowerCase();
     if (!EMAIL_REGEX.test(email)) {
       return { status: "error", message: "Adresse email invalide." };
-    }
-
-    if (!isAuthorizedEmail(email)) {
-      return {
-        status: "error",
-        message:
-          "Accès réservé aux emails @alyosingenierie.fr. Si tu penses qu'il s'agit d'une erreur, contacte l'équipe IT.",
-      };
     }
 
     const supabase = createSupabaseServerClient();

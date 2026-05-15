@@ -1,7 +1,6 @@
 import { chromium, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import { isAuthorizedEmail } from "../../src/lib/auth/domain";
 import type { UserMetadata } from "../../src/lib/auth/types";
 
 /**
@@ -81,22 +80,19 @@ async function ensureUserWithKnownPassword(email: string): Promise<void> {
  * Connecte la page sous l'identité `email` via le formulaire `/login`.
  * Crée l'utilisateur en amont si nécessaire (mot de passe durable connu).
  *
- * Comportement déterministe — détection automatique du flow via le suffixe
- * de domaine (cf. `isAuthorizedEmail`) :
+ * **Contrat ADR-011 / spec §0** : la Server Action `signInWithPasswordAction`
+ * ne fait plus de pré-validation de domaine. Tout email avec format valide et
+ * password correct obtient une session Supabase. Le rejet `@alyosingenierie.fr`
+ * arrive uniquement au passage du middleware, sur la première requête vers
+ * une route protégée (`/sourcing/*` → redirect `/forbidden`, `/api/protected/*`
+ * → 403 JSON).
  *
- *   - **In-domain** (`@alyosingenierie.fr` strict) : la Server Action
- *     `signInWithPasswordAction` pose les cookies `sb-*` et redirige vers
- *     `/sourcing/ao-du-jour`. On attend explicitement cette navigation.
- *     Pas de catch silencieux — si la nav échoue (timeout), le test fail
- *     proprement avec sa pile.
+ * Conséquence : ce helper ne discrimine plus in-domain / out-of-domain. Il
+ * pose simplement la session et rend la main une fois le round-trip RSC
+ * stabilisé. C'est à la spec caller d'enchaîner avec un `goto('/sourcing/*')`
+ * puis d'asserter l'URL finale (`/sourcing/ao-du-jour` vs `/forbidden`).
  *
- *   - **Out-of-domain** : la Server Action refuse en pré-validation
- *     (anti-fuite), aucun cookie de session n'est posé. La page reste sur
- *     `/login` avec un message d'erreur (data-testid="auth-error"). On
- *     attend uniquement la stabilisation réseau — c'est aux specs caller
- *     de vérifier le message d'erreur ou la suite du parcours.
- *
- * Source : `specs/middleware_domain_gate.md` §4 + ADR-011.
+ * Source : `specs/middleware_domain_gate.md` §0 + §4 + ADR-011.
  */
 export async function signInWith(page: Page, email: string): Promise<void> {
   await ensureUserWithKnownPassword(email);
@@ -106,19 +102,13 @@ export async function signInWith(page: Page, email: string): Promise<void> {
   await page.fill("input#password", E2E_DURABLE_PASSWORD);
   await page.click("button[type=submit]");
 
-  if (isAuthorizedEmail(email)) {
-    // Flow succès : la Server Action a posé les cookies et émis un
-    // `redirect("/sourcing/ao-du-jour")` (cf. `signInWithPasswordAction`).
-    // On attend la nav effective avant de rendre la main — c'est ce qui
-    // garantit aux specs caller que les cookies `sb-*` sont posés au
-    // moment où elles enchaînent leurs `page.goto("/sourcing/*")`.
-    await page.waitForURL("**/sourcing/**", { timeout: 15_000 });
-  } else {
-    // Flow refus : la Server Action retourne un state d'erreur, la page
-    // reste sur /login. On attend juste la stabilisation réseau (la
-    // Server Action a terminé son round-trip RSC).
-    await page.waitForLoadState("networkidle");
-  }
+  // La Server Action pose les cookies `sb-*` et émet un `redirect()` vers
+  // `/sourcing/ao-du-jour` (ou `/reset-password` si first-login). On attend
+  // la stabilisation réseau — au retour, la session est posée et la nav
+  // post-login a été suivie par le browser. Pour les users out-of-domain,
+  // le middleware aura redirigé vers `/forbidden` à ce moment-là ; la spec
+  // doit ensuite faire ses propres `goto` pour asserter le comportement.
+  await page.waitForLoadState("networkidle");
 }
 
 /**
