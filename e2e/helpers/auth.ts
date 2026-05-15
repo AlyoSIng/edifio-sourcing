@@ -1,6 +1,7 @@
 import { chromium, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { isAuthorizedEmail } from "../../src/lib/auth/domain";
 import type { UserMetadata } from "../../src/lib/auth/types";
 
 /**
@@ -80,16 +81,22 @@ async function ensureUserWithKnownPassword(email: string): Promise<void> {
  * Connecte la page sous l'identité `email` via le formulaire `/login`.
  * Crée l'utilisateur en amont si nécessaire (mot de passe durable connu).
  *
- * Après retour : la session Supabase est posée (cookies `sb-*`) et la page
- * est hors de `/login`. Le test peut ensuite naviguer vers la route à
- * valider et faire ses assertions sur l'URL résultante (cf. matrice spec §2).
+ * Comportement déterministe — détection automatique du flow via le suffixe
+ * de domaine (cf. `isAuthorizedEmail`) :
  *
- * Le helper accepte des emails hors-domaine (par ex. `bob@gmail.com`) pour
- * tester la matrice : le user est créé côté Supabase (admin API n'impose pas
- * le domaine), le login Server Action `signInWithPasswordAction` refuse en
- * pré-validation et reste sur `/login` avec un message d'erreur. Les tests
- * qui exercent ce cas regardent ce message ou tentent de naviguer vers
- * `/sourcing/*` qui les renverra sur `/forbidden` ou `/login`.
+ *   - **In-domain** (`@alyosingenierie.fr` strict) : la Server Action
+ *     `signInWithPasswordAction` pose les cookies `sb-*` et redirige vers
+ *     `/sourcing/ao-du-jour`. On attend explicitement cette navigation.
+ *     Pas de catch silencieux — si la nav échoue (timeout), le test fail
+ *     proprement avec sa pile.
+ *
+ *   - **Out-of-domain** : la Server Action refuse en pré-validation
+ *     (anti-fuite), aucun cookie de session n'est posé. La page reste sur
+ *     `/login` avec un message d'erreur (data-testid="auth-error"). On
+ *     attend uniquement la stabilisation réseau — c'est aux specs caller
+ *     de vérifier le message d'erreur ou la suite du parcours.
+ *
+ * Source : `specs/middleware_domain_gate.md` §4 + ADR-011.
  */
 export async function signInWith(page: Page, email: string): Promise<void> {
   await ensureUserWithKnownPassword(email);
@@ -99,21 +106,19 @@ export async function signInWith(page: Page, email: string): Promise<void> {
   await page.fill("input#password", E2E_DURABLE_PASSWORD);
   await page.click("button[type=submit]");
 
-  // Deux issues possibles selon le domaine :
-  //   - email Alyos → redirect vers /sourcing/ao-du-jour (succès) ;
-  //   - email hors-domaine → pré-validation Server Action refuse, on reste
-  //     sur /login avec message d'erreur (data-testid="auth-error").
-  // Dans les deux cas la nav quitte (ou maintient) /login après ~quelques
-  // ms — on attend que ce soit stable.
-  await page
-    .waitForURL((url) => !url.pathname.startsWith("/auth/callback"), {
-      waitUntil: "domcontentloaded",
-      timeout: 10_000,
-    })
-    .catch(() => {
-      // Pas de navigation — c'est le cas hors-domaine. Le test caller va
-      // observer l'état (message d'erreur ou tentative /sourcing/*).
-    });
+  if (isAuthorizedEmail(email)) {
+    // Flow succès : la Server Action a posé les cookies et émis un
+    // `redirect("/sourcing/ao-du-jour")` (cf. `signInWithPasswordAction`).
+    // On attend la nav effective avant de rendre la main — c'est ce qui
+    // garantit aux specs caller que les cookies `sb-*` sont posés au
+    // moment où elles enchaînent leurs `page.goto("/sourcing/*")`.
+    await page.waitForURL("**/sourcing/**", { timeout: 15_000 });
+  } else {
+    // Flow refus : la Server Action retourne un state d'erreur, la page
+    // reste sur /login. On attend juste la stabilisation réseau (la
+    // Server Action a terminé son round-trip RSC).
+    await page.waitForLoadState("networkidle");
+  }
 }
 
 /**
