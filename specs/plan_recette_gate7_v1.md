@@ -116,7 +116,7 @@ Un PDF de RC fictif de 12 pages couvrant :
 | S0.7 | Tentative login `attacker@gmail.com` + n'importe quel password | Échec auth Supabase, message générique « Identifiants incorrects » (pas de leak existence email) |
 | S0.8 | Tentative login `alice@alyosingenierie.com` (domaine cousin) + password valide | Login Supabase OK, mais redirect `/forbidden` au middleware, session invalidée |
 | S0.9 | Tentative login email AlyoS + mauvais password (5 fois) | Rate limit Supabase, message « Trop de tentatives, réessayez dans X minutes » |
-| S0.10 | « Mot de passe oublié ? » → saisir email AlyoS → recevoir lien reset → choisir nouveau mot de passe | Flow Supabase resetPasswordForEmail OK, session créée avec nouveau password |
+| S0.10 | « Mot de passe oublié ? » → saisir email AlyoS → recevoir nouveau mot de passe provisoire par email → login → force-redirect `/reset-password` → choix définitif | ADR-011 : `requestPasswordResetAction` regénère un provisoire via `admin.updateUserById` + envoi Resend (variant `reset`). Plus de lien tokenisé. Session établie après choix définitif, redirect `/sourcing/ao-du-jour`. |
 | S0.11 | Mot de passe provisoire utilisé > 24 heures après création | Compte expire, admin doit régénérer un nouveau mot de passe provisoire via bouton « Renvoyer » dans interface admin |
 | S0.12 | Tampering JWT (modifier `app_metadata` côté client) | Supabase rejette signature RS256, retour `/login` |
 | S0.13 | Session expirée (refresh token > 30j) | Redirect `/login?next=...` au prochain accès |

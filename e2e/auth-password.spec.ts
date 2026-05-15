@@ -4,7 +4,7 @@ import {
   createDurableUser,
   createProvisionalUser,
   deleteUserIfExists,
-  getRecoveryLink,
+  regenerateProvisionalPasswordFor,
 } from "./helpers/password";
 
 /**
@@ -22,11 +22,11 @@ import {
  *   6. Password provisoire expiré → message clair
  *
  * Stratégie email (justifiée — cf. brief §8 « Recommandation : Playwright
- * route handler ») : on N'envoie PAS de mail Resend. À la place, on utilise
- * `getRecoveryLink` (admin API Supabase) qui renvoie l'URL recovery directement
- * — fonctionnellement équivalent à parser un email reçu, mais offline-friendly
- * et déterministe. Pour le scénario 1, on prépare l'état directement via
- * `createProvisionalUser` qui reproduit ce que fait `POST /api/admin/users`.
+ * route handler ») : on N'envoie PAS de mail Resend. À la place, on prépare
+ * l'état utilisateur directement via les helpers `createProvisionalUser` /
+ * `regenerateProvisionalPasswordFor` qui reproduisent côté admin API ce que
+ * font respectivement `POST /api/admin/users` et `requestPasswordResetAction`
+ * (ADR-011). Offline-friendly et déterministe.
  *
  * Prérequis : `.env.local` avec `NEXT_PUBLIC_SUPABASE_URL`,
  * `NEXT_PUBLIC_SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY`. Le webServer
@@ -120,44 +120,43 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     await expect(page.getByTestId("auth-error")).toContainText(/alyosingenierie\.fr/i);
   });
 
-  test("S4 — Mot de passe oublié → flow reset complet via lien recovery", async ({ page }) => {
+  test("S4 — Mot de passe oublié (ADR-011) → nouveau provisoire → login → force reset → app", async ({
+    page,
+  }) => {
     const email = TEST_EMAILS.scenario4;
     await createDurableUser({ email, password: STRONG_PASSWORD });
 
-    // Soumission du form forgot-password (le serveur appelle Resend, mais
-    // on bypass le mail en récupérant le lien directement via admin API).
+    // 1. Soumission du form forgot-password — déclenche côté serveur la
+    //    regénération du provisoire via admin.updateUserById + envoi Resend
+    //    (mocké en preview). On valide la confirmation UX anti-énumération.
     await page.goto("/forgot-password");
     await page.fill("input#email", email);
     await page.click("button[type=submit]");
     await expect(page.getByRole("status")).toContainText(/Demande prise en compte/i);
 
-    // Récupération du lien recovery (équivalent au lien qu'aurait reçu
-    // l'utilisateur par email). On passe par /auth/callback pour que le
-    // ClientCallbackHandler décode le fragment d'URL que Supabase renvoie en
-    // implicit flow (#access_token=…) et établisse la session sur localhost
-    // — sans cette indirection, /reset-password verrait une page sans
-    // session et afficherait "Lien invalide". Cohérent avec
-    // `requestPasswordResetAction` côté production.
-    const baseURL = page.url().split("/forgot-password")[0] ?? "http://localhost:3000";
-    const recoveryUrl = await getRecoveryLink(
-      email,
-      `${baseURL}/auth/callback?next=/reset-password`,
-    );
+    // 2. Bypass mail : on regénère un provisoire connu via l'admin API
+    //    (équivalent fonctionnel à ce qu'a fait le serveur — l'invariante
+    //    sécurité interdit de lire le provisoire posé par l'action). Le test
+    //    valide la chaîne login → force-redirect /reset-password → app.
+    const { provisionalPassword } = await regenerateProvisionalPasswordFor(email);
 
-    // Suivi du lien — chaîne : Supabase verify → /auth/callback →
-    // setSession (client-side) → /reset-password.
-    await page.goto(recoveryUrl);
+    // 3. Login avec le provisoire.
+    await page.goto("/login");
+    await page.fill("input#email", email);
+    await page.fill("input#password", provisionalPassword);
+    await page.click("button[type=submit]");
+
+    // 4. Le middleware force-redirige sur /reset-password (must_change_password=true).
     await page.waitForURL(/\/reset-password/, { timeout: 10_000 });
 
-    // Nouveau mot de passe.
+    // 5. Choix du mot de passe définitif.
     const newPwd = "Reset-MVP-2026!!";
     await page.fill("input#password", newPwd);
     await page.fill("input#confirm", newPwd);
     await page.click("button[type=submit]");
 
-    // Mode recovery → signOut côté serveur + redirect /login?notice=password_updated.
-    await page.waitForURL(/\/login\?notice=password_updated/, { timeout: 10_000 });
-    await expect(page.getByRole("status")).toContainText(/Mot de passe mis à jour/i);
+    // 6. ADR-011 : le user a déjà sa session valide → redirect direct sur l'app.
+    await page.waitForURL(/\/sourcing\/ao-du-jour/, { timeout: 10_000 });
   });
 
   test("S5 — Password trop faible est rejeté", async ({ page }) => {

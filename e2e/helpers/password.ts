@@ -122,21 +122,49 @@ export async function createProvisionalUser(args: {
 }
 
 /**
- * Récupère un lien recovery directement via l'admin API (équivalent à ce que
- * fait `requestPasswordResetAction`). Permet de tester le flow reset sans
- * dépendre d'un email réellement envoyé.
+ * Regénère un mot de passe provisoire pour un user existant et le renvoie en
+ * clair. Équivalent fonctionnel à ce que fait `requestPasswordResetAction`
+ * (ADR-011 couche 3) : pose un nouveau provisoire via `admin.updateUserById`
+ * + flag `must_change_password=true` + `provisional_password_expires_at`.
+ *
+ * Permet aux tests E2E de simuler la réception d'un email reset sans
+ * dépendre d'un mail réellement envoyé : le test soumet le form
+ * `/forgot-password` pour valider l'UI (succès apparent) puis appelle ce
+ * helper pour récupérer le nouveau provisoire et continuer le flow login →
+ * force-redirect /reset-password → choix définitif.
  */
-export async function getRecoveryLink(email: string, redirectTo: string): Promise<string> {
+export async function regenerateProvisionalPasswordFor(
+  email: string,
+): Promise<{ provisionalPassword: string; expiresAt: string }> {
   const admin = createAdmin();
-  const { data, error } = await admin.auth.admin.generateLink({
-    type: "recovery",
-    email,
-    options: { redirectTo },
-  });
-  if (error || !data?.properties?.action_link) {
-    throw new Error(`getRecoveryLink(${email}): ${error?.message ?? "no action_link"}`);
+  const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  const found = (data?.users ?? []).find(
+    (u) => (u.email ?? "").toLowerCase() === email.toLowerCase(),
+  );
+  if (!found) {
+    throw new Error(`regenerateProvisionalPasswordFor(${email}): user introuvable.`);
   }
-  return data.properties.action_link;
+
+  const provisional = generateProvisionalPassword();
+  const expiresAt = computeProvisionalExpiresAt(PROVISIONAL_PASSWORD_TTL_HOURS);
+
+  const currentMeta = (found.user_metadata ?? {}) as UserMetadata;
+  const nextMeta: UserMetadata = {
+    ...currentMeta,
+    must_change_password: true,
+    provisional_password_expires_at: expiresAt,
+    password_reset_at: new Date().toISOString(),
+  };
+
+  const { error } = await admin.auth.admin.updateUserById(found.id, {
+    password: provisional,
+    user_metadata: nextMeta as Record<string, unknown>,
+  });
+  if (error) {
+    throw new Error(`regenerateProvisionalPasswordFor(${email}): ${error.message}`);
+  }
+
+  return { provisionalPassword: provisional, expiresAt };
 }
 
 /**
