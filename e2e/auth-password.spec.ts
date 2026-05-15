@@ -99,13 +99,20 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     await page.waitForURL(/\/sourcing\/ao-du-jour/, { timeout: 10_000 });
   });
 
-  test("S3 — Email hors-domaine est rejeté par le middleware", async ({ page }) => {
-    // Pas de création — le middleware doit refuser même un visiteur anonyme,
-    // mais ici on teste le cas « session existante avec email hors-domaine »
-    // qui est plus strict. On crée un user gmail directement.
+  test("S3 — Email hors-domaine : le flow login UI n'ouvre pas l'accès à /sourcing", async ({
+    page,
+  }) => {
+    // Complémentaire de C4 (cf. middleware-domain.spec.ts) qui pose la session
+    // via l'admin API : ici on exerce le **chemin form login** (Server Action
+    // `signInWithPasswordAction` → redirect → middleware). Depuis le fix
+    // Option A, la Server Action ne pré-valide plus le domaine côté serveur
+    // (la garde est centralisée dans le middleware Next.js, source unique de
+    // vérité). On vérifie donc que même avec des credentials valides côté
+    // Supabase, un email hors-domaine n'atteint pas l'app et atterrit sur
+    // /forbidden.
     const email = TEST_EMAILS.scenario3;
     // createDurableUser passe par auth.admin.createUser qui n'impose pas le
-    // domaine côté Supabase — la garde est applicative.
+    // domaine côté Supabase — la garde est applicative (middleware).
     await createDurableUser({ email, password: STRONG_PASSWORD });
 
     await page.goto("/login");
@@ -113,11 +120,10 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     await page.fill("input#password", STRONG_PASSWORD);
     await page.click("button[type=submit]");
 
-    // La Server Action signInWithPasswordAction refuse en pré-validation
-    // (garde domaine côté action) — message d'erreur sous le form, pas
-    // de redirect. On cible data-testid pour éviter le matching parasite
-    // sur le <div role="alert" id="__next-route-announcer__"> de Next.js.
-    await expect(page.getByTestId("auth-error")).toContainText(/alyosingenierie\.fr/i);
+    // Le middleware doit catcher la redirection post-login et envoyer sur
+    // /forbidden — JAMAIS sur /sourcing/*.
+    await page.waitForURL(/\/forbidden/, { timeout: 10_000 });
+    await expect(page).not.toHaveURL(/\/sourcing\//);
   });
 
   test("S4 — Mot de passe oublié (ADR-011) → nouveau provisoire → login → force reset → app", async ({
