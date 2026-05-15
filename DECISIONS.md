@@ -527,3 +527,23 @@
 ---
 
 *Dernière mise à jour : 2026-05-14 par [CEO Marc] — Audit edifio.fr OK, 3 patterns marketing intégrés au DS, maquettes existantes inchangées.*
+
+---
+
+## 2026-05-15 — Rollback propagation cookies middleware (commit f2c2e59)
+
+- **2026-05-15 · Alex (dev) + Yann (ps_operator) · `git revert f2c2e59` après détection régression CI (4 tests E2E rouges).** [ROLLBACK]
+  *Le fix propageait correctement les cookies effacés post-signOut vers le `NextResponse.redirect`, respectant la spec `middleware_domain_gate.md` §2 C4 « session invalidée immédiatement ». Mais il a cassé 4 tests E2E (C4/C7/C10/C12) qui s'appuyaient implicitement sur le bug pré-fix (cookies sb-* préservés permettant au middleware de re-évaluer correctement sur les `page.goto` suivants des tests). Diagnostic Alex : les helpers `signInWith` supposent une session résiduelle côté browser jusqu'au goto suivant ; après le fix, les cookies sb-* sont vraiment effacés → `page.goto` suivant part anonyme → branche `redirectToLogin` → `/login` au lieu de `/forbidden`.*
+
+- **2026-05-15 · Board · Ticket backlog Phase 2 ouvert : `auth: invalider proprement la session lors d'un rejet domain (spec §2 C4)`.** [TICKET BACKLOG PHASE 2]
+  *Prérequis pour ré-application :*
+  *1. Refactor helpers E2E `signInWith` pour ne pas dépendre de session résiduelle (option : pose session via `admin.generateLink` au lieu de form submit avec round-trip middleware immédiat).*
+  *2. Ajouter test E2E défensif `expect(context.cookies()).toHaveLength(0)` après rejet `/forbidden`.*
+  *3. Re-livrer le pattern `propagateAuthCookies` avec confiance.*
+
+- **2026-05-15 · Board · Écart spec `middleware_domain_gate.md` §2 C4 « session invalidée immédiatement » accepté temporairement.** [ÉCART SPEC ACCEPTÉ]
+  *La révocation côté Supabase server reste effective, seul le cookie local browser subsiste jusqu'à expiration naturelle. L'attaquant ne peut pas exploiter ce cookie résiduel (le middleware ré-vérifie à chaque request). Impact pratique : limité. À refermer en Phase 2 via le ticket backlog ci-dessus. Fix S3 (commit 9dc9c2a) reste en place, indépendant.*
+
+---
+
+*Dernière mise à jour : 2026-05-15 par [ps_operator Yann] — Rollback f2c2e59 (régression E2E), ticket backlog Phase 2 ouvert, fix S3 9dc9c2a conservé.*
