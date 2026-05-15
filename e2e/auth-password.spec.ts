@@ -105,11 +105,20 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     // Complémentaire de C4 (cf. middleware-domain.spec.ts) qui pose la session
     // via l'admin API : ici on exerce le **chemin form login** (Server Action
     // `signInWithPasswordAction` → redirect → middleware). Depuis le fix
-    // Option A, la Server Action ne pré-valide plus le domaine côté serveur
+    // ADR-011, la Server Action ne pré-valide plus le domaine côté serveur
     // (la garde est centralisée dans le middleware Next.js, source unique de
-    // vérité). On vérifie donc que même avec des credentials valides côté
-    // Supabase, un email hors-domaine n'atteint pas l'app et atterrit sur
-    // /forbidden.
+    // vérité — cf. `specs/middleware_domain_gate.md` §2 C4). On vérifie donc
+    // que même avec des credentials valides côté Supabase, un email hors-
+    // domaine n'atteint pas l'app et atterrit sur /forbidden.
+    //
+    // Pattern aligné sur C4 (middleware-domain.spec.ts) pour déterminisme
+    // Playwright : après le submit on attend que le réseau soit stable, puis
+    // on déclenche explicitement la navigation vers /sourcing/ao-du-jour ;
+    // c'est ce GET qui déclenche le middleware qui doit rediriger vers
+    // /forbidden. Cette séquence évite les races de redirect post-Server-Action
+    // (la SA `signInWithPasswordAction` pose la session puis redirect vers
+    // /sourcing/ao-du-jour — sans waitForLoadState on peut rater l'instant
+    // où le middleware évalue la session).
     const email = TEST_EMAILS.scenario3;
     // createDurableUser passe par auth.admin.createUser qui n'impose pas le
     // domaine côté Supabase — la garde est applicative (middleware).
@@ -119,10 +128,9 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     await page.fill("input#email", email);
     await page.fill("input#password", STRONG_PASSWORD);
     await page.click("button[type=submit]");
-
-    // Le middleware doit catcher la redirection post-login et envoyer sur
-    // /forbidden — JAMAIS sur /sourcing/*.
-    await page.waitForURL(/\/forbidden/, { timeout: 10_000 });
+    await page.waitForLoadState("networkidle");
+    await page.goto("/sourcing/ao-du-jour");
+    await expect(page).toHaveURL(/\/forbidden/);
     await expect(page).not.toHaveURL(/\/sourcing\//);
   });
 
