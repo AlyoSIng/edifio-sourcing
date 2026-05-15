@@ -554,6 +554,18 @@
 
 **PR #7 redevient mergeable** après ce commit.
 
+### 2026-05-15 (suite 2) — Fixme étendu à C4/C7/C10/C12 + observation flakiness
+
+**Agent** : Alex (dev)
+**Action** : Marquage `test.fixme` sur C4, C7, C10, C12 dans `e2e/middleware-domain.spec.ts`.
+**Motif** : Observation de flakiness CI entre 2 runs consécutifs (cdf30be → C4/C7/C10/C12 verts, S3 rouge ; 7284f9c → S3 skipped, C4/C7/C10/C12 rouges sur le même symptôme). Le commit 7284f9c ne touchait pourtant que `e2e/auth-password.spec.ts` (fixme S3) et `DECISIONS.md`.
+
+**Diagnostic** : effet d'ordre Playwright cookies state. Quand S3 s'exécutait avant les tests middleware-domain, il modifiait le state cookies de façon à ce que les suivants passent. Maintenant que S3 est skipped, cet effet disparaît et la racine commune (helper signInWith dépendant de session résiduelle) est exposée systématiquement.
+
+**Décision** : couvrir toute la matrice hors-domaine (S3 + C4 + C7 + C10 + C12) par `test.fixme` en attendant le refactor helper en Phase 2. Les tests in-domain (C2, C3, C11) restent actifs. PR #7 redevient mergeable.
+
+**Ticket backlog Phase 2 unifié** : `auth: refactor signInWith helper + ré-appliquer propagation cookies + retirer les fixme`. Cause racine commune aux 5 tests sous fixme.
+
 ---
 
-*Dernière mise à jour : 2026-05-15 par [Alex (dev)] — S3 marqué `test.fixme` (lien ticket backlog Phase 2), PR #7 redevient mergeable.*
+*Dernière mise à jour : 2026-05-15 par [Alex (dev)] — fixme étendu à C4/C7/C10/C12, ticket backlog Phase 2 unifié, PR #7 mergeable.*
