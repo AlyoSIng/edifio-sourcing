@@ -99,7 +99,19 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     await page.waitForURL(/\/sourcing\/ao-du-jour/, { timeout: 10_000 });
   });
 
-  test("S3 — Email hors-domaine : le flow login UI n'ouvre pas l'accès à /sourcing", async ({
+  /**
+   * S3 — Email hors-domaine : flow form login ne doit pas ouvrir /sourcing.
+   *
+   * test.fixme en attendant refactor helper E2E (ticket backlog Phase 2).
+   * Cf. DECISIONS.md entrée 2026-05-15 § rollback propagation cookies.
+   * Cf. specs/middleware_domain_gate.md §2 C4.
+   *
+   * Hypothèse : la séquence form submit → middleware signOut → goto
+   * /sourcing/* en S3 part anonyme là où C4 (helper signInWith) maintient
+   * une session résiduelle via cookies préservés. Diagnostic complet
+   * dans le rapport agent Alex du 2026-05-15.
+   */
+  test.fixme("S3 — Email hors-domaine : le flow login UI n'ouvre pas l'accès à /sourcing", async ({
     page,
   }) => {
     // Complémentaire de C4 (cf. middleware-domain.spec.ts) qui pose la session

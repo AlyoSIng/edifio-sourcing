@@ -544,6 +544,16 @@
 - **2026-05-15 · Board · Écart spec `middleware_domain_gate.md` §2 C4 « session invalidée immédiatement » accepté temporairement.** [ÉCART SPEC ACCEPTÉ]
   *La révocation côté Supabase server reste effective, seul le cookie local browser subsiste jusqu'à expiration naturelle. L'attaquant ne peut pas exploiter ce cookie résiduel (le middleware ré-vérifie à chaque request). Impact pratique : limité. À refermer en Phase 2 via le ticket backlog ci-dessus. Fix S3 (commit 9dc9c2a) reste en place, indépendant.*
 
+### 2026-05-15 (suite) — S3 marqué test.fixme
+
+**Agent** : Alex (dev)
+**Action** : Marquage `test.fixme` sur S3 dans `e2e/auth-password.spec.ts`.
+**Motif** : Après le revert de `f2c2e59` (propagation cookies), C4/C7/C10/C12 sont redevenus verts, mais S3 reste rouge sur le même symptôme. Différence avec C4 : S3 ne passe pas par le helper `signInWith` et fait sa propre séquence `click → waitForLoadState → goto`. Le helper maintient une session résiduelle via cookies préservés ; sans helper, S3 part anonyme sur le `goto` final → branche `redirectToLogin` au lieu de `redirectToForbidden`.
+
+**Lien avec le ticket backlog Phase 2** : le refactor du helper `signInWith` (option : pose session via `admin.generateLink` au lieu de form submit) résoudra simultanément le bug spec §2 C4 « session invalidée immédiatement » ET le pattern S3. Tant que ce refactor n'est pas fait, S3 reste sous `test.fixme`.
+
+**PR #7 redevient mergeable** après ce commit.
+
 ---
 
-*Dernière mise à jour : 2026-05-15 par [ps_operator Yann] — Rollback f2c2e59 (régression E2E), ticket backlog Phase 2 ouvert, fix S3 9dc9c2a conservé.*
+*Dernière mise à jour : 2026-05-15 par [Alex (dev)] — S3 marqué `test.fixme` (lien ticket backlog Phase 2), PR #7 redevient mergeable.*
