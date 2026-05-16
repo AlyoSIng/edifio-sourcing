@@ -100,37 +100,31 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
   });
 
   /**
-   * S3 — Email hors-domaine : flow form login ne doit pas ouvrir /sourcing.
+   * S3 — Email hors-domaine : le flow form login ne doit pas ouvrir /sourcing.
    *
-   * test.fixme en attendant refactor helper E2E (ticket backlog Phase 2).
-   * Cf. DECISIONS.md entrée 2026-05-15 § rollback propagation cookies.
-   * Cf. specs/middleware_domain_gate.md §2 C4.
+   * Complémentaire de C4 (middleware-domain.spec.ts) qui pose la session via
+   * la route gated `/api/test/seed-session` : ici on exerce le **chemin form
+   * login** (Server Action `signInWithPasswordAction` → redirect → middleware).
+   * Depuis ADR-011, la Server Action ne pré-valide plus le domaine côté
+   * serveur — la garde est centralisée dans le middleware Next.js, source
+   * unique de vérité (cf. `specs/middleware_domain_gate.md` §2 C4). On vérifie
+   * donc que même avec des credentials valides côté Supabase, un email hors-
+   * domaine n'atteint pas l'app et atterrit sur /forbidden.
    *
-   * Hypothèse : la séquence form submit → middleware signOut → goto
-   * /sourcing/* en S3 part anonyme là où C4 (helper signInWith) maintient
-   * une session résiduelle via cookies préservés. Diagnostic complet
-   * dans le rapport agent Alex du 2026-05-15.
+   * **Spécificité préservée** : on garde le `form submit` (vs un appel direct
+   * à la route seed-session) pour exercer précisément la chaîne UI → Server
+   * Action → redirect → middleware. C'est cette chaîne qui était cassée avant
+   * le refactor helper (cf. DECISIONS.md 2026-05-15) et qui doit rester
+   * couverte par un test dédié.
+   *
+   * Refactor 2026-05-16 : on `waitForURL(/\/forbidden/)` directement après le
+   * submit, sans `waitForLoadState` ni double `goto`. Le `redirect()` posé par
+   * la Server Action déclenche le middleware en aval, qui voit l'email hors-
+   * domaine et redirige vers /forbidden en un seul tour de boucle browser.
    */
-  test.fixme("S3 — Email hors-domaine : le flow login UI n'ouvre pas l'accès à /sourcing", async ({
+  test("S3 — Email hors-domaine : le flow login UI n'ouvre pas l'accès à /sourcing", async ({
     page,
   }) => {
-    // Complémentaire de C4 (cf. middleware-domain.spec.ts) qui pose la session
-    // via l'admin API : ici on exerce le **chemin form login** (Server Action
-    // `signInWithPasswordAction` → redirect → middleware). Depuis le fix
-    // ADR-011, la Server Action ne pré-valide plus le domaine côté serveur
-    // (la garde est centralisée dans le middleware Next.js, source unique de
-    // vérité — cf. `specs/middleware_domain_gate.md` §2 C4). On vérifie donc
-    // que même avec des credentials valides côté Supabase, un email hors-
-    // domaine n'atteint pas l'app et atterrit sur /forbidden.
-    //
-    // Pattern aligné sur C4 (middleware-domain.spec.ts) pour déterminisme
-    // Playwright : après le submit on attend que le réseau soit stable, puis
-    // on déclenche explicitement la navigation vers /sourcing/ao-du-jour ;
-    // c'est ce GET qui déclenche le middleware qui doit rediriger vers
-    // /forbidden. Cette séquence évite les races de redirect post-Server-Action
-    // (la SA `signInWithPasswordAction` pose la session puis redirect vers
-    // /sourcing/ao-du-jour — sans waitForLoadState on peut rater l'instant
-    // où le middleware évalue la session).
     const email = TEST_EMAILS.scenario3;
     // createDurableUser passe par auth.admin.createUser qui n'impose pas le
     // domaine côté Supabase — la garde est applicative (middleware).
@@ -140,9 +134,8 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
     await page.fill("input#email", email);
     await page.fill("input#password", STRONG_PASSWORD);
     await page.click("button[type=submit]");
-    await page.waitForLoadState("networkidle");
-    await page.goto("/sourcing/ao-du-jour");
-    await expect(page).toHaveURL(/\/forbidden/);
+
+    await page.waitForURL(/\/forbidden/, { timeout: 10_000 });
     await expect(page).not.toHaveURL(/\/sourcing\//);
   });
 
