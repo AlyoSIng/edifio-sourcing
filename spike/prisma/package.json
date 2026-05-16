@@ -1,0 +1,32 @@
+{
+  "name": "@edifio-sourcing/spike-prisma",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spike ORM Prisma — Phase 2b Gate 6. Jetable. NE PAS publier. NE PAS lier au package.json racine.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:diff": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script",
+    "seed": "tsx seed/100-tenders.ts",
+    "score": "tsx edge-function/scoring.ts",
+    "bench": "tsx bench/run-all.ts",
+    "bench:cold-start-probe": "tsx bench/cold-start-probe.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.4.1",
+    "@prisma/adapter-pg": "6.4.1",
+    "pg": "8.13.1",
+    "dotenv": "16.4.7"
+  },
+  "devDependencies": {
+    "prisma": "6.4.1",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "@types/node": "20.17.10",
+    "@types/pg": "8.11.10"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

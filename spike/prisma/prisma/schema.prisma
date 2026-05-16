@@ -1,0 +1,189 @@
+// ============================================================================
+// schema.prisma — Spike Prisma (Phase 2b Gate 6)
+// ----------------------------------------------------------------------------
+// Sous-ensemble minimal du schéma figé Gate 5 (`specs/schema_v1.sql`), aligné
+// strictement sur le spike Drizzle (`spike/drizzle/schema.ts`) pour comparaison
+// équitable du bench Phase 3.
+//
+// Périmètre (idem Drizzle) :
+//   - enums : subscription_tier, tender_status, architect_response_status
+//   - models : Organization, Architect, Tender, ArchitectResponse
+//   - jsonb : Json (Prisma) — NB : Prisma NE supporte PAS le typing fort
+//     d'un Json column (équivalent du Drizzle `$type<ArchitectContactInfo>()`).
+//     C'est un écart DX (critère 25%) documenté dans le rapport Phase 4.
+//
+// HORS PÉRIMÈTRE 2b (idem Drizzle, dette assumée) :
+//   - users / memberships / search_profiles / tender_lots / tender_documents
+//   - selections / match_proposals / architect_tokens / response_files
+//   - presentation_library / ai_prompts / ai_runs / odoo_opportunities
+//   - brevo_messages / notifications / audit_logs / learning_events
+//
+// Conventions Prisma → Postgres :
+//   - Models PascalCase côté Prisma, snake_case côté SQL via `@@map`
+//   - Champs camelCase côté Prisma, snake_case côté SQL via `@map`
+//   - Enums : valeurs exactes (libellés Gate 1 avec espace pour `Studio IA`)
+//     → @map nécessaire car les noms valides Prisma sont [A-Za-z_][A-Za-z0-9_]*.
+//
+// Driver adapter :
+//   - previewFeatures = ["driverAdapters"] activé
+//   - Côté Node (bench Phase 3) : @prisma/adapter-pg
+//   - Côté production Edge Function Deno : @prisma/adapter-pg-deno EXPÉRIMENTAL
+//     (handicap structurel assumé du brief — cf. Q2 Cowork « Data Proxy NO-GO »)
+//
+// Génération des migrations :
+//   prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
+//   → SQL standalone produit dans prisma/migrations/ (committé comme artefact spike,
+//     PAS exécuté en runtime — `prisma migrate dev` requiert une DB de shadow).
+// ============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// 1. ENUMS — alignés ligne pour ligne sur Drizzle (cf. spike/drizzle/schema.ts)
+// ---------------------------------------------------------------------------
+
+// Aligné sur spike/schema_subscription_tier.sql (libellés Gate 1, ANSWER
+// Cowork oral 2026-05-15 confirmé Gate 1).
+// Note : Prisma ne tolère pas l'espace dans un identifiant enum → `StudioIA`
+// côté Prisma + @map vers la valeur exacte `Studio IA` côté Postgres.
+enum SubscriptionTier {
+  Sourcing
+  Cotraitance
+  StudioIA @map("Studio IA")
+
+  @@map("subscription_tier")
+}
+
+// Sous-ensemble de tender_status (schema_v1.sql §TYPES ENUM) — uniquement
+// les états traversés par le flux scoring du bench.
+enum TenderStatus {
+  sourced
+  selected_solo
+  selected_tandem
+  awaiting_architect
+  architect_accepted
+  architect_declined
+  dropped
+
+  @@map("tender_status")
+}
+
+enum ArchitectResponseStatus {
+  pending
+  accepted
+  declined
+  info_requested
+
+  @@map("architect_response_status")
+}
+
+// ---------------------------------------------------------------------------
+// 2. ORGANIZATIONS
+// ---------------------------------------------------------------------------
+// La colonne `tier` est portée ici directement pour que `prisma migrate diff`
+// produise un DDL cohérent (l'ALTER de spike/schema_subscription_tier.sql
+// n'est plus nécessaire si on init from scratch).
+model Organization {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  siren     String?          @unique
+  tier      SubscriptionTier @default(Sourcing)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  architects         Architect[]
+  tenders            Tender[]
+  architectResponses ArchitectResponse[]
+
+  @@map("organizations")
+}
+
+// ---------------------------------------------------------------------------
+// 3. ARCHITECTS
+// ---------------------------------------------------------------------------
+// Note DX : `contactInfo Json` — Prisma N'A PAS d'équivalent du
+// drizzle `$type<ArchitectContactInfo>()`. Le typage fort doit être imposé
+// au point d'usage (cf. seed/100-tenders.ts qui cast manuellement).
+// Écart DX à mettre en regard du critère 25 % Gate 5.
+model Architect {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  firstname      String
+  lastname       String
+  contactInfo    Json     @map("contact_info")
+  specialtyCodes String[] @default([]) @map("specialty_codes")
+  geoZones       String[] @default([]) @map("geo_zones")
+  tutoiement     Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responses    ArchitectResponse[]
+
+  @@index([organizationId], map: "idx_architects_org_spike")
+  @@map("architects")
+}
+
+// ---------------------------------------------------------------------------
+// 4. TENDERS
+// ---------------------------------------------------------------------------
+// `rawData Json?` : payload 10-50 KB par AO (verdict Cowork Q1 médiane ~25 KB).
+// Pas de typage Prisma — opaque côté schema, structuré côté seed.
+model Tender {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  externalRef    String       @map("external_ref")
+  title          String
+  buyer          String
+  cpv            String[]     @default([])
+  geoZone        String?      @map("geo_zone")
+  amount         Decimal?     @db.Decimal(14, 2)
+  deadline       DateTime?    @db.Timestamptz(6)
+  rawData        Json?        @map("raw_data")
+  score          Decimal?     @db.Decimal(5, 2)
+  status         TenderStatus @default(sourced)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  responses    ArchitectResponse[]
+
+  @@unique([organizationId, externalRef], map: "uq_tenders_ext_ref_spike")
+  @@index([organizationId, status], map: "idx_tenders_org_status_spike")
+  @@map("tenders")
+}
+
+// ---------------------------------------------------------------------------
+// 5. ARCHITECT_RESPONSES
+// ---------------------------------------------------------------------------
+// Table cible des upserts du scoring. La contrainte UNIQUE (tender_id,
+// architect_id) permet l'idempotence du `upsert` Prisma (équivalent
+// ON CONFLICT DO UPDATE en SQL natif côté Drizzle).
+model ArchitectResponse {
+  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String                  @map("organization_id") @db.Uuid
+  tenderId       String                  @map("tender_id") @db.Uuid
+  architectId    String                  @map("architect_id") @db.Uuid
+  score          Decimal                 @db.Decimal(5, 2)
+  rationale      String?
+  responseData   Json?                   @map("response_data")
+  status         ArchitectResponseStatus @default(pending)
+  respondedAt    DateTime?               @map("responded_at") @db.Timestamptz(6)
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tender       Tender       @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  architect    Architect    @relation(fields: [architectId], references: [id], onDelete: Cascade)
+
+  @@unique([tenderId, architectId], map: "uq_architect_responses_tender_arch_spike")
+  @@index([status, tenderId], map: "idx_architect_responses_status_spike")
+  @@map("architect_responses")
+}
