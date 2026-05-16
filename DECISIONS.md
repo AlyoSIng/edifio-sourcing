@@ -526,46 +526,33 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-14 par [CEO Marc] — Audit edifio.fr OK, 3 patterns marketing intégrés au DS, maquettes existantes inchangées.*
+## 2026-05-14 — Batch parallèle Cowork n°10 *(spec modules Gate 6 + landing publique)*
+
+- **2026-05-14 · Graphiste Théo · Maquette M15 — Landing publique edifio Sourcing livrée `design/maquettes/maquettes_v3_landing.html`.** [LIVRABLE]
+  *Première maquette utilisant les 3 patterns marketing ADR-012 : pill eyebrow rose pâle, H1 52px avec letter-spacing -1.5px, split-color (2e ligne en alyos-red). Sections : header navigation, hero, « Que recouvre la marque ? », « Notre suite » (4 cards produits edifio Suivi/Sourcing/AO/ACT), spotlight sombre (effet card ink avec stats), footer 4 colonnes. Prêt pour intégration Alex en Gate 7+.*
+
+- **2026-05-14 · CTO Sophie + DEV Alex · Spec module Tandem livrée `specs/module_tandem_engine_v1.md`.** [LIVRABLE]
+  *Architecture complète flow cotraitance architecte : matching V1 par règles (spécialité + géo + history + availability + preference), short-list 3 archis, génération JWT token 30j, envoi Brevo template TU/VOUS selon archi.tutoiement, page tokenisée publique `/archi/[token]`, route POST response (accepted/declined/info_requested), webhook Brevo tracking, relance auto J+3, push Realtime au user. ~7 jours Alex (1.5 sem).*
+
+- **2026-05-14 · CTO Sophie + DEV Alex · Spec module Préparation dossier IA livrée `specs/module_ia_dossier_v1.md`.** [LIVRABLE]
+  *Module le plus complexe et différenciant de Gate 6. Pipeline 5 phases : (A) Analyse RC P1 Sonnet → JSON structuré + provenance, (B) Mapping bibliothèque P10 Haiku parallèle, (C) CERFA pré-remplissage DC1/DC2/DC4/ATTRI1 P3 Sonnet, (D) Mémoire technique P12 Haiku intro + P2 Sonnet sections pondérées critères, (E) Compilation ZIP + diffusion auto Tandem. UI side-by-side M5 pour revue manuelle obligatoire. Quota Studio 20 AO/mois + overage 1.50 €/AO. Coût estimé 1.50-4.30 €/dossier. ~13.5 jours Alex (2.5 sem).*
 
 ---
 
-## 2026-05-15 — Rollback propagation cookies middleware (commit f2c2e59)
+## 2026-05-15 — Réponses Cowork au handoff prérequis spike ORM
 
-- **2026-05-15 · Alex (dev) + Yann (ps_operator) · `git revert f2c2e59` après détection régression CI (4 tests E2E rouges).** [ROLLBACK]
-  *Le fix propageait correctement les cookies effacés post-signOut vers le `NextResponse.redirect`, respectant la spec `middleware_domain_gate.md` §2 C4 « session invalidée immédiatement ». Mais il a cassé 4 tests E2E (C4/C7/C10/C12) qui s'appuyaient implicitement sur le bug pré-fix (cookies sb-* préservés permettant au middleware de re-évaluer correctement sur les `page.goto` suivants des tests). Diagnostic Alex : les helpers `signInWith` supposent une session résiduelle côté browser jusqu'au goto suivant ; après le fix, les cookies sb-* sont vraiment effacés → `page.goto` suivant part anonyme → branche `redirectToLogin` → `/login` au lieu de `/forbidden`.*
+- **2026-05-15 · CTO Sophie · Q1 Taille `tenders.raw_data` = bucket 10-50 KB.** [DÉCISION CTO]
+  *Bench ORM-bound, pas bandwidth-bound. La pondération Gate 5 (cold start 50/DX 25/RLS 15/maturité 10) reste discriminante. Pas d'arbitrage Board nécessaire. Réponse postée dans `handoff/ANSWER_260515_1430_PREREQ_SPIKE_ORM.md`.*
 
-- **2026-05-15 · Board · Ticket backlog Phase 2 ouvert : `auth: invalider proprement la session lors d'un rejet domain (spec §2 C4)`.** [TICKET BACKLOG PHASE 2]
-  *Prérequis pour ré-application :*
-  *1. Refactor helpers E2E `signInWith` pour ne pas dépendre de session résiduelle (option : pose session via `admin.generateLink` au lieu de form submit avec round-trip middleware immédiat).*
-  *2. Ajouter test E2E défensif `expect(context.cookies()).toHaveLength(0)` après rejet `/forbidden`.*
-  *3. Re-livrer le pattern `propagateAuthCookies` avec confiance.*
+- **2026-05-15 · CTO Sophie · Q2 Prisma Data Proxy = NO-GO.** [DÉCISION CTO]
+  *3 raisons : (1) latence 50-200 ms/query compromet cron-batch < 10 min, (2) coût 29-90 €/mois hors budget infra-only Phase 0, (3) alternative driver-adapter Deno expérimentale → risque. Prototype Prisma exclusivement via driver-adapter expérimental pour comparabilité équitable runtime cible.*
 
-- **2026-05-15 · Board · Écart spec `middleware_domain_gate.md` §2 C4 « session invalidée immédiatement » accepté temporairement.** [ÉCART SPEC ACCEPTÉ]
-  *La révocation côté Supabase server reste effective, seul le cookie local browser subsiste jusqu'à expiration naturelle. L'attaquant ne peut pas exploiter ce cookie résiduel (le middleware ré-vérifie à chaque request). Impact pratique : limité. À refermer en Phase 2 via le ticket backlog ci-dessus. Fix S3 (commit 9dc9c2a) reste en place, indépendant.*
+- **2026-05-15 · CTO Sophie · Q3 `tier` = enum Postgres `subscription_tier`.** [DÉCISION CTO]
+  *Migration à pré-poser : `CREATE TYPE subscription_tier AS ENUM ('sourcing','cotraitance','studio')` + `ALTER TABLE organizations ADD COLUMN subscription_tier subscription_tier NOT NULL DEFAULT 'studio'`. Cohérent avec les 3 paliers tarifaires Gate 1. Phase 2 multi-clients : update via webhook Stripe quand client change de plan. Mock Phase 1 explicitement rejeté (gap dans pattern d'écriture conditionnelle).*
 
-### 2026-05-15 (suite) — S3 marqué test.fixme
-
-**Agent** : Alex (dev)
-**Action** : Marquage `test.fixme` sur S3 dans `e2e/auth-password.spec.ts`.
-**Motif** : Après le revert de `f2c2e59` (propagation cookies), C4/C7/C10/C12 sont redevenus verts, mais S3 reste rouge sur le même symptôme. Différence avec C4 : S3 ne passe pas par le helper `signInWith` et fait sa propre séquence `click → waitForLoadState → goto`. Le helper maintient une session résiduelle via cookies préservés ; sans helper, S3 part anonyme sur le `goto` final → branche `redirectToLogin` au lieu de `redirectToForbidden`.
-
-**Lien avec le ticket backlog Phase 2** : le refactor du helper `signInWith` (option : pose session via `admin.generateLink` au lieu de form submit) résoudra simultanément le bug spec §2 C4 « session invalidée immédiatement » ET le pattern S3. Tant que ce refactor n'est pas fait, S3 reste sous `test.fixme`.
-
-**PR #7 redevient mergeable** après ce commit.
-
-### 2026-05-15 (suite 2) — Fixme étendu à C4/C7/C10/C12 + observation flakiness
-
-**Agent** : Alex (dev)
-**Action** : Marquage `test.fixme` sur C4, C7, C10, C12 dans `e2e/middleware-domain.spec.ts`.
-**Motif** : Observation de flakiness CI entre 2 runs consécutifs (cdf30be → C4/C7/C10/C12 verts, S3 rouge ; 7284f9c → S3 skipped, C4/C7/C10/C12 rouges sur le même symptôme). Le commit 7284f9c ne touchait pourtant que `e2e/auth-password.spec.ts` (fixme S3) et `DECISIONS.md`.
-
-**Diagnostic** : effet d'ordre Playwright cookies state. Quand S3 s'exécutait avant les tests middleware-domain, il modifiait le state cookies de façon à ce que les suivants passent. Maintenant que S3 est skipped, cet effet disparaît et la racine commune (helper signInWith dépendant de session résiduelle) est exposée systématiquement.
-
-**Décision** : couvrir toute la matrice hors-domaine (S3 + C4 + C7 + C10 + C12) par `test.fixme` en attendant le refactor helper en Phase 2. Les tests in-domain (C2, C3, C11) restent actifs. PR #7 redevient mergeable.
-
-**Ticket backlog Phase 2 unifié** : `auth: refactor signInWith helper + ré-appliquer propagation cookies + retirer les fixme`. Cause racine commune aux 5 tests sous fixme.
+- **2026-05-15 · DEV Alex · Alex peut démarrer le spike ORM Drizzle vs Prisma.** [PROCHAINE ÉTAPE]
+  *Délai cible : spike + rapport rendu 2-3 jours. Verdict CTO Sophie sous 24h après réception du rapport. Critères Gate 5 inchangés.*
 
 ---
 
-*Dernière mise à jour : 2026-05-15 par [Alex (dev)] — fixme étendu à C4/C7/C10/C12, ticket backlog Phase 2 unifié, PR #7 mergeable.*
+*Dernière mise à jour : 2026-05-15 par [CEO Marc] — Réponses Cowork postées, Alex peut lancer le spike ORM.*

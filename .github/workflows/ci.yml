@@ -98,6 +98,11 @@ jobs:
       # quand le flow forgot-password / invite admin déclenche un envoi.
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+      # Ouvre la route /api/test/seed-session — la triple-gate refuse
+      # silencieusement (404) en production même si cette var est posée par
+      # erreur (cf. src/app/api/test/seed-session/route.ts).
+      # Requise pour le helper E2E `signInWith` post-refactor 2026-05-16.
+      E2E_TEST_ROUTES_ENABLED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
