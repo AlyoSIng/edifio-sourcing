@@ -1,120 +1,70 @@
 import { chromium, type Page } from "@playwright/test";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import type { UserMetadata } from "../../src/lib/auth/types";
+import { isAuthorizedEmail } from "../../src/lib/auth/domain";
 
 /**
  * Helpers d'authentification pour les tests E2E du middleware.
  *
- * **ADR-011 (2026-05-14)** : on n'utilise plus de magic-link admin pour
- * bootstrap une session — les flows tokenisés ont été abandonnés (scanner
- * email d'entreprise AlyoS qui consume les tokens). À la place :
+ * **Refactor 2026-05-16 (clôture ticket Phase 2)** : on n'utilise plus le
+ * chemin « form login + waitForLoadState » pour bootstrap une session E2E.
+ * Le helper appelle désormais `POST /api/test/seed-session` (route gated par
+ * triple-condition env, cf. `src/app/api/test/seed-session/route.ts`) qui :
  *
- *   1. créer l'utilisateur avec un mot de passe durable via l'API admin
- *      (`auth.admin.createUser`, `email_confirm: true`, metadata standard
- *      role=user + must_change_password=false) ;
- *   2. ouvrir `/login` dans la page Playwright et soumettre le formulaire ;
- *   3. attendre la redirection hors de `/login`.
+ *   1. crée le user côté admin (idempotent) avec un mot de passe connu ;
+ *   2. signe la session via `signInWithPassword` côté serveur ;
+ *   3. pose les cookies `sb-*` directement sur la réponse — pas de redirect
+ *      middleware en route, pas de race avec un `signOut` post-login.
  *
- * Side effects : si l'utilisateur existe déjà, on le supprime puis on le
- * recrée pour garantir un mot de passe connu. Les utilisateurs test
- * persistent dans la table `auth.users` du projet `edifio-sourcing-preview`
- * — à nettoyer périodiquement.
+ * Bénéfice : la session n'est plus posée via le flow form login qui passe
+ * par le middleware (et donc le `signOut` immédiat sur user out-of-domain
+ * mangeait les cookies effacés). On peut donc ré-appliquer le pattern
+ * `propagateAuthCookies` (cf. commit f2c2e59) sans casser C4/C7/C10/C12.
  *
- * Source : `specs/middleware_domain_gate.md` §4 + ADR-011.
+ * Préalable opérationnel : la CI et le `.env.local` posent
+ * `E2E_TEST_ROUTES_ENABLED=1`. Sans ça la route renvoie 404 — les tests
+ * échoueront avec un message explicite.
+ *
+ * Source : `specs/middleware_domain_gate.md` §0 + §4 + ADR-011.
  */
 
 /** Mot de passe durable utilisé pour tous les helpers E2E middleware. */
 const E2E_DURABLE_PASSWORD = "E2E-Middleware-Helper-2026!";
 
-function createTestAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRole) {
-    throw new Error(
-      "Tests E2E : NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY manquant. Vérifier .env.local.",
-    );
-  }
-  return createClient(url, serviceRole, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
-
 /**
- * Garantit qu'un utilisateur existe avec le mot de passe durable connu.
- * Idempotent : supprime + recrée si nécessaire pour aligner le mot de passe.
- */
-async function ensureUserWithKnownPassword(email: string): Promise<void> {
-  const admin = createTestAdminClient();
-
-  // Cherche un éventuel user existant pour le supprimer (les helpers E2E
-  // ne doivent pas dépendre d'un état précédent — déterminisme).
-  const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-  const found = (data?.users ?? []).find(
-    (u) => (u.email ?? "").toLowerCase() === email.toLowerCase(),
-  );
-  if (found) {
-    await admin.auth.admin.deleteUser(found.id);
-  }
-
-  const metadata: UserMetadata = {
-    role: "user",
-    must_change_password: false,
-    provisional_password_expires_at: null,
-    first_name: "E2E",
-    last_name: "Middleware",
-  };
-
-  const { error } = await admin.auth.admin.createUser({
-    email,
-    password: E2E_DURABLE_PASSWORD,
-    email_confirm: true,
-    user_metadata: metadata as Record<string, unknown>,
-  });
-  if (error) {
-    throw new Error(`E2E ensureUserWithKnownPassword(${email}) a échoué : ${error.message}`);
-  }
-}
-
-/**
- * Connecte la page sous l'identité `email` via le formulaire `/login`.
- * Crée l'utilisateur en amont si nécessaire (mot de passe durable connu).
+ * Connecte la page sous l'identité `email` via la route seed-session.
  *
- * **Contrat ADR-011 / spec §0** : la Server Action `signInWithPasswordAction`
- * ne fait plus de pré-validation de domaine. Tout email avec format valide et
- * password correct obtient une session Supabase. Le rejet `@alyosingenierie.fr`
- * arrive uniquement au passage du middleware, sur la première requête vers
- * une route protégée (`/sourcing/*` → redirect `/forbidden`, `/api/protected/*`
- * → 403 JSON).
+ * - Pour un email `@alyosingenierie.fr` : pose une session durable
+ *   (`must_change_password=false`).
+ * - Pour un email hors-domaine : crée un user out-of-domain temporaire et
+ *   signe sa session côté serveur. Au prochain `page.goto('/sourcing/*')`,
+ *   le middleware exécutera son `signOut` + redirect /forbidden — c'est
+ *   exactement ce qu'on veut tester en C4/C7/C10/C12.
  *
- * Conséquence : ce helper ne discrimine plus in-domain / out-of-domain. Il
- * pose simplement la session et rend la main une fois le round-trip RSC
- * stabilisé. C'est à la spec caller d'enchaîner avec un `goto('/sourcing/*')`
- * puis d'asserter l'URL finale (`/sourcing/ao-du-jour` vs `/forbidden`).
- *
- * Source : `specs/middleware_domain_gate.md` §0 + §4 + ADR-011.
+ * Le helper ne fait PAS de `page.goto('/login')`. À l'inverse de l'ancien
+ * helper, il ne dépend pas d'une page chargée — seulement d'un contexte
+ * Playwright valide capable d'envoyer des requêtes (`page.request.post`).
  */
 export async function signInWith(page: Page, email: string): Promise<void> {
-  await ensureUserWithKnownPassword(email);
+  const outOfDomain = !isAuthorizedEmail(email);
 
-  await page.goto("/login");
-  await page.fill("input#email", email);
-  await page.fill("input#password", E2E_DURABLE_PASSWORD);
-  await page.click("button[type=submit]");
+  const response = await page.request.post("/api/test/seed-session", {
+    data: outOfDomain ? { email, out_of_domain: true } : { email, password: E2E_DURABLE_PASSWORD },
+  });
 
-  // La Server Action pose les cookies `sb-*` et émet un `redirect()` vers
-  // `/sourcing/ao-du-jour` (ou `/reset-password` si first-login). On attend
-  // la stabilisation réseau — au retour, la session est posée et la nav
-  // post-login a été suivie par le browser. Pour les users out-of-domain,
-  // le middleware aura redirigé vers `/forbidden` à ce moment-là ; la spec
-  // doit ensuite faire ses propres `goto` pour asserter le comportement.
-  await page.waitForLoadState("networkidle");
+  if (!response.ok()) {
+    const body = await response.text();
+    throw new Error(
+      `E2E seed-session(${email}) a échoué : status=${response.status()} body=${body}. ` +
+        "Vérifier que E2E_TEST_ROUTES_ENABLED=1 dans l'env du serveur Next.",
+    );
+  }
 }
 
 /**
  * Renvoie une chaîne `cookie:` exploitable par `request.post(...)` pour les
- * tests API protégés (cas C7). Ouvre un navigateur jetable, se connecte,
- * extrait les cookies de la session, ferme le navigateur.
+ * tests API protégés (cas C7). Ouvre un navigateur jetable, appelle la route
+ * de seed pour poser la session, extrait les cookies du contexte, ferme le
+ * navigateur.
  */
 export async function getCookieFor(email: string): Promise<string> {
   const browser = await chromium.launch();
