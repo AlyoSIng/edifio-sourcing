@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isTestRouteEnabled } from "@/lib/auth/test-routes";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import type { UserMetadata } from "@/lib/auth/types";
 
@@ -14,16 +15,13 @@ import type { UserMetadata } from "@/lib/auth/types";
  * propagation cookies » (cf. DECISIONS.md 2026-05-15 § rollback propagation
  * cookies — `test.fixme` sur S3/C4/C7/C10/C12).
  *
- * Triple-gate sécurité (anti-énumération + anti-prod) :
- *   1. `process.env.NODE_ENV !== "production"`
- *   2. OU `process.env.NEXT_PUBLIC_APP_ENV !== "production"` (gate Vercel
- *      preview — utile parce qu'un déploiement Vercel preview voit
- *      `NODE_ENV=production` mais `NEXT_PUBLIC_APP_ENV=preview`)
- *   3. ET `process.env.E2E_TEST_ROUTES_ENABLED === "1"` (opt-in EXPLICITE)
+ * Triple-gate sécurité (anti-énumération + anti-prod) — voir
+ * `@/lib/auth/test-routes` pour la sémantique exacte. En résumé : dev OU
+ * preview Vercel, ET opt-in explicite `E2E_TEST_ROUTES_ENABLED === "1"`.
  *
- * Si une des deux premières conditions échoue OU si la troisième n'est pas
- * posée → **404**, pas 403. Anti-énumération : on ne révèle pas l'existence
- * d'une route de test à un attaquant qui balaie l'API en prod.
+ * Si le triple-gate ne passe pas → **404**, pas 403. Anti-énumération : on
+ * ne révèle pas l'existence d'une route de test à un attaquant qui balaie
+ * l'API en prod.
  *
  * Restriction email : la route accepte uniquement les emails qui matchent
  * `^(e2e-test\+|alice|bob)[^@]*@` — préfixes maîtrisés. Un attaquant qui aurait
@@ -150,18 +148,6 @@ async function signInAndReturn(email: string, password: string): Promise<NextRes
     return jsonError(401, `sign_in_failed:${error.message}`);
   }
   return NextResponse.json({ ok: true, email }, { status: 200 });
-}
-
-/**
- * Triple-gate exporté pour pouvoir le tester en unit Vitest. Cf. spec brief :
- *   - dev (NODE_ENV !== "production") OU preview Vercel (NEXT_PUBLIC_APP_ENV !== "production")
- *   - ET opt-in explicite E2E_TEST_ROUTES_ENABLED === "1"
- */
-export function isTestRouteEnabled(): boolean {
-  const isNonProdRuntime = process.env.NODE_ENV !== "production";
-  const isNonProdApp = process.env.NEXT_PUBLIC_APP_ENV !== "production";
-  const optedIn = process.env.E2E_TEST_ROUTES_ENABLED === "1";
-  return (isNonProdRuntime || isNonProdApp) && optedIn;
 }
 
 function jsonError(status: number, code: string): NextResponse {

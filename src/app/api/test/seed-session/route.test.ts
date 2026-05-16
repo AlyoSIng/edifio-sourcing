@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { isTestRouteEnabled } from "./route";
+import { isTestRouteEnabled } from "@/lib/auth/test-routes";
 
 /**
  * Test unit du triple-gate de la route /api/test/seed-session.
