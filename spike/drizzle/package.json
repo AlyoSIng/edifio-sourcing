@@ -1,0 +1,30 @@
+{
+  "name": "@edifio-sourcing/spike-drizzle",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spike ORM Drizzle — Phase 2a Gate 6. Jetable. NE PAS publier. NE PAS lier au package.json racine.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "generate": "drizzle-kit generate",
+    "check": "drizzle-kit check",
+    "seed": "tsx seed/100-tenders.ts",
+    "score": "tsx edge-function/scoring.ts",
+    "bench": "tsx bench/run-all.ts",
+    "bench:cold-start-probe": "tsx bench/cold-start-probe.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.39.3",
+    "postgres": "3.4.5",
+    "dotenv": "16.4.7"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.30.6",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "@types/node": "20.17.10"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}
