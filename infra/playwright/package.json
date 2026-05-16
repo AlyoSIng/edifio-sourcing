@@ -1,0 +1,26 @@
+{
+  "name": "edifio-playwright-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Worker Playwright pour scraping AO — déployé sur Fly.io EU (cdg).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/worker.ts",
+    "start": "tsx src/worker.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "fastify": "5.0.0",
+    "playwright": "1.49.1",
+    "tsx": "4.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.11",
+    "typescript": "5.6.3"
+  }
+}
