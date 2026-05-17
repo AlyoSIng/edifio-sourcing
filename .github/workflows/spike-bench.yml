@@ -1,0 +1,191 @@
+name: spike-bench
+
+# Bench équitable Drizzle vs Prisma (Phase 3 spike ORM, Gate 6).
+#
+# Pourquoi GHA ? Le poste de dev (win32-arm64) ne peut pas exécuter le query-engine
+# Prisma natif (engine x64 only à date). Pour garantir une comparaison à matériel
+# égal, on bench les deux prototypes sur le MÊME runner ubuntu-latest (x64), avec
+# 2 services Postgres 16 isolés en parallèle.
+#
+# Trigger : workflow_dispatch uniquement (déclenché manuellement par ps_operator
+# une fois que les 2 branches spike sont stables).
+#
+# Branches sources (READ-ONLY ici) :
+#   - spike/orm-drizzle  → prototype Drizzle ORM 0.39.3
+#   - spike/orm-prisma   → prototype Prisma 6.4.1 (driver-adapter pg)
+#
+# Sortie : 2 artifacts JSON téléchargeables via `gh run download`.
+
+on:
+  workflow_dispatch:
+
+# Permissions minimales : on lit les branches spike, on n'écrit rien dans le repo.
+permissions:
+  contents: read
+
+# Annule les runs concurrents sur la même ref pour éviter de gaspiller des
+# minutes runner si quelqu'un relance le workflow.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench-drizzle:
+    name: bench-drizzle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Service Postgres 16 dédié — port mappé sur localhost:5432.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: edifio
+          POSTGRES_PASSWORD: spike
+          POSTGRES_DB: edifio_sourcing_bench
+        ports:
+          - 5432:5432
+        # healthcheck pour que GHA attende que Postgres soit prêt avant d'enchaîner.
+        options: >-
+          --health-cmd "pg_isready -U edifio -d edifio_sourcing_bench"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://edifio:spike@localhost:5432/edifio_sourcing_bench
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: edifio
+      PGPASSWORD: spike
+      PGDATABASE: edifio_sourcing_bench
+
+    defaults:
+      run:
+        working-directory: spike/drizzle
+
+    steps:
+      - name: Checkout branche spike/orm-drizzle
+        uses: actions/checkout@v4
+        with:
+          ref: spike/orm-drizzle
+
+      - name: Setup pnpm 11.0.9
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps (ignore-workspace, frozen lockfile)
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
+      # drizzle-kit push est interactif (prompt confirmation). On contourne en
+      # appliquant directement la migration SQL committée — c'est le pattern
+      # adopté côté spike (cf. apply-schema.mts retiré ensuite). Le SQL généré
+      # est la source de vérité du schéma Drizzle pour Phase 3.
+      - name: Apply Drizzle schema via psql (migrations/0000_init.sql)
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0000_init.sql
+
+      - name: Apply RLS policies via psql (rls/policies.sql)
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f rls/policies.sql
+
+      - name: Seed 100 tenders
+        run: pnpm exec tsx seed/100-tenders.ts
+
+      - name: Run bench (cold-start + upsert + migration replay)
+        run: pnpm exec tsx bench/run-all.ts
+
+      - name: Upload Drizzle bench results
+        uses: actions/upload-artifact@v4
+        with:
+          name: drizzle-bench-results
+          path: spike/drizzle/bench/bench-results.json
+          if-no-files-found: error
+          retention-days: 30
+
+  bench-prisma:
+    name: bench-prisma
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Service Postgres 16 dédié à Prisma — instance distincte du job Drizzle.
+    # En parallèle, GHA isole chaque job sur son propre runner, donc localhost
+    # ne collisionne pas.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: edifio
+          POSTGRES_PASSWORD: spike
+          POSTGRES_DB: edifio_sourcing_bench
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U edifio -d edifio_sourcing_bench"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://edifio:spike@localhost:5432/edifio_sourcing_bench
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: edifio
+      PGPASSWORD: spike
+      PGDATABASE: edifio_sourcing_bench
+
+    defaults:
+      run:
+        working-directory: spike/prisma
+
+    steps:
+      - name: Checkout branche spike/orm-prisma
+        uses: actions/checkout@v4
+        with:
+          ref: spike/orm-prisma
+
+      - name: Setup pnpm 11.0.9
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps (ignore-workspace, frozen lockfile)
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
+      # Génération du client Prisma — requise avant tout import @prisma/client
+      # dans seed/bench. Le schema est lu depuis prisma/schema.prisma (committé
+      # sur la branche).
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # `prisma db push --force-reset --accept-data-loss` applique le schema
+      # déclaratif (pas de migration files), reset toute table existante.
+      # --skip-generate car déjà fait à l'étape précédente.
+      - name: Apply Prisma schema (db push --force-reset)
+        run: pnpm exec prisma db push --force-reset --accept-data-loss --skip-generate
+
+      - name: Apply RLS policies via psql (rls/policies.sql)
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f rls/policies.sql
+
+      - name: Seed 100 tenders
+        run: pnpm exec tsx seed/100-tenders.ts
+
+      - name: Run bench (cold-start + upsert + migration replay)
+        run: pnpm exec tsx bench/run-all.ts
+
+      - name: Upload Prisma bench results
+        uses: actions/upload-artifact@v4
+        with:
+          name: prisma-bench-results
+          path: spike/prisma/bench/bench-results.json
+          if-no-files-found: error
+          retention-days: 30
