@@ -80,6 +80,13 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Configure pnpm allow build scripts
+        working-directory: spike/drizzle
+        run: |
+          cat > .npmrc <<'EOF'
+          onlyBuiltDependencies[]=esbuild
+          EOF
+
       - name: Install deps (ignore-workspace, frozen lockfile)
         run: pnpm install --ignore-workspace --frozen-lockfile
 
@@ -157,6 +164,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Configure pnpm allow build scripts
+        working-directory: spike/prisma
+        run: |
+          cat > .npmrc <<'EOF'
+          onlyBuiltDependencies[]=@prisma/client
+          onlyBuiltDependencies[]=@prisma/engines
+          onlyBuiltDependencies[]=prisma
+          onlyBuiltDependencies[]=esbuild
+          EOF
 
       - name: Install deps (ignore-workspace, frozen lockfile)
         run: pnpm install --ignore-workspace --frozen-lockfile
