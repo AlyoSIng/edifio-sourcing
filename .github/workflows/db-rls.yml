@@ -68,6 +68,14 @@ jobs:
       - name: Install pgTAP + pg_prove
         run: |
           set -e
+          # Ubuntu Noble n'a pas postgresql-15-pgtap dans universe -> ajout du
+          # depot officiel PGDG (apt.postgresql.org) qui maintient les paquets
+          # PG 15 a jour pour toutes les versions Ubuntu supportees.
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-15-pgtap libtap-parser-sourcehandler-pgtap-perl
           # pg_prove vient avec TAP::Parser::SourceHandler::pgTAP -- on verifie

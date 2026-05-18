@@ -605,6 +605,9 @@
 - **2026-05-18 · DEV Alex · Validation locale Phase 1 verte (typecheck + lint + tests vitest).** [VÉRIFICATION]
   *`tsc --noEmit` = 0 erreur. `next lint` = aucun warning ni erreur. `vitest run` = 108 tests / 5 fichiers, tous PASS (incluant `tests/unit/seed/distribution.test.ts`). Le seed lui-même n'a **pas** été exécuté contre Postgres en local — l'exécution réelle (et la matérialisation de la médiane raw_data ∈ [20-30] KB sur Postgres) se fera en CI via le workflow étendu et lors du bench cold start pré-Gate 9. Prêt pour commit `feat(db): seed dev/CI 2 orgs + fixture BOAMP réelle (etape 5/6)` par Yann.*
 
+- **2026-05-18 · DEV Alex · Fix CI `ci-db-rls` — ajout dépôt PGDG officiel.** [FIX CI]
+  *Ubuntu Noble 24.04 (runner `ubuntu-latest`) n'a plus `postgresql-15-pgtap` dans universe — l'étape « Install pgTAP + pg_prove » plantait sur `E: Unable to locate package postgresql-15-pgtap` avant même le seed. Ajout du dépôt PGDG officiel `apt.postgresql.org` (clé `ACCC4CF8.asc` + `$(lsb_release -cs)-pgdg main`) dans l'étape concernée de `.github/workflows/db-rls.yml`. Aucun impact code applicatif ; isole le workflow de la dérive packaging Ubuntu. Vérification : seul workflow concerné (les deux autres `ci.yml` et `spike-bench.yml` n'installent pas pgTAP). CI relancée par le push qui suit.*
+
 ---
 
 *Dernière mise à jour : 2026-05-18 par [CEO Marc] — Décision ORM Drizzle actée, ADR-013 livré, CLAUDE.md amendé, module sourcing engine débloqué.*
