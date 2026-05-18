@@ -1,15 +1,16 @@
 /**
  * Schema Drizzle — edifio Sourcing
  *
- * STUB ÉTAPE 1 : volontairement vide. Le schema v1 complet (22+ tables,
- * enum subscription_tier, 9 colonnes jsonb, FK multi-tenant) sera posé
- * à l'étape 2 du plan Gate 6, aligné sur specs/schema_v1.sql.
+ * Source de vérité : `specs/schema_v1.sql` + ADR-013 (specs/adr_013_orm_drizzle.md).
  *
- * Ce fichier existe uniquement pour que `src/db/client.ts` et
- * `drizzle.config.ts` compilent dès maintenant (contrat de scripts figé
- * étape 1 sans bloquer l'avancement).
+ * Étape 2 du plan Gate 6 — Option A retenue : la migration 0000_init.sql
+ * pose UNIQUEMENT l'enum `subscription_tier` (single-purpose, démontre que
+ * la chaîne drizzle-kit generate fonctionne sur greenfield). Les 22+ tables
+ * du schema v1 (organizations comprise) et les 12 policies RLS arriveront
+ * à l'étape 3 dans la migration 0001.
  *
- * Réf : ADR-013 (specs/adr_013_orm_drizzle.md).
+ * Le ré-export agrège tous les sous-modules pour que `drizzle(pgClient, { schema })`
+ * (cf. src/db/client.ts) reçoive l'ensemble des objets typés.
  */
 
-export {};
+export * from "./enums";

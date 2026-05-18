@@ -25,3 +25,7 @@ README.md
 
 # --- Design tokens (structure DTCG sensible) ---
 design/tokens.json
+
+# Artefacts générés par drizzle-kit (snapshots, journal, SQL de migration)
+# Ne JAMAIS reformater manuellement — réécrits à chaque `drizzle-kit generate`.
+src/db/migrations/

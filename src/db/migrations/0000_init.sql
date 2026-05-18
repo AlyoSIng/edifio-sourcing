@@ -1,0 +1,1 @@
+CREATE TYPE "public"."subscription_tier" AS ENUM('sourcing', 'cotraitance', 'studio');
