@@ -78,10 +78,17 @@ export const tenders = pgTable(
     /** Borne score 0..100 */
     scoreRange: check("tenders_score_check", sql`${table.score} >= 0 AND ${table.score} <= 100`),
     orgStatusIdx: index("idx_tenders_org_status").on(table.organizationId, table.status),
-    /** Index partiel sur deadlines futures (perf vue « AO du jour ») */
-    deadlineIdx: index("idx_tenders_deadline")
-      .on(table.deadline)
-      .where(sql`${table.deadline} > now()`),
+    /**
+     * Index full sur deadline. Divergence assumée vs `specs/schema_v1.sql:206`
+     * qui posait un index partiel `WHERE deadline > now()` — Postgres refuse
+     * (SQLSTATE 42P17 : `now()` est STABLE, pas IMMUTABLE, et les prédicats
+     * d'index doivent être déterministes). L'overhead d'indexer aussi les
+     * deadlines passées est négligeable sur volume cible (~100-400 K rows),
+     * et toutes les queries applicatives filtrent `deadline > now()` dans
+     * leur WHERE clause — donc range scan sur l'index full, même perf qu'un
+     * partiel. Bug latent côté spec à amender (post-mortem CTO).
+     */
+    deadlineIdx: index("idx_tenders_deadline").on(table.deadline),
     /** Index GIN trigram pour recherche fuzzy sur title */
     titleTrgmIdx: index("idx_tenders_title_trgm").using("gin", sql`${table.title} gin_trgm_ops`),
     /** Index partiel pour ranking « AO du jour » trié par score */

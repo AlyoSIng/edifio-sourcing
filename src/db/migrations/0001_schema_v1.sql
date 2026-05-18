@@ -385,7 +385,7 @@ CREATE INDEX "idx_memberships_user" ON "memberships" USING btree ("user_id");-->
 CREATE INDEX "idx_tender_documents_tender" ON "tender_documents" USING btree ("tender_id");--> statement-breakpoint
 CREATE INDEX "idx_tender_events_tender" ON "tender_events" USING btree ("tender_id","occurred_at");--> statement-breakpoint
 CREATE INDEX "idx_tenders_org_status" ON "tenders" USING btree ("organization_id","status");--> statement-breakpoint
-CREATE INDEX "idx_tenders_deadline" ON "tenders" USING btree ("deadline") WHERE "tenders"."deadline" > now();--> statement-breakpoint
+CREATE INDEX "idx_tenders_deadline" ON "tenders" USING btree ("deadline");--> statement-breakpoint
 CREATE INDEX "idx_tenders_title_trgm" ON "tenders" USING gin ("title" gin_trgm_ops);--> statement-breakpoint
 CREATE INDEX "idx_tenders_score" ON "tenders" USING btree ("organization_id","score" DESC NULLS LAST) WHERE "tenders"."status" = 'sourced';--> statement-breakpoint
 CREATE INDEX "idx_architect_responses_status" ON "architect_responses" USING btree ("status","tender_id");--> statement-breakpoint

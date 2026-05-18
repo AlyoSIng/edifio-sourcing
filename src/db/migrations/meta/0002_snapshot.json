@@ -1771,7 +1771,6 @@
             }
           ],
           "isUnique": false,
-          "where": "\"tenders\".\"deadline\" > now()",
           "concurrently": false,
           "method": "btree",
           "with": {}
