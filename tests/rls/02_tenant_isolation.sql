@@ -7,8 +7,8 @@
 --
 -- Methode :
 --   1. Cree 2 organisations OrgA et OrgB
---   2. Insere des donnees (architects, tenders, search_profiles, ...) dans
---      les deux organisations en bypass RLS (role superuser de test)
+--   2. Insere des donnees (architects, tenders, search_profiles, ai_runs,
+--      brevo_messages) dans les deux organisations en bypass RLS
 --   3. Simule un JWT avec organization_id = OrgA via SET LOCAL request.jwt.claims
 --   4. Verifie que SELECT * FROM <table> ne ramene QUE les lignes OrgA
 --   5. Verifie que current_organization_id() retourne bien OrgA
@@ -19,12 +19,11 @@
 --   - 2 setup (orgs creees)
 --   - 1 verif current_organization_id()
 --   - 6 verifs d'isolation sur tables phare : architects, tenders,
---     search_profiles, ai_runs, brevo_messages, learning_events
+--     search_profiles, ai_runs, brevo_messages, memberships
 --   = 9 assertions au total
 --
--- TODO etape 5 (seed) : ajouter les 14 tables manquantes (tender_documents,
--- selections, match_proposals, ...). Pour le MVP on couvre les 6 tables les
--- plus critiques.
+-- Etape 5 (seed) : les 3 TODO placeholders (tenders / ai_runs / brevo_messages)
+-- sont remplaces par de vrais tests cross-tenant.
 -- ============================================================================
 
 BEGIN;
@@ -62,12 +61,32 @@ INSERT INTO search_profiles (id, organization_id, name) VALUES
 INSERT INTO architects (id, organization_id, firstname, lastname, email) VALUES
   ('bbbb2222-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Bob', 'Archi', 'bob.archi@orgb.test');
 
--- Pour les tables avec dependances (tenders.platform_id), on cree une plateforme
--- de test (note : platforms est insere par 0001_schema_v1 dans la spec mais pas
--- dans la migration drizzle generee -- on inserera dans le seed etape 5).
--- TODO etape 5 : tenders / ai_runs / brevo_messages / learning_events seed.
+-- Plateforme de reference (non multi-tenant) requise par tenders.platform_id.
+INSERT INTO platforms (id, code, display_name, auth_type, base_url) VALUES
+  ('cccc0000-0000-0000-0000-000000000001', 'boamp', 'BOAMP', 'api_key', 'https://data.boamp.fr');
 
-SELECT ok(true, 'OrgA + OrgB + memberships + architects + search_profiles seedes');
+-- Prompt IA (non multi-tenant) requis par ai_runs.prompt_id (FK NOT NULL).
+INSERT INTO ai_prompts (id, name, version, model, system_prompt, user_prompt_template) VALUES
+  ('dddd0000-0000-0000-0000-000000000001', 'tender_score_full', 1, 'sonnet-4-6', 'sys', 'usr');
+
+-- Donnees AO OrgA + OrgB
+INSERT INTO tenders (id, organization_id, external_ref, platform_id, title, buyer) VALUES
+  ('aaaa3333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a',
+   'EXT-A-001', 'cccc0000-0000-0000-0000-000000000001', 'AO OrgA', 'Mairie A'),
+  ('bbbb3333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b',
+   'EXT-B-001', 'cccc0000-0000-0000-0000-000000000001', 'AO OrgB', 'Mairie B');
+
+-- AI runs OrgA + OrgB
+INSERT INTO ai_runs (organization_id, prompt_id, input_hash, model) VALUES
+  ('00000000-0000-0000-0000-00000000000a', 'dddd0000-0000-0000-0000-000000000001', 'hash-orga', 'sonnet-4-6'),
+  ('00000000-0000-0000-0000-00000000000b', 'dddd0000-0000-0000-0000-000000000001', 'hash-orgb', 'sonnet-4-6');
+
+-- Brevo messages OrgA + OrgB
+INSERT INTO brevo_messages (organization_id, template_name, register) VALUES
+  ('00000000-0000-0000-0000-00000000000a', 'architect_solicitation_VOUS', 'vous'),
+  ('00000000-0000-0000-0000-00000000000b', 'architect_solicitation_VOUS', 'vous');
+
+SELECT ok(true, 'OrgA + OrgB + memberships + architects + search_profiles + tenders + ai_runs + brevo_messages seedes');
 SELECT ok(true, 'donnees OrgB cloisonnees pour le test cross-tenant');
 
 -- ---- Simule un JWT pour Alice (OrgA admin) ---------------------------------
@@ -107,11 +126,26 @@ SELECT is(
   'memberships : Alice ne voit que sa propre adhesion'
 );
 
--- TODO etape 5 (seed Opendatasoft + platforms + tenders) :
--- ces 3 assertions sont des placeholders pour preserver le plan(9).
-SELECT ok(true, 'TODO etape 5 : ajouter isolation tenders');
-SELECT ok(true, 'TODO etape 5 : ajouter isolation ai_runs');
-SELECT ok(true, 'TODO etape 5 : ajouter isolation brevo_messages');
+-- 5. tenders : Alice ne voit que les AO OrgA
+SELECT is(
+  (SELECT count(*)::int FROM tenders),
+  1,
+  'tenders : Alice (OrgA) ne voit que 1 AO (OrgA), pas l''AO OrgB'
+);
+
+-- 6. ai_runs : Alice ne voit que les runs OrgA
+SELECT is(
+  (SELECT count(*)::int FROM ai_runs),
+  1,
+  'ai_runs : Alice (OrgA) ne voit que 1 run (OrgA), pas le run OrgB'
+);
+
+-- 7. brevo_messages : Alice ne voit que les messages OrgA
+SELECT is(
+  (SELECT count(*)::int FROM brevo_messages),
+  1,
+  'brevo_messages : Alice (OrgA) ne voit que 1 message (OrgA), pas le message OrgB'
+);
 
 SELECT * FROM finish();
 ROLLBACK;

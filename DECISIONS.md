@@ -585,4 +585,26 @@
 
 ---
 
+## 2026-05-18 — Étape 5/6 module sourcing engine — Seed dev/CI livré
+
+- **2026-05-18 · DEV Alex · Seed dev/CI 2 orgs livré (200 tenders, fixture BOAMP réelle anonymisée).** [LIVRABLE]
+  *Étape 5/6 de la 1re PR module sourcing engine. Orchestrateur `src/db/seed/index.ts` + `reset.ts` + `fetch-boamp-fixture.ts` + 4 utilitaires sous `src/db/seed/lib/` (anonymize, distribution, fixture-loader, fixture-mock). Seed déterministe : 2 organisations (AlyoS + « Seed Test Org B »), 100 architects (50/org), 200 tenders (100/org) avec distribution stricte **15 % small / 60 % medium / 25 % large** sur `raw_data` jsonb. Buckets calibrés : small 10 KB ±1, medium 25 KB ±3, large 45 KB ±3 → **médiane raw_data dans [20-30] KB** (le bucket medium pèse 60 %), ce qui satisfait la **condition 2 du verdict CTO ADR-013** (re-seed payload réel 25 KB médiane à la 1re PR module sourcing). Fixture BOAMP réelle anonymisée `src/db/seed/fixtures/boamp-real.json` (~10,4 MB) committée pour reproductibilité CI sans dépendance réseau Opendatasoft.*
+
+- **2026-05-18 · DEV Alex · Tests cross-tenant pgTAP étendus à 9 assertions (TODO étape 5 clos).** [LIVRABLE]
+  *`tests/rls/02_tenant_isolation.sql` complété — fin des TODO étape 5 sur l'isolation cross-tenant. Couverture des 9 assertions exécutables sur dataset seedé 2 orgs (lectures bloquées org A → org B, INSERT/UPDATE/DELETE bloqués hors `current_organization_id()`, FORCE RLS effectif y compris pour le propriétaire). Validation matérielle de l'invariant multi-tenancy Gate 5.*
+
+- **2026-05-18 · DEV Alex · Test pgTAP `04_audit_immutable.sql` ajouté (audit log immutabilité).** [LIVRABLE]
+  *Nouveau test pgTAP qui vérifie l'invariant audit log Gate 5 contrainte 4 : `audit_logs` insertion-only — toute tentative d'UPDATE ou DELETE est rejetée par les policies RLS, y compris pour les rôles élevés. Garantit la rétention 5 ans immutable des 12 actions sensibles.*
+
+- **2026-05-18 · DEV Alex · CI étendue — `pnpm db:seed` entre migrate et pgTAP.** [LIVRABLE]
+  *`.github/workflows/db-rls.yml` étendu : la suite RLS exécute désormais `pnpm db:migrate` → `pnpm db:seed` → `pnpm test:rls`. Le seed alimente le dataset 2 orgs nécessaire aux 9 assertions cross-tenant + au test 04 immutable. Préserve la garantie « tests RLS sur données réalistes » sans dépendance hors-repo.*
+
+- **2026-05-18 · DEV Alex · Dépendances ajoutées : `@faker-js/faker@10.0.0` + `zod@4.1.13` (devDep).** [LIVRABLE]
+  *`@faker-js/faker` 10.0.0 utilisé par le seed pour génération déterministe (architects, tender_events, audit_logs payloads). `zod` 4.1.13 utilisé pour validation runtime de la fixture BOAMP côté `fixture-loader.ts`. Les deux strictement en `devDependencies` (jamais bundle prod). `pnpm audit` clean (à confirmer par Yann avant commit).*
+
+- **2026-05-18 · DEV Alex · Validation locale Phase 1 verte (typecheck + lint + tests vitest).** [VÉRIFICATION]
+  *`tsc --noEmit` = 0 erreur. `next lint` = aucun warning ni erreur. `vitest run` = 108 tests / 5 fichiers, tous PASS (incluant `tests/unit/seed/distribution.test.ts`). Le seed lui-même n'a **pas** été exécuté contre Postgres en local — l'exécution réelle (et la matérialisation de la médiane raw_data ∈ [20-30] KB sur Postgres) se fera en CI via le workflow étendu et lors du bench cold start pré-Gate 9. Prêt pour commit `feat(db): seed dev/CI 2 orgs + fixture BOAMP réelle (etape 5/6)` par Yann.*
+
+---
+
 *Dernière mise à jour : 2026-05-18 par [CEO Marc] — Décision ORM Drizzle actée, ADR-013 livré, CLAUDE.md amendé, module sourcing engine débloqué.*

@@ -92,6 +92,14 @@ jobs:
       - name: Run migrations (extensions + drizzle)
         run: pnpm db:migrate
 
+      # Seed dev/CI : 2 orgs + 200 tenders + ai_runs + brevo_messages + audit.
+      # Pose la fixture BOAMP committee + assertions condition 2 ADR-013
+      # (mediane raw_data 25 KB +/- tolerance). Le seed pgTAP isole ses propres
+      # donnees via BEGIN ... ROLLBACK, donc le seed reste en place pour
+      # eventuels jobs downstream (smoke tests RLS), sans collision.
+      - name: Seed dev/CI dataset (condition 2 ADR-013 -- payload reel)
+        run: pnpm db:seed
+
       # Lance la suite pgTAP. pg_prove charge les .sql un par un.
       - name: Run pgTAP suite
         env:

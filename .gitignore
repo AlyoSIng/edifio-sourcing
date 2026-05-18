@@ -51,3 +51,8 @@ Thumbs.db
 
 # --- Claude Code local (settings.json projet committé, .local non) ---
 .claude/settings.local.json
+
+# --- Seed fixtures et rapport distribution (decision Board etape 5) ---
+# Aucun ignore : `src/db/seed/fixtures/boamp-real.json` et
+# `src/db/seed/distribution-report.json` SONT committes (condition 2 CTO ADR-013).
+# On laisse cette ligne pour documenter l'intention.

@@ -34,3 +34,8 @@ src/db/migrations/
 # convention manuelle (uppercase keywords, indent 2 espaces).
 *.sql
 
+# Fixtures BOAMP committees -- produites par `pnpm db:fetch-boamp`,
+# JSON.stringify(2) natif. Pas de reformatage prettier sur ces ~10 MB.
+src/db/seed/fixtures/*.json
+src/db/seed/distribution-report.json
+
