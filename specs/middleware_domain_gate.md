@@ -1,10 +1,11 @@
 # Spec — Middleware de domaine `@alyosingenierie.fr`
 
 **Auteur** : [CTO Sophie Vasseur]
-**Date** : 2026-05-10
-**Version** : 1.0
+**Date** : 2026-05-10 (v1.1 mise à jour suite au pivot auth Board)
+**Version** : 1.1
 **Statut** : Spec figée — à implémenter par [DEV Alex] en début de Gate 6
 **Contrainte Board** : pas de route protégée déployée avant que ce middleware soit mergé sur `main` ET testé sur preview Vercel.
+**Note pivot 2026-05-10** : auth = **email + mot de passe** (pas magic-link). Le middleware lui-même est inchangé — il vérifie le domaine email de la session JWT Supabase, quel que soit le flow d'auth qui l'a créée.
 
 ---
 
@@ -264,7 +265,7 @@ Rétention : 5 ans (cf. politique audit log Gate 5).
 
 ## 8. Risques résiduels
 
-- **Confiance dans `user.email`** : Supabase Auth garantit que l'email a été vérifié au login (magic-link envoyé → click → token signé). Pas d'usurpation possible côté JWT.
+- **Confiance dans `user.email`** : Supabase Auth garantit que l'email correspond au compte authentifié (signature RS256). Avec le pivot email + password, c'est l'admin AlyoS qui crée le compte et valide implicitement l'email. Pas d'usurpation possible côté JWT.
 - **Email mutable** : un compte Supabase peut changer son email après création. Si un user @alyos passe à @gmail, sa session courante est encore valide jusqu'au prochain refresh. **Solution** : forcer un re-login lors d'un changement d'email Supabase (à implémenter Gate 6).
 - **Email avec alias `+`** : `alice+test@alyosingenierie.fr` est accepté (endsWith match). C'est OK, le domaine est le critère.
 

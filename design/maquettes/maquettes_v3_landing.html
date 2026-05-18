@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>edifio Sourcing — Maquette M15 — Landing publique</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --alyos-red: #FF0033; --alyos-red-dark: #CC0029;
+    --ink: #0F1A2E; --ink-2: #1F2937;
+    --paper: #FAF9F6; --paper-2: #F3F1EC; --paper-3: #E8E5DD;
+    --line: #E2DFD6; --line-2: #CFCBC0; --muted: #6B7280; --white: #FFFFFF;
+    --marketing-pill-bg: #FFE5EA;
+    --marketing-pill-color: #C8002A;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); background: var(--paper); color: var(--ink); }
+
+  .header-bar { background: var(--paper); border-bottom: 1px solid var(--line); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .edifio-logo { display: inline-flex; align-items: center; gap: 8px; }
+  .edifio-pin { width: 36px; height: 36px; border-radius: 50%; background: var(--alyos-red); display: grid; place-items: center; }
+  .edifio-pin svg { width: 18px; height: 21px; }
+  .edifio-word { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -1px; color: var(--ink); }
+  .edifio-suite { font-family: var(--font-body); font-weight: 500; color: var(--muted); font-size: 14px; margin-left: 4px; }
+
+  .nav-links { display: flex; gap: 32px; }
+  .nav-links a { color: var(--ink); font-size: 14px; font-weight: 500; text-decoration: none; }
+  .nav-links a:hover { color: var(--alyos-red); }
+
+  .header-cta { display: flex; align-items: center; gap: 12px; }
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 14px; padding: 11px 20px; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; display: inline-block; }
+  .btn-primary { background: var(--alyos-red); color: var(--white); }
+  .btn-primary:hover { background: var(--alyos-red-dark); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn-ghost:hover { background: var(--paper-2); }
+
+  /* === HERO SECTION === */
+  .hero { padding: 80px 32px 96px; text-align: center; max-width: 880px; margin: 0 auto; }
+
+  /* Pattern 1 — Pill eyebrow marketing (ADR-012) */
+  .pill-eyebrow { display: inline-block; background: var(--marketing-pill-bg); color: var(--marketing-pill-color); font-family: var(--font-display); font-weight: 700; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; padding: 6px 14px; border-radius: 999px; margin-bottom: 24px; }
+
+  /* Pattern 2 — H1 marketing scale (52px / letter-spacing -1.5px / line-height 1.05) */
+  .hero h1 { font-family: var(--font-display); font-weight: 700; font-size: 52px; line-height: 1.05; letter-spacing: -1.5px; color: var(--ink); margin: 0 0 24px; }
+  /* Pattern 3 — Split-color H1 (2ᵉ ligne en alyos-red) */
+  .hero h1 .split-red { color: var(--alyos-red); }
+
+  .hero p.lead { font-family: var(--font-body); font-size: 19px; line-height: 1.55; color: var(--ink-2); max-width: 720px; margin: 0 auto 36px; }
+  .hero .hero-cta { display: flex; gap: 12px; justify-content: center; }
+  .hero .btn { padding: 14px 24px; font-size: 15px; }
+
+  /* === SECTION QUE RECOUVRE === */
+  .que-recouvre { max-width: 1080px; margin: 0 auto 96px; padding: 0 32px; }
+  .info-box { background: var(--paper-2); border-radius: 16px; padding: 36px 40px; }
+  .info-box .pill-eyebrow { margin-bottom: 16px; }
+  .info-box p { font-size: 16px; line-height: 1.6; margin: 0 0 12px; }
+  .info-box p:last-child { margin-bottom: 0; }
+  .info-box strong { color: var(--ink); font-weight: 600; }
+
+  /* === SECTION NOTRE SUITE === */
+  .notre-suite { max-width: 1080px; margin: 0 auto 96px; padding: 0 32px; }
+  .notre-suite h2 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-height: 1.15; letter-spacing: -0.8px; margin: 0 0 12px; }
+  .notre-suite p.subtitle { color: var(--ink-2); font-size: 17px; max-width: 640px; margin: 0 0 32px; }
+  .suite-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .product-card { background: var(--white); border: 1px solid var(--line); border-radius: 14px; padding: 28px 28px 32px; }
+  .product-card .product-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 14px; }
+  .product-card .product-badge.dispo { background: var(--alyos-red); color: var(--white); }
+  .product-card .product-badge.bientot { background: #FFE89E; color: #74540B; }
+  .product-card .product-badge.exclusif { background: var(--marketing-pill-bg); color: var(--marketing-pill-color); }
+  .product-card h3 { font-family: var(--font-display); font-weight: 700; font-size: 24px; margin: 0 0 8px; }
+  .product-card h3 .product-suffix { color: var(--muted); font-weight: 500; }
+  .product-card .product-tagline { color: var(--ink-2); font-size: 14px; margin: 0 0 18px; }
+  .product-card .product-features { margin: 0 0 20px; padding: 0; list-style: none; }
+  .product-card .product-features li { font-size: 13.5px; padding: 4px 0; color: var(--ink-2); }
+  .product-card .product-features li::before { content: "✓ "; color: var(--alyos-red); font-weight: 700; margin-right: 6px; }
+  .product-card .product-cta { display: inline-block; font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: none; }
+  .product-card .product-cta:hover { color: var(--alyos-red); }
+  .product-card .product-cta::after { content: " →"; }
+
+  /* === SECTION TAGLINE EDIFIO SOURCING === */
+  .sourcing-spotlight { max-width: 1080px; margin: 0 auto 96px; padding: 0 32px; }
+  .spotlight-card { background: var(--ink); color: var(--white); border-radius: 16px; padding: 60px 56px; position: relative; overflow: hidden; }
+  .spotlight-card::before { content: ""; position: absolute; top: -100px; right: -100px; width: 300px; height: 300px; border-radius: 50%; background: var(--alyos-red); opacity: 0.2; }
+  .spotlight-card .pill-eyebrow { background: rgba(255,229,234,0.15); color: var(--marketing-pill-bg); }
+  .spotlight-card h2 { font-family: var(--font-display); font-weight: 700; font-size: 40px; line-height: 1.1; letter-spacing: -1px; margin: 16px 0 16px; max-width: 700px; position: relative; }
+  .spotlight-card h2 .split-red { color: var(--alyos-red); }
+  .spotlight-card .spotlight-text { font-size: 16px; line-height: 1.6; max-width: 600px; color: rgba(255,255,255,0.85); margin: 0 0 28px; position: relative; }
+  .spotlight-card .btn-primary { padding: 14px 28px; font-size: 15px; position: relative; }
+  .spotlight-card .stats-row { display: flex; gap: 48px; margin-top: 40px; position: relative; }
+  .stat { }
+  .stat .stat-value { font-family: var(--font-display); font-weight: 700; font-size: 36px; letter-spacing: -1px; color: var(--alyos-red); display: block; }
+  .stat .stat-label { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 4px; }
+
+  /* === FOOTER === */
+  .footer { background: var(--ink); color: rgba(255,255,255,0.7); padding: 48px 32px 32px; }
+  .footer-inner { max-width: 1080px; margin: 0 auto; }
+  .footer-cols { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 40px; }
+  .footer-col h4 { font-family: var(--font-display); font-weight: 600; font-size: 14px; color: var(--white); margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .footer-col ul { list-style: none; padding: 0; margin: 0; }
+  .footer-col li { padding: 4px 0; font-size: 13px; }
+  .footer-col a { color: rgba(255,255,255,0.7); text-decoration: none; }
+  .footer-col a:hover { color: var(--white); }
+  .footer-col p { font-size: 13.5px; line-height: 1.6; margin: 12px 0 0; }
+  .footer-bottom { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px; display: flex; justify-content: space-between; font-size: 12px; }
+
+  .page-header-meta { background: var(--ink); color: var(--white); padding: 12px 24px; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: center; letter-spacing: 1px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<div class="page-header-meta">
+  Maquette M15 v1.0 — Landing publique — Patterns marketing edifio.fr appliqués (cf. ADR-012)
+</div>
+
+<!-- === HEADER NAVIGATION === -->
+<header class="header-bar">
+  <span class="edifio-logo">
+    <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+    <span class="edifio-word">edifio</span>
+    <span class="edifio-suite">Sourcing</span>
+  </span>
+  <nav class="nav-links">
+    <a href="#suite">La suite edifio</a>
+    <a href="#fonctionnement">Comment ça marche</a>
+    <a href="#tarifs">Tarifs</a>
+    <a href="#contact">Contact</a>
+  </nav>
+  <div class="header-cta">
+    <a href="/login" class="btn btn-ghost">Se connecter</a>
+    <a href="#" class="btn btn-primary">Demander un accès</a>
+  </div>
+</header>
+
+<!-- === HERO SECTION (Pattern 1 + 2 + 3 de l'ADR-012) === -->
+<section class="hero">
+  <span class="pill-eyebrow">Outil interne — AlyoS Ingénierie</span>
+  <h1>
+    De l'avis publié à l'opportunité gagnée,
+    <br>
+    <span class="split-red">sans rien tenir à la main.</span>
+  </h1>
+  <p class="lead">
+    edifio Sourcing automatise le cycle complet d'un appel d'offres public BTP — du flux quotidien d'avis jusqu'au pli remis — pour les collaborateurs AlyoS Ingénierie.
+  </p>
+  <div class="hero-cta">
+    <a href="/login" class="btn btn-primary">Accéder à edifio Sourcing</a>
+    <a href="#fonctionnement" class="btn btn-ghost">Voir comment ça marche →</a>
+  </div>
+</section>
+
+<!-- === QUE RECOUVRE LA MARQUE ? === -->
+<section class="que-recouvre">
+  <div class="info-box">
+    <span class="pill-eyebrow">Que recouvre la marque ?</span>
+    <p><strong>edifio</strong> est l'éditeur et le panel de solutions logicielles d'AlyoS Ingénierie pour les métiers de la maîtrise d'œuvre.</p>
+    <p><strong>edifio Sourcing</strong> est notre 3ᵉ produit : sourcing automatique d'appels d'offres publics du BTP, mobilisation d'architectes cotraitants, préparation IA des dossiers de candidature.</p>
+  </div>
+</section>
+
+<!-- === NOTRE SUITE === -->
+<section class="notre-suite" id="suite">
+  <span class="pill-eyebrow">Notre suite</span>
+  <h2>Une seule source de vérité, modulaire selon vos besoins.</h2>
+  <p class="subtitle">Chaque produit est utilisable indépendamment, mais ils se complètent pour couvrir tout le cycle d'un projet de construction.</p>
+
+  <div class="suite-grid">
+    <!-- edifio Suivi -->
+    <div class="product-card">
+      <span class="product-badge dispo">DISPONIBLE</span>
+      <h3>edifio<span class="product-suffix"> Suivi</span></h3>
+      <p class="product-tagline">Pilotage de chantier MOE</p>
+      <ul class="product-features">
+        <li>Comptes-rendus de chantier structurés</li>
+        <li>Tâches, plans, diffusion centralisés</li>
+        <li>Application mobile pour le terrain</li>
+        <li>Sécurisé RGPD, hébergement UE</li>
+      </ul>
+      <a href="https://suivi.edifio.fr" class="product-cta">Accéder à edifio Suivi</a>
+    </div>
+
+    <!-- edifio Sourcing -->
+    <div class="product-card" style="border: 2px solid var(--alyos-red); position: relative;">
+      <span class="product-badge exclusif">Interne AlyoS</span>
+      <h3>edifio<span class="product-suffix"> Sourcing</span></h3>
+      <p class="product-tagline">AO publics, du sourcing au pli</p>
+      <ul class="product-features">
+        <li>Sourcing quotidien BOAMP + PLACE + Francmarchés</li>
+        <li>Mobilisation architectes cotraitants par mail</li>
+        <li>Préparation dossier IA (analyse RC, CERFA, mémoire)</li>
+        <li>Synchronisation Odoo CRM</li>
+      </ul>
+      <a href="/login" class="product-cta">Accéder à edifio Sourcing</a>
+    </div>
+
+    <!-- edifio AO -->
+    <div class="product-card">
+      <span class="product-badge bientot">BIENTÔT T3 2026</span>
+      <h3>edifio<span class="product-suffix"> AO</span></h3>
+      <p class="product-tagline">Suivi des réponses aux appels d'offres</p>
+      <ul class="product-features">
+        <li>Pipeline de réponses unifié</li>
+        <li>Indicateurs de performance commerciale</li>
+        <li>Archive des mémoires techniques</li>
+      </ul>
+      <a href="#" class="product-cta">Être informé du lancement</a>
+    </div>
+
+    <!-- edifio ACT -->
+    <div class="product-card">
+      <span class="product-badge bientot">BIENTÔT T4 2026</span>
+      <h3>edifio<span class="product-suffix"> ACT</span></h3>
+      <p class="product-tagline">Actes administratifs et marchés</p>
+      <ul class="product-features">
+        <li>Gestion centralisée des marchés</li>
+        <li>Templates administratifs</li>
+        <li>Audit trail réglementaire</li>
+      </ul>
+      <a href="#" class="product-cta">Être informé du lancement</a>
+    </div>
+  </div>
+</section>
+
+<!-- === SOURCING SPOTLIGHT (effet "card sombre") === -->
+<section class="sourcing-spotlight" id="fonctionnement">
+  <div class="spotlight-card">
+    <span class="pill-eyebrow">Pour les collaborateurs AlyoS Ingénierie</span>
+    <h2>
+      Détecte. Sélectionne. <span class="split-red">Réponds.</span>
+    </h2>
+    <p class="spotlight-text">
+      Chaque matin à 6h30, edifio Sourcing scanne les plateformes de marchés publics, filtre selon tes profils de recherche, te livre les AO pertinents triés par score. Tu sélectionnes en un tap. Mode Solo ou Tandem avec architecte cotraitant. L'IA analyse le RC et prépare le dossier en 30 minutes.
+    </p>
+    <a href="/login" class="btn btn-primary">Accéder à edifio Sourcing</a>
+    <div class="stats-row">
+      <div class="stat">
+        <span class="stat-value">50–80h</span>
+        <span class="stat-label">économisées / mois<br>par utilisateur actif</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">4</span>
+        <span class="stat-label">plateformes<br>BOAMP · PLACE · Francmarchés · MP.info</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">10 min</span>
+        <span class="stat-label">de revue dossier IA<br>vs 2 jours à la main</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- === FOOTER === -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-cols">
+      <div class="footer-col">
+        <span class="edifio-logo">
+          <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+          <span class="edifio-word" style="color: var(--white);">edifio</span>
+          <span class="edifio-suite">Sourcing</span>
+        </span>
+        <p>Outil interne AlyoS Ingénierie — Sourcing automatique d'appels d'offres publics BTP, cotraitance architecte et préparation IA des dossiers.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Produits</h4>
+        <ul>
+          <li><a href="https://suivi.edifio.fr">edifio Suivi</a></li>
+          <li><a href="#">edifio AO</a></li>
+          <li><a href="#">edifio ACT</a></li>
+          <li><a href="/login">edifio Sourcing</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>AlyoS</h4>
+        <ul>
+          <li><a href="https://alyosingenierie.fr">Le site AlyoS</a></li>
+          <li><a href="#">À propos d'edifio</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Légal</h4>
+        <ul>
+          <li><a href="/legal">Mentions légales</a></li>
+          <li><a href="/legal#privacy">Politique de confidentialité</a></li>
+          <li><a href="mailto:dpo@alyosingenierie.fr">DPO</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 AlyoS Ingénierie — Outil interne, hébergement strict UE</span>
+      <span>edifio Sourcing v1.0 — AO publics, du sourcing au pli</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

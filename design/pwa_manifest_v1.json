@@ -1,7 +1,7 @@
 {
   "name": "edifio Sourcing",
   "short_name": "edifio Sourcing",
-  "description": "Sourcing AO public BTP + cotraitance architecte + dossier IA. Outil interne AlyoS Ingenierie.",
+  "description": "AO publics, du sourcing au pli. Outil interne AlyoS Ingenierie.",
   "lang": "fr",
   "dir": "ltr",
   "start_url": "/sourcing",

@@ -183,16 +183,64 @@ Justification :
 
 ## Verdict CTO
 
-*Section à remplir par CTO Sophie après lecture.*
-
 ```
-[ ] Validation vote dev tel quel (Drizzle)
-[ ] Validation avec réserve : …
-[ ] Désaccord — arbitrage Board demandé via handoff/REQUEST_…
+[x] Validation vote dev tel quel (Drizzle) — sous 3 conditions formelles
 
-Date verdict : 2026-05-…
+Date verdict : 2026-05-18
 Signataire : Sophie (CTO)
+Validation Board : OUI (chat Cowork 2026-05-18)
+ADR de formalisation : specs/adr_013_orm_drizzle.md
 ```
+
+### Commentaires CTO
+
+**Le dossier d'Alex est solide.** Méthodologie rigoureuse, caveats assumés (cold start Prisma non mesuré quantitativement, seed jsonb sous-dimensionné à 10 KB médiane au lieu des 25 KB Q1 Cowork visés), calcul de scoring défendable (audité arithmétiquement : 7,80 vs 5,30 = écart **2,50** points et non 2,3 par arrondi). Le stress-test agressif (relâche cold start Drizzle 8→6) conserve un écart 1,50 point > seuil 1 point d'arbitrage CTO posé Gate 5 → la décision résiste.
+
+**Les 3 écarts DX disqualifiants Prisma** observés au code (Phase 2a + 2b) sont les motifs structurels qui pèsent le plus dans mon verdict :
+1. `upsertMany` absent → fallback `$executeRawUnsafe` répété chaque batch scoring 1100-3300 AO/jour
+2. `Json` opaque vs `jsonb().$type<T>()` typé fort × 9 colonnes jsonb au schéma v1
+3. `TRUNCATE` absent API native → symptôme « API safety » Prisma qui ferme l'accès Postgres avancé
+
+**RLS Postgres FORCE = parité stricte.** À acter pour les futurs ADR : aucun ORM TS n'apporte de valeur ajoutée pour la RLS. Le pgTAP + les 12 policies dans `rls/policies.sql` resteront identiques quel que soit l'ORM retenu. Ce critère ne discrimine pas Drizzle vs Prisma sur la RLS proprement dite.
+
+**Driver Deno** : `postgres-js` stable Drizzle vs `@prisma/adapter-pg-deno` flagué `experimental`. Q2 Cowork ayant verrouillé Data Proxy en NO-GO (latence + coût + budget), c'est la seule porte Prisma sur Deno — et c'est expérimentale. Le point chaud d'écriture vit en Edge Function Deno → la compat Deno pèse plus que les 15 % nominaux ne le laissent croire.
+
+**Maturité écosystème** : Prisma gagne légitimement (Stack Overflow 30k vs 2k, GUI Studio, docs, adoption Vercel/Notion/Reddit). Mais 10 % de pondération seulement. L'équipe a 1-2 jours de buffer dans le planning Gate 6 pour la rampe d'apprentissage Drizzle (acquis Prisma sur projets antérieurs). **Accepté.**
+
+### 3 conditions formelles de validation
+
+**Condition 1 — Bench cold start Edge Function Supabase Deno réel = bloquant pré-Gate 9**
+
+- Cible : preview Vercel + Edge Function Deno + Supabase Frankfurt
+- Outils : k6 charge test + sonde cold start dédiée
+- Cas : 100 invocations cold start ré-déployées + 1000 invocations warm
+- Métriques : médiane, p95, p99 cold + warm
+- **Seuil de validation finale** : si écart Drizzle vs Prisma cold start réel ≥ 200 ms → validation finale ADR-013. Sinon → post-mortem + ADR-013 amendé v1.1 + revérification critère 1.
+
+**Condition 2 — Re-seed payload Opendatasoft réel à la 1re PR module sourcing engine**
+
+- Seed actuel sous-dimensionné à 10 KB médiane (bug remplissage `description` répétés)
+- Re-faire avec payload BOAMP réel
+- Distribution cible : 15 % 10 KB / 60 % 25 KB / 25 % 45 KB (Q1 Cowork)
+- Bench upsert relancé sur seed réaliste → comparaison au 60 ms médiane batch_100 du spike
+
+**Condition 3 — Conservation 30 jours des branches spike**
+
+- `spike/orm-drizzle` et `spike/orm-prisma` conservées sur `origin` jusqu'au **2026-06-17**
+- Si la mesure pré-Gate 9 (condition 1) invalide la trajectoire Drizzle → bascule Prisma possible avec coût modeste
+- PS_OPERATOR Yann a un reminder programmé : `git push origin --delete spike/orm-drizzle` + `git push origin --delete spike/orm-prisma` à exécuter le 2026-06-17 SI condition 1 validée
+- Conservation locale 90j supplémentaires (purge complète 2026-09-15)
+
+### Prochaine étape Alex
+
+Démarrage **1re PR module sourcing engine** sur base Drizzle :
+
+- (a) Migration `0000_init.sql` enum `subscription_tier` + colonne `organizations.tier` (Q3 Cowork)
+- (b) Schema Drizzle v1 complet (22+ tables : tenders, architects, architect_responses, audit_logs, etc.)
+- (c) RLS FORCE 12 policies + helpers SQL natif (hors ORM)
+- (d) Seed payload Opendatasoft réel (condition 2)
+
+**Pas de carry-over** du spike : PR repart propre depuis `feat/sourcing-mvp` (le spike est référence pédagogique, pas base de code prod). Effort estimé : 9-13 jours sur 2-2.5 semaines.
 
 ---
 
