@@ -8,7 +8,13 @@ export default defineConfig({
     // sur les composants critiques (cf. Gate 5 stratégie de tests).
     environment: "node",
     globals: false,
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      // Étape 3 Gate 6 : tests d'inférence de types Drizzle (schéma v1).
+      // Couvre l'absence de régression `any`/`unknown` sur les 8 colonnes jsonb
+      // typées via `.$type<>()`.
+      "tests/**/*.{test,spec}.{ts,tsx}",
+    ],
     // Exclusion explicite des E2E Playwright (qui ont leur propre runner).
     exclude: ["e2e/**", "node_modules/**", ".next/**"],
     coverage: {

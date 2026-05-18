@@ -7,8 +7,8 @@
  * Toutes les valeurs sont en lowercase strict (jamais 'Sourcing' / 'STUDIO').
  *
  * Étape 2 du plan Gate 6 — Option A : la migration 0000_init.sql ne pose que
- * l'enum `subscription_tier` (single-purpose). Les 21+ tables et la table
- * `organizations` (qui consomme ce type) arrivent à l'étape 3 dans 0001.
+ * l'enum `subscription_tier` (single-purpose). Les 21+ tables et les 11 enums
+ * restants arrivent à l'étape 3 dans la migration 0001_schema_v1.sql.
  */
 
 import { pgEnum } from "drizzle-orm/pg-core";
@@ -25,3 +25,111 @@ import { pgEnum } from "drizzle-orm/pg-core";
  * et l'index `idx_organizations_tier` seront créés à l'étape 3 (migration 0001).
  */
 export const subscriptionTier = pgEnum("subscription_tier", ["sourcing", "cotraitance", "studio"]);
+
+/**
+ * membership_role — rôle d'un user dans une organisation.
+ * admin : full access (admin pages, audit logs, gestion membres)
+ * user  : usage standard (sélection AO, sollicitation archis, dossier)
+ * viewer: lecture seule
+ */
+export const membershipRole = pgEnum("membership_role", ["admin", "user", "viewer"]);
+
+/**
+ * platform_code — plateforme source d'un AO public BTP.
+ * 4 plateformes intégrées au MVP (cf. spec module_sourcing_engine_v1).
+ */
+export const platformCode = pgEnum("platform_code", ["boamp", "place", "francmarches", "mp_info"]);
+
+/**
+ * auth_type — type d'authentification du connecteur plateforme.
+ * api_key       : BOAMP (clef Opendatasoft)
+ * oauth         : réservé futurs connecteurs
+ * login_password: PLACE (scraping authentifié)
+ * none          : Francmarchés, MP.info (scraping public)
+ */
+export const authType = pgEnum("auth_type", ["api_key", "oauth", "login_password", "none"]);
+
+/**
+ * partnership_status — relation commerciale architecte.
+ */
+export const partnershipStatus = pgEnum("partnership_status", ["actif", "inactif", "prospect"]);
+
+/**
+ * tender_status — 14 statuts du cycle de vie d'un AO (Gate 4).
+ * Ordre logique : sourced → selected → architect/dossier → submitted → won|lost|dropped.
+ */
+export const tenderStatus = pgEnum("tender_status", [
+  "sourced",
+  "selected_solo",
+  "selected_tandem",
+  "awaiting_architect",
+  "architect_accepted",
+  "architect_declined",
+  "architect_info_requested",
+  "dossier_review_required",
+  "dossier_ready",
+  "dossier_diffused",
+  "submitted",
+  "won",
+  "lost",
+  "dropped",
+]);
+
+/**
+ * selection_mode — mode de réponse choisi pour un AO.
+ * solo   : réponse en propre (Mode 1 historique)
+ * tandem : cotraitance avec architecte (Mode 2 historique)
+ */
+export const selectionMode = pgEnum("selection_mode", ["solo", "tandem"]);
+
+/**
+ * architect_response_status — état de la réponse architecte à une sollicitation.
+ */
+export const architectResponseStatus = pgEnum("architect_response_status", [
+  "pending",
+  "accepted",
+  "declined",
+  "info_requested",
+]);
+
+/**
+ * ai_model — modèles Anthropic utilisés (Gate 2 arbitrage 4/A).
+ * sonnet-4-6 : tâches longues / structurées (P1, P2, P3)
+ * haiku-4-5  : tâches courtes / pré-classification (P4 à P12)
+ */
+export const aiModel = pgEnum("ai_model", ["sonnet-4-6", "haiku-4-5"]);
+
+/**
+ * brevo_register — registre de communication architecte.
+ * tu     : tutoiement (Gate 4 — colonne `architects.tutoiement = TRUE`)
+ * vous   : vouvoiement (DEFAULT — Gate 4 directive Board)
+ * neutre : pour communications non personnelles (système, notifications)
+ */
+export const brevoRegister = pgEnum("brevo_register", ["tu", "vous", "neutre"]);
+
+/**
+ * audit_action — 13 actions sensibles tracées en audit log immutable.
+ * Cf. `specs/audit_log_v1.md` pour les payloads détaillés par action.
+ */
+export const auditAction = pgEnum("audit_action", [
+  "login",
+  "membership_change",
+  "search_profile_change",
+  "tender_select",
+  "architect_solicit",
+  "dossier_diffuse",
+  "ai_run",
+  "odoo_opportunity_create",
+  "architect_change",
+  "rgpd_export",
+  "token_revoke",
+  "data_delete",
+  "access_attempt",
+]);
+
+/**
+ * learning_event_type — événement d'apprentissage du moteur de scoring.
+ * selected : l'utilisateur a sélectionné un AO → signal positif
+ * rejected : l'utilisateur a rejeté un AO → signal négatif (motif analysé par IA)
+ */
+export const learningEventType = pgEnum("learning_event_type", ["selected", "rejected"]);

@@ -1,16 +1,30 @@
 /**
- * Schema Drizzle — edifio Sourcing
+ * Schema Drizzle — edifio Sourcing (barrel)
  *
  * Source de vérité : `specs/schema_v1.sql` + ADR-013 (specs/adr_013_orm_drizzle.md).
  *
- * Étape 2 du plan Gate 6 — Option A retenue : la migration 0000_init.sql
- * pose UNIQUEMENT l'enum `subscription_tier` (single-purpose, démontre que
- * la chaîne drizzle-kit generate fonctionne sur greenfield). Les 22+ tables
- * du schema v1 (organizations comprise) et les 12 policies RLS arriveront
- * à l'étape 3 dans la migration 0001.
+ * Structure éclatée par domaine (décision Board étape 3) : un fichier par
+ * domaine métier, ré-export agrégé ici pour que :
+ *   - `drizzle.config.ts schema: './src/db/schema'` voie l'ensemble
+ *   - `drizzle(pgClient, { schema })` (cf. src/db/client.ts) bénéficie du
+ *     typage complet sur 22+ tables et 12 enums.
  *
- * Le ré-export agrège tous les sous-modules pour que `drizzle(pgClient, { schema })`
- * (cf. src/db/client.ts) reçoive l'ensemble des objets typés.
+ * Étape 3 du plan Gate 6 : migration `0001_schema_v1.sql` posée à partir
+ * de ces déclarations TS via `drizzle-kit generate`. RLS (étape 4) ajoutera
+ * 19 policies via une migration séparée.
  */
 
+// Types — enums et énumérations Postgres
 export * from "./enums";
+
+// Tables — un module par domaine
+export * from "./organizations";
+export * from "./users";
+export * from "./config";
+export * from "./architects";
+export * from "./tenders";
+export * from "./selections";
+export * from "./library";
+export * from "./ai";
+export * from "./integrations";
+export * from "./audit";
