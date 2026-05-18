@@ -29,3 +29,8 @@ design/tokens.json
 # Artefacts générés par drizzle-kit (snapshots, journal, SQL de migration)
 # Ne JAMAIS reformater manuellement — réécrits à chaque `drizzle-kit generate`.
 src/db/migrations/
+
+# SQL natif (extensions, RLS pgTAP) — pas de parser Prettier pour .sql,
+# convention manuelle (uppercase keywords, indent 2 espaces).
+*.sql
+

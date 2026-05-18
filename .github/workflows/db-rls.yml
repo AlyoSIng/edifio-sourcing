@@ -1,0 +1,106 @@
+name: ci-db-rls
+
+# Trigger -- toute PR vers main ou feat/sourcing-mvp, et push direct sur ces
+# branches. Le pgTAP est CI-only : il ne tourne PAS en local (decision CTO
+# etape 4) car l'install pg_prove sur Windows + macOS est friable.
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/sourcing-mvp
+  push:
+    branches:
+      - main
+      - feat/sourcing-mvp
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  rls:
+    name: ci-db-rls
+    runs-on: ubuntu-latest
+
+    # Service Postgres 15 dedie a ce job. Les extensions uuid-ossp, pgcrypto,
+    # pg_trgm sont activees par la migration `src/db/migrate.ts` au runtime
+    # (cf. src/db/setup/extensions.sql).
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: edifio_sourcing_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Connexion directe Postgres 5432 (jamais le pooler 6543 -- DDL drizzle-kit
+      # incompatible avec PgBouncer transaction mode).
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/edifio_sourcing_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # pgTAP + pg_prove. pgTAP est l'extension Postgres (tests SQL natifs),
+      # pg_prove est le runner Perl qui les execute.
+      - name: Install pgTAP + pg_prove
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y postgresql-15-pgtap libtap-parser-sourcehandler-pgtap-perl
+          # pg_prove vient avec TAP::Parser::SourceHandler::pgTAP -- on verifie
+          # qu'il est dispo.
+          which pg_prove || sudo cpanm --notest TAP::Parser::SourceHandler::pgTAP
+          pg_prove --version
+
+      # Schema auth (Supabase) faux-stub pour que 0003_fk_supabase passe en CI.
+      # En prod Supabase, auth.users existe nativement. Ici on cree un schema
+      # auth + table users minimaliste avant les migrations.
+      - name: Prepare Supabase auth schema stub
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -e
+          psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE SCHEMA IF NOT EXISTS auth;"
+          psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY, email text);"
+          # Active pgTAP dans la DB cible (pour pg_prove).
+          psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
+
+      # Migrations Drizzle (extensions + 0000 + 0001 + 0002 + 0003).
+      - name: Run migrations (extensions + drizzle)
+        run: pnpm db:migrate
+
+      # Lance la suite pgTAP. pg_prove charge les .sql un par un.
+      - name: Run pgTAP suite
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -e
+          pg_prove \
+            --host localhost \
+            --username postgres \
+            --dbname edifio_sourcing_test \
+            --ext .sql \
+            tests/rls/
