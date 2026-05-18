@@ -83,6 +83,22 @@ jobs:
           which pg_prove || sudo cpanm --notest TAP::Parser::SourceHandler::pgTAP
           pg_prove --version
 
+      # L'install precedente met pg_prove + le module Perl sur le runner host,
+      # mais pgtap.so / pgtap.control doivent vivre DANS le container Postgres
+      # (services.postgres) pour que CREATE EXTENSION pgtap fonctionne. L'image
+      # officielle postgres:15 est basee Debian bookworm et inclut deja le
+      # depot PGDG, donc `apt-get install postgresql-15-pgtap` y fonctionne.
+      - name: Install pgtap inside the postgres service container
+        run: |
+          set -e
+          CONTAINER=$(docker ps --filter "ancestor=postgres:15" --format "{{.ID}}" | head -1)
+          if [ -z "$CONTAINER" ]; then
+            echo "ERROR: postgres:15 service container introuvable"
+            docker ps
+            exit 1
+          fi
+          docker exec "$CONTAINER" bash -c "apt-get update -qq && apt-get install -y -qq postgresql-15-pgtap"
+
       # Schema auth (Supabase) faux-stub pour que 0003_fk_supabase passe en CI.
       # En prod Supabase, auth.users existe nativement. Ici on cree un schema
       # auth + table users minimaliste avant les migrations.
