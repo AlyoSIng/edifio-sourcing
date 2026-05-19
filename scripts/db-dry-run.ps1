@@ -174,12 +174,15 @@ try {
     Write-Ok "pgtap installe cote container"
 
     # ------------------------------------------------------------------------
-    # Stub schema auth.users (Supabase ne tourne pas localement)
+    # Stub Supabase (schema auth + users + auth.jwt() referencee par RLS)
     # ------------------------------------------------------------------------
-    Write-Step "Stub Supabase auth.users + activation pgtap"
+    Write-Step "Stub Supabase auth.users + auth.jwt() + activation pgtap"
     $stubSql = @"
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY, email text);
+CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS `$`$
+  SELECT NULLIF(current_setting('request.jwt.claims', true), '')::jsonb
+`$`$ LANGUAGE sql STABLE;
 CREATE EXTENSION IF NOT EXISTS pgtap;
 "@
     $stubSql | & docker exec -i $ContainerName psql -U postgres -d postgres -v ON_ERROR_STOP=1 2>&1 | Out-Null

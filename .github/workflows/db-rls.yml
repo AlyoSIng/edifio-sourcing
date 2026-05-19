@@ -99,9 +99,10 @@ jobs:
           fi
           docker exec "$CONTAINER" bash -c "apt-get update -qq && apt-get install -y -qq postgresql-15-pgtap"
 
-      # Schema auth (Supabase) faux-stub pour que 0003_fk_supabase passe en CI.
-      # En prod Supabase, auth.users existe nativement. Ici on cree un schema
-      # auth + table users minimaliste avant les migrations.
+      # Schema auth (Supabase) faux-stub pour que 0003_fk_supabase passe en CI
+      # ET pour que les policies RLS qui referencent auth.jwt() ne plantent pas
+      # a la creation. En prod Supabase, auth.users et auth.jwt() existent
+      # nativement. Ici on les stub pour matcher le contrat utilise par 0002_rls.
       - name: Prepare Supabase auth schema stub
         env:
           PGPASSWORD: postgres
@@ -109,6 +110,12 @@ jobs:
           set -e
           psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE SCHEMA IF NOT EXISTS auth;"
           psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY, email text);"
+          # Stub `auth.jwt()` -- en prod Supabase Auth pose cette fonction qui
+          # renvoie les claims JWT en jsonb. La policy `tenant_isolation` sur
+          # `notifications` y fait reference (cf. 0002_rls.sql:184).
+          # En CI : retourne le setting request.jwt.claims s'il existe, sinon
+          # NULL (acceptable : aucune session simulee n'est posee avant pgTAP).
+          psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS \$\$ SELECT NULLIF(current_setting('request.jwt.claims', true), '')::jsonb \$\$ LANGUAGE sql STABLE;"
           # Active pgTAP dans la DB cible (pour pg_prove).
           psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
 
