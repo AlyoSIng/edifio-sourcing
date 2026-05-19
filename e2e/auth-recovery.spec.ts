@@ -7,9 +7,17 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * Source : `DECISIONS.md` 2026-05-19 (entrée Alex hotfix recovery).
  *
  * Stratégie : on génère un VRAI lien recovery via l'API admin Supabase
- * (`auth.admin.generateLink({ type: 'recovery' })`). L'`action_link` retourné
- * est une URL `/auth/v1/verify?token=...&type=recovery&redirect_to=...` :
+ * (`auth.admin.generateLink({ type: 'recovery', options: { redirectTo } })`).
+ * L'`action_link` retourné est une URL
+ * `/auth/v1/verify?token=...&type=recovery&redirect_to=...` :
  * c'est l'URL qui serait embarquée dans l'email envoyé à l'utilisateur.
+ *
+ * Le `redirectTo` est forcé sur la baseURL Playwright locale
+ * (`http://localhost:3000` par défaut) — indispensable pour que le fragment
+ * recovery atterrisse sur le dev server et soit consommé par le
+ * `RecoveryHashHandler`. Sans cet override, Supabase retombe sur la Site
+ * URL projet (preview Vercel protégée par SSO) et le fragment est perdu
+ * en cours de redirect (INC-2026-05-19 — diagnostic R1).
  *
  * Le fragment recovery (`#access_token=...&type=recovery&refresh_token=...`)
  * n'apparaît qu'APRÈS visite de cet `action_link` : Supabase fait le verify
@@ -52,13 +60,23 @@ function createTestAdminClient(): SupabaseClient {
  * recovery et retourne l'`action_link` Supabase brut.
  *
  * Cet `action_link` est de la forme :
- *   https://<supabase-host>/auth/v1/verify?token=...&type=recovery&redirect_to=...
+ *   https://<supabase-host>/auth/v1/verify?token=...&type=recovery&redirect_to=<redirectTo>
  *
  * Playwright doit naviguer dessus pour déclencher le verify côté Supabase :
  * le serveur consomme le token OTP, pose les tokens dans un fragment, puis
- * redirige le navigateur vers `redirect_to` (notre baseURL).
+ * redirige le navigateur vers `redirect_to`.
+ *
+ * Le paramètre `redirectTo` est OBLIGATOIRE pour éviter que Supabase ne
+ * retombe sur la Site URL configurée (preview Vercel protégée par SSO →
+ * le fragment recovery serait perdu en cours de route). On force ici
+ * la baseURL Playwright locale (`http://localhost:3000` par défaut),
+ * cohérent avec le helper magic-link `e2e/helpers/auth.ts`.
+ *
+ * Prérequis Supabase : la baseURL doit figurer dans les
+ * `additional_redirect_urls` du projet ; le helper magic-link existant
+ * prouve empiriquement que `http://localhost:3000` est accepté.
  */
-async function generateRecoveryActionLink(email: string): Promise<string> {
+async function generateRecoveryActionLink(email: string, redirectTo: string): Promise<string> {
   const admin = createTestAdminClient();
 
   const { error: createError } = await admin.auth.admin.createUser({
@@ -73,6 +91,7 @@ async function generateRecoveryActionLink(email: string): Promise<string> {
   const { data, error } = await admin.auth.admin.generateLink({
     type: "recovery",
     email,
+    options: { redirectTo },
   });
 
   const actionLink = data?.properties?.action_link;
@@ -88,9 +107,24 @@ async function generateRecoveryActionLink(email: string): Promise<string> {
 test.describe("Flow recovery password — INC-2026-05-18-02", () => {
   test("R1 — happy path : action_link recovery → verify Supabase → /auth/update-password → /sourcing/ao-du-jour", async ({
     page,
+    baseURL,
   }) => {
+    // Source de vérité de la baseURL : le fixture Playwright (résolu depuis
+    // `playwright.config.ts → use.baseURL`). On NE relit PAS l'env ici, sinon
+    // un `.env.local` qui définit `NEXT_PUBLIC_SITE_URL` (preview Vercel SSO)
+    // pollue le redirectTo et le fragment recovery est perdu (INC-2026-05-19).
+    if (!baseURL) {
+      throw new Error(
+        "Tests E2E auth-recovery : `baseURL` Playwright fixture indéfini. Vérifier `playwright.config.ts → use.baseURL`.",
+      );
+    }
+
     const email = `recovery-happy-${Date.now()}@alyosingenierie.fr`;
-    const actionLink = await generateRecoveryActionLink(email);
+    // `${baseURL}/` (avec slash final) — le pattern Supabase allowlist
+    // `http://localhost:3000/**` ne matche pas l'URL nue sans chemin,
+    // Supabase fallback alors silencieusement sur la Site URL projet
+    // (preview Vercel SSO-protégée → fragment recovery perdu).
+    const actionLink = await generateRecoveryActionLink(email, `${baseURL}/`);
 
     // Playwright suit l'action_link : Supabase exécute le verify côté serveur,
     // pose les tokens dans un fragment, puis redirige vers `redirect_to`
