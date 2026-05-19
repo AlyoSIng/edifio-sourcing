@@ -68,23 +68,29 @@ INSERT INTO architects (id, organization_id, firstname, lastname, email) VALUES
   ('bbbb2222-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Bob', 'Archi', 'bob.archi@orgb.test');
 
 -- Plateforme de reference (non multi-tenant) requise par tenders.platform_id.
--- Code distinct du seed dev/CI pour eviter la collision UNIQUE
--- platforms_code_unique (le seed insere deja code='boamp').
+-- platforms.code est un enum (boamp|place|francmarches|mp_info) et le seed
+-- dev/CI insere deja les 4 valeurs. On ne peut donc pas creer une plateforme
+-- de test : on reutilise le seed via ON CONFLICT DO NOTHING + un SELECT
+-- subquery dans les INSERT tenders ci-dessous pour recuperer l'UUID effectif.
 INSERT INTO platforms (id, code, display_name, auth_type, base_url) VALUES
-  ('cccc0000-0000-0000-0000-000000000001', 'boamp_test', 'BOAMP (test)', 'api_key', 'https://data.boamp.fr');
+  ('cccc0000-0000-0000-0000-000000000001', 'boamp', 'BOAMP', 'api_key', 'https://data.boamp.fr')
+ON CONFLICT (code) DO NOTHING;
 
 -- Prompt IA (non multi-tenant) requis par ai_runs.prompt_id (FK NOT NULL).
--- Nom distinct du seed dev/CI pour eviter une eventuelle collision UNIQUE
--- sur ai_prompts.name (par precaution, meme symptome que platforms.code).
+-- Nom distinct du seed dev/CI -- UNIQUE(name, version) du seed = (tender_score_full, 1),
+-- ici (tender_score_full_test, 1) ne collide pas.
 INSERT INTO ai_prompts (id, name, version, model, system_prompt, user_prompt_template) VALUES
   ('dddd0000-0000-0000-0000-000000000001', 'tender_score_full_test', 1, 'sonnet-4-6', 'sys', 'usr');
 
 -- Donnees AO OrgA + OrgB
+-- platform_id : recupere l'UUID BOAMP effectif (du seed si pre-existant,
+-- de l'INSERT ci-dessus sinon). SELECT subquery a chaque ligne pour rester
+-- coherent avec ON CONFLICT DO NOTHING.
 INSERT INTO tenders (id, organization_id, external_ref, platform_id, title, buyer) VALUES
   ('aaaa3333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a',
-   'EXT-A-001', 'cccc0000-0000-0000-0000-000000000001', 'AO OrgA', 'Mairie A'),
+   'EXT-A-001', (SELECT id FROM platforms WHERE code = 'boamp'), 'AO OrgA', 'Mairie A'),
   ('bbbb3333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b',
-   'EXT-B-001', 'cccc0000-0000-0000-0000-000000000001', 'AO OrgB', 'Mairie B');
+   'EXT-B-001', (SELECT id FROM platforms WHERE code = 'boamp'), 'AO OrgB', 'Mairie B');
 
 -- AI runs OrgA + OrgB
 INSERT INTO ai_runs (organization_id, prompt_id, input_hash, model) VALUES

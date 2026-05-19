@@ -548,7 +548,11 @@ CREATE POLICY tenant_isolation ON learning_events
   USING (organization_id = current_organization_id());
 
 -- Insertion : admin OU user
-CREATE POLICY insert_by_member ON architects FOR INSERT
+-- AS RESTRICTIVE : sans ce qualificatif, le check est OR'd avec la policy
+-- PERMISSIVE tenant_isolation FOR ALL (qui couvre l'INSERT par defaut),
+-- ce qui laisse un viewer inserer dans sa propre org. RESTRICTIVE force le AND.
+-- Cf. DECISIONS.md 2026-05-19 (post-mortem 6e derive Postgres consecutive).
+CREATE POLICY insert_by_member ON architects AS RESTRICTIVE FOR INSERT
   WITH CHECK (organization_id = current_organization_id() AND current_user_role() IN ('admin','user'));
 -- (À répliquer sur tables où insert nécessite membre actif. Volontairement laissé minimal — Alex complétera selon contraintes métier.)
 

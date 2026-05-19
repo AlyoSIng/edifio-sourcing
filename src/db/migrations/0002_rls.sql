@@ -200,7 +200,11 @@ CREATE POLICY "tenant_isolation" ON "learning_events"
 -- ----------------------------------------------------------------------------
 -- Empeche un viewer d'inserer un architecte (lecture seule = pas d'ecriture).
 -- Spec ligne 551-552.
-CREATE POLICY "insert_by_member" ON "architects" FOR INSERT
+-- AS RESTRICTIVE : le check est ANDe avec tenant_isolation (PERMISSIVE FOR ALL)
+-- au lieu d'etre OR'd. Sans RESTRICTIVE, un viewer dans son org passe par
+-- tenant_isolation (org match) malgre le role check de insert_by_member.
+-- Cf. DECISIONS.md 2026-05-19 + memory feedback-postgres-dry-run-local.
+CREATE POLICY "insert_by_member" ON "architects" AS RESTRICTIVE FOR INSERT
   WITH CHECK (
     organization_id = current_organization_id()
     AND current_user_role() IN ('admin', 'user')
