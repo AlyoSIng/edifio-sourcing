@@ -7,14 +7,25 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * Source : `DECISIONS.md` 2026-05-19 (entrée Alex hotfix recovery).
  *
  * Stratégie : on génère un VRAI lien recovery via l'API admin Supabase
- * (`auth.admin.generateLink({ type: 'recovery' })`), on extrait le fragment
- * `#access_token=...&type=recovery&...`, et on navigue Playwright vers
- * `/<fragment>` directement. Le composant `RecoveryHashHandler` embarqué
- * sur `/` consomme alors le fragment et redirige vers `/auth/update-password`.
+ * (`auth.admin.generateLink({ type: 'recovery' })`). L'`action_link` retourné
+ * est une URL `/auth/v1/verify?token=...&type=recovery&redirect_to=...` :
+ * c'est l'URL qui serait embarquée dans l'email envoyé à l'utilisateur.
  *
- * Cas négatif : on navigue avec un fragment recovery aux tokens invalides
- * — Supabase rejette `setSession`, le handler tombe sur le branch erreur
- * et redirige vers `/login?error=recovery_invalid`.
+ * Le fragment recovery (`#access_token=...&type=recovery&refresh_token=...`)
+ * n'apparaît qu'APRÈS visite de cet `action_link` : Supabase fait le verify
+ * côté serveur (consomme le token OTP), pose les tokens d'auth dans un
+ * fragment, puis redirige vers `redirect_to` (notre baseURL Playwright).
+ *
+ * On laisse donc Playwright naviguer sur l'`action_link` complet et on
+ * observe `page.url()` après le redirect : c'est là que se trouve le
+ * fragment que notre `RecoveryHashHandler` doit consommer pour rediriger
+ * vers `/auth/update-password`.
+ *
+ * Cas négatif : on fabrique manuellement un fragment recovery aux tokens
+ * invalides — Supabase rejette `setSession`, le handler tombe sur le branch
+ * erreur et redirige vers `/login?error=recovery_invalid`. Pas besoin de
+ * Supabase live pour ce scénario (justement : c'est le risque
+ * « lien tronqué / token expiré » qu'on couvre).
  *
  * Cas neutre : visite normale de `/` sans fragment → la landing publique
  * s'affiche normalement (aucun redirect parasite, aucun overlay).
@@ -38,15 +49,16 @@ function createTestAdminClient(): SupabaseClient {
 
 /**
  * Idempotent : crée l'utilisateur s'il n'existe pas, puis génère un lien
- * recovery et retourne le fragment d'URL (`access_token=...&type=recovery`).
+ * recovery et retourne l'`action_link` Supabase brut.
  *
- * On extrait le fragment plutôt que de naviguer sur l'action_link complet
- * pour deux raisons : (1) l'action_link pointe sur la Site URL Supabase
- * (paramétrée côté projet, peut diverger de notre baseURL Playwright),
- * (2) on veut tester explicitement que `/` (notre landing) gère le fragment,
- * pas que la redirection Supabase fonctionne.
+ * Cet `action_link` est de la forme :
+ *   https://<supabase-host>/auth/v1/verify?token=...&type=recovery&redirect_to=...
+ *
+ * Playwright doit naviguer dessus pour déclencher le verify côté Supabase :
+ * le serveur consomme le token OTP, pose les tokens dans un fragment, puis
+ * redirige le navigateur vers `redirect_to` (notre baseURL).
  */
-async function generateRecoveryFragment(email: string): Promise<string> {
+async function generateRecoveryActionLink(email: string): Promise<string> {
   const admin = createTestAdminClient();
 
   const { error: createError } = await admin.auth.admin.createUser({
@@ -70,26 +82,22 @@ async function generateRecoveryFragment(email: string): Promise<string> {
     );
   }
 
-  // L'action_link Supabase a la forme :
-  //   https://<site-url>/<path>#access_token=...&type=recovery&refresh_token=...
-  // On extrait juste le fragment pour pouvoir le coller derrière notre baseURL.
-  const hashIndex = actionLink.indexOf("#");
-  if (hashIndex < 0) {
-    throw new Error(`Aucun fragment dans l'action_link recovery : ${actionLink}`);
-  }
-  return actionLink.slice(hashIndex); // inclut le `#`
+  return actionLink;
 }
 
 test.describe("Flow recovery password — INC-2026-05-18-02", () => {
-  test("R1 — happy path : fragment recovery valide → /auth/update-password → /sourcing/ao-du-jour", async ({
+  test("R1 — happy path : action_link recovery → verify Supabase → /auth/update-password → /sourcing/ao-du-jour", async ({
     page,
   }) => {
     const email = `recovery-happy-${Date.now()}@alyosingenierie.fr`;
-    const fragment = await generateRecoveryFragment(email);
+    const actionLink = await generateRecoveryActionLink(email);
 
-    await page.goto(`/${fragment}`);
+    // Playwright suit l'action_link : Supabase exécute le verify côté serveur,
+    // pose les tokens dans un fragment, puis redirige vers `redirect_to`
+    // (notre baseURL). Une fois sur `/`, le RecoveryHashHandler embarqué
+    // consomme le fragment et redirige vers /auth/update-password.
+    await page.goto(actionLink);
 
-    // Le RecoveryHashHandler doit consommer le fragment et rediriger.
     await page.waitForURL(/\/auth\/update-password/, { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/auth\/update-password/);
 
