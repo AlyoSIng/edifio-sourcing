@@ -39,6 +39,12 @@ INSERT INTO organizations (id, name) VALUES
   ('00000000-0000-0000-0000-00000000000a', 'OrgA'),
   ('00000000-0000-0000-0000-00000000000b', 'OrgB');
 
+-- Stub auth.users (Supabase Auth absent en CI/dry-run, cf. workflow + script).
+-- La FK users.id -> auth.users(id) bloque l'insert public.users sinon.
+INSERT INTO auth.users (id, email) VALUES
+  ('11111111-1111-1111-1111-1111111111a1', 'alice@orga.test'),
+  ('22222222-2222-2222-2222-2222222222b2', 'bob@orgb.test');
+
 -- Cree 2 users
 INSERT INTO users (id, email) VALUES
   ('11111111-1111-1111-1111-1111111111a1', 'alice@orga.test'),

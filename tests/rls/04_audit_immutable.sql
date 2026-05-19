@@ -20,6 +20,9 @@ SET LOCAL row_security = off;
 -- Cree une org + un user + une ligne audit_logs
 INSERT INTO organizations (id, name) VALUES
   ('00000000-0000-0000-0000-00000000000c', 'OrgC-audit');
+-- Stub auth.users (Supabase Auth absent en CI/dry-run, cf. workflow + script).
+INSERT INTO auth.users (id, email) VALUES
+  ('33333333-3333-3333-3333-333333333333', 'admin-audit@orga.test');
 INSERT INTO users (id, email) VALUES
   ('33333333-3333-3333-3333-333333333333', 'admin-audit@orga.test');
 INSERT INTO memberships (organization_id, user_id, role) VALUES

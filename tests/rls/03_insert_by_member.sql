@@ -17,6 +17,11 @@ SELECT plan(4);
 SET LOCAL row_security = off;
 INSERT INTO organizations (id, name) VALUES
   ('00000000-0000-0000-0000-00000000000a', 'OrgA-insert-test');
+-- Stub auth.users (Supabase Auth absent en CI/dry-run, cf. workflow + script).
+INSERT INTO auth.users (id, email) VALUES
+  ('11111111-1111-1111-1111-1111111111a1', 'alice-admin@orga.test'),
+  ('11111111-1111-1111-1111-1111111111a2', 'bob-user@orga.test'),
+  ('11111111-1111-1111-1111-1111111111a3', 'carol-viewer@orga.test');
 INSERT INTO users (id, email) VALUES
   ('11111111-1111-1111-1111-1111111111a1', 'alice-admin@orga.test'),
   ('11111111-1111-1111-1111-1111111111a2', 'bob-user@orga.test'),
