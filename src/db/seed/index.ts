@@ -629,6 +629,20 @@ export async function runSeed(): Promise<SeedReport> {
     }
   }
 
+  // Stub auth.users -- en prod Supabase Auth peuple auth.users automatiquement
+  // (cascade depuis l'invitation user). En dev/CI on n'a pas Supabase Auth
+  // managed : le stub auth.users existe en CI (cf. db-rls.yml etape
+  // "Prepare Supabase auth schema stub") et en dry-run local (cf.
+  // scripts/db-dry-run.ps1), mais reste vide a ce stade. La FK
+  // users.id -> auth.users(id) posee par 0003_fk_supabase.sql bloque l'insert
+  // ci-dessous si auth.users n'a pas d'abord les memes UUID. On stub donc ici,
+  // exclusivement pour dev/CI (seed `JAMAIS sur prod` cf. CLAUDE.md).
+  for (const u of allUsers) {
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email) VALUES (${u.id}::uuid, ${u.email}) ON CONFLICT (id) DO NOTHING`,
+    );
+  }
+
   await db
     .insert(users)
     .values(
