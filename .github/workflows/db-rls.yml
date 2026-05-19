@@ -123,6 +123,26 @@ jobs:
       - name: Run migrations (extensions + drizzle)
         run: pnpm db:migrate
 
+      # Role non-superuser pour les tests pgTAP. pg_prove tourne par defaut en
+      # postgres (superuser -> bypass RLS inconditionnel en PG 15, meme avec
+      # FORCE ROW LEVEL SECURITY). On cree un role applicatif sans BYPASSRLS,
+      # et chaque test pgTAP fait `SET LOCAL ROLE test_authenticated` avant la
+      # phase d'assertion. Le setup data reste en superuser (bypass volontaire
+      # pour inserer les fixtures sans contraintes RLS).
+      - name: Create non-superuser role for RLS assertions
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -e
+          psql -h localhost -U postgres -d edifio_sourcing_test -v ON_ERROR_STOP=1 <<SQL
+          CREATE ROLE test_authenticated NOINHERIT NOLOGIN;
+          GRANT USAGE ON SCHEMA public, auth TO test_authenticated;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO test_authenticated;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO test_authenticated;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO test_authenticated;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO test_authenticated;
+          SQL
+
       # Seed dev/CI : 2 orgs + 200 tenders + ai_runs + brevo_messages + audit.
       # Pose la fixture BOAMP committee + assertions condition 2 ADR-013
       # (mediane raw_data 25 KB +/- tolerance). Le seed pgTAP isole ses propres

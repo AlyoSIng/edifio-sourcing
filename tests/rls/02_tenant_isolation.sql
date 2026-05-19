@@ -68,12 +68,16 @@ INSERT INTO architects (id, organization_id, firstname, lastname, email) VALUES
   ('bbbb2222-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Bob', 'Archi', 'bob.archi@orgb.test');
 
 -- Plateforme de reference (non multi-tenant) requise par tenders.platform_id.
+-- Code distinct du seed dev/CI pour eviter la collision UNIQUE
+-- platforms_code_unique (le seed insere deja code='boamp').
 INSERT INTO platforms (id, code, display_name, auth_type, base_url) VALUES
-  ('cccc0000-0000-0000-0000-000000000001', 'boamp', 'BOAMP', 'api_key', 'https://data.boamp.fr');
+  ('cccc0000-0000-0000-0000-000000000001', 'boamp_test', 'BOAMP (test)', 'api_key', 'https://data.boamp.fr');
 
 -- Prompt IA (non multi-tenant) requis par ai_runs.prompt_id (FK NOT NULL).
+-- Nom distinct du seed dev/CI pour eviter une eventuelle collision UNIQUE
+-- sur ai_prompts.name (par precaution, meme symptome que platforms.code).
 INSERT INTO ai_prompts (id, name, version, model, system_prompt, user_prompt_template) VALUES
-  ('dddd0000-0000-0000-0000-000000000001', 'tender_score_full', 1, 'sonnet-4-6', 'sys', 'usr');
+  ('dddd0000-0000-0000-0000-000000000001', 'tender_score_full_test', 1, 'sonnet-4-6', 'sys', 'usr');
 
 -- Donnees AO OrgA + OrgB
 INSERT INTO tenders (id, organization_id, external_ref, platform_id, title, buyer) VALUES
@@ -96,6 +100,11 @@ SELECT ok(true, 'OrgA + OrgB + memberships + architects + search_profiles + tend
 SELECT ok(true, 'donnees OrgB cloisonnees pour le test cross-tenant');
 
 -- ---- Simule un JWT pour Alice (OrgA admin) ---------------------------------
+-- Bascule sur role non-superuser pour que RLS s'applique reellement.
+-- Le setup ci-dessus tournait en postgres (bypass RLS) pour inserer les
+-- fixtures cross-tenant sans contraintes. A partir d'ici, on simule un
+-- vrai user applicatif et on verifie que RLS isole les donnees.
+SET LOCAL ROLE test_authenticated;
 SET LOCAL row_security = on;
 
 -- Faux JWT claims : app_metadata.organization_id = OrgA, role = admin.

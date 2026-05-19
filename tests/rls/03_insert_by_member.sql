@@ -31,6 +31,12 @@ INSERT INTO memberships (organization_id, user_id, role) VALUES
   ('00000000-0000-0000-0000-00000000000a', '11111111-1111-1111-1111-1111111111a2', 'user'),
   ('00000000-0000-0000-0000-00000000000a', '11111111-1111-1111-1111-1111111111a3', 'viewer');
 SET LOCAL row_security = on;
+-- Bascule sur role non-superuser : RLS s'applique reellement (sinon le
+-- superuser postgres bypass FORCE ROW LEVEL SECURITY en PG 15, ce qui ferait
+-- passer tests 1 et 2 (INSERT toujours OK) mais echouer tests 3 et 4 (le
+-- viewer reussit, l'admin cross-tenant heurte une FK 23503 au lieu d'une
+-- violation RLS 42501).
+SET LOCAL ROLE test_authenticated;
 
 -- 1. Admin : INSERT autorise
 SELECT set_config(
