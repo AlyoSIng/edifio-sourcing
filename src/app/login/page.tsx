@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { RecoveryHashHandler } from "@/components/auth/RecoveryHashHandler";
 import { EdifioLogo } from "@/components/EdifioLogo";
 
 import { LoginForm } from "./LoginForm";
@@ -25,6 +26,13 @@ export default function Login({ searchParams }: { searchParams?: { error?: strin
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-12">
+      {/*
+       * Embed `RecoveryHashHandler` ici aussi : Supabase Site URL peut être
+       * pointée sur `/login` selon la config Vercel, ou un user déjà connecté
+       * peut être redirigé sur cette page avec un fragment recovery résiduel.
+       * Cf. INC-2026-05-18-02.
+       */}
+      <RecoveryHashHandler />
       <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-8 shadow-sm">
         <div className="mb-6 flex justify-center">
           <EdifioLogo />

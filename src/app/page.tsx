@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { RecoveryHashHandler } from "@/components/auth/RecoveryHashHandler";
 import { EdifioLogo } from "@/components/EdifioLogo";
 
 /**
@@ -7,11 +8,18 @@ import { EdifioLogo } from "@/components/EdifioLogo";
  * Si l'utilisateur est connecté avec un email `@alyosingenierie.fr`,
  * le lien « Accéder à edifio Sourcing » pointe vers `/sourcing/ao-du-jour`
  * (protégé par le middleware).
+ *
+ * Embed `RecoveryHashHandler` : Supabase Site URL pointe par défaut sur `/`,
+ * donc les liens « Mot de passe oublié » arrivent sur cette page avec
+ * `#access_token=...&type=recovery` dans le fragment. Le composant Client
+ * détecte le fragment et redirige vers `/auth/update-password`. Silencieux
+ * pour les visites normales (rend `null`). Cf. INC-2026-05-18-02.
  */
 export default function Home() {
   const year = new Date().getFullYear();
   return (
     <main className="flex min-h-screen flex-col">
+      <RecoveryHashHandler />
       <header className="border-b border-neutral-200 px-8 py-6">
         <EdifioLogo />
       </header>

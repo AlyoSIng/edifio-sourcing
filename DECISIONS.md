@@ -635,4 +635,35 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-19 par [DEV Alex] — Fix pgTAP RLS PR #14 itération 2 (enum `platform_code` + policy `insert_by_member AS RESTRICTIVE`), commit suggéré prêt pour `ps_operator`.*
+## 2026-05-19 — Hotfix P0 INC-2026-05-18-02 — Routing recovery password
+
+- **2026-05-19 · INC-2026-05-18-02 · Routing recovery password — landing Server Component ignorait le fragment.** [INCIDENT SEV1 résolu]
+  *Diagnostic Board : le lien recovery Supabase atterrit sur `/#access_token=...&type=recovery&refresh_token=...` (Site URL pointée sur `/`). La landing `src/app/page.tsx` est un Server Component — le fragment d'URL n'est jamais envoyé au serveur, le navigateur seul peut l'extraire. Aucun Client Component n'inspectait `window.location.hash` sur cette page. Conséquence : le user reste sur la landing, ne peut jamais réinitialiser son mot de passe → onboarding utilisateurs réels bloqué.*
+
+- **2026-05-19 · DEV Alex · Fix — composant Client `RecoveryHashHandler` réutilisable + page `/auth/update-password`.** [LIVRABLE — branche `hotfix/auth-recovery-password`]
+  *Approche : ne pas toucher au `ClientCallbackHandler` existant (dédié au flow magic-link `/auth/callback`, redirige vers `/sourcing/ao-du-jour`). Création d'un composant séparé `src/components/auth/RecoveryHashHandler.tsx` (Client Component silencieux, rend `null` si pas de fragment `type=recovery`) embarqué sur `/` (landing) ET `/login` (au cas où Site URL change). Logique : `URLSearchParams(window.location.hash.slice(1))` → si `type === 'recovery'` + 2 tokens présents → `supabase.auth.setSession()` → `history.replaceState` (nettoyage URL) → `router.replace('/auth/update-password')`. Erreur → `/login?error=recovery_invalid`. `useRef` anti-double-exec Strict Mode (parité `ClientCallbackHandler`). Overlay « Redirection en cours… » pendant la phase processing (limite le clignotement landing).*
+
+- **2026-05-19 · DEV Alex · Nouvelle page `/auth/update-password` — formulaire `updateUser({ password })` client.** [LIVRABLE]
+  *`src/app/auth/update-password/page.tsx` (Server Component minimal — metadata + layout calqué sur `/login`) + `src/app/auth/update-password/UpdatePasswordForm.tsx` (Client Component). Pas de Server Action : la session vient d'être posée côté client par `setSession`, `updateUser` consomme directement le cookie. Validation client : min 16 caractères + ≥ 1 majuscule + ≥ 1 minuscule + ≥ 1 chiffre + ≥ 1 caractère spécial (conforme CLAUDE.md « Décisions d'architecture 2026-05-10 » Q2/B, BOARD-OK). Helper `validatePassword(password, confirmation)` pur testable hors React. Erreurs Supabase localisées FR via `mapSupabaseError` (session expirée, mot de passe identique à l'ancien, refus weak password).*
+
+- **2026-05-19 · DEV Alex · Choix de redirect post-update : `/sourcing/ao-du-jour` (pas `/dashboard`).** [DÉCISION DEV à arbitrer Board]
+  *Le brief Board mentionnait `/dashboard` mais cette route n'existe pas dans le repo. Choix par cohérence avec le CTA principal de la landing et avec `ClientCallbackHandler` magic-link (même cible). À arbitrer par le Board si une autre destination est souhaitée (ex. page de confirmation dédiée « Mot de passe mis à jour »). Note de suivi `CC_260519_1915_HOTFIX_RECOVERY_PASSWORD.md` flag explicite.*
+
+- **2026-05-19 · DEV Alex · Test E2E `e2e/auth-recovery.spec.ts` — 3 scénarios.** [LIVRABLE]
+  *R1 happy path : `auth.admin.generateLink({ type: 'recovery' })` → extraction du fragment → `page.goto('/<fragment>')` → assertion redirect `/auth/update-password` → submit formulaire valide → assertion redirect `/sourcing/ao-du-jour`. R2 hash invalide : tokens factices → assertion redirect `/login?error=recovery_invalid`. R3 visite normale : `/` sans fragment → assertion landing visible + overlay absent. Helper inline (pas de factorisation avec `e2e/helpers/auth.ts` qui est dédié magic-link). Mêmes prérequis env vars que `middleware-domain.spec.ts`. Non exécuté localement (dépend d'un projet Supabase live) — sera couvert par le pipeline CI.*
+
+- **2026-05-19 · DEV Alex · Référence pivot auth 2026-05-10.** [TRACE]
+  *Le pivot auth « email + password durable au lieu de magic-link » (entrée 2026-05-10, BOARD-OK) impliquait nativement un flow recovery — Supabase reset password est le pattern standard pour ce type d'auth. L'incident INC-2026-05-18-02 révèle que la chaîne complète n'avait jamais été testée bout-en-bout sur le déploiement Vercel (le flow recovery a été configuré côté Supabase Custom SMTP le 2026-05-14, cf. INC-2026-05-14-01 sur le bug `https://https://`). Le présent hotfix complète cette chaîne côté front.*
+
+- **2026-05-19 · DEV Alex · Validation locale verte.** [VÉRIFICATION]
+  *`tsc --noEmit` = 0 erreur. `next lint` = aucun warning ni erreur. `vitest run` = 108 tests / 5 fichiers tous PASS (pas de nouveau test unitaire vitest dans ce hotfix — la validation `validatePassword` est testable mais reportée à une PR de hardening pour ne pas étendre le scope du hotfix). `next build` = succès, route `/auth/update-password` (1.72 kB) listée. E2E Playwright non exécuté en local (dépend du projet Supabase live + service role) — couvert en CI. Pas de migration BDD touchée → dry-run DB non applicable.*
+
+- **2026-05-19 · DEV Alex · Pas de touche au `ClientCallbackHandler` magic-link existant.** [TRACE]
+  *Décision délibérée : `src/app/auth/callback/ClientCallbackHandler.tsx` est inchangé. Le facteur commun (lire le hash, appeler `setSession`, gérer erreur, nettoyer URL) aurait pu être extrait dans un hook partagé, mais la divergence des branches (`type=recovery` → update-password vs implicit flow magic-link → cible dynamique `next`) + le risque de régression sur le magic-link (toujours utilisé par les helpers E2E `signInWith` qui doivent passer C1-C12 du middleware domaine) ont motivé la séparation. Refactor possible Phase 2 si un 3e handler apparaît.*
+
+- **2026-05-19 · DEV Alex · Fichiers modifiés / créés (6 fichiers, edits non stagés).** [LIVRABLE]
+  *Créés : `src/components/auth/RecoveryHashHandler.tsx`, `src/app/auth/update-password/page.tsx`, `src/app/auth/update-password/UpdatePasswordForm.tsx`, `e2e/auth-recovery.spec.ts`, `notes-de-suivi/CC_260519_1915_HOTFIX_RECOVERY_PASSWORD.md`. Modifiés : `src/app/page.tsx` (embed handler), `src/app/login/page.tsx` (embed handler), `DECISIONS.md` (cette entrée). Pas de drizzle-kit generate (aucune migration BDD). Prêt pour commit + push par `ps_operator` Yann sur la branche `hotfix/auth-recovery-password`.*
+
+---
+
+*Dernière mise à jour : 2026-05-19 par [DEV Alex] — Hotfix P0 INC-2026-05-18-02 (routing recovery password), commit suggéré prêt pour `ps_operator`.*
