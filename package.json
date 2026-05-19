@@ -28,6 +28,7 @@
     "db:seed": "tsx src/db/seed/index.ts",
     "db:reset": "tsx src/db/seed/reset.ts",
     "db:fetch-boamp": "tsx src/db/seed/fetch-boamp-fixture.ts",
+    "db:dry-run": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/db-dry-run.ps1",
     "prepare": "husky"
   },
   "dependencies": {
