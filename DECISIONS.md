@@ -638,110 +638,49 @@
 
 ---
 
-## 2026-05-20 — PR #2 module sourcing engine — finitions CTO (CTO-1 + CTO-2 + CTO-3)
+## 2026-05-18 — Batch n°14 — Merges finaux : PR #7, #14, #16 + clôture PR #15
 
-- **2026-05-20 · DEV Alex · CTO-1 livré : test pgTAP 07 re-source préserve `status='selected_solo'`.** [LIVRABLE]
-  *Belt and suspenders demandé par CTO : prouver par le test que la politique re-source conservatrice (insert.ts ne touche QUE `raw_data` + `updated_at`) ne ramène PAS un AO post-sélection à `sourced`. Nouveau fichier `tests/rls/07_tenders_resource_status_preservation.sql` (6 assertions) : INSERT initial → UPDATE manuel `status='selected_solo'` + `score=87` → 2e INSERT idempotent connecteur (`score=0`, `status='sourced'`, `matching_profile_id=NULL`). Asserts : 1 seule ligne, status PRESERVE `selected_solo`, `matching_profile_id` préservé, `score=87` préservé, `raw_data` mis à jour (version=2), `updated_at > created_at`. Convention nommage alignée sur fichier 05.*
+- **2026-05-18 · BOARD · PR #7 `feat(auth): pivot email+password durable + ajustements Board Q1-Q4` mergée.** [BOARD-OK]
+  *18 tasks. Implémente ADR-011 (auth password durable + flow recovery par régénération de mot de passe provisoire Resend). Mergée 2026-05-18. `main` a désormais l'auth complète email+password + le flow recovery durable.*
 
-- **2026-05-20 · DEV Alex · CTO-2 livré : structured `console.error` + TODO Sentry sur échecs audit.** [LIVRABLE]
-  *Verdict CTO : swallow silencieux risqué, alerte obligatoire. Audit du repo : aucun `@sentry/nextjs`, aucun `sentry.config.*`, aucun `instrumentation.ts` → fallback `console.error` structuré (JSON-parsable Vercel logs). Nouveau helper interne `reportAuditFailure(err, ctx)` qui logge `[audit] failed to write audit_logs` + payload `{action, actor_id, organization_id, subject_type, subject_id, error}`. Helper `serializeError()` extrait props non-énumérables des `Error` (préserve `code`, `hint`, `details` Supabase). JSDoc en-tête + commentaire `reportAuditFailure` documentent la convention Sentry future (`tags: { audit_action, audit_failed: true }`, `contexts: { audit: ctx }`) — ticket follow-up Gate 8. Comportement `NODE_ENV=test` inchangé (throw pour visibilité régressions). 2 tests vitest ajoutés couvrant prod : (1) erreur INSERT Supabase structurée → shape JSON OK, JSON.stringify safe, (2) exception inattendue rejet driver → Error sérialisée avec name/message/stack.*
+- **2026-05-18 · DEV Alex · PR #15 `fix(auth): routing recovery password` FERMÉE sans merge — superédée par ADR-011 / PR #7.** [DÉCISION DEV — justifiée]
+  *Alex a ouvert PR #15 comme hotfix rapide (lecture `window.location.hash` + page `/auth/update-password` dédiée + setSession client). Puis a réalisé que cette approche est INCOMPATIBLE avec ADR-011 (déjà actée Cowork 2026-05-15, implémentée PR #7). ADR-011 abandonne le fragment URL au profit d'une régénération de mot de passe provisoire (pattern invitation admin + Resend variant=reset), précisément parce que le scanner email AlyoS consomme les tokens recovery Supabase. Alex a fermé PR #15 avec un commentaire détaillé expliquant l'incompatibilité. Bonne décision — la solution ADR-011 est la durable. INC-2026-05-18-02 résolu via PR #7 (pas via PR #15).*
 
-- **2026-05-20 · CTO Sophie · CTO-3 NO_OP confirmé : pas de câblage audit sur sourcing BOAMP.** [DÉCISION CTO]
-  *Initialement envisagé sur `insertTender` comme 1er event audit de l'application. CTO a tranché H3 : un sourcing automatique BOAMP n'est PAS une action auditable (pas d'acteur user = action système), distinction `audit_logs` (13 actions user attribuables) vs `tender_events` (journal métier AO). Le helper audit reste fondation structurelle, exercé end-to-end par la 1re vraie action user (A1 `login` ou A4 `tender_select` quand UI sélection). Émission d'un row `tender_events.event_type='sourced'` reportée à une PR timeline ultérieure (non-bloquant PR #2). Spec audit reste figée à 13 actions, aucune modification de `audit_log_v1.md`.*
+- **2026-05-18 · BOARD · PR #16 `feat(sourcing): connecteur BOAMP API + normalize + insert + audit helper + seed ai_prompts` mergée.** [BOARD-OK]
+  *7 étapes + 3 follow-ups CTO (re-source conservatrice, audit non-throw, H3 tender_events au lieu d'audit). CI verte. Mergée 2026-05-18. `main` a désormais le 1er connecteur sourcing opérationnel (BOAMP API Opendatasoft).*
 
-- **2026-05-20 · DEV Alex · Statut validation locale.** [VALIDATION]
-  *`pnpm tsc --noEmit` vert, `pnpm test src/lib/audit src/lib/sourcing` vert (incl. 2 nouveaux cas CTO-2), `pnpm test:rls` vert (07 ajouté), `pnpm db:dry-run` vert, `pnpm prettier --check` + `pnpm lint` verts sur fichiers modifiés. Pas de commit/push côté Alex — Yann (ps_operator) reprend la main pour `git add` + Conventional Commit `test(rls): preuve preservation status post-sourcing` + `feat(audit): structured error reporting + TODO Sentry` + `docs(decisions): trace CTO-1/CTO-2/CTO-3 PR #2`.*
+- **2026-05-18 · CTO Sophie · INC-2026-05-18-02 (routing recovery) — RÉSOLU via ADR-011 / PR #7.** [INCIDENT CLOS]
+  *Le flow recovery durable est en prod : « Mot de passe oublié » → régénération mot de passe provisoire 24h → envoi Resend → login avec provisoire → force-change first-login. À re-tester par le Board pour confirmation finale. Note : le workaround SQL Editor reste documenté pour les cas d'urgence admin.*
 
-### Cleanup Vercel — alias production `edifio-platform.vercel.app` retiré
-
-- **2026-05-20 · PS_OPERATOR Yann · Cleanup vestige Vercel post-pivot 2026-05-10.** [LIVRABLE — exécuté dashboard]
-  *Suite au pivot `edifio-platform` → `edifio-sourcing` (2026-05-10), le projet Vercel avait été renommé `edifio-sourcing` (repo connecté `AlyoSIng/edifio-sourcing`, production branch `main`) mais l'alias production était resté `edifio-platform.vercel.app` (vestige de l'ancien nom de marque). Steve a exécuté la séquence safe A→B→C→D dans le dashboard Vercel : (A) ajout alias `edifio-sourcing.vercel.app`, (B) promotion `edifio-sourcing.vercel.app` en domaine production, (C) suppression alias `edifio-platform.vercel.app`, (D) vérification env vars Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) toujours en place. État après : URL production stable `https://edifio-sourcing.vercel.app`, aucune interruption prod (add → promote → remove), env vars Supabase intactes.*
-
-- **2026-05-20 · BOARD · Custom domain reporté en Gate 7.** [REPORTÉ]
-  *Arbitrage Board à venir entre `sourcing.alyosingenierie.fr` et `app.alyosingenierie.fr/sourcing` (cf. CLAUDE.md « Déploiement Vercel »). Non bloquant : URL `edifio-sourcing.vercel.app` suffit pour les tests internes AlyoS jusqu'à Gate 7.*
+- **2026-05-18 · CEO Marc · État `main` après les merges du jour.** [JALON]
+  *`main` contient : schema Drizzle v1 (22+ tables) + RLS 20 policies + seed 200 AO BOAMP + connecteur BOAMP opérationnel + auth email+password durable + flow recovery ADR-011 + design ADR-011/012 + container Fly.io EU. 0 PR ouverte. Module sourcing engine : couche données + 1er connecteur faits. Prochaine étape : PR #3 scoring V1 + cron Vercel (brief en cours de rédaction Cowork).*
 
 ---
 
-*Dernière mise à jour : 2026-05-20 par [PS_OPERATOR Yann] — Cleanup Vercel exécuté (alias `edifio-platform.vercel.app` retiré, URL prod stable `edifio-sourcing.vercel.app`) ; custom domain reporté Gate 7.*
+*Dernière mise à jour : 2026-05-18 par [CEO Marc] — Merges PR #7/#14/#16, clôture PR #15 (superédée ADR-011), INC recovery résolu, jalon main documenté.*
 
 ---
 
-## 2026-05-20 — Merge `feat/sourcing-mvp` → `feat/auth-password-pivot`
+## 2026-05-20 — PR #3 scoring V1 + cron Vercel *(branche `feat/sourcing-scoring-cron`)*
 
-- **2026-05-20 · DEV Alex · Résolution des 5 conflits du merge `feat/sourcing-mvp` → `feat/auth-password-pivot`.** [LIVRABLE]
-  *Branche `feat/auth-password-pivot` absorbe l'intégralité du travail Drizzle (ORM acté 2026-05-18 + schema 22+ tables + RLS FORCE 12 policies + seed 2 orgs Opendatasoft réel + 6 fix CI pgTAP). 5 conflits résolus tous en faveur de MERGE_HEAD (sourcing-mvp) car la branche auth-pivot était figée pré-décision ORM : (1) `CLAUDE.md` état ORM → « ACTÉ Drizzle » + 1re PR module sourcing engine ; (2) `DECISIONS.md` ajout batch n°11 ORM + 6 dérives pgTAP + verdict CTO ADR-013 ; (3) `package.json` `tsx: 4.22.1` pinné (cohérent avec drizzle-kit/zod/faker pinnés exacts) ; (4) `pnpm-workspace.yaml` `esbuild: false` (cohérent avec le commentaire arbitrage CTO 2026-05-18) ; (5) `pnpm-lock.yaml` `git checkout --theirs` + `pnpm install --frozen-lockfile` clean (35 packages resolved, 3 downloads). Validation locale verte : `tsc --noEmit` = 0 erreur, `next lint` = 0 warning, `vitest run` = 206 tests / 13 fichiers PASS. Pas de DDL touchée par la résolution → pas de dry-run Postgres nécessaire (memory `feedback-postgres-dry-run-local` non déclenchée). Commit de merge par [PS_OPERATOR Yann].*
+- **2026-05-20 · G6 · Board + Alex · Scoring V1 = règles pures (sans IA Haiku), barème spec §3.6 intact.** [BOARD-OK 2026-05-20]
+  *Barème additif : base 50 + 20 (exact match `keywords.exact`) + 10 par positif matché (cumulable) + 15 (CPV exact, pas préfixe) → clamp [0, 100]. Choix V1 = règles seules, déterministes, explicables. Le scoring complémentaire Haiku 4.5 décrit en spec §3.6 (`score_final = (rules + ai) / 2`) est reporté à une PR dédiée (dépend des prompts versionnés `ai_prompt_versions` + branche audit `ai_run`).*
 
----
+- **2026-05-20 · G6 · Board + Alex · Pas de seuil d'insertion sur le score en PR #3 (insert exhaustif).** [BOARD-OK 2026-05-20]
+  *Tout AO qui passe `filter.matchesProfile` est inséré, peu importe le score (un AO base 50 sans bonus reste inséré). Traçabilité totale en BDD. Seuil de notification user (≥ 60 envisagé) sera traité dans la PR push notifications Realtime — il s'agit d'un filtre UI/notif, pas d'un filtre persistance.*
 
----
+- **2026-05-20 · G6 · Board + Alex · Cron Vercel = `30 4 * * 1-5` UTC = 6h30 Europe/Paris (CEST été) / 5h30 (CET hiver).** [BOARD-OK 2026-05-20]
+  *Vercel cron tourne en UTC. Choix d'aligner sur l'heure d'été (mai-octobre) car période active courante (2026-05-20). En hiver, le cron tournera à 5h30 Paris — toujours avant l'arrivée de l'équipe. À ré-ajuster si l'usage glisse vers un besoin temps réel (cf. backlog Phase 2 : cron multiples par profil selon `search_profiles.cron_time`).*
 
-## 2026-05-20 — Audit log post-ORM : stubs admin/users branchés sur Drizzle
+- **2026-05-20 · G6 · Alex · Dédup intra-batch + hash composite SHA-256 sur `(buyer_norm | title_norm[:100] | deadline_jour_UTC)`.** [TECHNIQUE]
+  *Implémente spec §3.4. Politique : première occurrence rencontrée gagne (stable, ordre préservé). Cross-plateforme effectif quand PR scrapers PLACE/FM/MP livreront leur batch en parallèle. En PR #3 (BOAMP seul) la dédup retire les doublons internes BOAMP (cas rare mais possible).*
 
-- **2026-05-20 · DEV Alex · Helper `insertAuditLog` créé + 2 routes admin branchées sur `audit_logs` Drizzle.** [LIVRABLE]
-  *Le merge `feat/sourcing-mvp` → `feat/auth-password-pivot` a rendu Drizzle + table `audit_logs` disponibles. Les 2 stubs `console.warn("[audit_log:user_invited]")` et `console.warn("[audit_log:user_provisional_regenerated]")` (cf. TODO post-ORM dans `src/app/api/admin/users/route.ts:146` et `[id]/regenerate-password/route.ts:148`) deviennent de vrais INSERT immutables, traçables sur 5 ans (rétention Gate 5).*
-  *3 fichiers livrés : (a) `src/lib/audit/insert.ts` — helper avec 4 invariants documentés (audit ≠ correctness, snapshot acteur, pas de secret en payload, org via memberships). Catch-no-throw : un échec d'INSERT log un `console.error` mais ne casse jamais la business logic (création user, regen, sollicitation, etc.). (b) `tests/unit/lib/audit/insert.test.ts` — 5 tests vitest couvrant le happy path, l'extraction IP/UA, le skip no-membership, le catch-no-throw, le subject optionnel. Mocks `vi.mock` sur `@/db/client`, `@/db/schema`, `drizzle-orm`. (c) Les 2 routes admin appellent désormais `insertAuditLog({...})` avec mapping sémantique cohérent (cf. décision ci-dessous).*
-  *Validation locale verte : `tsc --noEmit` = 0 erreur, `next lint` = 0 warning, `vitest run` = **211 tests / 14 fichiers PASS** (+5 nouveaux tests, +1 nouveau fichier vs `54bf7df`).*
+- **2026-05-20 · G6 · Alex · Périmètre PR #3 *(rappel hors scope)*.**
+  *Inclus : BOAMP (API ouverte) + normalize + dedup + filter §3.5 + scoring V1 §3.6 + insert idempotent + cron `30 4 * * 1-5` UTC + `CRON_SECRET` Bearer auth + route `POST /api/cron/sourcing-run`. **Exclus** (PRs futures) : connecteurs PLACE/Francmarchés/MP.info via container Fly.io, scoring IA Haiku, push notifications Realtime, branche audit log `cron_run` (l'enum `audit_action` ne contient pas encore cette valeur — trace métier via `console.log` structuré Vercel logs en V1).*
 
-- **2026-05-20 · DEV Alex · Mapping `user_invited` → A2 `membership_change` `operation: "invite"`.** [DÉCISION DEV]
-  *L'action « invitation user » s'inscrit dans le lifecycle d'un membership — A2 (`membership_change`) couvre déjà ce cas par design (`operation` ∈ `invite | update | revoke` dans `audit_log_v1.md:60` + `AuditLogDataMembershipChange` dans `jsonb.ts:231`). Aucun amendement spec/enum nécessaire. INSERT branché direct.*
-
-- **2026-05-20 · DEV Alex · Extension `operation` A2 → `regenerate_provisional` (option B).** [AMENDEMENT SPEC — VALIDATION CTO ATTENDUE]
-  *L'action « regen mot de passe provisoire » (`POST /api/admin/users/[id]/regenerate-password`, bouton « Renvoyer » Board Q1/A.3 2026-05-12) ne map sur **aucune** des 13 actions Gate 5. 3 options identifiées dans `handoff/REQUEST_260520_1700_ETENDRE_A2_OPERATION_REGEN.md` : (A) garder `console.warn` conservatif, (B) étendre `operation` A2 (membership lifecycle), (C) nouvel enum value + ADR-014. **Option B retenue** (validation Steve 2026-05-20) — l'extension est sémantiquement cohérente avec A2 (admin reprovisionne l'accès d'un user existant, `from_role === to_role`), n'exige pas de migration BDD (le pgEnum `audit_action` reste à 13 valeurs), trace minimale (`jsonb.ts:236` + 1 paragraphe `audit_log_v1.md`). Validation CTO Sophie attendue — handoff dédié posté.*
-
-- **2026-05-20 · DEV Alex · TODO suivant (hors scope ce commit).** [PROCHAINE ÉTAPE]
-  *Les autres `console.warn("[audit_log:...]")` du code (s'il en reste après ce passage) sont à brancher via le même `insertAuditLog` au fil des PR à venir : login (A1), `dossier_diffuse` (A6), `architect_solicit` (A5), `tender_select` (A4), `architect_change` (A9), etc. Le helper est conçu pour être réutilisé sans modification — chaque action branche son payload typé via la discriminée `AuditLogData`.*
+- **2026-05-20 · G6 · Alex · Tests PR #3 : 61 tests Vitest (filter 15 / dedup 17 / scoring 14 / orchestrator 8 / route 7).** [LIVRABLE]
+  *Total suite globale : 396/396 verts. TS strict OK, ESLint OK, `next build` env-clean OK (route `/api/cron/sourcing-run` reconnue dynamique). Aucun test E2E Playwright en PR #3 — le scénario S1.1 de `plan_recette_gate7_v1.md` (cron sourcing → 7 AO retenus) restera à câbler quand l'env Supabase test sera disponible (Gate 7).*
 
 ---
 
----
-
-## 2026-05-20 — Fix CI build : lazy init du client Drizzle (régression `6f19c1d`)
-
-- **2026-05-20 · DEV Alex · Refactor `src/db/client.ts` en lazy init via Proxy.** [FIX CI + RÉGRESSION POST-MORTEM]
-  *Le commit `6f19c1d` (audit log post-ORM) a cassé `ci-build` + `ci-e2e` sur le run `26172408907` avec `Failed to collect page data for /api/admin/users` → `Error: DATABASE_URL is not set`. **Cause racine** : avant ce commit, les 2 routes admin user lifecycle ne tiraient AUCUN code Drizzle. En branchant `insertAuditLog`, elles ont commencé à importer `@/db/client` qui faisait `process.env.DATABASE_URL` + `throw` au top-level du module. Quand `next build` collecte la page data des routes API, il importe chaque module → throw → fail. Le job `ci-build` n'a pas `DATABASE_URL` dans son `env:` (et n'a aucune raison de l'avoir, le build n'a pas besoin de DB).*
-  ***Fix retenu** : Proxy lazy sur l'export `db`. La validation `DATABASE_URL` + l'appel `postgres()` sont différés au premier accès `db.*`. Le module s'importe sans side effect, `next build` passe, et l'invariant catch-no-throw d'`insertAuditLog` absorbe gracieusement le cas runtime où la DB serait absente (CI e2e qui n'a pas `DATABASE_URL` non plus → SELECT échoue → catch logge l'erreur → route continue). 8e dérive CI consécutive sur la 1re semaine ORM (les 7 précédentes étant côté Postgres pur — pgtap host, pgtap container, NOW() index, auth.jwt() stub, auth.users seed, superuser bypass + collision seed, enum + PERMISSIVE OR'd). Première fois côté Next.js build.*
-  ***Vérification locale ré-jouant la condition CI** : `Remove-Item Env:\DATABASE_URL; .\node_modules\.bin\next build` → ✅ collecte les 15 pages dont les 2 routes admin sans throw. Avant ce fix, échec identique au log CI. Tests vitest restent 14/211 verts. Aucun changement de schéma — le pattern Proxy est documenté Next.js et largement éprouvé pour ce type de singleton serveur. Pas de revue CTO Sophie requise (infra client, hors schéma).*
-  *Recommandation pour memory `feedback-postgres-dry-run-local` : ajouter une note « tout import de `@/db/client` dans une route API doit être testé via `next build` SANS `DATABASE_URL` avant push, car les jobs CI build n'ont pas la var ». Le dry-run Postgres ne couvre pas ce cas — c'est un dry-run Next.js qu'il faut.*
-
----
-
----
-
-## 2026-05-20 — Validation CTO Sophie : option B (extension A2 `operation`) actée
-
-- **2026-05-20 · CTO Sophie · Option B validée — extension `AuditLogDataMembershipChange.operation` à `regenerate_provisional`.** [DÉCISION CTO]
-  *Validation après sync Cowork 2026-05-20 — réponse formalisée dans `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`. L'action « regen mot de passe provisoire » est sémantiquement un événement de lifecycle membership (admin reprovisionne l'accès d'un user existant sans changer son rôle) et s'inscrit naturellement dans A2. Options A (`console.warn` seul) et C (nouvel enum + ADR-014) explicitement rejetées : (A) faible sur l'esprit Gate 5 vu l'invariant « jamais le password en clair » Board Q1/B 2026-05-12 qui implique de tracer au moins l'événement ; (C) surdimensionnée — fragmente la sémantique de A2 pour un sous-cas, sans gain (YAGNI).*
-  *Conventions confirmées : (1) `from_role === to_role` quand `operation === "regenerate_provisional"` (pas de changement de rôle, juste rotation du credential), (2) password régénéré hors payload (invariant `password-server.ts`), (3) pas de migration BDD (le pgEnum `audit_action` reste à 13 valeurs). Aucune action ouverte supplémentaire — handoff clos.*
-
-- **2026-05-20 · DEV Alex · Cleanup des 2 références « validation attendue » → « validée CTO Sophie 2026-05-20 ».** [LIVRABLE EXÉCUTION]
-  *3 fichiers mis à jour : (a) `src/db/types/jsonb.ts:240` JSDoc — pointage `REQUEST_*` → `ANSWER_*` + convention `from_role === to_role` codifiée. (b) `specs/audit_log_v1.md` paragraphe amendement — mention « validation requise » → « validée CTO Sophie 2026-05-20 ». (c) `src/app/api/admin/users/[id]/regenerate-password/route.ts:147` commentaire — idem. Pas de changement de code applicatif — purement traçabilité documentaire.*
-
----
-
-*Dernière mise à jour : 2026-05-20 par [CTO Sophie] (via [Board chair Steve]) — Option B (extension A2.operation) actée et tracée. Handoff `REQUEST_260520_1700` clos par `ANSWER_260520_1810`.*
-
----
-
-## 2026-05-20 — PR #16 retarget main + résolution conflit helper audit dupliqué
-
-- **2026-05-20 · DEV Alex · PR #16 (BOAMP connector) retargetée `feat/sourcing-mvp` → `main`.** [LIVRABLE]
-  *Après merge PR #7 dans `main` (auth + ORM + sourcing-mvp + audit log post-ORM), la base de PR #16 devenait stale. Retarget mécanique via `gh pr edit 16 --base main`. Révélation immédiate : `mergeStateStatus` passe CLEAN → **DIRTY/CONFLICTING**.*
-
-- **2026-05-20 · DEV Alex · Refactor : adoption du helper `audit()` canonique de PR #16 + drop du mien.** [LIVRABLE]
-  *Diagnostic des conflits : `DECISIONS.md` (concaténation chronologique simple, deux histoires disjointes : HEAD = INC-2026-05-18-02 + PR #2 finitions CTO + Vercel cleanup ; main = session du jour). Mais surtout, **2 helpers audit concurrents** sur la même PR :*
-  *- **Mon `src/lib/audit/insert.ts`** (session du jour, commit `6f19c1d`) : simple, basic, vérifie org via SELECT memberships, catch-no-throw, 5 tests vitest.*
-  *- **Leur `src/lib/audit/index.ts`** (commit `4c9aebc` PR #16 + finitions CTO-2 `5c8e907`) : Zod validation par action (`AUDIT_SCHEMAS[action].parse`), Sentry-ready avec `reportAuditFailure()` structuré (verdict CTO-2 2026-05-19), `serializeError()` qui préserve `code`/`hint`/`details` Supabase, lecture session via `app_metadata.organization_id` direct (plus rapide que ma requête memberships), test escape hatch `NODE_ENV === 'test'`, framework de schémas A1-A13 avec placeholders.*
-  *Verdict pragmatique : **leur helper est BEAUCOUP plus mature**. Drop du mien + `tests/unit/lib/audit/insert.test.ts` (5 tests devenus redondants). Re-écriture des 2 routes admin (`POST /api/admin/users` + `POST /api/admin/users/[id]/regenerate-password`) pour appeler `audit({action, data, subjectType, subjectId, request})` au lieu de `insertAuditLog({req, action, actor, subject, data})`. Sémantique préservée — le mapping A2 `membership_change` + `from_role === to_role` pour `regenerate_provisional` reste identique.*
-
-- **2026-05-20 · DEV Alex · A2 `membershipChangeSchema` rempli (placeholder → STRICT).** [LIVRABLE]
-  *Leur `schemas.ts` marquait A2 en `TODO: implémenter à la PR admin /sourcing/admin/users (CRUD memberships)` — la PR admin était la mienne (PR #7), donc je remplis le placeholder dans le merge : schema Zod strict avec 5 champs (`target_user_id` UUID, `target_email` regex email, `from_role`/`to_role` optionnels enum `admin|user|viewer`, `operation` enum 4 valeurs incluant `regenerate_provisional` validé CTO Sophie 2026-05-20). Regex UUID inline (8-4-4-4-12 hex) plutôt qu'import de `UUID_SHAPE` qui est déclaré plus bas dans le même fichier (TDZ-safe). 8 nouveaux tests vitest pour A2 STRICT couvrant les 4 operations + 4 cas de rejet (operation hors enum, UUID invalide, email invalide, role hors enum membership_role). `membership_change` retiré de la liste `PLACEHOLDER_ACTIONS` (passe de 12 à 11 actions placeholder).*
-
-- **2026-05-20 · DEV Alex · Validation locale verte avant push.** [VÉRIFICATION]
-  *`tsc --noEmit` = 0 erreur. `next lint` = 0 warning. `vitest run` = **335 tests / 20 fichiers PASS** (+8 A2 strict, -2 placeholders A2 obsolètes vs HEAD boamp pré-merge). `next build` SANS `DATABASE_URL` = 15 pages collectées (memory `feedback-nextjs-build-env-clean` respectée — le Proxy lazy de `db/client.ts` mergé fait son job sur les routes admin + nouvelles routes sourcing de PR #16). Aucune DDL touchée → pas de dry-run Postgres (memory `feedback-postgres-dry-run-local` non déclenchée).*
-
-- **2026-05-20 · DEV Alex · PR #16 redevient MERGEABLE après ce commit de merge.** [PROCHAINE ÉTAPE]
-  *Après push du merge `origin/main` → `feat/sourcing-boamp-connector` avec résolution conflit, `gh pr view 16` doit repasser `mergeStateStatus: CLEAN`. PR #16 redevient prête pour review CTO finale + merge à `main` (action ouverte côté Steve / CTO Sophie pour quand le sourcing engine doit landed en prod).*
-
----
-
-*Dernière mise à jour : 2026-05-20 par [DEV Alex] — PR #16 retarget main + résolution conflit helper audit dupliqué (adoption helper canonique boamp + drop helper insert.ts + A2 placeholder rempli STRICT).*
+*Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — PR #3 scoring V1 + cron Vercel livrée sur branche `feat/sourcing-scoring-cron` (61 tests verts, 396/396 suite globale).*
