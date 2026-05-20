@@ -701,3 +701,17 @@
 ---
 
 *Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — Hotfix cron Vercel (GET handler + schedule `30 6` UTC) sur branche `feat/sourcing-scoring-cron`.*
+
+---
+
+## 2026-05-20 — PR `fix/cron-schedule-paris` — Retour cron à 6h30 Paris (`30 4` UTC)
+
+- **2026-05-20 · G6 · Board · Cron Vercel = `30 4 * * 1-5` UTC = 6h30 Europe/Paris (CEST été) / 5h30 (CET hiver).** [BOARD-OK 2026-05-20] [SURCLASSE l'entrée hotfix précédente `30 6`]
+  *Décision Board en révision de l'hotfix `30 6` mergé via PR #18 (commit `f0e06c5`). Cible métier confirmée : **6h30 heure de Paris**, pas 8h30. **Note technique fuseau (importante pour toute évolution future du schedule)** : Vercel cron tourne en UTC fixe et **ne gère pas le DST** (Daylight Saving Time). L'offset UTC est figé une fois posé. Conséquence : `30 4` UTC = 6h30 Paris en été (CEST = UTC+2) / 5h30 Paris en hiver (CET = UTC+1). Pas de bascule automatique. Trade-off accepté : l'heure d'hiver dérive de 1 h plus tôt, **toujours avant l'arrivée équipe** (9h) — l'AO du jour reste prêt à consultation pour Sandrine. Si l'usage glisse vers un besoin d'horaire strictement constant côté Paris, voir backlog Phase 2 : passer à un cron Supabase pg_cron (qui supporte les fuseaux) ou ajouter un offset DST dans `search_profiles.cron_time` exploité par un dispatcher d'orchestration interne.*
+
+- **2026-05-20 · G6 · Alex · One-liner `vercel.json` `30 6` → `30 4` + cohérence JSDoc `route.ts` + nouvelle entrée DECISIONS.md.** [LIVRABLE]
+  *Aucun changement de logique métier (le handler GET / POST + auth Bearer reste identique). Tests inchangés, 400/400 verts. Branche dédiée `fix/cron-schedule-paris` depuis `main` post-merge PR #18, ouvre une PR mince vers `main`.*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — Retour cron `30 4` UTC (= 6h30 Paris été) sur branche `fix/cron-schedule-paris` depuis `main`.*
