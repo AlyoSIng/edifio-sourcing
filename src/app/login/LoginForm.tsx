@@ -1,37 +1,47 @@
 "use client";
 
+import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 
-import { signInWithOtpAction } from "./actions";
+import { formatCountdownMinSec } from "@/lib/auth/password";
+
+import { signInWithPasswordAction } from "./actions";
 import { initialLoginState, type LoginState } from "./types";
+import { useCountdown } from "./useCountdown";
 
 /**
- * Composant client — formulaire de connexion magic-link.
+ * Formulaire de connexion — email + password (pivot Board 2026-05-11).
  *
- * Wraps la Server Action `signInWithOtpAction` (cf. `./actions.ts`) avec
- * `useFormState` (React 18 / Next 14). Trois états :
+ * Ajustement Board Q4/A 2026-05-12 — affichage d'un countdown rate-limit
+ * quand Supabase Auth répond 429 (« Trop de tentatives. Réessaye dans X »).
  *
- * - idle : formulaire vide, prêt à recevoir un email
- * - error : message d'erreur sous le champ (validation domaine, infra Supabase)
- * - sent : état de confirmation conforme M7 (« Lien envoyé à alice@... »)
+ * Trois états visuels :
+ *   - idle : formulaire vide / saisie en cours
+ *   - error simple : message d'erreur sous les champs (validation, identifiants)
+ *   - error rate-limited : message + countdown mm:ss + submit disabled
  *
- * Le composant ne valide PAS le domaine côté client — toute la garde de
- * domaine est centralisée dans la Server Action (réutilise `isAuthorizedEmail`
- * de l'étape 2). Le navigateur ne fait que de la validation de format basique
- * via `type="email"` et `pattern` (UX, pas de sécurité).
+ * Le composant ne valide pas le domaine côté client — toute la garde est
+ * centralisée dans la Server Action. Validation HTML5 basique (`required`,
+ * `type="email"`) pour l'UX uniquement.
  */
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, formAction] = useFormState<LoginState, FormData>(
-    signInWithOtpAction,
+    signInWithPasswordAction,
     initialLoginState,
   );
 
-  if (state.status === "sent") {
-    return <SuccessState email={state.email} />;
-  }
+  const rateLimitedUntil =
+    state.status === "error" && typeof state.rateLimitedUntil === "number"
+      ? state.rateLimitedUntil
+      : null;
+  const { remainingSec, isActive: isRateLimited } = useCountdown(rateLimitedUntil);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      {/* `next` propagé via hidden input — la Server Action s'occupe de la
+          sanitization (anti open-redirect). */}
+      {next ? <input type="hidden" name="next" value={next} /> : null}
+
       <div className="flex flex-col gap-1">
         <label htmlFor="email" className="text-sm font-medium text-neutral-700">
           Email AlyoS
@@ -45,60 +55,59 @@ export function LoginForm() {
           placeholder="prenom.nom@alyosingenierie.fr"
           className="rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder-neutral-400 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
         />
-        <span className="text-xs text-neutral-500">
-          Aucun mot de passe à retenir — un lien sécurisé est envoyé à chaque connexion.
-        </span>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="password" className="text-sm font-medium text-neutral-700">
+          Mot de passe
+        </label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          autoComplete="current-password"
+          className="rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder-neutral-400 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+        />
       </div>
 
       {state.status === "error" ? (
-        <p
+        <div
           role="alert"
+          data-testid="auth-error"
           className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
         >
-          {state.message}
-        </p>
+          <p>{state.message}</p>
+          {isRateLimited ? (
+            <p className="mt-1 font-mono text-xs">
+              Réessaye dans{" "}
+              <span data-testid="rate-limit-countdown">{formatCountdownMinSec(remainingSec)}</span>
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
-      <SubmitButton />
+      <SubmitButton disabled={isRateLimited} />
+
+      <p className="text-center text-xs text-neutral-600">
+        <Link href="/forgot-password" className="underline-offset-4 hover:underline">
+          Mot de passe oublié ?
+        </Link>
+      </p>
     </form>
   );
 }
 
-function SubmitButton() {
+function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
+  const isDisabled = pending || disabled;
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={isDisabled}
       className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-400"
     >
-      {pending ? "Envoi du lien…" : "Recevoir mon lien de connexion"}
+      {pending ? "Connexion…" : disabled ? "Patiente…" : "Se connecter"}
     </button>
-  );
-}
-
-function SuccessState({ email }: { email: string }) {
-  return (
-    <div className="flex flex-col items-center gap-4 text-center" role="status">
-      <div
-        aria-hidden
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-2xl text-green-700"
-      >
-        ✓
-      </div>
-      <h3 className="font-display text-lg font-semibold">
-        Lien envoyé à{" "}
-        <span className="text-neutral-900" style={{ overflowWrap: "anywhere" }}>
-          {email}
-        </span>
-      </h3>
-      <p className="text-sm text-neutral-600">
-        Ouvre ta boîte mail — tu as 15 minutes pour cliquer sur le lien. Tu peux fermer cet onglet,
-        l&apos;app s&apos;ouvrira automatiquement après le clic.
-      </p>
-      <p className="text-xs text-neutral-500">
-        Pas reçu ? Vérifie tes spams ou réessaie après quelques minutes.
-      </p>
-    </div>
   );
 }

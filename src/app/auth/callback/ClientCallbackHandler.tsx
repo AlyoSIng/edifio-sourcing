@@ -3,20 +3,28 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { parseHashError } from "@/lib/auth/parse-hash-error";
 
 /**
- * Client Component du callback — gère l'implicit flow (`#access_token=...`)
- * que `auth.admin.generateLink` produit (notamment pour les tests E2E).
+ * Client Component du callback — gère le fragment d'erreur Supabase.
  *
- * Le fragment d'URL n'est jamais envoyé au serveur, donc seul ce composant
- * (qui s'exécute côté navigateur) peut l'extraire et établir la session via
- * `supabase.auth.setSession({ access_token, refresh_token })`.
+ * **ADR-011** : depuis l'abandon des flows tokenisés (magic-link + recovery),
+ * `/auth/callback` ne reçoit plus de fragment `#access_token=…` à décoder.
+ * La seule chose qu'on peut encore voir côté fragment, c'est un
+ * `#error=…&error_code=otp_expired&…` posé par Supabase quand un ancien
+ * lien en cache / partagé est cliqué après que son token a été consommé
+ * (typiquement par un scanner email d'entreprise — Microsoft Defender Safe
+ * Links, Proofpoint). On nettoie le fragment et on redirige vers
+ * `/auth/error?code=…` qui affiche un message UX clair + un CTA
+ * `/forgot-password`.
+ *
+ * Fragment vide ou non reconnu → redirection sur `/login` (signal neutre :
+ * l'utilisateur a probablement atterri ici par erreur).
  *
  * Le `useRef` évite la double exécution de l'effet en mode React Strict
- * (Next.js dev) — l'appel à `setSession` ne doit s'exécuter qu'une fois.
+ * (Next.js dev) — la redirection ne doit s'exécuter qu'une fois.
  */
-export function ClientCallbackHandler({ next }: { next: string }) {
+export function ClientCallbackHandler() {
   const router = useRouter();
   const handledRef = useRef(false);
 
@@ -26,37 +34,28 @@ export function ClientCallbackHandler({ next }: { next: string }) {
 
     const hash = window.location.hash.slice(1);
     if (!hash) {
-      router.replace("/login?error=magic_link_invalid");
+      router.replace("/login");
       return;
     }
 
-    const params = new URLSearchParams(hash);
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-
-    if (!accessToken || !refreshToken) {
-      router.replace("/login?error=magic_link_invalid");
+    const errorInfo = parseHashError(hash);
+    if (errorInfo) {
+      window.history.replaceState(null, "", window.location.pathname);
+      const errorParams = new URLSearchParams();
+      errorParams.set("code", errorInfo.code);
+      if (errorInfo.description) errorParams.set("description", errorInfo.description);
+      router.replace(`/auth/error?${errorParams.toString()}`);
       return;
     }
 
-    const supabase = createSupabaseBrowserClient();
-    supabase.auth
-      .setSession({ access_token: accessToken, refresh_token: refreshToken })
-      .then(({ error }) => {
-        if (error) {
-          console.error("[auth/callback:setSession]", error.message);
-          router.replace("/login?error=magic_link_invalid");
-          return;
-        }
-        // Nettoyer le fragment pour ne pas le laisser traîner dans l'URL.
-        window.history.replaceState(null, "", window.location.pathname);
-        router.replace(next);
-      });
-  }, [next, router]);
+    // Fragment présent mais non reconnu — on nettoie et on retourne au login.
+    window.history.replaceState(null, "", window.location.pathname);
+    router.replace("/login");
+  }, [router]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-50">
-      <p className="text-sm text-neutral-600">Connexion en cours…</p>
+      <p className="text-sm text-neutral-600">Redirection en cours…</p>
     </main>
   );
 }

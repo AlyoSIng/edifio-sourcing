@@ -663,3 +663,85 @@
 ---
 
 *Dernière mise à jour : 2026-05-20 par [PS_OPERATOR Yann] — Cleanup Vercel exécuté (alias `edifio-platform.vercel.app` retiré, URL prod stable `edifio-sourcing.vercel.app`) ; custom domain reporté Gate 7.*
+
+---
+
+## 2026-05-20 — Merge `feat/sourcing-mvp` → `feat/auth-password-pivot`
+
+- **2026-05-20 · DEV Alex · Résolution des 5 conflits du merge `feat/sourcing-mvp` → `feat/auth-password-pivot`.** [LIVRABLE]
+  *Branche `feat/auth-password-pivot` absorbe l'intégralité du travail Drizzle (ORM acté 2026-05-18 + schema 22+ tables + RLS FORCE 12 policies + seed 2 orgs Opendatasoft réel + 6 fix CI pgTAP). 5 conflits résolus tous en faveur de MERGE_HEAD (sourcing-mvp) car la branche auth-pivot était figée pré-décision ORM : (1) `CLAUDE.md` état ORM → « ACTÉ Drizzle » + 1re PR module sourcing engine ; (2) `DECISIONS.md` ajout batch n°11 ORM + 6 dérives pgTAP + verdict CTO ADR-013 ; (3) `package.json` `tsx: 4.22.1` pinné (cohérent avec drizzle-kit/zod/faker pinnés exacts) ; (4) `pnpm-workspace.yaml` `esbuild: false` (cohérent avec le commentaire arbitrage CTO 2026-05-18) ; (5) `pnpm-lock.yaml` `git checkout --theirs` + `pnpm install --frozen-lockfile` clean (35 packages resolved, 3 downloads). Validation locale verte : `tsc --noEmit` = 0 erreur, `next lint` = 0 warning, `vitest run` = 206 tests / 13 fichiers PASS. Pas de DDL touchée par la résolution → pas de dry-run Postgres nécessaire (memory `feedback-postgres-dry-run-local` non déclenchée). Commit de merge par [PS_OPERATOR Yann].*
+
+---
+
+---
+
+## 2026-05-20 — Audit log post-ORM : stubs admin/users branchés sur Drizzle
+
+- **2026-05-20 · DEV Alex · Helper `insertAuditLog` créé + 2 routes admin branchées sur `audit_logs` Drizzle.** [LIVRABLE]
+  *Le merge `feat/sourcing-mvp` → `feat/auth-password-pivot` a rendu Drizzle + table `audit_logs` disponibles. Les 2 stubs `console.warn("[audit_log:user_invited]")` et `console.warn("[audit_log:user_provisional_regenerated]")` (cf. TODO post-ORM dans `src/app/api/admin/users/route.ts:146` et `[id]/regenerate-password/route.ts:148`) deviennent de vrais INSERT immutables, traçables sur 5 ans (rétention Gate 5).*
+  *3 fichiers livrés : (a) `src/lib/audit/insert.ts` — helper avec 4 invariants documentés (audit ≠ correctness, snapshot acteur, pas de secret en payload, org via memberships). Catch-no-throw : un échec d'INSERT log un `console.error` mais ne casse jamais la business logic (création user, regen, sollicitation, etc.). (b) `tests/unit/lib/audit/insert.test.ts` — 5 tests vitest couvrant le happy path, l'extraction IP/UA, le skip no-membership, le catch-no-throw, le subject optionnel. Mocks `vi.mock` sur `@/db/client`, `@/db/schema`, `drizzle-orm`. (c) Les 2 routes admin appellent désormais `insertAuditLog({...})` avec mapping sémantique cohérent (cf. décision ci-dessous).*
+  *Validation locale verte : `tsc --noEmit` = 0 erreur, `next lint` = 0 warning, `vitest run` = **211 tests / 14 fichiers PASS** (+5 nouveaux tests, +1 nouveau fichier vs `54bf7df`).*
+
+- **2026-05-20 · DEV Alex · Mapping `user_invited` → A2 `membership_change` `operation: "invite"`.** [DÉCISION DEV]
+  *L'action « invitation user » s'inscrit dans le lifecycle d'un membership — A2 (`membership_change`) couvre déjà ce cas par design (`operation` ∈ `invite | update | revoke` dans `audit_log_v1.md:60` + `AuditLogDataMembershipChange` dans `jsonb.ts:231`). Aucun amendement spec/enum nécessaire. INSERT branché direct.*
+
+- **2026-05-20 · DEV Alex · Extension `operation` A2 → `regenerate_provisional` (option B).** [AMENDEMENT SPEC — VALIDATION CTO ATTENDUE]
+  *L'action « regen mot de passe provisoire » (`POST /api/admin/users/[id]/regenerate-password`, bouton « Renvoyer » Board Q1/A.3 2026-05-12) ne map sur **aucune** des 13 actions Gate 5. 3 options identifiées dans `handoff/REQUEST_260520_1700_ETENDRE_A2_OPERATION_REGEN.md` : (A) garder `console.warn` conservatif, (B) étendre `operation` A2 (membership lifecycle), (C) nouvel enum value + ADR-014. **Option B retenue** (validation Steve 2026-05-20) — l'extension est sémantiquement cohérente avec A2 (admin reprovisionne l'accès d'un user existant, `from_role === to_role`), n'exige pas de migration BDD (le pgEnum `audit_action` reste à 13 valeurs), trace minimale (`jsonb.ts:236` + 1 paragraphe `audit_log_v1.md`). Validation CTO Sophie attendue — handoff dédié posté.*
+
+- **2026-05-20 · DEV Alex · TODO suivant (hors scope ce commit).** [PROCHAINE ÉTAPE]
+  *Les autres `console.warn("[audit_log:...]")` du code (s'il en reste après ce passage) sont à brancher via le même `insertAuditLog` au fil des PR à venir : login (A1), `dossier_diffuse` (A6), `architect_solicit` (A5), `tender_select` (A4), `architect_change` (A9), etc. Le helper est conçu pour être réutilisé sans modification — chaque action branche son payload typé via la discriminée `AuditLogData`.*
+
+---
+
+---
+
+## 2026-05-20 — Fix CI build : lazy init du client Drizzle (régression `6f19c1d`)
+
+- **2026-05-20 · DEV Alex · Refactor `src/db/client.ts` en lazy init via Proxy.** [FIX CI + RÉGRESSION POST-MORTEM]
+  *Le commit `6f19c1d` (audit log post-ORM) a cassé `ci-build` + `ci-e2e` sur le run `26172408907` avec `Failed to collect page data for /api/admin/users` → `Error: DATABASE_URL is not set`. **Cause racine** : avant ce commit, les 2 routes admin user lifecycle ne tiraient AUCUN code Drizzle. En branchant `insertAuditLog`, elles ont commencé à importer `@/db/client` qui faisait `process.env.DATABASE_URL` + `throw` au top-level du module. Quand `next build` collecte la page data des routes API, il importe chaque module → throw → fail. Le job `ci-build` n'a pas `DATABASE_URL` dans son `env:` (et n'a aucune raison de l'avoir, le build n'a pas besoin de DB).*
+  ***Fix retenu** : Proxy lazy sur l'export `db`. La validation `DATABASE_URL` + l'appel `postgres()` sont différés au premier accès `db.*`. Le module s'importe sans side effect, `next build` passe, et l'invariant catch-no-throw d'`insertAuditLog` absorbe gracieusement le cas runtime où la DB serait absente (CI e2e qui n'a pas `DATABASE_URL` non plus → SELECT échoue → catch logge l'erreur → route continue). 8e dérive CI consécutive sur la 1re semaine ORM (les 7 précédentes étant côté Postgres pur — pgtap host, pgtap container, NOW() index, auth.jwt() stub, auth.users seed, superuser bypass + collision seed, enum + PERMISSIVE OR'd). Première fois côté Next.js build.*
+  ***Vérification locale ré-jouant la condition CI** : `Remove-Item Env:\DATABASE_URL; .\node_modules\.bin\next build` → ✅ collecte les 15 pages dont les 2 routes admin sans throw. Avant ce fix, échec identique au log CI. Tests vitest restent 14/211 verts. Aucun changement de schéma — le pattern Proxy est documenté Next.js et largement éprouvé pour ce type de singleton serveur. Pas de revue CTO Sophie requise (infra client, hors schéma).*
+  *Recommandation pour memory `feedback-postgres-dry-run-local` : ajouter une note « tout import de `@/db/client` dans une route API doit être testé via `next build` SANS `DATABASE_URL` avant push, car les jobs CI build n'ont pas la var ». Le dry-run Postgres ne couvre pas ce cas — c'est un dry-run Next.js qu'il faut.*
+
+---
+
+---
+
+## 2026-05-20 — Validation CTO Sophie : option B (extension A2 `operation`) actée
+
+- **2026-05-20 · CTO Sophie · Option B validée — extension `AuditLogDataMembershipChange.operation` à `regenerate_provisional`.** [DÉCISION CTO]
+  *Validation après sync Cowork 2026-05-20 — réponse formalisée dans `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`. L'action « regen mot de passe provisoire » est sémantiquement un événement de lifecycle membership (admin reprovisionne l'accès d'un user existant sans changer son rôle) et s'inscrit naturellement dans A2. Options A (`console.warn` seul) et C (nouvel enum + ADR-014) explicitement rejetées : (A) faible sur l'esprit Gate 5 vu l'invariant « jamais le password en clair » Board Q1/B 2026-05-12 qui implique de tracer au moins l'événement ; (C) surdimensionnée — fragmente la sémantique de A2 pour un sous-cas, sans gain (YAGNI).*
+  *Conventions confirmées : (1) `from_role === to_role` quand `operation === "regenerate_provisional"` (pas de changement de rôle, juste rotation du credential), (2) password régénéré hors payload (invariant `password-server.ts`), (3) pas de migration BDD (le pgEnum `audit_action` reste à 13 valeurs). Aucune action ouverte supplémentaire — handoff clos.*
+
+- **2026-05-20 · DEV Alex · Cleanup des 2 références « validation attendue » → « validée CTO Sophie 2026-05-20 ».** [LIVRABLE EXÉCUTION]
+  *3 fichiers mis à jour : (a) `src/db/types/jsonb.ts:240` JSDoc — pointage `REQUEST_*` → `ANSWER_*` + convention `from_role === to_role` codifiée. (b) `specs/audit_log_v1.md` paragraphe amendement — mention « validation requise » → « validée CTO Sophie 2026-05-20 ». (c) `src/app/api/admin/users/[id]/regenerate-password/route.ts:147` commentaire — idem. Pas de changement de code applicatif — purement traçabilité documentaire.*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [CTO Sophie] (via [Board chair Steve]) — Option B (extension A2.operation) actée et tracée. Handoff `REQUEST_260520_1700` clos par `ANSWER_260520_1810`.*
+
+---
+
+## 2026-05-20 — PR #16 retarget main + résolution conflit helper audit dupliqué
+
+- **2026-05-20 · DEV Alex · PR #16 (BOAMP connector) retargetée `feat/sourcing-mvp` → `main`.** [LIVRABLE]
+  *Après merge PR #7 dans `main` (auth + ORM + sourcing-mvp + audit log post-ORM), la base de PR #16 devenait stale. Retarget mécanique via `gh pr edit 16 --base main`. Révélation immédiate : `mergeStateStatus` passe CLEAN → **DIRTY/CONFLICTING**.*
+
+- **2026-05-20 · DEV Alex · Refactor : adoption du helper `audit()` canonique de PR #16 + drop du mien.** [LIVRABLE]
+  *Diagnostic des conflits : `DECISIONS.md` (concaténation chronologique simple, deux histoires disjointes : HEAD = INC-2026-05-18-02 + PR #2 finitions CTO + Vercel cleanup ; main = session du jour). Mais surtout, **2 helpers audit concurrents** sur la même PR :*
+  *- **Mon `src/lib/audit/insert.ts`** (session du jour, commit `6f19c1d`) : simple, basic, vérifie org via SELECT memberships, catch-no-throw, 5 tests vitest.*
+  *- **Leur `src/lib/audit/index.ts`** (commit `4c9aebc` PR #16 + finitions CTO-2 `5c8e907`) : Zod validation par action (`AUDIT_SCHEMAS[action].parse`), Sentry-ready avec `reportAuditFailure()` structuré (verdict CTO-2 2026-05-19), `serializeError()` qui préserve `code`/`hint`/`details` Supabase, lecture session via `app_metadata.organization_id` direct (plus rapide que ma requête memberships), test escape hatch `NODE_ENV === 'test'`, framework de schémas A1-A13 avec placeholders.*
+  *Verdict pragmatique : **leur helper est BEAUCOUP plus mature**. Drop du mien + `tests/unit/lib/audit/insert.test.ts` (5 tests devenus redondants). Re-écriture des 2 routes admin (`POST /api/admin/users` + `POST /api/admin/users/[id]/regenerate-password`) pour appeler `audit({action, data, subjectType, subjectId, request})` au lieu de `insertAuditLog({req, action, actor, subject, data})`. Sémantique préservée — le mapping A2 `membership_change` + `from_role === to_role` pour `regenerate_provisional` reste identique.*
+
+- **2026-05-20 · DEV Alex · A2 `membershipChangeSchema` rempli (placeholder → STRICT).** [LIVRABLE]
+  *Leur `schemas.ts` marquait A2 en `TODO: implémenter à la PR admin /sourcing/admin/users (CRUD memberships)` — la PR admin était la mienne (PR #7), donc je remplis le placeholder dans le merge : schema Zod strict avec 5 champs (`target_user_id` UUID, `target_email` regex email, `from_role`/`to_role` optionnels enum `admin|user|viewer`, `operation` enum 4 valeurs incluant `regenerate_provisional` validé CTO Sophie 2026-05-20). Regex UUID inline (8-4-4-4-12 hex) plutôt qu'import de `UUID_SHAPE` qui est déclaré plus bas dans le même fichier (TDZ-safe). 8 nouveaux tests vitest pour A2 STRICT couvrant les 4 operations + 4 cas de rejet (operation hors enum, UUID invalide, email invalide, role hors enum membership_role). `membership_change` retiré de la liste `PLACEHOLDER_ACTIONS` (passe de 12 à 11 actions placeholder).*
+
+- **2026-05-20 · DEV Alex · Validation locale verte avant push.** [VÉRIFICATION]
+  *`tsc --noEmit` = 0 erreur. `next lint` = 0 warning. `vitest run` = **335 tests / 20 fichiers PASS** (+8 A2 strict, -2 placeholders A2 obsolètes vs HEAD boamp pré-merge). `next build` SANS `DATABASE_URL` = 15 pages collectées (memory `feedback-nextjs-build-env-clean` respectée — le Proxy lazy de `db/client.ts` mergé fait son job sur les routes admin + nouvelles routes sourcing de PR #16). Aucune DDL touchée → pas de dry-run Postgres (memory `feedback-postgres-dry-run-local` non déclenchée).*
+
+- **2026-05-20 · DEV Alex · PR #16 redevient MERGEABLE après ce commit de merge.** [PROCHAINE ÉTAPE]
+  *Après push du merge `origin/main` → `feat/sourcing-boamp-connector` avec résolution conflit, `gh pr view 16` doit repasser `mergeStateStatus: CLEAN`. PR #16 redevient prête pour review CTO finale + merge à `main` (action ouverte côté Steve / CTO Sophie pour quand le sourcing engine doit landed en prod).*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [DEV Alex] — PR #16 retarget main + résolution conflit helper audit dupliqué (adoption helper canonique boamp + drop helper insert.ts + A2 placeholder rempli STRICT).*

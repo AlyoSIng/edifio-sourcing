@@ -85,10 +85,46 @@ const placeholder = z.object({}).passthrough();
 const loginSchema = placeholder;
 
 /**
- * A2 — `membership_change` (placeholder)
- * TODO: implémenter à la PR admin `/sourcing/admin/users` (CRUD memberships).
+ * A2 — `membership_change` (STRICT — implémenté par la PR auth-password-pivot).
+ *
+ * Couvre 4 sous-cas d'`operation` :
+ *  - `invite` : admin crée un nouveau collaborateur AlyoS via `POST /api/admin/users`.
+ *    `from_role` omis (le user n'existe pas avant), `to_role` = rôle assigné.
+ *  - `update` : admin modifie le rôle d'un user existant (interface admin Gate 7).
+ *    `from_role` ≠ `to_role`.
+ *  - `revoke` : admin retire un user (interface admin Gate 7+).
+ *    `to_role` omis (perte de membership).
+ *  - `regenerate_provisional` : bouton « Renvoyer » admin sur un user existant
+ *    via `POST /api/admin/users/[id]/regenerate-password`. Convention validée
+ *    CTO Sophie 2026-05-20 (cf. `handoff/ANSWER_260520_1810_*.md`) :
+ *    `from_role === to_role` (pas de changement de rôle, juste rotation du
+ *    credential provisoire). Le password régénéré n'est **JAMAIS** loggué
+ *    (invariant `src/lib/auth/password-server.ts`).
+ *
+ * Contraintes :
+ *  - `target_user_id` : UUID shape (regex inline `8-4-4-4-12` hex —
+ *    permissif v4-strict vs déterministes de test, cf. `UUID_SHAPE`
+ *    plus bas réutilisé par A4).
+ *  - `target_email` : email simple (regex non-RFC, suffisant pour audit).
+ *  - `from_role` / `to_role` : optionnels selon l'opération, enum
+ *    `admin | user | viewer` aligné sur `membership_role` Postgres.
+ *  - `operation` : enum strict 4 valeurs.
  */
-const membershipChangeSchema = placeholder;
+const membershipChangeSchema = z.object({
+  target_user_id: z
+    .string()
+    .regex(
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+      "target_user_id doit être un UUID",
+    ),
+  target_email: z
+    .string()
+    .min(3)
+    .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "email invalide"),
+  from_role: z.enum(["admin", "user", "viewer"]).optional(),
+  to_role: z.enum(["admin", "user", "viewer"]).optional(),
+  operation: z.enum(["invite", "update", "revoke", "regenerate_provisional"]),
+});
 
 /**
  * A3 — `search_profile_change` (placeholder)

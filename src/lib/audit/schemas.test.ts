@@ -121,9 +121,11 @@ describe("tenderSelectSchema (A4 strict)", () => {
 // Placeholders — 12 actions non-strictes (smoke tests)
 // ----------------------------------------------------------------------------
 
+// `membership_change` retiré de la liste : implémenté STRICT par la PR
+// auth-password-pivot (2026-05-20) — couvert par son propre describe block
+// plus bas. Reste 11 placeholders.
 const PLACEHOLDER_ACTIONS = [
   "login",
-  "membership_change",
   "search_profile_change",
   "architect_solicit",
   "dossier_diffuse",
@@ -136,7 +138,99 @@ const PLACEHOLDER_ACTIONS = [
   "access_attempt",
 ] as const satisfies readonly AuditAction[];
 
-describe("placeholders (12 actions non-strictes)", () => {
+describe("membershipChangeSchema (A2 strict)", () => {
+  const validBase = {
+    target_user_id: "11111111-1111-1111-1111-111111111111",
+    target_email: "newbie@alyosingenierie.fr",
+    to_role: "user" as const,
+    operation: "invite" as const,
+  };
+
+  it("accepte un invite valide (sans from_role)", () => {
+    const schema = AUDIT_SCHEMAS.membership_change;
+    expect(schema.safeParse(validBase).success).toBe(true);
+  });
+
+  it("accepte un update avec from_role et to_role", () => {
+    const schema = AUDIT_SCHEMAS.membership_change;
+    expect(
+      schema.safeParse({
+        ...validBase,
+        from_role: "user",
+        to_role: "admin",
+        operation: "update",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("accepte un revoke (to_role omis acceptable)", () => {
+    const schema = AUDIT_SCHEMAS.membership_change;
+    const { to_role: _drop, ...withoutToRole } = validBase;
+    void _drop;
+    expect(
+      schema.safeParse({
+        ...withoutToRole,
+        from_role: "admin",
+        operation: "revoke",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("accepte regenerate_provisional avec from_role === to_role (convention CTO Sophie 2026-05-20)", () => {
+    const schema = AUDIT_SCHEMAS.membership_change;
+    expect(
+      schema.safeParse({
+        ...validBase,
+        from_role: "user",
+        to_role: "user",
+        operation: "regenerate_provisional",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejette un operation hors enum", () => {
+    const schema = AUDIT_SCHEMAS.membership_change;
+    expect(
+      schema.safeParse({
+        ...validBase,
+        operation: "promote",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejette un target_user_id non-UUID", () => {
+    const schema = AUDIT_SCHEMAS.membership_change;
+    expect(
+      schema.safeParse({
+        ...validBase,
+        target_user_id: "not-a-uuid",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejette un target_email invalide", () => {
+    const schema = AUDIT_SCHEMAS.membership_change;
+    expect(
+      schema.safeParse({
+        ...validBase,
+        target_email: "no-at-sign",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejette un from_role hors enum membership_role", () => {
+    const schema = AUDIT_SCHEMAS.membership_change;
+    expect(
+      schema.safeParse({
+        ...validBase,
+        from_role: "superuser",
+        operation: "update",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("placeholders (11 actions non-strictes)", () => {
   // Test smoke : chaque placeholder accepte un objet vide ET un objet arbitraire
   // via `passthrough()`. Garantit qu'on peut déjà coder `audit({action: 'login',
   // data: {...}})` côté call-site sans attendre l'implémentation stricte.
