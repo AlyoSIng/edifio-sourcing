@@ -676,4 +676,17 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-20 par [DEV Alex] — Fix CI build lazy init `src/db/client.ts` (régression `6f19c1d`), Proxy pattern validé localement par `next build` sans DATABASE_URL.*
+---
+
+## 2026-05-20 — Validation CTO Sophie : option B (extension A2 `operation`) actée
+
+- **2026-05-20 · CTO Sophie · Option B validée — extension `AuditLogDataMembershipChange.operation` à `regenerate_provisional`.** [DÉCISION CTO]
+  *Validation après sync Cowork 2026-05-20 — réponse formalisée dans `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`. L'action « regen mot de passe provisoire » est sémantiquement un événement de lifecycle membership (admin reprovisionne l'accès d'un user existant sans changer son rôle) et s'inscrit naturellement dans A2. Options A (`console.warn` seul) et C (nouvel enum + ADR-014) explicitement rejetées : (A) faible sur l'esprit Gate 5 vu l'invariant « jamais le password en clair » Board Q1/B 2026-05-12 qui implique de tracer au moins l'événement ; (C) surdimensionnée — fragmente la sémantique de A2 pour un sous-cas, sans gain (YAGNI).*
+  *Conventions confirmées : (1) `from_role === to_role` quand `operation === "regenerate_provisional"` (pas de changement de rôle, juste rotation du credential), (2) password régénéré hors payload (invariant `password-server.ts`), (3) pas de migration BDD (le pgEnum `audit_action` reste à 13 valeurs). Aucune action ouverte supplémentaire — handoff clos.*
+
+- **2026-05-20 · DEV Alex · Cleanup des 2 références « validation attendue » → « validée CTO Sophie 2026-05-20 ».** [LIVRABLE EXÉCUTION]
+  *3 fichiers mis à jour : (a) `src/db/types/jsonb.ts:240` JSDoc — pointage `REQUEST_*` → `ANSWER_*` + convention `from_role === to_role` codifiée. (b) `specs/audit_log_v1.md` paragraphe amendement — mention « validation requise » → « validée CTO Sophie 2026-05-20 ». (c) `src/app/api/admin/users/[id]/regenerate-password/route.ts:147` commentaire — idem. Pas de changement de code applicatif — purement traçabilité documentaire.*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [CTO Sophie] (via [Board chair Steve]) — Option B (extension A2.operation) actée et tracée. Handoff `REQUEST_260520_1700` clos par `ANSWER_260520_1810`.*

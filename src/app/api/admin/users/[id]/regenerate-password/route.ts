@@ -141,8 +141,8 @@ export async function POST(
 
     // ---------- 5. Audit log ----------
     // Action mappée sur A2 `membership_change` avec `operation: "regenerate_provisional"`
-    // (amendement spec 2026-05-20 — cf. handoff
-    // `REQUEST_260520_1700_ETENDRE_A2_OPERATION_REGEN.md` en attente CTO).
+    // (amendement spec 2026-05-20, validé CTO Sophie — cf.
+    // `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`).
     // GARDE-FOU : on ne logge JAMAIS le password en clair.
     const currentRole = (currentMeta.role ?? "user") as "admin" | "user" | "viewer";
     await insertAuditLog({

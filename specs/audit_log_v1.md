@@ -59,7 +59,7 @@ Déclencheur : callback OAuth/magic-link Supabase Auth.
 ```
 `operation` ∈ `invite | update | revoke | regenerate_provisional`.
 
-> **Amendement 2026-05-20** : `regenerate_provisional` ajouté pour tracer le bouton « Renvoyer un mot de passe provisoire » (route `POST /api/admin/users/[id]/regenerate-password`, cf. Board Q1/A.3 2026-05-12). Aucun changement de rôle — `from_role` et `to_role` égaux ou tous deux omis. Le password régénéré n'est **JAMAIS** loggué (cf. invariant `password-server.ts`). Validation CTO Sophie requise — cf. `handoff/REQUEST_260520_1700_ETENDRE_A2_OPERATION_REGEN.md`.
+> **Amendement 2026-05-20** : `regenerate_provisional` ajouté pour tracer le bouton « Renvoyer un mot de passe provisoire » (route `POST /api/admin/users/[id]/regenerate-password`, cf. Board Q1/A.3 2026-05-12). Aucun changement de rôle — convention `from_role === to_role`. Le password régénéré n'est **JAMAIS** loggué (cf. invariant `password-server.ts`). **Validé CTO Sophie 2026-05-20** — cf. `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`.
 
 ### A3 — `search_profile_change`
 ```json

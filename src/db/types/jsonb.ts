@@ -234,10 +234,12 @@ export interface AuditLogDataMembershipChange {
   from_role?: "admin" | "user" | "viewer";
   to_role?: "admin" | "user" | "viewer";
   /**
-   * `regenerate_provisional` ajouté 2026-05-20 par [DEV Alex] (handoff
-   * `REQUEST_260520_1700_ETENDRE_A2_OPERATION_REGEN.md` — validation CTO
-   * Sophie attendue). Couvre le bouton « Renvoyer » admin qui regénère le
-   * mot de passe provisoire d'un user existant sans changer son rôle.
+   * `regenerate_provisional` ajouté 2026-05-20 par [DEV Alex],
+   * **validé CTO Sophie 2026-05-20** via
+   * `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`. Couvre le
+   * bouton « Renvoyer » admin qui regénère le mot de passe provisoire
+   * d'un user existant sans changer son rôle (convention :
+   * `from_role === to_role` quand `operation === "regenerate_provisional"`).
    */
   operation: "invite" | "update" | "revoke" | "regenerate_provisional";
 }
