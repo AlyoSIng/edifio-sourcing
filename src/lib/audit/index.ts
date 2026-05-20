@@ -18,9 +18,9 @@
  *
  * Contrat de non-throw :
  *  - L'audit ne doit JAMAIS casser l'action métier qui l'a déclenché. Toute
- *    erreur (validation Zod, INSERT BDD, session manquante) est loggée
- *    via `console.error` (capté en prod par Sentry / Vercel logs) mais le
- *    helper retourne `void` sans propager l'exception.
+ *    erreur (validation Zod, INSERT BDD, session manquante) est tracée via
+ *    `console.error` structuré (JSON-parsable, capté par Vercel logs) mais le
+ *    helper retourne `void` sans propager l'exception en prod.
  *  - Cas particulier : en environnement de test (`NODE_ENV === 'test'`) on
  *    laisse l'erreur remonter pour faciliter la détection des régressions.
  *
@@ -29,8 +29,18 @@
  *    PAS empêcher l'utilisateur de sélectionner son AO. L'audit est un
  *    « side-effect best-effort ». La spec audit insiste sur l'immutabilité
  *    mais pas sur la blocage des actions métier en cas d'échec d'audit.
- *  - Cf. discussion handoff CC_260512_AUDIT_NON_BLOCKING.md (à archiver
- *    quand Sentry sera branché — Gate 8).
+ *  - Cf. discussion handoff CC_260512_AUDIT_NON_BLOCKING.md.
+ *
+ * Observabilité des échecs (verdict CTO 2026-05-19 CTO-2) :
+ *  - Sentry n'est PAS encore branché dans le repo (vérifié 2026-05-19 :
+ *    aucune dépendance `@sentry/nextjs`, aucun `sentry.config.*`, aucun
+ *    `instrumentation.ts`). Fallback : `console.error` structuré format
+ *    `[audit] failed to write audit_logs` + payload JSON {action, actor_id,
+ *    organization_id, subject_type, subject_id, error}.
+ *  - TODO Sentry (ticket follow-up Gate 8) : remplacer le `console.error`
+ *    structuré par `Sentry.captureException(err, { tags: { audit_action,
+ *    audit_failed: true }, contexts: { audit: {...} } })`. Convention de
+ *    tags documentée plus bas dans `reportAuditFailure()`.
  */
 
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
@@ -78,6 +88,19 @@ export interface AuditInsertPayload {
   data: Record<string, unknown>;
 }
 
+/**
+ * Contexte structuré associé à un échec d'audit. Sérialisé en JSON dans le
+ * `console.error` actuel ; sera passé en `contexts.audit` quand Sentry sera
+ * branché (Gate 8). Aucun champ libre `any` — tous les types sont stricts.
+ */
+interface AuditFailureContext {
+  action: AuditAction;
+  actor_id: string | null;
+  organization_id: string | null;
+  subject_type: string | null;
+  subject_id: string | null;
+}
+
 // ----------------------------------------------------------------------------
 // Helpers d'enrichissement
 // ----------------------------------------------------------------------------
@@ -90,6 +113,58 @@ export interface AuditInsertPayload {
 interface AppMetadata {
   organization_id?: string;
   role?: "admin" | "user" | "viewer";
+}
+
+/**
+ * Sérialise une erreur arbitraire de manière JSON-safe. On extrait `name`,
+ * `message`, `stack` et tout champ propre énumérable (ex. `code` Supabase).
+ * Évite que `JSON.stringify` recrache `{}` sur une `Error` (les props sont
+ * non-énumérables par défaut).
+ */
+function serializeError(err: unknown): Record<string, unknown> {
+  if (err instanceof Error) {
+    const base: Record<string, unknown> = {
+      name: err.name,
+      message: err.message,
+    };
+    if (err.stack) base.stack = err.stack;
+    // Préserve les éventuelles props custom (ex. PostgrestError.code, hint, details)
+    for (const key of Object.keys(err)) {
+      base[key] = (err as unknown as Record<string, unknown>)[key];
+    }
+    return base;
+  }
+  if (typeof err === "object" && err !== null) {
+    return err as Record<string, unknown>;
+  }
+  return { value: String(err) };
+}
+
+/**
+ * Reporte un échec d'audit côté observabilité. Aujourd'hui : `console.error`
+ * structuré (JSON-parsable par Vercel logs / Datadog). Demain (Gate 8) :
+ * `Sentry.captureException`.
+ *
+ * Convention Sentry future :
+ *   Sentry.captureException(err, {
+ *     tags: { audit_action: ctx.action, audit_failed: true },
+ *     contexts: { audit: ctx },
+ *   });
+ *
+ * @internal Exporté pour les tests qui veulent vérifier le call shape.
+ */
+function reportAuditFailure(err: unknown, ctx: AuditFailureContext): void {
+  // TODO(Gate 8) : remplacer par Sentry.captureException quand
+  // `@sentry/nextjs` sera branché. Voir JSDoc en-tête du module pour la
+  // convention de tags/contexts.
+  console.error("[audit] failed to write audit_logs", {
+    action: ctx.action,
+    actor_id: ctx.actor_id,
+    organization_id: ctx.organization_id,
+    subject_type: ctx.subject_type,
+    subject_id: ctx.subject_id,
+    error: serializeError(err),
+  });
 }
 
 /**
@@ -182,6 +257,16 @@ async function readSessionContext(): Promise<{
 export async function audit<A extends AuditAction>(params: AuditParams<A>): Promise<void> {
   const { action, data, subjectType, subjectId, request } = params;
 
+  // Contexte minimal connu dès l'entrée — sert au reporting d'échec même si
+  // l'enrichissement de session foire plus loin.
+  let failureContext: AuditFailureContext = {
+    action,
+    actor_id: null,
+    organization_id: null,
+    subject_type: subjectType ?? null,
+    subject_id: subjectId ?? null,
+  };
+
   try {
     // 1. Validation Zod par action (lève ZodError sur payload non conforme)
     const schema = AUDIT_SCHEMAS[action];
@@ -190,6 +275,14 @@ export async function audit<A extends AuditAction>(params: AuditParams<A>): Prom
     // 2. Enrichissement session + headers
     const session = await readSessionContext();
     const { ipAddress, userAgent } = extractClientHeaders(request);
+
+    // Update du contexte d'échec avec les infos de session (utile si l'INSERT
+    // suivant foire — on veut tracer actor_id + organization_id).
+    failureContext = {
+      ...failureContext,
+      actor_id: session.actorId,
+      organization_id: session.organizationId,
+    };
 
     const payload: AuditInsertPayload = {
       organization_id: session.organizationId,
@@ -210,14 +303,14 @@ export async function audit<A extends AuditAction>(params: AuditParams<A>): Prom
     const { error } = await admin.from("audit_logs").insert(payload);
 
     if (error) {
-      // Best-effort : on log mais on ne propage pas (l'action métier doit
-      // continuer même si l'audit échoue côté BDD).
-      console.error("[audit] INSERT audit_logs a échoué :", { action, error });
+      // Best-effort : on log structuré mais on ne propage pas (l'action
+      // métier doit continuer même si l'audit échoue côté BDD).
+      reportAuditFailure(error, failureContext);
       if (process.env.NODE_ENV === "test") throw error;
     }
   } catch (err) {
     // Best-effort global (ZodError, exception inattendue, ...).
-    console.error("[audit] helper audit() a levé une exception :", { action, err });
+    reportAuditFailure(err, failureContext);
     if (process.env.NODE_ENV === "test") throw err;
   }
 }

@@ -258,3 +258,99 @@ describe("audit() — comportement face à une erreur INSERT Supabase", () => {
     }
   });
 });
+
+// ----------------------------------------------------------------------------
+// CTO-2 (verdict 2026-05-19) — Observabilité structurée des échecs audit
+// ----------------------------------------------------------------------------
+
+describe("audit() — structured console.error en cas d'échec INSERT (CTO-2)", () => {
+  it("appelle console.error avec un shape JSON-parsable en NODE_ENV=production", async () => {
+    const originalEnv = process.env.NODE_ENV;
+    // @ts-expect-error NODE_ENV readonly
+    process.env.NODE_ENV = "production";
+
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      mockAuthenticatedSession();
+      mockInsert.mockResolvedValue({
+        data: null,
+        error: { message: "supabase down", code: "PGRST500", hint: "retry later" },
+      });
+
+      // Best-effort prod : aucun throw remonté.
+      await expect(
+        audit({
+          action: "tender_select",
+          data: VALID_TENDER_SELECT,
+          subjectType: "tender",
+          subjectId: VALID_TENDER_SELECT.tender_id,
+        }),
+      ).resolves.toBeUndefined();
+
+      // L'helper a tracé le payload structuré via reportAuditFailure().
+      // On retrouve l'appel "[audit] failed to write audit_logs" + un objet.
+      const failureCall = consoleErrorSpy.mock.calls.find(
+        (args) => args[0] === "[audit] failed to write audit_logs",
+      );
+      expect(failureCall).toBeDefined();
+
+      const failureCtx = failureCall?.[1] as Record<string, unknown>;
+      expect(failureCtx).toBeDefined();
+      expect(failureCtx.action).toBe("tender_select");
+      expect(failureCtx.actor_id).toBe(USER_ID);
+      expect(failureCtx.organization_id).toBe(ORG_A_ID);
+      expect(failureCtx.subject_type).toBe("tender");
+      expect(failureCtx.subject_id).toBe(VALID_TENDER_SELECT.tender_id);
+
+      // L'objet error doit être sérialisé (préserve code Supabase + message)
+      const err = failureCtx.error as Record<string, unknown>;
+      expect(err).toBeDefined();
+      expect(err.message).toBe("supabase down");
+      expect(err.code).toBe("PGRST500");
+
+      // Vérifie que le payload est JSON-stringifiable (contrat Vercel logs).
+      expect(() => JSON.stringify(failureCtx)).not.toThrow();
+    } finally {
+      consoleErrorSpy.mockRestore();
+      // @ts-expect-error restore
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
+
+  it("trace aussi les exceptions inattendues (catch global) avec le même shape", async () => {
+    const originalEnv = process.env.NODE_ENV;
+    // @ts-expect-error NODE_ENV readonly
+    process.env.NODE_ENV = "production";
+
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      mockAuthenticatedSession();
+      // Simule un crash réseau de Supabase (pas une "error" structurée, une
+      // vraie exception JS qui remonte du driver).
+      mockInsert.mockRejectedValue(new Error("network ECONNRESET"));
+
+      await expect(
+        audit({ action: "tender_select", data: VALID_TENDER_SELECT }),
+      ).resolves.toBeUndefined();
+
+      const failureCall = consoleErrorSpy.mock.calls.find(
+        (args) => args[0] === "[audit] failed to write audit_logs",
+      );
+      expect(failureCall).toBeDefined();
+
+      const failureCtx = failureCall?.[1] as Record<string, unknown>;
+      const err = failureCtx.error as Record<string, unknown>;
+      expect(err.name).toBe("Error");
+      expect(err.message).toBe("network ECONNRESET");
+      // L'erreur Error est sérialisée avec stack (les props non-énumérables
+      // sont extraites par serializeError).
+      expect(typeof err.stack).toBe("string");
+    } finally {
+      consoleErrorSpy.mockRestore();
+      // @ts-expect-error restore
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
+});
