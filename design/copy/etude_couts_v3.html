@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Étude coûts v3 — mutualisation 3 apps + flywheel + challenger</title>
+<style>
+  :root { --paper:#FFFFFF; --paper-alt:#FAFAF8; --ink:#1A1A1A; --ink-muted:#5C5C5C; --line:#E5E5E5; --alyos-red:#C8002A; --pill-bg:#FFE5EA; --pill-fg:#C8002A; --positive:#2D8659; --warning:#B5781C; --negative:#B83333; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:"Inter",-apple-system,BlinkMacSystemFont,sans-serif; font-size:11pt; line-height:1.5; }
+  body { max-width:210mm; margin:0 auto; padding:25mm 18mm; }
+  h1, h2, h3, h4 { font-family:"Space Grotesk","Inter",sans-serif; color:var(--ink); margin-top:1.5em; margin-bottom:0.5em; letter-spacing:-0.02em; }
+  h1 { font-size:30pt; line-height:1.05; margin-top:0; border-bottom:3px solid var(--alyos-red); padding-bottom:0.3em; }
+  h1 .accent { color:var(--alyos-red); }
+  h2 { font-size:17pt; margin-top:2em; padding-top:0.5em; border-top:1px solid var(--line); }
+  h3 { font-size:13pt; color:var(--alyos-red); }
+  h4 { font-size:11pt; font-weight:600; margin-bottom:0.25em; }
+  p { margin:0.5em 0 1em; }
+  ul, ol { margin:0.5em 0 1em; padding-left:1.5em; }
+  li { margin-bottom:0.3em; }
+  .pill { display:inline-block; background:var(--pill-bg); color:var(--pill-fg); padding:3px 10px; border-radius:20px; font-size:9pt; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }
+  .meta { color:var(--ink-muted); font-size:10pt; }
+  .meta strong { color:var(--ink); }
+  table { width:100%; border-collapse:collapse; margin:1em 0 1.5em; font-size:10pt; page-break-inside:avoid; }
+  table th, table td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table th { background:var(--paper-alt); font-weight:600; font-size:9.5pt; text-transform:uppercase; letter-spacing:0.04em; border-bottom:2px solid var(--ink); }
+  table tr:nth-child(even) td { background:var(--paper-alt); }
+  table td.num, table th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  table td.center, table th.center { text-align:center; }
+  table tr.total td { font-weight:700; background:var(--pill-bg) !important; border-top:2px solid var(--ink); }
+  table tr.subtotal td { font-weight:600; border-top:1px solid var(--ink); }
+  .box { background:var(--paper-alt); border-left:4px solid var(--alyos-red); padding:12px 16px; margin:1em 0 1.5em; border-radius:0 4px 4px 0; }
+  .box.positive { border-left-color:var(--positive); }
+  .box.warning { border-left-color:var(--warning); }
+  .box h4 { margin-top:0; }
+  .kpi-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:1em 0 1.5em; }
+  .kpi { background:var(--paper-alt); border:1px solid var(--line); padding:14px; border-radius:6px; }
+  .kpi .label { font-size:9pt; color:var(--ink-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .kpi .value { font-family:"Space Grotesk",sans-serif; font-size:20pt; font-weight:700; color:var(--alyos-red); line-height:1; }
+  .kpi .unit { font-size:9.5pt; color:var(--ink-muted); margin-top:4px; }
+  .lever { background:var(--paper-alt); border:1px solid var(--line); border-radius:6px; padding:12px 16px; margin:0.8em 0; page-break-inside:avoid; }
+  .lever.new { border-left:4px solid var(--positive); }
+  .lever .head { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+  .lever .id { font-family:"Space Grotesk",sans-serif; font-weight:700; color:var(--alyos-red); font-size:11pt; }
+  .lever .title { font-weight:600; font-size:11pt; }
+  .lever .impact { margin-left:auto; background:var(--positive); color:white; font-size:9pt; padding:2px 8px; border-radius:4px; font-weight:600; }
+  .lever .body { font-size:10pt; line-height:1.5; }
+  .footer-note { margin-top:3em; padding-top:1em; border-top:1px solid var(--line); color:var(--ink-muted); font-size:9pt; font-style:italic; }
+  .page-break { page-break-after:always; }
+  .chart-container { margin:1.5em 0; background:var(--paper-alt); padding:16px; border-radius:6px; border:1px solid var(--line); }
+  .chart-container .chart-title { font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:11pt; margin-bottom:12px; }
+  .delta-pos { color:var(--positive); font-weight:600; }
+  .delta-neg { color:var(--negative); font-weight:600; }
+  @media print { body { padding:15mm 12mm; max-width:100%; } h2 { page-break-after:avoid; } table, .kpi-grid, .box, .chart-container, .lever { page-break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<!-- ========= PAGE DE GARDE ========= -->
+<div>
+  <span class="pill">Étude financière · v3.0 — mutualisation + flywheel + challenger</span>
+  <h1>edifio <span class="accent">Sourcing</span><br>Coûts mutualisés &amp; leviers d'optimisation</h1>
+  <p class="meta">
+    <strong>Auteurs</strong> : [CEO Marc] (structure financière) + [CTO Sophie] (mutualisation) + [CMO Léa] (cross-app)<br>
+    <strong>Date</strong> : 2026-05-18 · v3.0<br>
+    <strong>Statut</strong> : v3.0 — relivrée après directives Board (mutualisation 3 apps + cross-app flywheel + challenger pricing)<br>
+    <strong>Changements vs v2</strong> :
+    <ul style="margin-top:6px;">
+      <li>Mutualisation des charges fixes avec edifio Suivi et edifio ACT (allocation /3 par app)</li>
+      <li>Pricing challenger : 149 / 299 / 549 €/mo (au lieu de 190 / 390 / 790 v2)</li>
+      <li>CAC effectif 250 € (au lieu de 600 € v2) grâce au flywheel cross-app</li>
+      <li>2 nouveaux leviers ajoutés (M9 cross-app prospects + M10 bundle 3 apps)</li>
+    </ul>
+  </p>
+</div>
+
+<div class="box positive">
+  <h4>Impact synthétique des changements v3 vs v2</h4>
+  <table style="margin:0;">
+    <tr style="background:transparent;"><th>Indicateur</th><th class="num">v2 (Cowork + premium)</th><th class="num">v3 (mutualisé + challenger)</th><th class="num">Delta</th></tr>
+    <tr><td>Coûts fixes mensuels An 1 (alloués Sourcing)</td><td class="num">345 €</td><td class="num">145 €</td><td class="num delta-pos">-58 %</td></tr>
+    <tr><td>Coûts fixes mensuels An 5 (alloués Sourcing)</td><td class="num">725 €</td><td class="num">240 €</td><td class="num delta-pos">-67 %</td></tr>
+    <tr><td>ARPU mensuel moyen</td><td class="num">350 €</td><td class="num">261,5 €</td><td class="num delta-neg">-25 %</td></tr>
+    <tr><td>CAC effectif moyen</td><td class="num">600 €</td><td class="num">250 €</td><td class="num delta-pos">-58 %</td></tr>
+    <tr><td>Clients fin An 5</td><td class="num">262</td><td class="num">375</td><td class="num delta-pos">+43 %</td></tr>
+    <tr><td>EBITDA An 5</td><td class="num">+752 k€</td><td class="num">+824 k€</td><td class="num delta-pos">+72 k€</td></tr>
+  </table>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 1. SYNTHÈSE ========= -->
+<h2>1. Synthèse et chiffres clés v3</h2>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Coût mensuel à 1 client</div>
+    <div class="value">~301 €</div>
+    <div class="unit">vs 501 € v2 · -40 %</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Coût mensuel à 100 clients</div>
+    <div class="value">~3,3 k€</div>
+    <div class="unit">vs 3,9 k€ v2</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Coût mensuel à 300 clients</div>
+    <div class="value">~9,9 k€</div>
+    <div class="unit">vs 10,9 k€ v2</div>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Seuil de rentabilité</div>
+    <div class="value">~1 client</div>
+    <div class="unit">Studio IA suffit (rentable dès 1 client)</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Marge unitaire moyenne</div>
+    <div class="value">~88 %</div>
+    <div class="unit">Reste élevée malgré pricing challenger</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Économies leviers (12 actionnés)</div>
+    <div class="value">~140 k€/an</div>
+    <div class="unit">EBITDA An 5 : 824 → 964 k€</div>
+  </div>
+</div>
+
+<h3>Conclusions clés v3</h3>
+
+<ol>
+  <li><strong>La mutualisation /3 apps amplifie encore la rentabilité.</strong> Les coûts fixes alloués à edifio Sourcing passent de 345 €/mo (v2 Cowork-only) à 145 €/mo (v3 mutualisé) — soit -58 %. Sur 5 ans, économie cumulée ~12 k€ rien que sur les fixes alloués à Sourcing.</li>
+  <li><strong>Le pricing challenger conserve les marges grâce au volume.</strong> ARPU -25 %, mais clients +43 % → CA en hausse de 7 % et EBITDA en hausse de 10 %.</li>
+  <li><strong>Le flywheel cross-app divise le CAC par 2,4.</strong> Le levier M9 (nouveau) capitalise sur les leads croisés Sourcing → Suivi → ACT pour réduire le coût d'acquisition moyen de 600 € à 250 €. Économie cumulée 5 ans : ~250 k€.</li>
+  <li><strong>EBITDA positif dès An 1</strong> (+43 k€ vs +29 k€ v2) — la trajectoire devient quasi sans-risque financier.</li>
+  <li><strong>15 leviers retenus actifs (vs 17 v2)</strong>. Suppression de M2 (outsourcing support N1 — couvert par Cowork). Ajout de M9 (cross-app prospects) et M10 (bundle 3 apps -15 %) spécifiques au modèle écosystème.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ========= 2. MUTUALISATION ========= -->
+<h2>2. Mutualisation des charges entre les 3 apps edifio</h2>
+
+<h3>2.1. Principe de l'allocation /3</h3>
+
+<p>Les 3 apps (edifio Sourcing, edifio Suivi, edifio ACT) partagent une même équipe Cowork, un même Board, une même infrastructure de base. Les charges fixes sont donc <strong>allouées /3</strong> à chaque app pour le suivi analytique. Tableau détaillé :</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">Total mensuel</th>
+      <th class="num">Alloué Sourcing (/3)</th>
+      <th>Justification de l'allocation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Abonnement Claude Cowork</td>
+      <td class="num">180 €</td>
+      <td class="num">60 €</td>
+      <td>1 abonnement Cowork pour orchestrer les 3 projets · usage équilibré</td>
+    </tr>
+    <tr>
+      <td>GitHub Team (3 repos · 4 seats)</td>
+      <td class="num">16 €</td>
+      <td class="num">5 €</td>
+      <td>Même organisation GitHub `AlyoSIng`</td>
+    </tr>
+    <tr>
+      <td>DNS IONOS</td>
+      <td class="num">3 €</td>
+      <td class="num">1 €</td>
+      <td>Domaine `alyosingenierie.fr` partagé</td>
+    </tr>
+    <tr>
+      <td>Sentry Team</td>
+      <td class="num">26 €</td>
+      <td class="num">9 €</td>
+      <td>1 compte Sentry pour 3 projets · alertes par projet</td>
+    </tr>
+    <tr>
+      <td>Comptable / juriste (provision)</td>
+      <td class="num">150-500 €</td>
+      <td class="num">50-167 €</td>
+      <td>Services partagés AlyoS Ingénierie</td>
+    </tr>
+    <tr>
+      <td>Vercel Pro seats (3-5 seats équipe)</td>
+      <td class="num">60-100 €</td>
+      <td class="num">20-33 €</td>
+      <td>Même équipe Vercel pour 3 projets séparés</td>
+    </tr>
+    <tr class="total">
+      <td>TOTAL charges mutualisables (An 1 → An 5)</td>
+      <td class="num">~430 → ~720 €</td>
+      <td class="num">~145 → ~240 €</td>
+      <td>Allocation /3 par app</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>2.2. Charges spécifiques à edifio Sourcing (non mutualisées)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">An 1</th>
+      <th class="num">An 5</th>
+      <th>Motif spécificité</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Supabase Pro (1 projet dédié)</td>
+      <td class="num">24 €</td>
+      <td class="num">580 €</td>
+      <td>RLS + isolation données par app pour sécurité</td>
+    </tr>
+    <tr>
+      <td>Anthropic API (scoring + IA dossier)</td>
+      <td class="num">variable</td>
+      <td class="num">variable</td>
+      <td>Usage spécifique au module sourcing engine</td>
+    </tr>
+    <tr>
+      <td>Fly.io container scraping</td>
+      <td class="num">5-20 €</td>
+      <td class="num">20 €</td>
+      <td>Logique BOAMP/PLACE spécifique Sourcing</td>
+    </tr>
+    <tr>
+      <td>Brevo (quotas dédiés)</td>
+      <td class="num">0-65 €</td>
+      <td class="num">65 €</td>
+      <td>Templates et webhooks dédiés (sollicitation architectes)</td>
+    </tr>
+    <tr>
+      <td>Resend (notifications utilisateurs Sourcing)</td>
+      <td class="num">0-95 €</td>
+      <td class="num">95 €</td>
+      <td>Volumes notifications distincts</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="box">
+  <h4>Économie globale 3 apps (vs si chaque app payait tout en propre)</h4>
+  <p>Si edifio Sourcing, Suivi et ACT étaient développés séparément (3 abonnements Cowork × 3 GitHub × etc.), le coût total fixe serait <strong>3× ~345 €/mo = 1 035 €/mo</strong>. Avec la mutualisation, le coût total est <strong>~430 €/mo</strong>. Économie : <strong>~605 €/mo = 7,3 k€/an</strong> dès An 1 sur l'écosystème complet.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 3. STRUCTURE COÛTS V3 ========= -->
+<h2>3. Décomposition par strate v3</h2>
+
+<h3>3.1. Coûts FIXES v3 (alloués Sourcing /3)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">An 1</th>
+      <th class="num">An 3</th>
+      <th class="num">An 5</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Cowork allocation /3</td><td class="num">60 €</td><td class="num">60 €</td><td class="num">60 €</td></tr>
+    <tr><td>GitHub Team /3</td><td class="num">4 €</td><td class="num">4 €</td><td class="num">5 €</td></tr>
+    <tr><td>DNS /3</td><td class="num">1 €</td><td class="num">1 €</td><td class="num">1 €</td></tr>
+    <tr><td>Sentry /3</td><td class="num">0 €</td><td class="num">9 €</td><td class="num">9 €</td></tr>
+    <tr><td>Comptable / juriste /3</td><td class="num">50 €</td><td class="num">100 €</td><td class="num">167 €</td></tr>
+    <tr><td>Vercel Pro seats /3</td><td class="num">30 €</td><td class="num">30 €</td><td class="num">35 €</td></tr>
+    <tr class="total">
+      <td>TOTAL FIXES v3 (alloués Sourcing)</td>
+      <td class="num">~145 €</td>
+      <td class="num">~205 €</td>
+      <td class="num">~280 €</td>
+    </tr>
+    <tr>
+      <td>Annuel</td>
+      <td class="num">~1,7 k€</td>
+      <td class="num">~2,5 k€</td>
+      <td class="num">~3,4 k€</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.2. Coûts VARIABLES par client (recalculés avec pricing challenger)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">Sourcing 149 €</th>
+      <th class="num">Cotraitance 299 €</th>
+      <th class="num">Studio IA 549 €</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Anthropic API (scoring + Tandem)</td><td class="num">5 €</td><td class="num">9 €</td><td class="num">9 €</td></tr>
+    <tr><td>Anthropic API (Studio IA Sonnet — quota réduit à 15 AO/mo)</td><td class="num">0 €</td><td class="num">0 €</td><td class="num">45 €</td></tr>
+    <tr><td>Supabase storage + bandwidth</td><td class="num">1,5 €</td><td class="num">3 €</td><td class="num">7 €</td></tr>
+    <tr><td>Brevo + Resend</td><td class="num">0,7 €</td><td class="num">2,8 €</td><td class="num">4,5 €</td></tr>
+    <tr><td>Support (provision)</td><td class="num">4 €</td><td class="num">7 €</td><td class="num">12 €</td></tr>
+    <tr class="total">
+      <td>Coût variable / client / mois</td>
+      <td class="num">~11 €</td>
+      <td class="num">~22 €</td>
+      <td class="num">~78 €</td>
+    </tr>
+    <tr>
+      <td>Marge unitaire</td>
+      <td class="num"><strong>138 € (93 %)</strong></td>
+      <td class="num"><strong>277 € (93 %)</strong></td>
+      <td class="num"><strong>471 € (86 %)</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="font-size:9.5pt; color:var(--ink-muted);">Notes v3 :
+- Studio IA passe à un quota réduit à 15 AO/mo (vs 20 v1/v2) pour absorber la baisse de prix → coût Sonnet -25 %
+- Support coûts légèrement révisés à la baisse (volumes plus élevés permettent une économie d'échelle sur le support automatisé)
+- Marges unitaires restent à 86-93 % — l'épine dorsale du modèle</p>
+
+<h3>3.3. ARPU pondéré et marge unitaire moyenne v3</h3>
+
+<p>Avec un mix tier 50 % Sourcing / 35 % Cotraitance / 15 % Studio IA :</p>
+<ul>
+  <li><strong>ARPU pondéré</strong> = 0,5 × 149 + 0,35 × 299 + 0,15 × 549 = 74,5 + 104,65 + 82,35 = <strong>261,5 €/mo</strong></li>
+  <li><strong>Coût variable moyen</strong> = 0,5 × 11 + 0,35 × 22 + 0,15 × 78 = 5,5 + 7,7 + 11,7 = <strong>~25 €/mo</strong></li>
+  <li><strong>Marge unitaire pondérée</strong> = 261,5 - 25 = <strong>236,5 €/mo (90 %)</strong></li>
+</ul>
+
+<div class="page-break"></div>
+
+<!-- ========= 4. ÉVOLUTION COÛTS ========= -->
+<h2>4. Évolution des coûts × nombre de clients v3</h2>
+
+<h3>4.1. Tableau de modélisation v3</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th class="num">Clients</th>
+      <th class="num">Coûts fixes (alloc.)</th>
+      <th class="num">Semi-fixes</th>
+      <th class="num">Variables</th>
+      <th class="num">TOTAL coûts</th>
+      <th class="num">Revenus</th>
+      <th class="num">Marge</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td class="num">1</td><td class="num">145 €</td><td class="num">60 €</td><td class="num">78 €</td><td class="num">283 €</td><td class="num">549 €</td><td class="num">+266 €</td>
+    </tr>
+    <tr><td class="num">10</td><td class="num">145 €</td><td class="num">85 €</td><td class="num">~210 €</td><td class="num">440 €</td><td class="num">2 615 €</td><td class="num">+2 175 €</td></tr>
+    <tr><td class="num">30</td><td class="num">150 €</td><td class="num">130 €</td><td class="num">~700 €</td><td class="num">980 €</td><td class="num">7 845 €</td><td class="num">+6 865 €</td></tr>
+    <tr><td class="num">50</td><td class="num">170 €</td><td class="num">170 €</td><td class="num">~1 235 €</td><td class="num">1 575 €</td><td class="num">13 075 €</td><td class="num">+11 500 €</td></tr>
+    <tr><td class="num">100</td><td class="num">200 €</td><td class="num">230 €</td><td class="num">~2 510 €</td><td class="num">2 940 €</td><td class="num">26 150 €</td><td class="num">+23 210 €</td></tr>
+    <tr><td class="num">150</td><td class="num">220 €</td><td class="num">295 €</td><td class="num">~3 800 €</td><td class="num">4 315 €</td><td class="num">39 225 €</td><td class="num">+34 910 €</td></tr>
+    <tr><td class="num">200</td><td class="num">240 €</td><td class="num">880 €</td><td class="num">~5 040 €</td><td class="num">6 160 €</td><td class="num">52 300 €</td><td class="num">+46 140 €</td></tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td class="num">300</td><td class="num">260 €</td><td class="num">920 €</td><td class="num">~7 530 €</td><td class="num">8 710 €</td><td class="num">78 450 €</td><td class="num">+69 740 €</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td class="num">375 (cible An 5)</td><td class="num">280 €</td><td class="num">960 €</td><td class="num">~9 400 €</td><td class="num">10 640 €</td><td class="num">98 100 €</td><td class="num">+87 460 €</td>
+    </tr>
+    <tr><td class="num">500</td><td class="num">300 €</td><td class="num">1 040 €</td><td class="num">~12 550 €</td><td class="num">13 890 €</td><td class="num">130 750 €</td><td class="num">+116 860 €</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:9.5pt; color:var(--ink-muted);">Lignes en rose : (a) rentabilité dès 1 client Studio IA, (b) 300 clients milestone, (c) 375 clients cible An 5 scénario base v3.</p>
+
+<h3>4.2. Graphique de corrélation coûts × clients v3</h3>
+
+<div class="chart-container">
+  <div class="chart-title">Coûts mensuels et revenus en fonction du nombre de clients actifs (v3 mutualisé)</div>
+  <svg viewBox="0 0 720 380" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+    <!-- Y axis labels -->
+    <text x="20" y="20" font-size="9" fill="#5C5C5C">140 k€</text>
+    <text x="20" y="60" font-size="9" fill="#5C5C5C">120 k€</text>
+    <text x="20" y="100" font-size="9" fill="#5C5C5C">100 k€</text>
+    <text x="20" y="140" font-size="9" fill="#5C5C5C">80 k€</text>
+    <text x="20" y="180" font-size="9" fill="#5C5C5C">60 k€</text>
+    <text x="20" y="220" font-size="9" fill="#5C5C5C">40 k€</text>
+    <text x="20" y="260" font-size="9" fill="#5C5C5C">20 k€</text>
+    <text x="20" y="290" font-size="9" fill="#5C5C5C">0 €</text>
+
+    <!-- X axis -->
+    <text x="65" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">1</text>
+    <text x="100" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">10</text>
+    <text x="165" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">30</text>
+    <text x="220" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">50</text>
+    <text x="290" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">100</text>
+    <text x="360" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">150</text>
+    <text x="425" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">200</text>
+    <text x="555" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">300</text>
+    <text x="615" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">375</text>
+    <text x="690" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">500</text>
+    <text x="370" y="335" font-size="10" fill="#1A1A1A" text-anchor="middle" font-weight="600">Nombre de clients actifs</text>
+
+    <!-- Grid -->
+    <line x1="60" y1="15" x2="700" y2="15" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="55" x2="700" y2="55" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="95" x2="700" y2="95" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="135" x2="700" y2="135" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="175" x2="700" y2="175" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="215" x2="700" y2="215" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="255" x2="700" y2="255" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="285" x2="700" y2="285" stroke="#1A1A1A" stroke-width="1.5"/>
+    <line x1="60" y1="15" x2="60" y2="285" stroke="#1A1A1A" stroke-width="1.5"/>
+
+    <!-- Break-even at 1 client -->
+    <line x1="65" y1="15" x2="65" y2="285" stroke="#C8002A" stroke-width="1" stroke-dasharray="4 2" opacity="0.6"/>
+    <text x="70" y="28" font-size="9" fill="#C8002A" font-weight="600">Rentable dès 1 client (Studio)</text>
+
+    <!-- Cost line TOTAL (red): 283, 440, 980, 1575, 2940, 4315, 6160, 8710, 10640, 13890
+         Scale: 140k€ = 270px → 1px = 519€
+         y = 285 - cost/519
+         283 → 285-0.5 = 284.5
+         440 → 285-0.8 = 284.2
+         980 → 285-1.9 = 283.1
+         1575 → 285-3.0 = 282
+         2940 → 285-5.7 = 279.3
+         4315 → 285-8.3 = 276.7
+         6160 → 285-11.9 = 273.1
+         8710 → 285-16.8 = 268.2
+         10640 → 285-20.5 = 264.5
+         13890 → 285-26.8 = 258.2 -->
+    <polyline points="65,284 100,284 165,283 220,282 290,279 360,277 425,273 555,268 615,264 690,258"
+      fill="none" stroke="#C8002A" stroke-width="3"/>
+    <text x="690" y="256" font-size="9" fill="#C8002A" font-weight="600">Coûts totaux</text>
+
+    <!-- Variable costs (orange): 78, 210, 700, 1235, 2510, 3800, 5040, 7530, 9400, 12550 -->
+    <polyline points="65,285 100,285 165,283 220,283 290,280 360,278 425,275 555,270 615,267 690,261"
+      fill="none" stroke="#B5781C" stroke-width="2"/>
+    <text x="690" y="259" font-size="9" fill="#B5781C" font-weight="600">Variables</text>
+
+    <!-- Fixed costs (gray): 145, 145, 150, 170, 200, 220, 240, 260, 280, 300 - barely visible -->
+    <polyline points="65,285 100,285 165,285 220,285 290,285 360,285 425,285 555,285 615,285 690,285"
+      fill="none" stroke="#5C5C5C" stroke-width="2" stroke-dasharray="5 3"/>
+    <text x="690" y="283" font-size="9" fill="#5C5C5C" font-weight="600">Fixes (Cowork mut.)</text>
+
+    <!-- Revenue line (green): 549, 2615, 7845, 13075, 26150, 39225, 52300, 78450, 98100, 130750 -->
+    <polyline points="65,284 100,280 165,270 220,260 290,234 360,209 425,184 555,134 615,96 690,33"
+      fill="none" stroke="#2D8659" stroke-width="3"/>
+    <text x="690" y="31" font-size="9" fill="#2D8659" font-weight="600">Revenus (ARPU 261,5 €)</text>
+
+    <!-- Break-even point marker -->
+    <circle cx="65" cy="284" r="5" fill="#C8002A" stroke="white" stroke-width="2"/>
+  </svg>
+  <p style="font-size:9pt; color:var(--ink-muted); margin-top:10px;">Lecture : la courbe rouge des coûts totaux est <strong>presque collée à l'axe</strong> tant qu'on est sous 100 clients. Les coûts fixes (gris pointillé) sont quasi-invisibles à cette échelle (~145-280 €/mo). C'est la signature d'un SaaS quasi sans coûts fixes — toute croissance de revenus se traduit directement en marge.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 5. SEUIL ========= -->
+<h2>5. Seuil de rentabilité v3</h2>
+
+<h3>5.1. Calcul direct</h3>
+
+<table>
+  <thead>
+    <tr><th>Variable</th><th class="num">Valeur v3</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Coûts fixes mensuels An 1 (alloués)</td><td class="num">145 €</td></tr>
+    <tr><td>Semi-fixes minimum (1 client)</td><td class="num">60 €</td></tr>
+    <tr><td>Total charges « plancher »</td><td class="num">205 €/mo</td></tr>
+    <tr><td>Marge unitaire moyenne v3</td><td class="num">236,5 €/mo</td></tr>
+    <tr class="total"><td>Seuil de rentabilité (clients)</td><td class="num">~1 client (Studio) ou ~2 clients (mix tier)</td></tr>
+  </tbody>
+</table>
+
+<h3>5.2. Trajectoire v3</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Mois</th>
+      <th class="num">Clients</th>
+      <th class="num">EBITDA</th>
+      <th>Commentaire</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td>Q4 2026 — 1er pilote Studio</td>
+      <td class="num">1</td>
+      <td class="num">+266 €/mo</td>
+      <td>Rentable immédiatement</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td>Q4 2026 fin</td>
+      <td class="num">5</td>
+      <td class="num">+1 000 €/mo</td>
+      <td>Premier mois fortement positif</td>
+    </tr>
+    <tr>
+      <td>Q1 2027</td>
+      <td class="num">15</td>
+      <td class="num">+3 200 €/mo</td>
+      <td>Acquisition cross-app + parrainage activés</td>
+    </tr>
+    <tr>
+      <td>Fin An 1 (Q3 2027)</td>
+      <td class="num">42</td>
+      <td class="num">+9 800 €/mo</td>
+      <td>EBITDA An 1 total = +43 k€</td>
+    </tr>
+    <tr>
+      <td>Fin An 5 (2031)</td>
+      <td class="num">375</td>
+      <td class="num">+87 k€/mo</td>
+      <td>EBITDA An 5 total = +824 k€</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ========= 6. LEVIERS ========= -->
+<h2>6. Leviers d'optimisation v3 (15 actifs + 2 nouveaux)</h2>
+
+<p>Les leviers techniques (T1-T8) et fonctionnels (F1-F7) restent inchangés vs v2. Les changements concernent les leviers managériaux.</p>
+
+<h3>6.1. Récap leviers inchangés vs v2</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Catégorie</th>
+      <th class="num">Nombre</th>
+      <th class="num">Impact total</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Techniques (T1-T8) — inchangés</td><td class="num">8</td><td class="num">36,8 k€/an</td></tr>
+    <tr><td>Fonctionnels (F1-F7) — inchangés</td><td class="num">7</td><td class="num">89,0 k€/an</td></tr>
+    <tr><td>Managériaux (révisés) — M3, M4, M5, M6, M7, M8, M9*, M10*</td><td class="num">8 (dont 2 nouveaux)</td><td class="num">~127 k€/an</td></tr>
+    <tr class="total">
+      <td>TOTAL leviers v3</td>
+      <td class="num">23 (15 actifs + 2 nouveaux + 4 obsolètes M1/M2 + 2 ajustés M7/M8)</td>
+      <td class="num">~253 k€/an</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>6.2. Nouveaux leviers v3 spécifiques au modèle écosystème</h3>
+
+<div class="lever new">
+  <div class="head"><span class="id">M9</span><span class="title">⭐ NOUVEAU — Cross-app prospects database (flywheel monétisation)</span><span class="impact">~38 k€/an</span></div>
+  <div class="body">Construire une <strong>base prospects unifiée</strong> entre les 3 apps edifio. Quand un client edifio Sourcing saisit un cotraitant architecte dans le module Tandem, ce contact alimente automatiquement (RGPD + consentement) la base prospects edifio Suivi. Idem dans l'autre sens. Mécaniques de scoring lead automatisé (Haiku) + séquences nurturing Brevo. Hypothèse : 200 clients edifio Sourcing actifs × 12 contacts archi qualifiés/an × 5 % conversion vers Suivi à 250 €/mo = 750 €/mo × 12 = 9 k€/an Suivi. × 3 apps croisées = ~38 k€/an d'EBITDA cross-app capturé par le flywheel. Effet : <strong>CAC effectif global divisé par 2,4</strong> (de 600 € à 250 €).</div>
+  <div style="font-size:9pt; color:var(--ink-muted); margin-top:6px;">Effort : 8-12 j Alex (table partagée, RGPD consent, séquences Brevo automatisées, scoring leads Haiku) · 3 j Léa (séquences email) · Architecture à intégrer à Gate 5 v2.</div>
+</div>
+
+<div class="lever new">
+  <div class="head"><span class="id">M10</span><span class="title">⭐ NOUVEAU — Bundle « 3 apps edifio » à -15 %</span><span class="impact">~22 k€/an</span></div>
+  <div class="body">Offre commerciale dédiée aux clients utilisant simultanément Sourcing + Suivi + ACT. Tarification : somme des 3 abonnements × 0,85. Ex : 149 + 180 (Suivi tier base hypothétique) + 250 (ACT tier base hypothétique) = 579 €/mo × 0,85 = <strong>492 €/mo bundle</strong>. Avantage client : -15 % vs achat séparé. Avantage AlyoS : LTV ×3 par client, rétention ×4 (un client multi-app churn 5 % vs 15 % mono-app). Hypothèse : 15 % des clients edifio Sourcing souscrivent au bundle à partir d'An 2 → ~30 clients bundle × ~120 € de valeur additionnelle ARPU = 43 k€/an de revenus additionnels. Moins -15 % de remise = ~22 k€/an net.</div>
+  <div style="font-size:9pt; color:var(--ink-muted); margin-top:6px;">Effort : 4-6 j Alex (logique bundle Stripe + facturation unifiée) · 2 j Léa (page tarifs bundle + argumentaire commercial)</div>
+</div>
+
+<h3>6.3. Synthèse impact cumulé v3</h3>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">EBITDA An 5 baseline v3</div>
+    <div class="value">+824 k€</div>
+    <div class="unit">Marge 70 %</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA An 5 + 12 leviers</div>
+    <div class="value">+964 k€</div>
+    <div class="unit">+140 k€ · marge 80 %</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA An 5 max théorique</div>
+    <div class="value">+1 077 k€</div>
+    <div class="unit">Tous leviers v3 activés (~91 % marge)</div>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 7. RECO ========= -->
+<h2>7. Recommandation Board v3</h2>
+
+<div class="box positive">
+  <h4>Décision recommandée v3</h4>
+  <p>Le modèle mutualisé + flywheel + challenger est <strong>le plus rentable des 3 scénarios étudiés</strong> (EBITDA An 5 +824 k€ baseline, jusqu'à +964 k€ avec 12 leviers). Mais surtout, il est <strong>structurellement plus solide</strong> car ancré dans l'écosystème edifio (3 apps) avec un moat cross-app inimitable.</p>
+</div>
+
+<h3>7.1. Plan d'action Phase 1 v3 — 6 leviers activables immédiatement</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Levier</th>
+      <th>Pilote</th>
+      <th>Échéance</th>
+      <th class="num">Impact €/an</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>T2 — Prompt caching Anthropic</td><td>Alex</td><td>1re PR module IA dossier</td><td class="num">14 000</td></tr>
+    <tr><td>T7 — Drizzle batch upsert (acté ADR-013)</td><td>Alex</td><td>Déjà acté</td><td class="num">1 000</td></tr>
+    <tr><td>F1 — Quota Studio 15 AO + overage 1,50 €</td><td>Alex</td><td>1re PR module IA dossier</td><td class="num">13 000</td></tr>
+    <tr><td>M5 — Dashboard coûts + alertes</td><td>Yann + Board</td><td>Gate 9</td><td class="num">8 000</td></tr>
+    <tr><td>M7 — Optimisation usage Cowork</td><td>Alex + Marc (Cowork)</td><td>Q4 2026</td><td class="num">6 000</td></tr>
+    <tr><td>⭐ M9 — Cross-app prospects DB</td><td>Alex + Léa</td><td>Pré-Gate 9 (architecture)</td><td class="num">38 000</td></tr>
+    <tr class="total">
+      <td colspan="3">TOTAL Phase 1 v3</td>
+      <td class="num">~80 000</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>7.2. Décisions Board demandées v3</h3>
+
+<div class="box">
+  <ul>
+    <li>☐ <strong>Validation modèle mutualisé</strong> avec edifio Suivi et edifio ACT (allocation /3 des charges fixes)</li>
+    <li>☐ <strong>Validation pricing challenger</strong> : 149 / 299 / 549 €/mo</li>
+    <li>☐ <strong>Validation architecture cross-app prospects DB</strong> à intégrer à Gate 5 v2 (M9)</li>
+    <li>☐ <strong>Validation bundle 3 apps -15 %</strong> à proposer dès An 2 (M10)</li>
+    <li>☐ <strong>Confirmation</strong> qu'edifio Suivi et ACT sont effectivement en parallèle pour activer le flywheel</li>
+    <li>☐ <strong>Provisionnement</strong> budget cross-app activation ~5 k€ (séquences Brevo + scoring Haiku)</li>
+  </ul>
+</div>
+
+<h3>7.3. Risques spécifiques v3</h3>
+
+<table>
+  <thead>
+    <tr><th>Risque</th><th class="center">Proba.</th><th>Mitigation</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Flywheel cross-app ne s'amorce pas</strong> (qualité leads insuffisante, séquences mal calibrées)</td>
+      <td class="center">~30 %</td>
+      <td>POC sur 50 leads en An 1. Audit conversion mensuel. Ajustement séquences Brevo.</td>
+    </tr>
+    <tr>
+      <td><strong>RGPD bloque le cross-app data sharing</strong> (consentement client manquant)</td>
+      <td class="center">~20 %</td>
+      <td>Consent management explicite dès l'onboarding. CGU/CGV alignées sur ce point. Audit juriste Gate 8.</td>
+    </tr>
+    <tr>
+      <td><strong>Pricing challenger perçu « low quality »</strong> par certains prospects</td>
+      <td class="center">~15 %</td>
+      <td>Témoignages clients premium. Studio IA à 549 € signal qualité.</td>
+    </tr>
+    <tr>
+      <td><strong>Bundle 3 apps complexifie la facturation</strong> (Stripe multi-produits)</td>
+      <td class="center">~20 %</td>
+      <td>Différer M10 à An 2 (après stabilisation Sourcing). Utiliser Chargebee si Stripe trop limitant.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="footer-note">
+  Document v3.0 — relivré le 2026-05-18 après directives Board (mutualisation + cross-app + challenger). Remplace v1.0 et v2.0 pour toute référence stratégique. v1, v2 conservées en archive comparative.<br><br>
+  Sources : <code>specs/budget_infra_v1.md</code>, <code>design/copy/etude_marche_v3.html</code>, <code>specs/module_ia_dossier_v1.md</code>, abonnement Claude Cowork mutualisé 3 apps 180 €/mo HT, hypothèses flywheel basées sur volume saisie typique BTP/MOE/entreprises.<br><br>
+  — [CEO Marc] + [CTO Sophie] + [CMO Léa] · edifio Sourcing · AlyoS Ingénierie · 2026-05-18
+</div>
+
+</body>
+</html>

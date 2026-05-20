@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Étude coûts mensuels &amp; leviers d'optimisation — edifio Sourcing v1.0</title>
+<style>
+  :root {
+    --paper: #FFFFFF;
+    --paper-alt: #FAFAF8;
+    --ink: #1A1A1A;
+    --ink-muted: #5C5C5C;
+    --line: #E5E5E5;
+    --alyos-red: #C8002A;
+    --pill-bg: #FFE5EA;
+    --pill-fg: #C8002A;
+    --positive: #2D8659;
+    --warning: #B5781C;
+    --negative: #B83333;
+    --c-team: #C8002A;
+    --c-infra: #B5781C;
+    --c-anthropic: #D4A82A;
+    --c-supabase: #2D8659;
+    --c-vercel: #2D5C86;
+    --c-emails: #6B4C9A;
+    --c-support: #5C5C5C;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  body {
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 25mm 18mm;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    color: var(--ink);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    font-size: 30pt;
+    line-height: 1.05;
+    margin-top: 0;
+    border-bottom: 3px solid var(--alyos-red);
+    padding-bottom: 0.3em;
+  }
+
+  h1 .accent { color: var(--alyos-red); }
+
+  h2 {
+    font-size: 17pt;
+    margin-top: 2em;
+    padding-top: 0.5em;
+    border-top: 1px solid var(--line);
+  }
+
+  h3 {
+    font-size: 13pt;
+    color: var(--alyos-red);
+  }
+
+  h4 {
+    font-size: 11pt;
+    font-weight: 600;
+    margin-bottom: 0.25em;
+  }
+
+  p { margin: 0.5em 0 1em; }
+
+  ul, ol { margin: 0.5em 0 1em; padding-left: 1.5em; }
+  li { margin-bottom: 0.3em; }
+
+  .pill {
+    display: inline-block;
+    background: var(--pill-bg);
+    color: var(--pill-fg);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .meta {
+    color: var(--ink-muted);
+    font-size: 10pt;
+  }
+
+  .meta strong { color: var(--ink); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0 1.5em;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+
+  table th, table td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  table th {
+    background: var(--paper-alt);
+    font-weight: 600;
+    font-size: 9.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  table tr:nth-child(even) td { background: var(--paper-alt); }
+  table td.num, table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table td.center, table th.center { text-align: center; }
+  table tr.total td { font-weight: 700; background: var(--pill-bg) !important; border-top: 2px solid var(--ink); }
+  table tr.subtotal td { font-weight: 600; border-top: 1px solid var(--ink); }
+
+  .box {
+    background: var(--paper-alt);
+    border-left: 4px solid var(--alyos-red);
+    padding: 12px 16px;
+    margin: 1em 0 1.5em;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .box.positive { border-left-color: var(--positive); }
+  .box.warning { border-left-color: var(--warning); }
+  .box h4 { margin-top: 0; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 1em 0 1.5em;
+  }
+
+  .kpi {
+    background: var(--paper-alt);
+    border: 1px solid var(--line);
+    padding: 14px;
+    border-radius: 6px;
+  }
+
+  .kpi .label {
+    font-size: 9pt;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+
+  .kpi .value {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 20pt;
+    font-weight: 700;
+    color: var(--alyos-red);
+    line-height: 1;
+  }
+
+  .kpi .unit {
+    font-size: 9.5pt;
+    color: var(--ink-muted);
+    margin-top: 4px;
+  }
+
+  .lever {
+    background: var(--paper-alt);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 0.8em 0;
+    page-break-inside: avoid;
+  }
+
+  .lever.tech { border-left: 4px solid var(--c-vercel); }
+  .lever.fonc { border-left: 4px solid var(--c-supabase); }
+  .lever.mana { border-left: 4px solid var(--alyos-red); }
+
+  .lever .head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .lever .id {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    color: var(--alyos-red);
+    font-size: 11pt;
+  }
+
+  .lever .title { font-weight: 600; font-size: 11pt; }
+
+  .lever .impact {
+    margin-left: auto;
+    background: var(--positive);
+    color: white;
+    font-size: 9pt;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .lever .body { font-size: 10pt; line-height: 1.5; }
+
+  .lever .effort {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 9pt;
+    color: var(--ink-muted);
+  }
+
+  .toc {
+    background: var(--paper-alt);
+    padding: 16px 24px;
+    border-radius: 6px;
+    margin: 1em 0 2em;
+    font-size: 10pt;
+  }
+
+  .toc ol { padding-left: 1.5em; }
+  .toc li { margin-bottom: 0.2em; }
+
+  .footer-note {
+    margin-top: 3em;
+    padding-top: 1em;
+    border-top: 1px solid var(--line);
+    color: var(--ink-muted);
+    font-size: 9pt;
+    font-style: italic;
+  }
+
+  .page-break { page-break-after: always; }
+
+  .chart-container {
+    margin: 1.5em 0;
+    background: var(--paper-alt);
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+  }
+
+  .chart-container .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 9.5pt;
+    margin-top: 12px;
+  }
+
+  .chart-container .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .chart-container .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  .chart-container .chart-title {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: 11pt;
+    margin-bottom: 12px;
+  }
+
+  @media print {
+    body { padding: 15mm 12mm; max-width: 100%; }
+    h2 { page-break-after: avoid; }
+    table { page-break-inside: avoid; }
+    .kpi-grid, .lever, .box, .chart-container { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ========= PAGE DE GARDE ========= -->
+<div>
+  <span class="pill">Étude financière · v1.0</span>
+  <h1>edifio <span class="accent">Sourcing</span><br>Structure de coûts &amp; leviers d'optimisation</h1>
+  <p class="meta">
+    <strong>Auteurs</strong> : [CEO Marc] (structure financière) + [CTO Sophie] (leviers techniques) + [CMO Léa] (leviers fonctionnels)<br>
+    <strong>Date</strong> : 2026-05-18<br>
+    <strong>Statut</strong> : v1.0 — usage interne Board AlyoS Ingénierie<br>
+    <strong>Périmètre</strong> : Phase 2 commercialisation SaaS multi-clients (post-Gate 9, Q4 2026 → 2031)<br>
+    <strong>Documents amont</strong> : <code>specs/budget_infra_v1.md</code> (prévisionnel MVP), <code>design/copy/etude_marche_v1.html</code> (prévisionnel 5 ans), <code>specs/module_ia_dossier_v1.md</code> (coûts IA)
+  </p>
+</div>
+
+<div class="box">
+  <h4>Trois questions de cette étude</h4>
+  <ol>
+    <li>De quoi est faite la facture mensuelle réelle d'edifio Sourcing une fois en production ?</li>
+    <li>Comment cette facture évolue-t-elle quand on passe de 1 client (interne AlyoS) à 100, 300, 500 clients SaaS ?</li>
+    <li>Quels leviers techniques, fonctionnels et managériaux permettent d'optimiser cette structure ?</li>
+  </ol>
+</div>
+
+<div class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li>Synthèse et chiffres clés</li>
+    <li>Méthode et hypothèses</li>
+    <li>Décomposition par strate (fixe / semi-fixe / variable)</li>
+    <li>Coût par client à chaque palier tarifaire</li>
+    <li>Évolution des coûts en fonction du nombre de clients</li>
+    <li>Graphique de corrélation coûts × clients</li>
+    <li>Seuil de rentabilité et marge unitaire</li>
+    <li>21 leviers d'optimisation (8 techniques · 7 fonctionnels · 6 managériaux)</li>
+    <li>Impact cumulé sur l'EBITDA Année 5</li>
+    <li>Recommandation Board</li>
+  </ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 1. SYNTHÈSE ========= -->
+<h2>1. Synthèse et chiffres clés</h2>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Coût mensuel à 1 client</div>
+    <div class="value">~110 €</div>
+    <div class="unit">MVP interne AlyoS — Gate 9 cible</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Coût mensuel à 100 clients</div>
+    <div class="value">~15,8 k€</div>
+    <div class="unit">Équipe + infra mutualisée + variable client</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Coût mensuel à 300 clients</div>
+    <div class="value">~30,1 k€</div>
+    <div class="unit">Cible An 5 scénario base</div>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Seuil de rentabilité</div>
+    <div class="value">~42 clients</div>
+    <div class="unit">Couvre les coûts fixes à ARPU 350 €</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Marge unitaire moyenne</div>
+    <div class="value">~89 %</div>
+    <div class="unit">Avant coûts fixes — pondérée mix tier</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Économies si tous leviers actionnés</div>
+    <div class="value">~115 k€/an</div>
+    <div class="unit">À An 5, sur EBITDA base 451 k€ → 566 k€</div>
+  </div>
+</div>
+
+<h3>Conclusions clés</h3>
+
+<ol>
+  <li><strong>La structure de coûts est saine.</strong> Les coûts variables par client représentent 8-12 % du tarif perçu selon le palier. La marge contributive est donc &gt; 88 % avant coûts fixes.</li>
+  <li><strong>Les coûts fixes (équipe) dominent largement</strong> les 12-24 premiers mois. Ils représentent ~90 % de la facture mensuelle à 50 clients, mais &lt; 50 % à 300 clients (scale).</li>
+  <li><strong>Le poste Anthropic API est le seul vraiment volatil</strong> sur les coûts variables. À 100 clients, il représente ~40 % des coûts variables (mais 6-8 % du CA).</li>
+  <li><strong>21 leviers identifiés</strong>, dont 6 « quick wins » à impact &gt; 5 k€/an chacun activables en &lt; 1 mois d'effort.</li>
+  <li><strong>L'EBITDA An 5 peut passer de 451 k€ à 566 k€</strong> (+25 %) si tous les leviers sont actionnés sans dégrader la qualité produit.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ========= 2. MÉTHODE ========= -->
+<h2>2. Méthode et hypothèses</h2>
+
+<h3>2.1. Classification des coûts en 3 strates</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Strate</th>
+      <th>Définition</th>
+      <th>Exemples</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Fixes</strong></td>
+      <td>Coûts qui ne varient pas avec le nombre de clients (sauf paliers d'équipe long terme)</td>
+      <td>Équipe (CTO, CEO, CMO, CS), DNS, outillage dev (GitHub, Sentry)</td>
+    </tr>
+    <tr>
+      <td><strong>Semi-fixes</strong></td>
+      <td>Coûts qui sautent par paliers à des seuils de volume</td>
+      <td>Supabase Pro → Team → Enterprise, Brevo Lite → Premium, Resend Free → Pro → Scale</td>
+    </tr>
+    <tr>
+      <td><strong>Variables</strong></td>
+      <td>Coûts linéaires en fonction du nombre de clients actifs ou de l'usage</td>
+      <td>Anthropic API tokens (Sonnet + Haiku), bandwidth Vercel, storage Supabase, emails Brevo/Resend par client actif</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>2.2. Hypothèses centrales du modèle</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th class="num">Valeur</th>
+      <th>Justification</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Mix tier (% clients par palier)</td>
+      <td class="num">50 / 35 / 15</td>
+      <td>Sourcing / Cotraitance / Studio IA. Cohérent avec progression d'upsell naturelle décrite étude marché § 6.3</td>
+    </tr>
+    <tr>
+      <td>ARPU mensuel moyen pondéré</td>
+      <td class="num">~350 €</td>
+      <td>0,5 × 190 + 0,35 × 390 + 0,15 × 790 = 350</td>
+    </tr>
+    <tr>
+      <td>Usage IA Sourcing tier (Haiku scoring)</td>
+      <td class="num">1 000 AO/mois × 0,01 €</td>
+      <td>P4 tender_scoring_complementary — cf. budget_infra_v1 §2</td>
+    </tr>
+    <tr>
+      <td>Usage IA Cotraitance tier</td>
+      <td class="num">+30-60 sollicitations × 0,01 €</td>
+      <td>P5 matching + P6/P7 sujets emails</td>
+    </tr>
+    <tr>
+      <td>Usage IA Studio tier</td>
+      <td class="num">20 AO/mois × 1,5-4 €</td>
+      <td>P1 analyse RC Sonnet + P3 CERFA + P2 mémoire technique Sonnet</td>
+    </tr>
+    <tr>
+      <td>Storage moyen par client actif</td>
+      <td class="num">~2 Go</td>
+      <td>RC archivés + dossiers générés + attachements emails. Sourcing 0,5 Go, Studio 4 Go.</td>
+    </tr>
+    <tr>
+      <td>Emails Brevo / mois / client actif</td>
+      <td class="num">Sourcing 5, Cotraitance 50, Studio 80</td>
+      <td>Sollicitations architectes + relances J+3 + notifications statuts</td>
+    </tr>
+    <tr>
+      <td>Emails Resend / mois / client actif</td>
+      <td class="num">~10 (tous tiers)</td>
+      <td>Welcome, password reset, push notifications utilisateurs internes</td>
+    </tr>
+    <tr>
+      <td>Support : coût/client/mois</td>
+      <td class="num">Sourcing 5 €, Cotraitance 8 €, Studio 15 €</td>
+      <td>Ratio 0.5 ETP CS pour 100 clients = 25 k€/an → 25 €/client/mo moyenné, pondéré par complexité tier</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ========= 3. DÉCOMPOSITION PAR STRATE ========= -->
+<h2>3. Décomposition par strate</h2>
+
+<h3>3.1. Coûts FIXES (en €/mois, hors variation équipe inter-annuelle)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th>Fournisseur</th>
+      <th class="num">An 1</th>
+      <th class="num">An 3</th>
+      <th class="num">An 5</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>CTO 1 ETP (Sophie + équivalent)</td>
+      <td>AlyoS interne</td>
+      <td class="num">6 700 €</td>
+      <td class="num">7 500 €</td>
+      <td class="num">8 300 €</td>
+      <td>80 k€/an chargé → +5 %/an</td>
+    </tr>
+    <tr>
+      <td>CEO 0,5 ETP (Marc — pilotage produit)</td>
+      <td>AlyoS interne</td>
+      <td class="num">3 300 €</td>
+      <td class="num">3 700 €</td>
+      <td class="num">4 100 €</td>
+      <td>40 k€/an chargé</td>
+    </tr>
+    <tr>
+      <td>CMO 0,5 ETP (Léa — acquisition + content)</td>
+      <td>AlyoS interne</td>
+      <td class="num">2 500 €</td>
+      <td class="num">3 800 €</td>
+      <td class="num">5 800 €</td>
+      <td>30 k€/an An 1 → 70 k€/an An 5 (passage progressif 0,5→1 ETP)</td>
+    </tr>
+    <tr>
+      <td>Customer Success 0,5 ETP</td>
+      <td>AlyoS interne</td>
+      <td class="num">0 €</td>
+      <td class="num">2 500 €</td>
+      <td class="num">5 800 €</td>
+      <td>Embauche à 30 clients (Q2 An 2). Passe à 1 ETP à 150 clients</td>
+    </tr>
+    <tr>
+      <td>Dev junior (renfort Alex)</td>
+      <td>AlyoS interne</td>
+      <td class="num">0 €</td>
+      <td class="num">0 €</td>
+      <td class="num">4 600 €</td>
+      <td>Embauche à 200 clients fin An 4. 55 k€/an</td>
+    </tr>
+    <tr class="subtotal">
+      <td colspan="2">Sous-total équipe</td>
+      <td class="num">12 500 €</td>
+      <td class="num">17 500 €</td>
+      <td class="num">28 600 €</td>
+      <td>Représente 80-95 % des fixes</td>
+    </tr>
+    <tr>
+      <td>GitHub Team (Alex + Yann + Sophie)</td>
+      <td>GitHub</td>
+      <td class="num">12 €</td>
+      <td class="num">12 €</td>
+      <td class="num">16 €</td>
+      <td>4 $/utilisateur/mo</td>
+    </tr>
+    <tr>
+      <td>DNS</td>
+      <td>IONOS</td>
+      <td class="num">3 €</td>
+      <td class="num">3 €</td>
+      <td class="num">3 €</td>
+      <td>Déjà payé par AlyoS</td>
+    </tr>
+    <tr>
+      <td>Sentry (monitoring erreurs)</td>
+      <td>Sentry</td>
+      <td class="num">0 €</td>
+      <td class="num">26 €</td>
+      <td class="num">26 €</td>
+      <td>Free tier → Team à 50 clients</td>
+    </tr>
+    <tr>
+      <td>Anthropic Console (compte payant)</td>
+      <td>Anthropic</td>
+      <td class="num">0 €</td>
+      <td class="num">0 €</td>
+      <td class="num">0 €</td>
+      <td>Pas d'abonnement, usage-based uniquement</td>
+    </tr>
+    <tr>
+      <td>Comptable / juriste (provision)</td>
+      <td>Externe</td>
+      <td class="num">150 €</td>
+      <td class="num">300 €</td>
+      <td class="num">500 €</td>
+      <td>RGPD audit, CGU/CGV, comptabilité SaaS</td>
+    </tr>
+    <tr class="subtotal">
+      <td colspan="2">Sous-total outillage / services</td>
+      <td class="num">~165 €</td>
+      <td class="num">~340 €</td>
+      <td class="num">~545 €</td>
+      <td></td>
+    </tr>
+    <tr class="total">
+      <td colspan="2">TOTAL FIXES</td>
+      <td class="num">~12 665 €</td>
+      <td class="num">~17 840 €</td>
+      <td class="num">~29 145 €</td>
+      <td>~ 152, 214, 350 k€/an</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.2. Coûts SEMI-FIXES (paliers de volume)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th>Fournisseur</th>
+      <th>Seuil de déclenchement</th>
+      <th class="num">Coût palier</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Vercel Pro (équipe dev)</td>
+      <td>Vercel</td>
+      <td>0-5 utilisateurs internes</td>
+      <td class="num">20 €/user/mo</td>
+      <td>3 dev seats An 1 → 5 dev seats An 5 = 60-100 €/mo</td>
+    </tr>
+    <tr>
+      <td>Supabase Pro</td>
+      <td>Supabase</td>
+      <td>0-50 clients actifs</td>
+      <td class="num">24 €/mo</td>
+      <td>Inclut 8 Go DB, 100 Go bandwidth, 100 Go storage</td>
+    </tr>
+    <tr>
+      <td>Supabase Pro + compute add-on</td>
+      <td>Supabase</td>
+      <td>50-150 clients actifs</td>
+      <td class="num">+60 €/mo</td>
+      <td>Compute Small → Medium (CPU + RAM)</td>
+    </tr>
+    <tr>
+      <td>Supabase Team</td>
+      <td>Supabase</td>
+      <td>150-400 clients actifs</td>
+      <td class="num">580 €/mo</td>
+      <td>Compute Large + 1 To DB + SLA + SOC2</td>
+    </tr>
+    <tr>
+      <td>Brevo Lite</td>
+      <td>Brevo</td>
+      <td>Volume &gt; 9 000 emails/mo (~30 clients Cotraitance)</td>
+      <td class="num">~25 €/mo</td>
+      <td>20 000 emails/mo</td>
+    </tr>
+    <tr>
+      <td>Brevo Premium</td>
+      <td>Brevo</td>
+      <td>Volume &gt; 60 000 emails/mo</td>
+      <td class="num">~65 €/mo</td>
+      <td>Templates + segments + automatisations</td>
+    </tr>
+    <tr>
+      <td>Resend Pro</td>
+      <td>Resend</td>
+      <td>Volume &gt; 3 000 emails/mo (~30 clients actifs)</td>
+      <td class="num">20 €/mo</td>
+      <td>100 000 emails/mo inclus</td>
+    </tr>
+    <tr>
+      <td>Resend Scale</td>
+      <td>Resend</td>
+      <td>Volume &gt; 100 000 emails/mo</td>
+      <td class="num">95 €/mo</td>
+      <td>Au-delà de 250 clients actifs</td>
+    </tr>
+    <tr>
+      <td>Fly.io scaling</td>
+      <td>Fly.io</td>
+      <td>0-20 clients : 1 instance · 20-100 : 2 instances · &gt;100 : 3</td>
+      <td class="num">5-20 €/mo</td>
+      <td>256-512 Mo RAM par instance</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.3. Coûts VARIABLES par client actif (en €/mois)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">Sourcing 190 €</th>
+      <th class="num">Cotraitance 390 €</th>
+      <th class="num">Studio IA 790 €</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Anthropic API (scoring Haiku)</td>
+      <td class="num">5 €</td>
+      <td class="num">6 €</td>
+      <td class="num">6 €</td>
+    </tr>
+    <tr>
+      <td>Anthropic API (Tandem matching + emails Haiku)</td>
+      <td class="num">0 €</td>
+      <td class="num">3 €</td>
+      <td class="num">3 €</td>
+    </tr>
+    <tr>
+      <td>Anthropic API (Studio IA — Sonnet 4.6 lourd)</td>
+      <td class="num">0 €</td>
+      <td class="num">0 €</td>
+      <td class="num">60 €</td>
+    </tr>
+    <tr>
+      <td>Supabase storage (par client)</td>
+      <td class="num">1 €</td>
+      <td class="num">2 €</td>
+      <td class="num">5 €</td>
+    </tr>
+    <tr>
+      <td>Supabase bandwidth (par client)</td>
+      <td class="num">0,5 €</td>
+      <td class="num">1 €</td>
+      <td class="num">2 €</td>
+    </tr>
+    <tr>
+      <td>Brevo (emails architectes par client)</td>
+      <td class="num">0,5 €</td>
+      <td class="num">2,5 €</td>
+      <td class="num">4 €</td>
+    </tr>
+    <tr>
+      <td>Resend (emails utilisateurs par client)</td>
+      <td class="num">0,2 €</td>
+      <td class="num">0,3 €</td>
+      <td class="num">0,5 €</td>
+    </tr>
+    <tr>
+      <td>Support (provision)</td>
+      <td class="num">5 €</td>
+      <td class="num">8 €</td>
+      <td class="num">15 €</td>
+    </tr>
+    <tr class="total">
+      <td>Coût variable / client / mois</td>
+      <td class="num">~12 €</td>
+      <td class="num">~23 €</td>
+      <td class="num">~96 €</td>
+    </tr>
+    <tr>
+      <td>Marge unitaire mensuelle</td>
+      <td class="num"><strong>178 € (94 %)</strong></td>
+      <td class="num"><strong>367 € (94 %)</strong></td>
+      <td class="num"><strong>694 € (88 %)</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="box">
+  <h4>Lecture clé</h4>
+  <p>Le tier <strong>Studio IA est le plus consommateur en absolu</strong> (96 €/client/mois de coût variable) mais reste à <strong>88 % de marge unitaire</strong>. Le quota dur 20 AO Studio inclus + 1,50 €/AO overage (acté Gate 1) est précisément calibré pour ce ratio.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 4. COÛT PAR TIER ========= -->
+<h2>4. Coût par client à chaque palier tarifaire</h2>
+
+<h3>4.1. Décomposition visuelle du coût par tier</h3>
+
+<div class="chart-container">
+  <div class="chart-title">Coût variable mensuel par client — décomposition par poste</div>
+  <svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+    <!-- Y axis labels -->
+    <text x="40" y="30" font-size="9" fill="#5C5C5C">100 €</text>
+    <text x="40" y="80" font-size="9" fill="#5C5C5C">75 €</text>
+    <text x="40" y="130" font-size="9" fill="#5C5C5C">50 €</text>
+    <text x="40" y="180" font-size="9" fill="#5C5C5C">25 €</text>
+    <text x="40" y="230" font-size="9" fill="#5C5C5C">0 €</text>
+
+    <!-- Grid lines -->
+    <line x1="80" y1="30" x2="680" y2="30" stroke="#E5E5E5" stroke-width="1"/>
+    <line x1="80" y1="80" x2="680" y2="80" stroke="#E5E5E5" stroke-width="1"/>
+    <line x1="80" y1="130" x2="680" y2="130" stroke="#E5E5E5" stroke-width="1"/>
+    <line x1="80" y1="180" x2="680" y2="180" stroke="#E5E5E5" stroke-width="1"/>
+    <line x1="80" y1="230" x2="680" y2="230" stroke="#1A1A1A" stroke-width="2"/>
+
+    <!-- Sourcing tier bar (total 12€) - centered at x=200, width=120 -->
+    <g>
+      <!-- Anthropic Haiku 5€ - 10px = 5€×2 -->
+      <rect x="140" y="220" width="120" height="10" fill="#D4A82A"/>
+      <!-- Supabase storage 1€ -->
+      <rect x="140" y="218" width="120" height="2" fill="#2D8659"/>
+      <!-- Supabase bandwidth 0.5€ -->
+      <rect x="140" y="217" width="120" height="1" fill="#5BA37E"/>
+      <!-- Brevo 0.5€ -->
+      <rect x="140" y="216" width="120" height="1" fill="#6B4C9A"/>
+      <!-- Resend 0.2€ -->
+      <rect x="140" y="215.6" width="120" height="0.4" fill="#9B7BC4"/>
+      <!-- Support 5€ -->
+      <rect x="140" y="205.6" width="120" height="10" fill="#5C5C5C"/>
+      <text x="200" y="246" font-size="11" fill="#1A1A1A" text-anchor="middle" font-weight="600">Sourcing</text>
+      <text x="200" y="260" font-size="9" fill="#5C5C5C" text-anchor="middle">12 €/mo coût</text>
+      <text x="200" y="272" font-size="9" fill="#C8002A" text-anchor="middle" font-weight="600">94 % marge</text>
+    </g>
+
+    <!-- Cotraitance tier bar (total 23€) -->
+    <g>
+      <!-- Anthropic Haiku scoring 6€ -->
+      <rect x="320" y="218" width="120" height="12" fill="#D4A82A"/>
+      <!-- Anthropic Haiku Tandem 3€ -->
+      <rect x="320" y="212" width="120" height="6" fill="#E0B850"/>
+      <!-- Supabase storage 2€ -->
+      <rect x="320" y="208" width="120" height="4" fill="#2D8659"/>
+      <!-- Supabase bandwidth 1€ -->
+      <rect x="320" y="206" width="120" height="2" fill="#5BA37E"/>
+      <!-- Brevo 2.5€ -->
+      <rect x="320" y="201" width="120" height="5" fill="#6B4C9A"/>
+      <!-- Resend 0.3€ -->
+      <rect x="320" y="200.4" width="120" height="0.6" fill="#9B7BC4"/>
+      <!-- Support 8€ -->
+      <rect x="320" y="184.4" width="120" height="16" fill="#5C5C5C"/>
+      <text x="380" y="246" font-size="11" fill="#1A1A1A" text-anchor="middle" font-weight="600">Cotraitance</text>
+      <text x="380" y="260" font-size="9" fill="#5C5C5C" text-anchor="middle">23 €/mo coût</text>
+      <text x="380" y="272" font-size="9" fill="#C8002A" text-anchor="middle" font-weight="600">94 % marge</text>
+    </g>
+
+    <!-- Studio IA tier bar (total 96€) - this is the big one -->
+    <g>
+      <!-- Anthropic Haiku scoring 6€ -->
+      <rect x="500" y="218" width="120" height="12" fill="#D4A82A"/>
+      <!-- Anthropic Haiku Tandem 3€ -->
+      <rect x="500" y="212" width="120" height="6" fill="#E0B850"/>
+      <!-- Anthropic Sonnet Studio 60€ - this dominates -->
+      <rect x="500" y="92" width="120" height="120" fill="#C8002A"/>
+      <!-- Supabase storage 5€ -->
+      <rect x="500" y="82" width="120" height="10" fill="#2D8659"/>
+      <!-- Supabase bandwidth 2€ -->
+      <rect x="500" y="78" width="120" height="4" fill="#5BA37E"/>
+      <!-- Brevo 4€ -->
+      <rect x="500" y="70" width="120" height="8" fill="#6B4C9A"/>
+      <!-- Resend 0.5€ -->
+      <rect x="500" y="69" width="120" height="1" fill="#9B7BC4"/>
+      <!-- Support 15€ -->
+      <rect x="500" y="39" width="120" height="30" fill="#5C5C5C"/>
+      <text x="560" y="246" font-size="11" fill="#1A1A1A" text-anchor="middle" font-weight="600">Studio IA</text>
+      <text x="560" y="260" font-size="9" fill="#5C5C5C" text-anchor="middle">96 €/mo coût</text>
+      <text x="560" y="272" font-size="9" fill="#C8002A" text-anchor="middle" font-weight="600">88 % marge</text>
+    </g>
+  </svg>
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="background: #C8002A"></span>Anthropic Sonnet (Studio IA)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #D4A82A"></span>Anthropic Haiku (scoring)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #E0B850"></span>Anthropic Haiku (Tandem)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #2D8659"></span>Supabase storage</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #5BA37E"></span>Supabase bandwidth</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #6B4C9A"></span>Brevo emails</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #9B7BC4"></span>Resend emails</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #5C5C5C"></span>Support humain</div>
+  </div>
+</div>
+
+<h3>4.2. Observation clé</h3>
+
+<div class="box">
+  <p>Sur le tier Studio IA, <strong>Anthropic Sonnet représente 60 % du coût variable</strong>. C'est notre principal poste d'optimisation. Sur les tiers Sourcing et Cotraitance, le <strong>support humain</strong> est le poste dominant (40-45 % du coût variable). Différentes stratégies d'optimisation s'imposent selon le tier (cf. § 8).</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 5. COÛTS x NOMBRE CLIENTS ========= -->
+<h2>5. Évolution des coûts en fonction du nombre de clients</h2>
+
+<h3>5.1. Tableau de modélisation (scénario base, ARPU 350 €)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th class="num">Clients actifs</th>
+      <th class="num">Mix tier (S/C/St)</th>
+      <th class="num">Coûts fixes</th>
+      <th class="num">Coûts semi-fixes</th>
+      <th class="num">Coûts variables</th>
+      <th class="num">TOTAL coûts</th>
+      <th class="num">Revenus</th>
+      <th class="num">Marge</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="num">1</td>
+      <td class="num">0/0/1</td>
+      <td class="num">12 500 €</td>
+      <td class="num">60 €</td>
+      <td class="num">96 €</td>
+      <td class="num">12 656 €</td>
+      <td class="num">790 €</td>
+      <td class="num">-11 866 €</td>
+    </tr>
+    <tr>
+      <td class="num">10</td>
+      <td class="num">5/4/1</td>
+      <td class="num">12 500 €</td>
+      <td class="num">85 €</td>
+      <td class="num">~250 €</td>
+      <td class="num">12 835 €</td>
+      <td class="num">3 460 €</td>
+      <td class="num">-9 375 €</td>
+    </tr>
+    <tr>
+      <td class="num">30</td>
+      <td class="num">15/11/4</td>
+      <td class="num">13 000 €</td>
+      <td class="num">130 €</td>
+      <td class="num">~830 €</td>
+      <td class="num">13 960 €</td>
+      <td class="num">10 530 €</td>
+      <td class="num">-3 430 €</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td class="num">42</td>
+      <td class="num">21/15/6</td>
+      <td class="num">13 200 €</td>
+      <td class="num">145 €</td>
+      <td class="num">~1 200 €</td>
+      <td class="num">14 545 €</td>
+      <td class="num">14 580 €</td>
+      <td class="num">+35 €</td>
+    </tr>
+    <tr>
+      <td class="num">50</td>
+      <td class="num">25/17/8</td>
+      <td class="num">14 000 €</td>
+      <td class="num">170 €</td>
+      <td class="num">~1 470 €</td>
+      <td class="num">15 640 €</td>
+      <td class="num">17 350 €</td>
+      <td class="num">+1 710 €</td>
+    </tr>
+    <tr>
+      <td class="num">100</td>
+      <td class="num">50/35/15</td>
+      <td class="num">15 500 €</td>
+      <td class="num">230 €</td>
+      <td class="num">~3 100 €</td>
+      <td class="num">18 830 €</td>
+      <td class="num">34 700 €</td>
+      <td class="num">+15 870 €</td>
+    </tr>
+    <tr>
+      <td class="num">150</td>
+      <td class="num">75/52/23</td>
+      <td class="num">17 000 €</td>
+      <td class="num">295 €</td>
+      <td class="num">~4 700 €</td>
+      <td class="num">21 995 €</td>
+      <td class="num">52 050 €</td>
+      <td class="num">+30 055 €</td>
+    </tr>
+    <tr>
+      <td class="num">200</td>
+      <td class="num">100/70/30</td>
+      <td class="num">22 000 €</td>
+      <td class="num">880 €</td>
+      <td class="num">~6 200 €</td>
+      <td class="num">29 080 €</td>
+      <td class="num">69 400 €</td>
+      <td class="num">+40 320 €</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td class="num">300</td>
+      <td class="num">150/105/45</td>
+      <td class="num">27 000 €</td>
+      <td class="num">920 €</td>
+      <td class="num">~9 300 €</td>
+      <td class="num">37 220 €</td>
+      <td class="num">104 100 €</td>
+      <td class="num">+66 880 €</td>
+    </tr>
+    <tr>
+      <td class="num">500</td>
+      <td class="num">250/175/75</td>
+      <td class="num">32 000 €</td>
+      <td class="num">1 040 €</td>
+      <td class="num">~15 500 €</td>
+      <td class="num">48 540 €</td>
+      <td class="num">173 500 €</td>
+      <td class="num">+124 960 €</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="font-size: 9.5pt; color: var(--ink-muted); margin-top: -8px;">
+Les lignes en rose marquent (a) le seuil de rentabilité ~42 clients et (b) la cible An 5 du scénario base ~300 clients.
+</p>
+
+<h3>5.2. Graphique de corrélation coûts × clients</h3>
+
+<div class="chart-container">
+  <div class="chart-title">Coûts mensuels et revenus en fonction du nombre de clients actifs</div>
+  <svg viewBox="0 0 720 380" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+    <!-- Y axis labels (€/mois) -->
+    <text x="20" y="20" font-size="9" fill="#5C5C5C">180 k€</text>
+    <text x="20" y="65" font-size="9" fill="#5C5C5C">150 k€</text>
+    <text x="20" y="110" font-size="9" fill="#5C5C5C">120 k€</text>
+    <text x="20" y="155" font-size="9" fill="#5C5C5C">90 k€</text>
+    <text x="20" y="200" font-size="9" fill="#5C5C5C">60 k€</text>
+    <text x="20" y="245" font-size="9" fill="#5C5C5C">30 k€</text>
+    <text x="20" y="290" font-size="9" fill="#5C5C5C">0 €</text>
+
+    <!-- X axis labels (clients) -->
+    <text x="65" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">1</text>
+    <text x="113" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">10</text>
+    <text x="170" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">30</text>
+    <text x="195" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">42</text>
+    <text x="222" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">50</text>
+    <text x="280" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">100</text>
+    <text x="343" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">150</text>
+    <text x="410" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">200</text>
+    <text x="540" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">300</text>
+    <text x="680" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">500</text>
+    <text x="370" y="335" font-size="10" fill="#1A1A1A" text-anchor="middle" font-weight="600">Nombre de clients actifs</text>
+
+    <!-- Grid lines -->
+    <line x1="60" y1="15" x2="700" y2="15" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="60" x2="700" y2="60" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="105" x2="700" y2="105" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="150" x2="700" y2="150" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="195" x2="700" y2="195" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="240" x2="700" y2="240" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="285" x2="700" y2="285" stroke="#1A1A1A" stroke-width="1.5"/>
+
+    <!-- Vertical axis -->
+    <line x1="60" y1="15" x2="60" y2="285" stroke="#1A1A1A" stroke-width="1.5"/>
+
+    <!-- Break-even vertical line at x=195 (42 clients) -->
+    <line x1="195" y1="15" x2="195" y2="285" stroke="#C8002A" stroke-width="1" stroke-dasharray="4 2" opacity="0.6"/>
+    <text x="198" y="28" font-size="9" fill="#C8002A" font-weight="600">Seuil rentabilité</text>
+
+    <!-- Cost line (TOTAL) - red line -->
+    <!-- Data points (x_client, y_total):
+         (1, 12656) -> y=285-(12656/600)=285-21=264
+         (10, 12835) -> 285-21=264
+         (30, 13960) -> 285-23=262
+         (42, 14545) -> 285-24=261
+         (50, 15640) -> 285-26=259
+         (100, 18830) -> 285-31=254
+         (150, 21995) -> 285-37=248
+         (200, 29080) -> 285-48=237
+         (300, 37220) -> 285-62=223
+         (500, 48540) -> 285-81=204
+         scale: 180k -> 270px from 285 -> y=15. Pixel scale = 270/180000 = 0.0015 -->
+    <polyline
+      points="65,266 113,266 170,265 195,265 222,264 280,257 343,252 410,240 540,229 680,212"
+      fill="none" stroke="#C8002A" stroke-width="3"/>
+    <text x="690" y="210" font-size="9" fill="#C8002A" font-weight="600">Coûts totaux</text>
+
+    <!-- Fixed costs line - red dashed -->
+    <!-- 12500, 12500, 13000, 13200, 14000, 15500, 17000, 22000, 27000, 32000 -->
+    <polyline
+      points="65,266 113,266 170,266 195,265 222,264 280,262 343,260 410,252 540,245 680,237"
+      fill="none" stroke="#5C5C5C" stroke-width="2" stroke-dasharray="5 3"/>
+    <text x="690" y="235" font-size="9" fill="#5C5C5C" font-weight="600">Coûts fixes</text>
+
+    <!-- Variable costs line - orange -->
+    <!-- 96, 250, 830, 1200, 1470, 3100, 4700, 6200, 9300, 15500 -->
+    <polyline
+      points="65,285 113,285 170,284 195,283 222,283 280,280 343,278 410,276 540,271 680,262"
+      fill="none" stroke="#B5781C" stroke-width="2"/>
+    <text x="690" y="260" font-size="9" fill="#B5781C" font-weight="600">Coûts variables</text>
+
+    <!-- Revenue line - green -->
+    <!-- 790, 3460, 10530, 14580, 17350, 34700, 52050, 69400, 104100, 173500 -->
+    <polyline
+      points="65,284 113,280 170,269 195,263 222,259 280,233 343,207 410,181 540,129 680,25"
+      fill="none" stroke="#2D8659" stroke-width="3"/>
+    <text x="690" y="23" font-size="9" fill="#2D8659" font-weight="600">Revenus</text>
+
+    <!-- Break-even point marker -->
+    <circle cx="195" cy="263" r="5" fill="#C8002A" stroke="white" stroke-width="2"/>
+
+  </svg>
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="background: #C8002A"></span>Coûts totaux mensuels</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #5C5C5C; opacity: 0.7"></span>Coûts fixes (équipe + outils)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #B5781C"></span>Coûts variables (par client)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #2D8659"></span>Revenus mensuels (ARPU 350 €)</div>
+  </div>
+</div>
+
+<div class="box">
+  <h4>Lecture clé du graphique</h4>
+  <p>La courbe rouge des coûts totaux est <strong>presque plate jusqu'à 100 clients</strong> (les fixes dominent), puis <strong>croît modérément</strong> au-delà (les variables prennent le relais). La courbe verte des revenus croît <strong>linéairement et fortement</strong>. Le point d'intersection à ~42 clients marque le seuil de rentabilité. Au-delà, chaque client supplémentaire contribue <strong>~320 € de marge brute mensuelle</strong>.</p>
+</div>
+
+<h3>5.3. Marge contributive par client supplémentaire (vue marginale)</h3>
+
+<div class="chart-container">
+  <div class="chart-title">Marge contributive incrémentale (€/client/mo) par tier vs revenus</div>
+  <svg viewBox="0 0 700 230" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+    <!-- Background bars representing tier revenue -->
+    <rect x="100" y="40" width="120" height="160" fill="#FAFAF8" stroke="#E5E5E5"/>
+    <rect x="280" y="40" width="120" height="160" fill="#FAFAF8" stroke="#E5E5E5"/>
+    <rect x="460" y="40" width="120" height="160" fill="#FAFAF8" stroke="#E5E5E5"/>
+
+    <!-- Sourcing: ARPU 190, Cost 12 -->
+    <rect x="100" y="160" width="120" height="40" fill="#5C5C5C"/>
+    <rect x="100" y="40" width="120" height="120" fill="#C8002A"/>
+    <text x="160" y="22" font-size="11" font-weight="600" text-anchor="middle">Sourcing 190 €</text>
+    <text x="160" y="105" font-size="14" font-weight="700" fill="white" text-anchor="middle">+178 €</text>
+    <text x="160" y="120" font-size="9" fill="white" text-anchor="middle">marge unitaire</text>
+    <text x="160" y="185" font-size="9" fill="white" text-anchor="middle">coût 12 €</text>
+    <text x="160" y="218" font-size="9" fill="#5C5C5C" text-anchor="middle">94 % marge contributive</text>
+
+    <!-- Cotraitance: ARPU 390, Cost 23 -->
+    <rect x="280" y="178" width="120" height="22" fill="#5C5C5C"/>
+    <rect x="280" y="40" width="120" height="138" fill="#C8002A"/>
+    <text x="340" y="22" font-size="11" font-weight="600" text-anchor="middle">Cotraitance 390 €</text>
+    <text x="340" y="105" font-size="14" font-weight="700" fill="white" text-anchor="middle">+367 €</text>
+    <text x="340" y="120" font-size="9" fill="white" text-anchor="middle">marge unitaire</text>
+    <text x="340" y="195" font-size="9" fill="white" text-anchor="middle">coût 23 €</text>
+    <text x="340" y="218" font-size="9" fill="#5C5C5C" text-anchor="middle">94 % marge contributive</text>
+
+    <!-- Studio IA: ARPU 790, Cost 96 -->
+    <rect x="460" y="160" width="120" height="40" fill="#5C5C5C"/>
+    <rect x="460" y="40" width="120" height="120" fill="#C8002A"/>
+    <text x="520" y="22" font-size="11" font-weight="600" text-anchor="middle">Studio IA 790 €</text>
+    <text x="520" y="100" font-size="14" font-weight="700" fill="white" text-anchor="middle">+694 €</text>
+    <text x="520" y="115" font-size="9" fill="white" text-anchor="middle">marge unitaire</text>
+    <text x="520" y="185" font-size="9" fill="white" text-anchor="middle">coût 96 €</text>
+    <text x="520" y="218" font-size="9" fill="#5C5C5C" text-anchor="middle">88 % marge contributive</text>
+  </svg>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 6. SEUIL ========= -->
+<h2>6. Seuil de rentabilité et marge unitaire</h2>
+
+<h3>6.1. Calcul du seuil de rentabilité</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th class="num">Valeur</th>
+      <th>Calcul</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Coûts fixes mensuels An 1</td>
+      <td class="num">12 500 €</td>
+      <td>Équipe seulement (1 CTO + 0,5 CEO + 0,5 CMO + outils)</td>
+    </tr>
+    <tr>
+      <td>ARPU mensuel moyen</td>
+      <td class="num">350 €</td>
+      <td>Mix 50/35/15</td>
+    </tr>
+    <tr>
+      <td>Coût variable moyen / client</td>
+      <td class="num">31 €</td>
+      <td>0,5 × 12 + 0,35 × 23 + 0,15 × 96 = 30,75 €</td>
+    </tr>
+    <tr>
+      <td>Marge unitaire mensuelle</td>
+      <td class="num">319 €</td>
+      <td>350 - 31</td>
+    </tr>
+    <tr class="total">
+      <td>Seuil de rentabilité</td>
+      <td class="num">~42 clients</td>
+      <td>12 500 / 319 = 39,2 → arrondi 42 (couverture des paliers semi-fixes)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>6.2. Date estimée d'atteinte du seuil (scénario base)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Mois</th>
+      <th class="num">Clients cumulés</th>
+      <th class="num">EBITDA mensuel</th>
+      <th>Commentaire</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Q4 2026 (lancement)</td>
+      <td class="num">10</td>
+      <td class="num">-9,4 k€</td>
+      <td>Pilotes AlyoS réseau direct</td>
+    </tr>
+    <tr>
+      <td>Q1 2027</td>
+      <td class="num">18</td>
+      <td class="num">-6,8 k€</td>
+      <td>Acquisition SEA + parrainage commencent</td>
+    </tr>
+    <tr>
+      <td>Q2 2027</td>
+      <td class="num">26</td>
+      <td class="num">-4,2 k€</td>
+      <td>Partenariats fédérations enclenchés</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td>Q3 2027</td>
+      <td class="num">42</td>
+      <td class="num">~0 €</td>
+      <td>SEUIL ATTEINT (T+12 mois post-lancement)</td>
+    </tr>
+    <tr>
+      <td>Q4 2027</td>
+      <td class="num">56</td>
+      <td class="num">+4,4 k€</td>
+      <td>Premier trimestre rentable</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ========= 7-8. LEVIERS ========= -->
+<h2>7. 21 leviers d'optimisation</h2>
+
+<p>Chaque levier est étiqueté <strong>T</strong> (Technique), <strong>F</strong> (Fonctionnel) ou <strong>M</strong> (Managérial), avec impact chiffré (€/an économisés à 200 clients actifs) et effort de mise en œuvre.</p>
+
+<h3>7.1. Leviers techniques (T1 à T8) — pilotés par CTO Sophie</h3>
+
+<div class="lever tech">
+  <div class="head"><span class="id">T1</span><span class="title">Cache des appels Anthropic Haiku (scoring AO)</span><span class="impact">~9 k€/an</span></div>
+  <div class="body">Beaucoup d'AO réapparaissent à l'identique sur plusieurs plateformes (BOAMP + MP.info publient souvent le même AO). Mettre en place un cache 7 jours sur le hash composite (CPV + acheteur + objet) → réduction ~35 % des appels Haiku scoring. À 200 clients qui consomment ~10 € de Haiku/mo → économie 35 % × 10 € × 200 × 12 = 8 400 €/an.</div>
+  <div class="effort">Effort : 2-3 j Alex · Tech : table cache Drizzle + TTL côté Edge Function</div>
+</div>
+
+<div class="lever tech">
+  <div class="head"><span class="id">T2</span><span class="title">Prompt caching Anthropic (system prompts répétés)</span><span class="impact">~14 k€/an</span></div>
+  <div class="body">L'API Anthropic supporte le prompt caching depuis 2024. Les system prompts P1 (analyse RC) et P2 (mémoire technique) sont identiques entre appels, seul l'input client change. Activer le caching → réduction ~70 % du coût des tokens input répétés. Sur le tier Studio IA (60 €/client/mo de Sonnet), économie ~14 % du tier → 14 €/client/mo × 45 clients Studio × 12 = 7 560 €/an. Avec montée en volume, ~14 k€/an à terme.</div>
+  <div class="effort">Effort : 1-2 j Alex · Tech : ajout headers cache-control sur appels Anthropic</div>
+</div>
+
+<div class="lever tech">
+  <div class="head"><span class="id">T3</span><span class="title">Compression jsonb agressive (raw_data BOAMP)</span><span class="impact">~3 k€/an</span></div>
+  <div class="body">Postgres supporte la compression TOAST automatiquement, mais on peut forcer une compression LZ4 sur les colonnes jsonb les plus volumineuses (`tenders.raw_data`, `ai_runs.output`). Réduction storage ~4×. Sur 200 clients × 2 Go × 0,021 €/Go/mo Supabase = 8,4 €/client/mo → -75 % = 6,3 €/client/mo économisés × 200 × 12 = 15 120 €/an théorique. En pratique, hit ~20 % du total storage → 3 k€/an réaliste.</div>
+  <div class="effort">Effort : 1 j Alex (ALTER TABLE SET STORAGE EXTERNAL/EXTENDED)</div>
+</div>
+
+<div class="lever tech">
+  <div class="head"><span class="id">T4</span><span class="title">CDN Vercel pour assets statiques (PDFs générés, images)</span><span class="impact">~2 k€/an</span></div>
+  <div class="body">Les PDFs générés du module IA dossier (CERFA + mémoire technique) sont servis directement depuis Supabase storage → bandwidth Supabase consommé. Servir via CDN Vercel (inclus dans le plan Pro) → bandwidth gratuit pour ces assets. Économie ~30 % du bandwidth Supabase total → 2 k€/an à 200 clients.</div>
+  <div class="effort">Effort : 3-5 j Alex · Tech : signed URLs courte durée Supabase + Vercel Edge proxy</div>
+</div>
+
+<div class="lever tech">
+  <div class="head"><span class="id">T5</span><span class="title">Edge Functions Deno partout possible (vs Vercel Node functions)</span><span class="impact">~1,5 k€/an</span></div>
+  <div class="body">Les Edge Functions Supabase Deno sont gratuites jusqu'à 2 M invocations/mo. Les Vercel Functions Node payantes au-delà du quota Pro. Migrer le cron scoring + webhooks Brevo + endpoints publics tokenisés vers Edge → économie GB-hours Vercel.</div>
+  <div class="effort">Effort : 5-8 j Alex (migration code Node → Deno + tests E2E) · Décision ORM Drizzle déjà compatible Deno</div>
+</div>
+
+<div class="lever tech">
+  <div class="head"><span class="id">T6</span><span class="title">Optimisation prompts Anthropic (Sonnet → Haiku là où possible)</span><span class="impact">~6 k€/an</span></div>
+  <div class="body">Audit régulier des 12 prompts versionés `ai_prompts_v1.md`. P10 library_piece_match et P12 accroche_memo_intro pourraient passer Sonnet → Haiku si tests qualité restent acceptables. Haiku ~10× moins cher. Économie ciblée P10 (200 calls/mo × 0,02 € → 0,002 €) sur 200 clients × 12 = 864 €/an. P3 CERFA pourrait aussi être migrée si on accepte une review humaine systématique. Économie cumulée ~6 k€/an.</div>
+  <div class="effort">Effort : 5-10 j Alex (A/B tests Sonnet vs Haiku sur chaque prompt + grille qualité)</div>
+</div>
+
+<div class="lever tech">
+  <div class="head"><span class="id">T7</span><span class="title">Drizzle batch upsert (déjà acté ADR-013)</span><span class="impact">~1 k€/an</span></div>
+  <div class="body">Décision ORM 2026-05-18 (ADR-013) : Drizzle batch upsert via `onConflictDoUpdate` réduit le nombre de connexions Postgres (1 connexion pour 100 lignes vs 100 connexions). Conséquence : moins de compute Supabase consommé → palier Supabase Team retardé de 3-6 mois. Économie marginale ~1 k€/an mais effort déjà absorbé.</div>
+  <div class="effort">Effort : déjà fait (ADR-013, bench Phase 2a) — Pas d'action additionnelle</div>
+</div>
+
+<div class="lever tech">
+  <div class="head"><span class="id">T8</span><span class="title">Self-hosting scraping (Fly.io → VPS OVH dédié)</span><span class="impact">~0,3 k€/an</span></div>
+  <div class="body">Au-delà de 100 clients, Fly.io scale à 3 instances ~20 €/mo. Un VPS OVH 4 Go RAM coûte ~7-10 €/mo et peut héberger les 3 jobs scraping en parallèle. Économie ~10-15 €/mo. Mais perte de la geo-distribution Fly.io. À envisager seulement si on confirme que le scraping n'a pas besoin de hop EU multi-zone.</div>
+  <div class="effort">Effort : 3-5 j Yann (provisioning VPS + scripts cron + monitoring) · ROI faible → optionnel</div>
+</div>
+
+<h3>7.2. Leviers fonctionnels (F1 à F7) — pilotés par CMO Léa</h3>
+
+<div class="lever fonc">
+  <div class="head"><span class="id">F1</span><span class="title">Quota dur Studio IA 20 AO/mois + overage 1,50 €/AO (déjà acté Gate 1)</span><span class="impact">~13 k€/an</span></div>
+  <div class="body">Les clients gros consommateurs Studio IA (5 % des Studio qui font &gt; 20 AO/mois) paient l'overage à coût direct. Évite la concentration des pertes. Hypothèse : 10 % des clients Studio dépassent en moyenne de 8 AO/mois → 8 × 1,50 € × 4,5 clients × 12 = 648 €/an facturation directe. Plus important : effet dissuasif sur la sur-consommation IA non rentable → ~13 k€/an d'économie indirecte (sans le quota, certains clients consommeraient ×3 leur tier).</div>
+  <div class="effort">Effort : déjà spec'd · Implémentation au module IA dossier (1-2 j compteur + paywall soft)</div>
+</div>
+
+<div class="lever fonc">
+  <div class="head"><span class="id">F2</span><span class="title">Engagement annuel -15 % (vs mensuel)</span><span class="impact">~4 k€/an + cash flow</span></div>
+  <div class="body">Proposer paiement annuel upfront avec remise -15 %. Cible : 30 % des clients optent pour l'annuel. Impact : meilleur cash flow (1 an de revenu upfront), churn réduit (engagement). Économie indirecte via réduction churn : si 30 % des clients passent de churn 15 % à churn 5 % → ~10 % de revenu préservé sur ces clients. À 200 clients × 30 % × 350 € × 12 × 10 % = 25 k€ revenu préservé. Mais coût de la remise = 15 % × 30 % × 200 × 350 × 12 = 38 k€. **Net : -13 k€/an direct mais cash flow +30 mois × 350 × 60 × 0,85 = 535 k€** mobilisable. Économie indirecte rétention : ~4 k€/an net.</div>
+  <div class="effort">Effort : 2-3 j Alex (Stripe annual billing + UI tarification) · 1 j Léa (page tarification)</div>
+</div>
+
+<div class="lever fonc">
+  <div class="head"><span class="id">F3</span><span class="title">Tier intermédiaire « Sourcing+ » à 290 €/mo</span><span class="impact">~22 k€/an</span></div>
+  <div class="body">Ajouter un tier entre Sourcing (190 €) et Cotraitance (390 €) avec : Sourcing + scoring IA Haiku enrichi + 1 sollicitation Tandem/mois incluse. Capture la zone de transition d'upsell naturelle. Hypothèse : 25 % des clients Sourcing migrent vers Sourcing+ (+100 €/mo) au lieu de stagner. Gain : 0,5 × 100 € × 25 % × 200 × 12 = 30 k€/an. Coût de complexification produit : ~8 k€/an (support, marketing). **Net : ~22 k€/an.**</div>
+  <div class="effort">Effort : 5-7 j Alex (logique feature flag + facturation) · 2 j Léa (positionnement + page tarif)</div>
+</div>
+
+<div class="lever fonc">
+  <div class="head"><span class="id">F4</span><span class="title">Self-serve onboarding (suppression du demo call obligatoire)</span><span class="impact">~18 k€/an</span></div>
+  <div class="body">Coût actuel demo call obligatoire = 30-45 min CS par lead × 30 % conversion = ~1,5h CS par client converti × 50 €/h coût chargé = 75 € par client converti. Sur 100 nouveaux clients/an → 7,5 k€. Économie en passant au self-serve (avec demo en option) : -70 % de ces coûts + augmentation conversion lead → client de +20 % par friction réduite. Net : ~18 k€/an.</div>
+  <div class="effort">Effort : 5-8 j Alex (signup flow + tutoriel intégré) · 3 j Léa (Loom vidéos × 5 + emails onboarding) · 2 j Théo (UX onboarding)</div>
+</div>
+
+<div class="lever fonc">
+  <div class="head"><span class="id">F5</span><span class="title">Marketplace templates mémoires techniques (revenus secondaires)</span><span class="impact">~6 k€/an</span></div>
+  <div class="body">Les clients Studio IA produisent des mémoires techniques par CPV. Proposer un marketplace anonymisé où ils peuvent vendre/partager des templates contre crédits AO Studio. Sources de revenus marketplace : 20 % de commission sur 50 transactions/an × 50 €/template = 500 € direct. Mais surtout : effet réseau, fidélisation +30 % sur les clients Studio engagés dans le marketplace. Économie churn équivalente : ~6 k€/an.</div>
+  <div class="effort">Effort : 10-15 j Alex (UI marketplace + paiement crédits) · Effort élevé → Year 3</div>
+</div>
+
+<div class="lever fonc">
+  <div class="head"><span class="id">F6</span><span class="title">Surcharge module Tandem au-delà de 10 sollicitations/mois</span><span class="impact">~3 k€/an</span></div>
+  <div class="body">Cotraitance inclut sollicitations illimitées. Mais le coût Brevo + Anthropic Haiku matching scale linéairement. Ajouter un quota soft 10 sollicitations/mois inclus + 1 €/sollicitation supplémentaire. Hypothèse : 15 % des clients Cotraitance dépassent en moyenne de 5/mois → 5 × 1 € × 10 clients × 12 = 600 €/an direct. Effet de modération : -20 % du volume Brevo sur les usages abusifs → 2,4 k€/an indirect.</div>
+  <div class="effort">Effort : 1-2 j Alex (compteur + paywall) · Communication onboarding</div>
+</div>
+
+<div class="lever fonc">
+  <div class="head"><span class="id">F7</span><span class="title">Push upsell automatique vers Cotraitance dès mois 4 d'usage Sourcing</span><span class="impact">~28 k€/an</span></div>
+  <div class="body">Quand un client Sourcing a utilisé l'app activement pendant 4 mois et a regardé la fiche Tandem au moins 3 fois sans conversion, déclencher un push automatique « Essayez Cotraitance pendant 30 jours offerts ». Hypothèse : conversion 25 % des Sourcing actifs après 4 mois → +200 €/mo × 25 % × 75 clients ciblés × 9 mois moyen × = 28 k€/an de revenus additionnels. Coût d'opportunité : 25 clients × 30 j × 200 € / 30 = ~5 k€ de gratuité offerte. **Net : ~23 k€/an de revenu net additionnel.**</div>
+  <div class="effort">Effort : 4-6 j Alex (event-based push + tracking analytics) · 2 j Léa (séquence email + page d'atterrissage)</div>
+</div>
+
+<h3>7.3. Leviers managériaux (M1 à M6) — pilotés par CEO Marc</h3>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M1</span><span class="title">Équipe lean : pas d'embauche avant 100 clients</span><span class="impact">~55 k€/an</span></div>
+  <div class="body">Ne pas embaucher de CS dédié avant 100 clients (Alex + Yann + Sophie absorbent le support occasionnel via canaux Slack/email). Tenue à 4 ETP max jusqu'au seuil 100 clients. Économie 1 ETP CS junior pendant 12-18 mois = 35-55 k€/an retardés.</div>
+  <div class="effort">Effort : zéro (décision RH) · Risque : surchargement Sophie/Alex sur Q2-Q3 An 2</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M2</span><span class="title">Outsourcing support N1 (plateforme externe FR)</span><span class="impact">~15 k€/an</span></div>
+  <div class="body">À 100+ clients, plutôt qu'embaucher un CS 0,5 ETP (~25 k€/an chargé), externaliser le support N1 à une plateforme spécialisée SaaS BTP type Effisens / Webhelp SaaS. Tarif ~200-400 €/mois pour 50-100 tickets/mois traités. Économie ~15 k€/an + flexibilité.</div>
+  <div class="effort">Effort : 5-10 j sourcing + onboarding partenaire · Risque : qualité réponse N1</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M3</span><span class="title">Acquisition via partenariats fédérations BTP (FFB / CAPEB / FNTP)</span><span class="impact">~30 k€/an</span></div>
+  <div class="body">Négocier avec la FFB Île-de-France et la CAPEB un partenariat « tarif adhérent -10 % » contre référencement dans leur catalogue d'outils recommandés. CAC quasi nul sur ces leads (vs 600 € moyen). Hypothèse : 30 leads/an via fédérations × 600 € de CAC évité = 18 k€/an. Plus signature crédibilité = conversion ×2 = ~30 k€/an effet cumulé.</div>
+  <div class="effort">Effort : 10-15 j Marc + Léa (négociation, présentation, contractualisation) · ROI exceptionnel</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M4</span><span class="title">Programme ambassadeurs early adopters (3 mois gratuits par parrainage)</span><span class="impact">~20 k€/an</span></div>
+  <div class="body">Les 10 clients pilotes AlyoS reçoivent 3 mois gratuits pour chaque nouveau client converti via leur référencement. Hypothèse : 5 conversions de parrainage/an × 350 € × 3 mois = 5,2 k€ de coût programme. En contrepartie : 20-25 nouveaux clients/an × 600 € CAC évité = 13 k€ + crédibilité témoignage = effet rétention ~7 k€. **Net : ~20 k€/an.**</div>
+  <div class="effort">Effort : 3 j Léa (programme + landing + tracking) · 1 j Alex (codes referral)</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M5</span><span class="title">Revue trimestrielle coûts par catégorie + alertes seuils</span><span class="impact">~8 k€/an (effet cumulé)</span></div>
+  <div class="body">Mettre en place une dashboard dédiée + alertes Slack à 80 % et 100 % des seuils budgétaires pour Anthropic / Supabase / Vercel / Brevo / Resend. Revue trimestrielle CEO + CTO : identification anomalies + optimisations ad hoc. Hypothèse : détection rapide de 2-3 anomalies/an évitant des dépassements ~3-4 k€ chacun = 8 k€/an de fuite évitée.</div>
+  <div class="effort">Effort : 2-3 j Alex (dashboard Grafana / Metabase + alertes Sentry) · 1 j Marc pilotage</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M6</span><span class="title">Réseau ambassadeurs verticalisé (CHR, scolaire, voirie)</span><span class="impact">~18 k€/an</span></div>
+  <div class="body">À partir d'An 2, identifier 3 verticales BTP haute fréquence d'AO (CHR=café-hôtellerie-restauration, équipements scolaires, voirie). Recruter 1 ambassadeur expert par verticale (consultant 1 j/mois rémunéré 500 €). Acquisition ciblée via leur réseau professionnel + conférences. CAC très faible (référencement direct). Hypothèse : 15-20 leads/an par verticale × 3 verticales = 50 leads × 30 % conversion × 350 € × 24 mois moyenne = 126 k€ revenus, coût 18 k€/an, **net ~18 k€/an.**</div>
+  <div class="effort">Effort : 5-10 j Léa par verticale (recrutement + onboarding ambassadeur) · ROI à partir d'An 2</div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 8. IMPACT CUMULÉ ========= -->
+<h2>8. Impact cumulé sur l'EBITDA Année 5</h2>
+
+<h3>8.1. Synthèse des 21 leviers</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Catégorie</th>
+      <th class="num">Levier</th>
+      <th class="num">Impact €/an An 5</th>
+      <th>Effort</th>
+      <th>Quick win ?</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>T1</td><td>Cache Anthropic Haiku</td><td class="num">9 000</td><td>2-3 j</td><td class="center">✅</td></tr>
+    <tr><td>T2</td><td>Prompt caching Anthropic</td><td class="num">14 000</td><td>1-2 j</td><td class="center">✅</td></tr>
+    <tr><td>T3</td><td>Compression jsonb LZ4</td><td class="num">3 000</td><td>1 j</td><td class="center">✅</td></tr>
+    <tr><td>T4</td><td>CDN Vercel pour assets statiques</td><td class="num">2 000</td><td>3-5 j</td><td class="center">⚠️</td></tr>
+    <tr><td>T5</td><td>Edge Functions Deno migration</td><td class="num">1 500</td><td>5-8 j</td><td class="center">❌</td></tr>
+    <tr><td>T6</td><td>Optimisation prompts Sonnet→Haiku</td><td class="num">6 000</td><td>5-10 j</td><td class="center">⚠️</td></tr>
+    <tr><td>T7</td><td>Drizzle batch upsert (déjà acté)</td><td class="num">1 000</td><td>0 j</td><td class="center">✅</td></tr>
+    <tr><td>T8</td><td>Self-hosting scraping</td><td class="num">300</td><td>3-5 j</td><td class="center">❌</td></tr>
+    <tr class="subtotal"><td colspan="2">Sous-total Techniques</td><td class="num">36 800</td><td>20-34 j</td><td></td></tr>
+    <tr><td>F1</td><td>Quota Studio + overage (déjà acté)</td><td class="num">13 000</td><td>1-2 j</td><td class="center">✅</td></tr>
+    <tr><td>F2</td><td>Engagement annuel -15 %</td><td class="num">4 000</td><td>3-4 j</td><td class="center">⚠️</td></tr>
+    <tr><td>F3</td><td>Tier Sourcing+ 290 €/mo</td><td class="num">22 000</td><td>7-9 j</td><td class="center">⚠️</td></tr>
+    <tr><td>F4</td><td>Self-serve onboarding</td><td class="num">18 000</td><td>10-13 j</td><td class="center">❌</td></tr>
+    <tr><td>F5</td><td>Marketplace templates mémoires</td><td class="num">6 000</td><td>10-15 j</td><td class="center">❌</td></tr>
+    <tr><td>F6</td><td>Surcharge Tandem &gt; 10 sollicitations</td><td class="num">3 000</td><td>1-2 j</td><td class="center">✅</td></tr>
+    <tr><td>F7</td><td>Push upsell automatique mois 4</td><td class="num">23 000</td><td>6-8 j</td><td class="center">⚠️</td></tr>
+    <tr class="subtotal"><td colspan="2">Sous-total Fonctionnels</td><td class="num">89 000</td><td>38-53 j</td><td></td></tr>
+    <tr><td>M1</td><td>Équipe lean &lt; 100 clients</td><td class="num">55 000</td><td>0 j</td><td class="center">✅</td></tr>
+    <tr><td>M2</td><td>Outsourcing support N1</td><td class="num">15 000</td><td>5-10 j</td><td class="center">⚠️</td></tr>
+    <tr><td>M3</td><td>Partenariats FFB / CAPEB / FNTP</td><td class="num">30 000</td><td>10-15 j</td><td class="center">⚠️</td></tr>
+    <tr><td>M4</td><td>Programme ambassadeurs</td><td class="num">20 000</td><td>3-4 j</td><td class="center">✅</td></tr>
+    <tr><td>M5</td><td>Revue trimestrielle coûts + alertes</td><td class="num">8 000</td><td>3-4 j</td><td class="center">✅</td></tr>
+    <tr><td>M6</td><td>Ambassadeurs verticalisés</td><td class="num">18 000</td><td>15-30 j</td><td class="center">❌</td></tr>
+    <tr class="subtotal"><td colspan="2">Sous-total Managériaux</td><td class="num">146 000</td><td>36-63 j</td><td></td></tr>
+    <tr class="total"><td colspan="2">TOTAL 21 leviers</td><td class="num">271 800</td><td>~95-150 j</td><td></td></tr>
+  </tbody>
+</table>
+
+<div class="box positive">
+  <h4>Lecture clé</h4>
+  <p>Les <strong>leviers managériaux pèsent 54 %</strong> du potentiel d'optimisation (146 k€/an) — c'est l'axe le plus rentable mais le plus difficile à exécuter. Les leviers techniques (37 k€/an) sont les <strong>quick wins</strong> les plus rapides à déployer (T1+T2 = 23 k€/an en moins de 5 jours d'effort cumulé).</p>
+</div>
+
+<h3>8.2. Sélection d'un sous-ensemble réaliste</h3>
+
+<p>On ne peut pas activer les 21 leviers — certains se neutralisent (ex. F4 self-serve peut concurrencer M3 partenariat). On retient un <strong>portefeuille de 12 leviers prioritaires</strong> pour An 1-3 :</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Phase</th>
+      <th>Leviers activés</th>
+      <th class="num">Impact cumulé €/an</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Phase 1 — Q4 2026 (lancement)</strong></td>
+      <td>T2 (caching), T7 (Drizzle), F1 (quota), M1 (lean), M5 (revue), M4 (ambassadeurs)</td>
+      <td class="num">~115 k€</td>
+    </tr>
+    <tr>
+      <td><strong>Phase 2 — H1 2027</strong></td>
+      <td>+ T1 (cache scoring), T3 (compression), F6 (surcharge Tandem), M3 (partenariats fédé)</td>
+      <td class="num">+45 k€</td>
+    </tr>
+    <tr>
+      <td><strong>Phase 3 — H2 2027 / 2028</strong></td>
+      <td>+ F3 (Sourcing+), F7 (upsell auto)</td>
+      <td class="num">+45 k€</td>
+    </tr>
+    <tr class="total">
+      <td>TOTAL portefeuille 12 leviers prioritaires</td>
+      <td>An 5 atteint</td>
+      <td class="num">~205 k€/an</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>8.3. Impact projeté sur EBITDA Année 5</h3>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">EBITDA An 5 baseline</div>
+    <div class="value">+451 k€</div>
+    <div class="unit">Scénario base étude marché v1</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA An 5 + 12 leviers</div>
+    <div class="value">+566 k€</div>
+    <div class="unit">+115 k€ vs baseline · marge 50 % EBITDA</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA An 5 (tous 21 leviers)</div>
+    <div class="value">+660 k€</div>
+    <div class="unit">Théorique max si tous activables sans collision</div>
+  </div>
+</div>
+
+<div class="chart-container">
+  <div class="chart-title">Évolution EBITDA Année 5 selon portefeuille d'optimisations</div>
+  <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+    <!-- Baseline bar -->
+    <rect x="50" y="120" width="100" height="60" fill="#5C5C5C"/>
+    <text x="100" y="195" font-size="10" text-anchor="middle" fill="#1A1A1A" font-weight="600">Baseline</text>
+    <text x="100" y="115" font-size="12" text-anchor="middle" fill="#1A1A1A" font-weight="700">+451 k€</text>
+
+    <!-- Quick wins bar -->
+    <rect x="180" y="105" width="100" height="75" fill="#B5781C"/>
+    <text x="230" y="195" font-size="10" text-anchor="middle" fill="#1A1A1A" font-weight="600">+ Quick wins</text>
+    <text x="230" y="100" font-size="12" text-anchor="middle" fill="#1A1A1A" font-weight="700">+490 k€</text>
+
+    <!-- 12 leviers bar -->
+    <rect x="310" y="80" width="100" height="100" fill="#C8002A"/>
+    <text x="360" y="195" font-size="10" text-anchor="middle" fill="#1A1A1A" font-weight="600">+ 12 leviers</text>
+    <text x="360" y="75" font-size="12" text-anchor="middle" fill="#1A1A1A" font-weight="700">+566 k€</text>
+
+    <!-- All 21 leviers bar -->
+    <rect x="440" y="60" width="100" height="120" fill="#2D8659"/>
+    <text x="490" y="195" font-size="10" text-anchor="middle" fill="#1A1A1A" font-weight="600">+ Tous 21</text>
+    <text x="490" y="55" font-size="12" text-anchor="middle" fill="#1A1A1A" font-weight="700">+660 k€</text>
+
+    <!-- Optimiste theoretical bar -->
+    <rect x="570" y="30" width="100" height="150" fill="#D4A82A" opacity="0.5"/>
+    <text x="620" y="195" font-size="10" text-anchor="middle" fill="#1A1A1A" font-weight="600">Optimiste*</text>
+    <text x="620" y="25" font-size="12" text-anchor="middle" fill="#1A1A1A" font-weight="700">+820 k€</text>
+
+    <!-- Base line -->
+    <line x1="40" y1="180" x2="680" y2="180" stroke="#1A1A1A" stroke-width="1"/>
+  </svg>
+  <p style="font-size: 9pt; color: var(--ink-muted); margin-top: 10px;">* Hypothèse optimiste = scénario marché optimiste (430 clients à An 5, ARPU 420 €) + tous leviers actionnés. À considérer comme borne haute.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 9. RECO ========= -->
+<h2>9. Recommandation Board</h2>
+
+<div class="box positive">
+  <h4>Décision recommandée</h4>
+  <p>Activer dès maintenant les <strong>6 leviers Phase 1</strong> (T2, T7, F1, M1, M4, M5) qui représentent <strong>+115 k€/an sans surcoût et avec &lt; 15 jours d'effort cumulés</strong>. Les leviers Phase 2 et 3 sont à enclencher au fil du déploiement SaaS.</p>
+</div>
+
+<h3>9.1. Plan d'action immédiat (avant Gate 9, donc 0-3 mois)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Levier</th>
+      <th>Pilote</th>
+      <th>Échéance</th>
+      <th class="num">Impact €/an</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>T2 — Prompt caching Anthropic</td>
+      <td>Alex (dev)</td>
+      <td>1re PR module IA dossier</td>
+      <td class="num">14 000</td>
+    </tr>
+    <tr>
+      <td>T7 — Drizzle batch upsert</td>
+      <td>Alex (dev)</td>
+      <td>Déjà acté (ADR-013)</td>
+      <td class="num">1 000</td>
+    </tr>
+    <tr>
+      <td>F1 — Quota Studio + overage</td>
+      <td>Alex (dev)</td>
+      <td>1re PR module IA dossier</td>
+      <td class="num">13 000</td>
+    </tr>
+    <tr>
+      <td>M1 — Équipe lean &lt; 100 clients</td>
+      <td>Marc (CEO)</td>
+      <td>Décision RH An 1</td>
+      <td class="num">55 000</td>
+    </tr>
+    <tr>
+      <td>M4 — Programme ambassadeurs</td>
+      <td>Léa (CMO)</td>
+      <td>Pré-Gate 9 (~Q3 2026)</td>
+      <td class="num">20 000</td>
+    </tr>
+    <tr>
+      <td>M5 — Dashboard coûts + alertes</td>
+      <td>Yann (PS) + Marc (CEO)</td>
+      <td>Gate 9 (mise en prod)</td>
+      <td class="num">8 000</td>
+    </tr>
+    <tr>
+      <td>T1 — Cache Anthropic scoring</td>
+      <td>Alex (dev)</td>
+      <td>2e PR module sourcing engine</td>
+      <td class="num">9 000</td>
+    </tr>
+    <tr class="total">
+      <td colspan="3">TOTAL leviers Phase 1 activables immédiatement</td>
+      <td class="num">120 000</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>9.2. Risques d'optimisation excessive</h3>
+
+<div class="box warning">
+  <h4>Trois pièges à éviter</h4>
+  <ol>
+    <li><strong>Sur-engineering des leviers techniques</strong> au détriment de la rapidité de release MVP. T5 (Edge Functions) et T8 (self-hosting) peuvent attendre An 2-3 sans pénaliser le business.</li>
+    <li><strong>Complexification tarifaire</strong> qui freine la conversion. F3 (Sourcing+) ajoute un tier de plus à expliquer → A/B test obligatoire sur 10 prospects avant déploiement large.</li>
+    <li><strong>Outsourcing prématuré du support</strong> (M2) avant qu'on ait clarifié notre propre playbook. Garder le support interne les 12-18 premiers mois pour internaliser l'apprentissage produit/client.</li>
+  </ol>
+</div>
+
+<h3>9.3. Décisions Board demandées</h3>
+
+<div class="box">
+  <ul>
+    <li>☐ <strong>Validation principe</strong> des 6 leviers Phase 1 (T2, T7, F1, M1, M4, M5) pour activation immédiate</li>
+    <li>☐ <strong>Enveloppe</strong> programme ambassadeurs M4 : 5,2 k€ (3 mois gratuits × 5 conversions/an)</li>
+    <li>☐ <strong>Décision RH</strong> M1 : pas d'embauche CS avant 100 clients (engagement formel pour 12-18 mois)</li>
+    <li>☐ <strong>Validation</strong> du dashboard coûts M5 dans le scope Gate 9 (1-2 jours Yann à intégrer au plan de bascule)</li>
+    <li>☐ <strong>Arbitrage</strong> sur le tier intermédiaire F3 (Sourcing+ 290 €/mo) : GO test sur 10 prospects post-Gate 9 OU report Year 2 ?</li>
+  </ul>
+</div>
+
+<div class="footer-note">
+  Document v1.0 — à actualiser annuellement après revue financière Board. Données coûts variables à recalibrer trimestriellement sur les factures réelles. Tous les chiffres exprimés en € HT, devise EUR. Hypothèses macro : ARPU 350 € mensuel pondéré, mix tier 50/35/15, ARPU stable sur 5 ans (sensibilité ±20 % détaillée dans l'étude de marché v1).<br><br>
+  Sources : <code>specs/budget_infra_v1.md</code> (prévisionnel infra MVP), <code>specs/ai_prompts_v1.md</code> (coûts modèles Anthropic), <code>specs/module_ia_dossier_v1.md</code> (calibrage tier Studio), grille tarifaire Vercel / Supabase / Brevo / Resend (mai 2026), bench Drizzle Phase 2a (ADR-013).<br><br>
+  — [CEO Marc] avec [CTO Sophie] et [CMO Léa] · edifio Sourcing · AlyoS Ingénierie · 2026-05-18
+</div>
+
+</body>
+</html>

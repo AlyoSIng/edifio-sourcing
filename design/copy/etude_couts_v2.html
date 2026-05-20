@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Étude coûts mensuels v2 — modèle Cowork-only — edifio Sourcing</title>
+<style>
+  :root {
+    --paper: #FFFFFF;
+    --paper-alt: #FAFAF8;
+    --ink: #1A1A1A;
+    --ink-muted: #5C5C5C;
+    --line: #E5E5E5;
+    --alyos-red: #C8002A;
+    --pill-bg: #FFE5EA;
+    --pill-fg: #C8002A;
+    --positive: #2D8659;
+    --warning: #B5781C;
+    --negative: #B83333;
+    --c-team: #C8002A;
+    --c-infra: #B5781C;
+    --c-anthropic: #D4A82A;
+    --c-supabase: #2D8659;
+    --c-vercel: #2D5C86;
+    --c-emails: #6B4C9A;
+    --c-support: #5C5C5C;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11pt; line-height: 1.5; }
+  body { max-width: 210mm; margin: 0 auto; padding: 25mm 18mm; }
+  h1, h2, h3, h4 { font-family: "Space Grotesk", "Inter", sans-serif; color: var(--ink); margin-top: 1.5em; margin-bottom: 0.5em; letter-spacing: -0.02em; }
+  h1 { font-size: 30pt; line-height: 1.05; margin-top: 0; border-bottom: 3px solid var(--alyos-red); padding-bottom: 0.3em; }
+  h1 .accent { color: var(--alyos-red); }
+  h2 { font-size: 17pt; margin-top: 2em; padding-top: 0.5em; border-top: 1px solid var(--line); }
+  h3 { font-size: 13pt; color: var(--alyos-red); }
+  h4 { font-size: 11pt; font-weight: 600; margin-bottom: 0.25em; }
+  p { margin: 0.5em 0 1em; }
+  ul, ol { margin: 0.5em 0 1em; padding-left: 1.5em; }
+  li { margin-bottom: 0.3em; }
+  .pill { display: inline-block; background: var(--pill-bg); color: var(--pill-fg); padding: 3px 10px; border-radius: 20px; font-size: 9pt; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  .meta { color: var(--ink-muted); font-size: 10pt; }
+  .meta strong { color: var(--ink); }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0 1.5em; font-size: 10pt; page-break-inside: avoid; }
+  table th, table td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table th { background: var(--paper-alt); font-weight: 600; font-size: 9.5pt; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 2px solid var(--ink); }
+  table tr:nth-child(even) td { background: var(--paper-alt); }
+  table td.num, table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table td.center, table th.center { text-align: center; }
+  table tr.total td { font-weight: 700; background: var(--pill-bg) !important; border-top: 2px solid var(--ink); }
+  table tr.subtotal td { font-weight: 600; border-top: 1px solid var(--ink); }
+  table tr.deprecated td { text-decoration: line-through; color: var(--ink-muted); }
+  .box { background: var(--paper-alt); border-left: 4px solid var(--alyos-red); padding: 12px 16px; margin: 1em 0 1.5em; border-radius: 0 4px 4px 0; }
+  .box.positive { border-left-color: var(--positive); }
+  .box.warning { border-left-color: var(--warning); }
+  .box.obsolete { border-left-color: var(--ink-muted); opacity: 0.7; }
+  .box h4 { margin-top: 0; }
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 1em 0 1.5em; }
+  .kpi { background: var(--paper-alt); border: 1px solid var(--line); padding: 14px; border-radius: 6px; }
+  .kpi .label { font-size: 9pt; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .kpi .value { font-family: "Space Grotesk", sans-serif; font-size: 20pt; font-weight: 700; color: var(--alyos-red); line-height: 1; }
+  .kpi .unit { font-size: 9.5pt; color: var(--ink-muted); margin-top: 4px; }
+  .lever { background: var(--paper-alt); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; margin: 0.8em 0; page-break-inside: avoid; }
+  .lever.tech { border-left: 4px solid var(--c-vercel); }
+  .lever.fonc { border-left: 4px solid var(--c-supabase); }
+  .lever.mana { border-left: 4px solid var(--alyos-red); }
+  .lever.obsolete { opacity: 0.5; border-left-color: var(--ink-muted); }
+  .lever.obsolete .title { text-decoration: line-through; }
+  .lever .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .lever .id { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--alyos-red); font-size: 11pt; }
+  .lever .title { font-weight: 600; font-size: 11pt; }
+  .lever .impact { margin-left: auto; background: var(--positive); color: white; font-size: 9pt; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .lever .impact.obs { background: var(--ink-muted); }
+  .lever .body { font-size: 10pt; line-height: 1.5; }
+  .lever .effort { display: inline-block; margin-top: 6px; font-size: 9pt; color: var(--ink-muted); }
+  .toc { background: var(--paper-alt); padding: 16px 24px; border-radius: 6px; margin: 1em 0 2em; font-size: 10pt; }
+  .toc ol { padding-left: 1.5em; }
+  .toc li { margin-bottom: 0.2em; }
+  .footer-note { margin-top: 3em; padding-top: 1em; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 9pt; font-style: italic; }
+  .page-break { page-break-after: always; }
+  .chart-container { margin: 1.5em 0; background: var(--paper-alt); padding: 16px; border-radius: 6px; border: 1px solid var(--line); }
+  .chart-container .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 9.5pt; margin-top: 12px; }
+  .chart-container .legend-item { display: flex; align-items: center; gap: 6px; }
+  .chart-container .legend-swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+  .chart-container .chart-title { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 11pt; margin-bottom: 12px; }
+  .delta-pos { color: var(--positive); font-weight: 600; }
+  .delta-neg { color: var(--negative); font-weight: 600; }
+  @media print {
+    body { padding: 15mm 12mm; max-width: 100%; }
+    h2 { page-break-after: avoid; }
+    table { page-break-inside: avoid; }
+    .kpi-grid, .lever, .box, .chart-container { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ========= PAGE DE GARDE ========= -->
+<div>
+  <span class="pill">Étude financière · v2.0 — modèle Cowork-only</span>
+  <h1>edifio <span class="accent">Sourcing</span><br>Structure de coûts &amp; leviers d'optimisation</h1>
+  <p class="meta">
+    <strong>Auteurs</strong> : [CEO Marc] (structure financière) + [CTO Sophie] (leviers techniques) + [CMO Léa] (leviers fonctionnels)<br>
+    <strong>Date</strong> : 2026-05-18 · v2.0<br>
+    <strong>Statut</strong> : v2.0 — relivrée après directive Board « modèle 100 % Cowork »<br>
+    <strong>Changement majeur vs v1</strong> : suppression totale des coûts salariaux internes. Toute l'équipe projet (CEO Marc, CTO Sophie, CMO Léa, CS, DEV Alex, PS_OPERATOR Yann) est portée par <strong>l'abonnement Claude Cowork à 180 €/mo HT</strong>. Conséquence : coûts fixes annuels passent de ~150 k€ à ~4 k€ → impact massif sur EBITDA An 1-5.<br>
+    <strong>Documents amont</strong> : <code>specs/budget_infra_v1.md</code>, <code>design/copy/etude_marche_v2.html</code>, <code>specs/module_ia_dossier_v1.md</code>
+  </p>
+</div>
+
+<div class="box positive">
+  <h4>Impact synthétique de la bascule Cowork-only</h4>
+  <table style="margin: 0;">
+    <tr style="background: transparent;">
+      <th>Indicateur</th>
+      <th class="num">v1 (équipe salariée)</th>
+      <th class="num">v2 (Cowork-only)</th>
+      <th class="num">Delta</th>
+    </tr>
+    <tr>
+      <td>Coûts fixes mensuels An 1</td>
+      <td class="num">~12 665 €</td>
+      <td class="num">~345 €</td>
+      <td class="num delta-pos">-12 320 €/mo</td>
+    </tr>
+    <tr>
+      <td>Coûts fixes mensuels An 5</td>
+      <td class="num">~29 145 €</td>
+      <td class="num">~725 €</td>
+      <td class="num delta-pos">-28 420 €/mo</td>
+    </tr>
+    <tr>
+      <td>Seuil de rentabilité (clients)</td>
+      <td class="num">~42</td>
+      <td class="num">~2</td>
+      <td class="num delta-pos">-40 clients</td>
+    </tr>
+    <tr>
+      <td>EBITDA An 1 (scénario base)</td>
+      <td class="num">-117 k€</td>
+      <td class="num">+29 k€</td>
+      <td class="num delta-pos">+146 k€</td>
+    </tr>
+    <tr>
+      <td>EBITDA An 5 (scénario base)</td>
+      <td class="num">+451 k€</td>
+      <td class="num">+752 k€</td>
+      <td class="num delta-pos">+301 k€</td>
+    </tr>
+  </table>
+</div>
+
+<div class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li>Synthèse et chiffres clés</li>
+    <li>Méthode et hypothèses v2</li>
+    <li>Décomposition par strate (fixe / semi-fixe / variable)</li>
+    <li>Coût par client à chaque palier tarifaire</li>
+    <li>Évolution des coûts en fonction du nombre de clients</li>
+    <li>Graphique de corrélation coûts × clients</li>
+    <li>Seuil de rentabilité et marge unitaire</li>
+    <li>17 leviers d'optimisation actualisés (4 obsolètes + 2 nouveaux)</li>
+    <li>Impact cumulé sur l'EBITDA Année 5</li>
+    <li>Recommandation Board</li>
+  </ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 1. SYNTHÈSE ========= -->
+<h2>1. Synthèse et chiffres clés</h2>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Coût mensuel à 1 client</div>
+    <div class="value">~501 €</div>
+    <div class="unit">Cowork 180 € + outils + infra base</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Coût mensuel à 100 clients</div>
+    <div class="value">~3,4 k€</div>
+    <div class="unit">Fixes + semi-fixes + variable (vs 15,8 k€ v1)</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Coût mensuel à 300 clients</div>
+    <div class="value">~10,2 k€</div>
+    <div class="unit">Cible An 5 scénario base (vs 37,2 k€ v1)</div>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Seuil de rentabilité</div>
+    <div class="value">~2 clients</div>
+    <div class="unit">Ratio fixes/marge unitaire</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Marge unitaire moyenne</div>
+    <div class="value">~89 %</div>
+    <div class="unit">Inchangée vs v1</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Économies leviers actionnés</div>
+    <div class="value">~115 k€/an</div>
+    <div class="unit">17 leviers retenus · EBITDA An 5 752→867 k€</div>
+  </div>
+</div>
+
+<h3>Conclusions clés v2</h3>
+
+<ol>
+  <li><strong>Le modèle économique change de catégorie.</strong> En v1, edifio Sourcing était un SaaS avec une équipe interne classique (~150 k€/an de fixes). En v2 avec Cowork, c'est un produit logiciel quasi-sans charges fixes (~4 k€/an), ce qui transforme la dynamique financière.</li>
+  <li><strong>Le seuil de rentabilité passe de 42 à 2 clients.</strong> AlyoS atteint l'équilibre opérationnel dès les premiers clients pilotes Q4 2026. Pas de phase « cash-burn » de 12-18 mois.</li>
+  <li><strong>L'EBITDA An 5 grimpe à +752 k€</strong> (vs +451 k€ v1) soit <strong>80 % de marge EBITDA</strong> sur le revenu. C'est exceptionnellement élevé pour un SaaS BTP — directement explicable par l'absence de charges salariales.</li>
+  <li><strong>17 leviers retenus</strong> (vs 21 v1) : M1 (équipe lean) et M2 (outsourcing support) sont devenus <strong>obsolètes</strong> — il n'y a plus d'équipe à dimensionner. Ajout de <strong>2 nouveaux leviers</strong> M7 et M8 spécifiques au modèle Cowork-only.</li>
+  <li><strong>Le risque principal devient « capacité d'exécution »</strong> : Cowork à 180 €/mo couvre l'orchestration produit/tech/marketing, mais pas l'effort humain de prospection commerciale ou de support client à volume. Voir M7 dans § 8.</li>
+  <li><strong>L'investissement initial Years 1-2 passe de 160 k€ à ~0 k€.</strong> Le projet devient quasi-autofinancé dès le premier client. Question stratégique : que faire des EBITDA dégagés ? Réinvestissement produit, distribution dividendes, ou levée pour accélérer ?</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ========= 2. MÉTHODE ========= -->
+<h2>2. Méthode et hypothèses v2</h2>
+
+<h3>2.1. Le changement structurel — abonnement Cowork</h3>
+
+<p>L'équipe projet d'edifio Sourcing est désormais <strong>entièrement portée par Claude Cowork</strong>. Concrètement :</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Rôle</th>
+      <th>Avant (v1 — salaire chargé)</th>
+      <th>Maintenant (v2 — Cowork)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>CEO Marc (pilotage produit, business case)</td>
+      <td>40 k€/an (0,5 ETP)</td>
+      <td rowspan="6" style="vertical-align: middle; text-align: center; font-weight: 700; background: var(--pill-bg);">Abonnement Cowork<br><strong>180 €/mo HT</strong><br>=<br><strong>2 160 €/an</strong></td>
+    </tr>
+    <tr>
+      <td>CTO Sophie (architecture, sécurité, ADR)</td>
+      <td>80 k€/an (1 ETP)</td>
+    </tr>
+    <tr>
+      <td>CMO Léa (acquisition, content, copywriting)</td>
+      <td>30 k€/an → 70 k€/an</td>
+    </tr>
+    <tr>
+      <td>Customer Success (support clients)</td>
+      <td>25 k€/an → 55 k€/an</td>
+    </tr>
+    <tr>
+      <td>DEV Alex (sub-agent Claude Code)</td>
+      <td>0 € (déjà via Claude Code)</td>
+    </tr>
+    <tr>
+      <td>PS_OPERATOR Yann (sub-agent Claude Code)</td>
+      <td>0 € (déjà via Claude Code)</td>
+    </tr>
+    <tr class="total">
+      <td>TOTAL équipe annuelle</td>
+      <td class="num">150-310 k€/an selon année</td>
+      <td>2 160 €/an</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="box">
+  <h4>Hypothèses clés du modèle Cowork-only</h4>
+  <ul>
+    <li>L'abonnement Cowork couvre l'orchestration stratégique (CEO/CTO/CMO/Graphiste) et la production de tous les livrables Cowork (ADR, specs, copy, designs, comptes-rendus, études).</li>
+    <li>L'exécution code/git/déploiement reste portée par Claude Code (DEV Alex + PS_OPERATOR Yann) sans surcoût additionnel — déjà inclus dans l'abonnement Claude API du Board ou l'enveloppe Anthropic mutualisée.</li>
+    <li>Les <strong>actions humaines non automatisables</strong> (signatures contrats, appels commerciaux à froid, RH ponctuelle) restent à la charge du Board (TEISSIER) ou à externaliser ponctuellement (avocat, comptable).</li>
+    <li>Le <strong>support client</strong> est soit assuré par le Board en direct (jusqu'à ~50 clients faisable), soit externalisé partiellement à partir d'un certain volume (cf. nouveau levier M8).</li>
+  </ul>
+</div>
+
+<h3>2.2. Hypothèses inchangées vs v1</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th class="num">Valeur</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Mix tier (% clients par palier)</td>
+      <td class="num">50 / 35 / 15</td>
+      <td>Sourcing / Cotraitance / Studio IA</td>
+    </tr>
+    <tr>
+      <td>ARPU mensuel moyen pondéré</td>
+      <td class="num">~350 €</td>
+      <td>0,5 × 190 + 0,35 × 390 + 0,15 × 790</td>
+    </tr>
+    <tr>
+      <td>Coût variable moyen / client / mois</td>
+      <td class="num">~31 €</td>
+      <td>Sourcing 12 € / Cotraitance 23 € / Studio 96 €</td>
+    </tr>
+    <tr>
+      <td>Marge unitaire moyenne</td>
+      <td class="num">~319 €/mo</td>
+      <td>89 % de l'ARPU</td>
+    </tr>
+    <tr>
+      <td>Churn annuel</td>
+      <td class="num">15 %</td>
+      <td>Hypothèse scénario base inchangée</td>
+    </tr>
+    <tr>
+      <td>CAC (coût d'acquisition par client)</td>
+      <td class="num">600 €</td>
+      <td>Conservé (ad spend + Brevo marketing + 3-mois free programme ambassadeurs)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ========= 3. DÉCOMPOSITION PAR STRATE ========= -->
+<h2>3. Décomposition par strate v2</h2>
+
+<h3>3.1. Coûts FIXES v2 (en €/mois)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th>Fournisseur</th>
+      <th class="num">An 1</th>
+      <th class="num">An 3</th>
+      <th class="num">An 5</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="deprecated">
+      <td>CTO 1 ETP (Sophie + équivalent)</td>
+      <td>—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td>Supprimé v2 — porté par Cowork</td>
+    </tr>
+    <tr class="deprecated">
+      <td>CEO 0,5 ETP (Marc)</td>
+      <td>—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td>Supprimé v2 — porté par Cowork</td>
+    </tr>
+    <tr class="deprecated">
+      <td>CMO 0,5 ETP (Léa)</td>
+      <td>—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td>Supprimé v2 — porté par Cowork</td>
+    </tr>
+    <tr class="deprecated">
+      <td>Customer Success</td>
+      <td>—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td class="num">—</td>
+      <td>Supprimé v2 — voir nouveau levier M8</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td>Abonnement Claude Cowork</td>
+      <td>Anthropic</td>
+      <td class="num">180 €</td>
+      <td class="num">180 €</td>
+      <td class="num">180 €</td>
+      <td>Remplace toute l'équipe interne · 180 €/mo HT fixé</td>
+    </tr>
+    <tr>
+      <td>GitHub Team</td>
+      <td>GitHub</td>
+      <td class="num">12 €</td>
+      <td class="num">12 €</td>
+      <td class="num">16 €</td>
+      <td>3-4 seats (Board + sub-agents)</td>
+    </tr>
+    <tr>
+      <td>DNS</td>
+      <td>IONOS</td>
+      <td class="num">3 €</td>
+      <td class="num">3 €</td>
+      <td class="num">3 €</td>
+      <td>Déjà payé par AlyoS</td>
+    </tr>
+    <tr>
+      <td>Sentry (monitoring erreurs)</td>
+      <td>Sentry</td>
+      <td class="num">0 €</td>
+      <td class="num">26 €</td>
+      <td class="num">26 €</td>
+      <td>Free tier → Team à 50 clients</td>
+    </tr>
+    <tr>
+      <td>Anthropic Console (compte payant)</td>
+      <td>Anthropic</td>
+      <td class="num">0 €</td>
+      <td class="num">0 €</td>
+      <td class="num">0 €</td>
+      <td>Usage-based uniquement (cf. variables)</td>
+    </tr>
+    <tr>
+      <td>Comptable / juriste (provision)</td>
+      <td>Externe</td>
+      <td class="num">150 €</td>
+      <td class="num">300 €</td>
+      <td class="num">500 €</td>
+      <td>RGPD audit, CGU/CGV, comptabilité SaaS</td>
+    </tr>
+    <tr class="total">
+      <td colspan="2">TOTAL FIXES v2</td>
+      <td class="num">~345 €</td>
+      <td class="num">~521 €</td>
+      <td class="num">~725 €</td>
+      <td>~ 4,1 / 6,3 / 8,7 k€/an</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.2. Coûts SEMI-FIXES (paliers de volume) — inchangés vs v1</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th>Fournisseur</th>
+      <th>Seuil de déclenchement</th>
+      <th class="num">Coût palier</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Vercel Pro (équipe dev)</td>
+      <td>Vercel</td>
+      <td>3 seats (Board + 2 sub-agents)</td>
+      <td class="num">60 €/mo</td>
+    </tr>
+    <tr>
+      <td>Supabase Pro</td>
+      <td>Supabase</td>
+      <td>0-50 clients actifs</td>
+      <td class="num">24 €/mo</td>
+    </tr>
+    <tr>
+      <td>Supabase Pro + compute add-on</td>
+      <td>Supabase</td>
+      <td>50-150 clients</td>
+      <td class="num">+60 €/mo</td>
+    </tr>
+    <tr>
+      <td>Supabase Team</td>
+      <td>Supabase</td>
+      <td>150-400 clients</td>
+      <td class="num">580 €/mo</td>
+    </tr>
+    <tr>
+      <td>Brevo Lite</td>
+      <td>Brevo</td>
+      <td>~30 clients Cotraitance</td>
+      <td class="num">~25 €/mo</td>
+    </tr>
+    <tr>
+      <td>Brevo Premium</td>
+      <td>Brevo</td>
+      <td>~60 000 emails/mo</td>
+      <td class="num">~65 €/mo</td>
+    </tr>
+    <tr>
+      <td>Resend Pro</td>
+      <td>Resend</td>
+      <td>~30 clients actifs</td>
+      <td class="num">20 €/mo</td>
+    </tr>
+    <tr>
+      <td>Resend Scale</td>
+      <td>Resend</td>
+      <td>~250 clients actifs</td>
+      <td class="num">95 €/mo</td>
+    </tr>
+    <tr>
+      <td>Fly.io scaling</td>
+      <td>Fly.io</td>
+      <td>1-3 instances selon volume</td>
+      <td class="num">5-20 €/mo</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.3. Coûts VARIABLES par client actif — inchangés vs v1</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">Sourcing 190 €</th>
+      <th class="num">Cotraitance 390 €</th>
+      <th class="num">Studio IA 790 €</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Anthropic API (scoring Haiku)</td>
+      <td class="num">5 €</td>
+      <td class="num">6 €</td>
+      <td class="num">6 €</td>
+    </tr>
+    <tr>
+      <td>Anthropic API (Tandem matching + emails)</td>
+      <td class="num">0 €</td>
+      <td class="num">3 €</td>
+      <td class="num">3 €</td>
+    </tr>
+    <tr>
+      <td>Anthropic API (Studio IA — Sonnet 4.6)</td>
+      <td class="num">0 €</td>
+      <td class="num">0 €</td>
+      <td class="num">60 €</td>
+    </tr>
+    <tr>
+      <td>Supabase storage + bandwidth</td>
+      <td class="num">1,5 €</td>
+      <td class="num">3 €</td>
+      <td class="num">7 €</td>
+    </tr>
+    <tr>
+      <td>Brevo + Resend (emails)</td>
+      <td class="num">0,7 €</td>
+      <td class="num">2,8 €</td>
+      <td class="num">4,5 €</td>
+    </tr>
+    <tr>
+      <td>Support (provision externalisable — voir M8)</td>
+      <td class="num">5 €</td>
+      <td class="num">8 €</td>
+      <td class="num">15 €</td>
+    </tr>
+    <tr class="total">
+      <td>Coût variable / client / mois</td>
+      <td class="num">~12 €</td>
+      <td class="num">~23 €</td>
+      <td class="num">~96 €</td>
+    </tr>
+    <tr>
+      <td>Marge unitaire mensuelle</td>
+      <td class="num"><strong>178 € (94 %)</strong></td>
+      <td class="num"><strong>367 € (94 %)</strong></td>
+      <td class="num"><strong>694 € (88 %)</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ========= 4. COÛT PAR TIER ========= -->
+<h2>4. Coût par client à chaque palier tarifaire</h2>
+
+<h3>4.1. Décomposition visuelle du coût par tier (identique v1)</h3>
+
+<div class="chart-container">
+  <div class="chart-title">Coût variable mensuel par client — décomposition par poste</div>
+  <svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+    <text x="40" y="30" font-size="9" fill="#5C5C5C">100 €</text>
+    <text x="40" y="80" font-size="9" fill="#5C5C5C">75 €</text>
+    <text x="40" y="130" font-size="9" fill="#5C5C5C">50 €</text>
+    <text x="40" y="180" font-size="9" fill="#5C5C5C">25 €</text>
+    <text x="40" y="230" font-size="9" fill="#5C5C5C">0 €</text>
+    <line x1="80" y1="30" x2="680" y2="30" stroke="#E5E5E5" stroke-width="1"/>
+    <line x1="80" y1="80" x2="680" y2="80" stroke="#E5E5E5" stroke-width="1"/>
+    <line x1="80" y1="130" x2="680" y2="130" stroke="#E5E5E5" stroke-width="1"/>
+    <line x1="80" y1="180" x2="680" y2="180" stroke="#E5E5E5" stroke-width="1"/>
+    <line x1="80" y1="230" x2="680" y2="230" stroke="#1A1A1A" stroke-width="2"/>
+
+    <g>
+      <rect x="140" y="220" width="120" height="10" fill="#D4A82A"/>
+      <rect x="140" y="217" width="120" height="3" fill="#2D8659"/>
+      <rect x="140" y="215.6" width="120" height="1.4" fill="#6B4C9A"/>
+      <rect x="140" y="205.6" width="120" height="10" fill="#5C5C5C"/>
+      <text x="200" y="246" font-size="11" fill="#1A1A1A" text-anchor="middle" font-weight="600">Sourcing</text>
+      <text x="200" y="260" font-size="9" fill="#5C5C5C" text-anchor="middle">12 €/mo coût</text>
+      <text x="200" y="272" font-size="9" fill="#C8002A" text-anchor="middle" font-weight="600">94 % marge</text>
+    </g>
+
+    <g>
+      <rect x="320" y="218" width="120" height="12" fill="#D4A82A"/>
+      <rect x="320" y="212" width="120" height="6" fill="#E0B850"/>
+      <rect x="320" y="206" width="120" height="6" fill="#2D8659"/>
+      <rect x="320" y="200.4" width="120" height="5.6" fill="#6B4C9A"/>
+      <rect x="320" y="184.4" width="120" height="16" fill="#5C5C5C"/>
+      <text x="380" y="246" font-size="11" fill="#1A1A1A" text-anchor="middle" font-weight="600">Cotraitance</text>
+      <text x="380" y="260" font-size="9" fill="#5C5C5C" text-anchor="middle">23 €/mo coût</text>
+      <text x="380" y="272" font-size="9" fill="#C8002A" text-anchor="middle" font-weight="600">94 % marge</text>
+    </g>
+
+    <g>
+      <rect x="500" y="218" width="120" height="12" fill="#D4A82A"/>
+      <rect x="500" y="212" width="120" height="6" fill="#E0B850"/>
+      <rect x="500" y="92" width="120" height="120" fill="#C8002A"/>
+      <rect x="500" y="78" width="120" height="14" fill="#2D8659"/>
+      <rect x="500" y="69" width="120" height="9" fill="#6B4C9A"/>
+      <rect x="500" y="39" width="120" height="30" fill="#5C5C5C"/>
+      <text x="560" y="246" font-size="11" fill="#1A1A1A" text-anchor="middle" font-weight="600">Studio IA</text>
+      <text x="560" y="260" font-size="9" fill="#5C5C5C" text-anchor="middle">96 €/mo coût</text>
+      <text x="560" y="272" font-size="9" fill="#C8002A" text-anchor="middle" font-weight="600">88 % marge</text>
+    </g>
+  </svg>
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="background: #C8002A"></span>Anthropic Sonnet (Studio IA)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #D4A82A"></span>Anthropic Haiku (scoring)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #E0B850"></span>Anthropic Haiku (Tandem)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #2D8659"></span>Supabase (storage + bandwidth)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #6B4C9A"></span>Emails (Brevo + Resend)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #5C5C5C"></span>Support (externalisable M8)</div>
+  </div>
+</div>
+
+<div class="box">
+  <h4>Observation clé — inchangée vs v1</h4>
+  <p>Sur le tier Studio IA, <strong>Anthropic Sonnet représente toujours 60 % du coût variable</strong>. C'est le principal poste d'optimisation. Sur Sourcing/Cotraitance, <strong>Support humain</strong> domine (mais désormais externalisable via M8).</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 5. COÛTS x NOMBRE CLIENTS ========= -->
+<h2>5. Évolution des coûts en fonction du nombre de clients</h2>
+
+<h3>5.1. Tableau de modélisation v2 (scénario base, ARPU 350 €)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th class="num">Clients actifs</th>
+      <th class="num">Mix tier (S/C/St)</th>
+      <th class="num">Coûts fixes</th>
+      <th class="num">Coûts semi-fixes</th>
+      <th class="num">Coûts variables</th>
+      <th class="num">TOTAL coûts</th>
+      <th class="num">Revenus</th>
+      <th class="num">Marge</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td class="num">1</td>
+      <td class="num">0/0/1</td>
+      <td class="num">345 €</td>
+      <td class="num">60 €</td>
+      <td class="num">96 €</td>
+      <td class="num">501 €</td>
+      <td class="num">790 €</td>
+      <td class="num">+289 €</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td class="num">2</td>
+      <td class="num">1/0/1</td>
+      <td class="num">345 €</td>
+      <td class="num">60 €</td>
+      <td class="num">108 €</td>
+      <td class="num">513 €</td>
+      <td class="num">980 €</td>
+      <td class="num">+467 €</td>
+    </tr>
+    <tr>
+      <td class="num">10</td>
+      <td class="num">5/4/1</td>
+      <td class="num">345 €</td>
+      <td class="num">85 €</td>
+      <td class="num">248 €</td>
+      <td class="num">678 €</td>
+      <td class="num">3 460 €</td>
+      <td class="num">+2 782 €</td>
+    </tr>
+    <tr>
+      <td class="num">30</td>
+      <td class="num">15/11/4</td>
+      <td class="num">345 €</td>
+      <td class="num">130 €</td>
+      <td class="num">830 €</td>
+      <td class="num">1 305 €</td>
+      <td class="num">10 530 €</td>
+      <td class="num">+9 225 €</td>
+    </tr>
+    <tr>
+      <td class="num">50</td>
+      <td class="num">25/17/8</td>
+      <td class="num">500 €</td>
+      <td class="num">170 €</td>
+      <td class="num">1 470 €</td>
+      <td class="num">2 140 €</td>
+      <td class="num">17 350 €</td>
+      <td class="num">+15 210 €</td>
+    </tr>
+    <tr>
+      <td class="num">100</td>
+      <td class="num">50/35/15</td>
+      <td class="num">521 €</td>
+      <td class="num">230 €</td>
+      <td class="num">3 100 €</td>
+      <td class="num">3 851 €</td>
+      <td class="num">34 700 €</td>
+      <td class="num">+30 849 €</td>
+    </tr>
+    <tr>
+      <td class="num">150</td>
+      <td class="num">75/52/23</td>
+      <td class="num">600 €</td>
+      <td class="num">295 €</td>
+      <td class="num">4 700 €</td>
+      <td class="num">5 595 €</td>
+      <td class="num">52 050 €</td>
+      <td class="num">+46 455 €</td>
+    </tr>
+    <tr>
+      <td class="num">200</td>
+      <td class="num">100/70/30</td>
+      <td class="num">650 €</td>
+      <td class="num">880 €</td>
+      <td class="num">6 200 €</td>
+      <td class="num">7 730 €</td>
+      <td class="num">69 400 €</td>
+      <td class="num">+61 670 €</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td class="num">300</td>
+      <td class="num">150/105/45</td>
+      <td class="num">725 €</td>
+      <td class="num">920 €</td>
+      <td class="num">9 300 €</td>
+      <td class="num">10 945 €</td>
+      <td class="num">104 100 €</td>
+      <td class="num">+93 155 €</td>
+    </tr>
+    <tr>
+      <td class="num">500</td>
+      <td class="num">250/175/75</td>
+      <td class="num">850 €</td>
+      <td class="num">1 040 €</td>
+      <td class="num">15 500 €</td>
+      <td class="num">17 390 €</td>
+      <td class="num">173 500 €</td>
+      <td class="num">+156 110 €</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="font-size: 9.5pt; color: var(--ink-muted); margin-top: -8px;">
+Les lignes en rose marquent (a) la rentabilité opérationnelle dès 1-2 clients et (b) la cible An 5 ~300 clients. À 300 clients : <strong>EBITDA mensuel = 93 k€/mo = 1,1 M€/an</strong> hors CAC.
+</p>
+
+<h3>5.2. Graphique de corrélation coûts × clients v2</h3>
+
+<div class="chart-container">
+  <div class="chart-title">Coûts mensuels et revenus en fonction du nombre de clients actifs (modèle Cowork-only)</div>
+  <svg viewBox="0 0 720 380" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+    <!-- Y axis labels (€/mois) -->
+    <text x="20" y="20" font-size="9" fill="#5C5C5C">180 k€</text>
+    <text x="20" y="65" font-size="9" fill="#5C5C5C">150 k€</text>
+    <text x="20" y="110" font-size="9" fill="#5C5C5C">120 k€</text>
+    <text x="20" y="155" font-size="9" fill="#5C5C5C">90 k€</text>
+    <text x="20" y="200" font-size="9" fill="#5C5C5C">60 k€</text>
+    <text x="20" y="245" font-size="9" fill="#5C5C5C">30 k€</text>
+    <text x="20" y="290" font-size="9" fill="#5C5C5C">0 €</text>
+
+    <text x="65" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">1</text>
+    <text x="92" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">2</text>
+    <text x="113" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">10</text>
+    <text x="170" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">30</text>
+    <text x="222" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">50</text>
+    <text x="280" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">100</text>
+    <text x="343" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">150</text>
+    <text x="410" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">200</text>
+    <text x="540" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">300</text>
+    <text x="680" y="310" font-size="9" fill="#5C5C5C" text-anchor="middle">500</text>
+    <text x="370" y="335" font-size="10" fill="#1A1A1A" text-anchor="middle" font-weight="600">Nombre de clients actifs</text>
+
+    <line x1="60" y1="15" x2="700" y2="15" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="60" x2="700" y2="60" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="105" x2="700" y2="105" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="150" x2="700" y2="150" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="195" x2="700" y2="195" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="240" x2="700" y2="240" stroke="#E5E5E5" stroke-width="0.5"/>
+    <line x1="60" y1="285" x2="700" y2="285" stroke="#1A1A1A" stroke-width="1.5"/>
+
+    <line x1="60" y1="15" x2="60" y2="285" stroke="#1A1A1A" stroke-width="1.5"/>
+
+    <!-- Break-even at ~2 clients -->
+    <line x1="92" y1="15" x2="92" y2="285" stroke="#C8002A" stroke-width="1" stroke-dasharray="4 2" opacity="0.6"/>
+    <text x="95" y="28" font-size="9" fill="#C8002A" font-weight="600">Seuil rentabilité (~2 clients)</text>
+
+    <!-- Cost line TOTAL (red) - data: 501, 513, 678, 1305, 2140, 3851, 5595, 7730, 10945, 17390
+         Scale: 180k€ = 270px from y=285 (so 1px = 666€)
+         y = 285 - (cost/666)
+         501 -> 285-0.75=284.2
+         513 -> 284.2
+         678 -> 284
+         1305 -> 283
+         2140 -> 282
+         3851 -> 279
+         5595 -> 277
+         7730 -> 273
+         10945 -> 269
+         17390 -> 259 -->
+    <polyline
+      points="65,284 92,284 113,284 170,283 222,282 280,279 343,277 410,273 540,269 680,259"
+      fill="none" stroke="#C8002A" stroke-width="3"/>
+    <text x="690" y="257" font-size="9" fill="#C8002A" font-weight="600">Coûts totaux</text>
+
+    <!-- Fixed costs (gray dashed) - 345, 345, 345, 345, 500, 521, 600, 650, 725, 850 -->
+    <polyline
+      points="65,285 92,285 113,285 170,285 222,285 280,284 343,284 410,284 540,284 680,284"
+      fill="none" stroke="#5C5C5C" stroke-width="2" stroke-dasharray="5 3"/>
+    <text x="690" y="282" font-size="9" fill="#5C5C5C" font-weight="600">Coûts fixes (Cowork+outils)</text>
+
+    <!-- Variable costs (orange) -->
+    <polyline
+      points="65,285 92,285 113,285 170,284 222,283 280,280 343,278 410,276 540,271 680,262"
+      fill="none" stroke="#B5781C" stroke-width="2"/>
+    <text x="690" y="260" font-size="9" fill="#B5781C" font-weight="600">Coûts variables</text>
+
+    <!-- Revenue line (green): 790, 980, 3460, 10530, 17350, 34700, 52050, 69400, 104100, 173500 -->
+    <polyline
+      points="65,284 92,284 113,280 170,269 222,259 280,233 343,207 410,181 540,129 680,25"
+      fill="none" stroke="#2D8659" stroke-width="3"/>
+    <text x="690" y="23" font-size="9" fill="#2D8659" font-weight="600">Revenus</text>
+
+    <!-- Break-even marker at x=92 -->
+    <circle cx="92" cy="284" r="5" fill="#C8002A" stroke="white" stroke-width="2"/>
+  </svg>
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="background: #C8002A"></span>Coûts totaux mensuels</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #5C5C5C; opacity: 0.7"></span>Coûts fixes (Cowork 180 € + outils)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #B5781C"></span>Coûts variables (par client)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background: #2D8659"></span>Revenus mensuels (ARPU 350 €)</div>
+  </div>
+</div>
+
+<div class="box positive">
+  <h4>Lecture clé v2</h4>
+  <p>Avec le modèle Cowork-only, la courbe des coûts est <strong>quasi confondue avec l'axe horizontal</strong> jusqu'à 50-100 clients. La courbe verte des revenus décolle bien plus vite. Le point d'intersection arrive <strong>dès 1-2 clients</strong>. Cela transforme edifio Sourcing d'un investissement en SaaS classique (cash burn 12-18 mois) en <strong>un produit quasi-autofinancé dès le lancement</strong>.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 6. SEUIL ========= -->
+<h2>6. Seuil de rentabilité et marge unitaire</h2>
+
+<h3>6.1. Calcul du seuil de rentabilité v2</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th class="num">v1 (équipe)</th>
+      <th class="num">v2 (Cowork)</th>
+      <th>Calcul v2</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Coûts fixes mensuels An 1</td>
+      <td class="num">12 500 €</td>
+      <td class="num">345 €</td>
+      <td>Cowork 180 + GitHub 12 + DNS 3 + comptable 150</td>
+    </tr>
+    <tr>
+      <td>ARPU mensuel moyen</td>
+      <td class="num">350 €</td>
+      <td class="num">350 €</td>
+      <td>Mix 50/35/15 inchangé</td>
+    </tr>
+    <tr>
+      <td>Marge unitaire mensuelle</td>
+      <td class="num">319 €</td>
+      <td class="num">319 €</td>
+      <td>350 - 31 (coût variable moyen)</td>
+    </tr>
+    <tr class="total">
+      <td>Seuil de rentabilité (clients)</td>
+      <td class="num">~42</td>
+      <td class="num">~2</td>
+      <td>345 / 319 = 1,08 → 2 clients (avec semi-fixes)</td>
+    </tr>
+    <tr class="total">
+      <td>Date estimée d'atteinte</td>
+      <td class="num">Q3 2027 (T+12 mois)</td>
+      <td class="num">~Q1 2027 (T+3-6 mois)</td>
+      <td>2 clients atteint dès les premiers pilotes AlyoS</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>6.2. Trajectoire de rentabilité v2</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Mois</th>
+      <th class="num">Clients cumulés</th>
+      <th class="num">EBITDA mensuel</th>
+      <th>Commentaire</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td>Q4 2026 (lancement, 1er pilote)</td>
+      <td class="num">1</td>
+      <td class="num">+289 € (si Studio IA) ou -227 € (si Sourcing)</td>
+      <td>Rentable immédiatement sur Studio IA</td>
+    </tr>
+    <tr style="background: var(--pill-bg) !important; font-weight: 600;">
+      <td>Q4 2026 (3 mois post-lancement)</td>
+      <td class="num">3-5</td>
+      <td class="num">+1 200 à +2 500 €</td>
+      <td>SEUIL ATTEINT confortablement</td>
+    </tr>
+    <tr>
+      <td>Q1 2027</td>
+      <td class="num">12</td>
+      <td class="num">+3 400 €</td>
+      <td>~40 k€ ARR</td>
+    </tr>
+    <tr>
+      <td>Q2 2027</td>
+      <td class="num">20</td>
+      <td class="num">+5 700 €</td>
+      <td>~70 k€ ARR · 1er trimestre fortement rentable</td>
+    </tr>
+    <tr>
+      <td>Fin An 1 (Q3 2027)</td>
+      <td class="num">28</td>
+      <td class="num">+8 000 €</td>
+      <td>~96 k€ ARR · EBITDA An 1 = +29 k€</td>
+    </tr>
+    <tr>
+      <td>Fin An 5 (2031)</td>
+      <td class="num">262</td>
+      <td class="num">+62 700 €</td>
+      <td>~1,1 M€ ARR · EBITDA An 5 = +752 k€</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ========= 7. LEVIERS ========= -->
+<h2>7. Leviers d'optimisation v2 (17 actifs + 2 obsolètes + 2 nouveaux)</h2>
+
+<p>Sur les 21 leviers v1, <strong>2 deviennent obsolètes</strong> (M1 équipe lean, M2 outsourcing support — la question ne se pose plus) et <strong>2 nouveaux apparaissent</strong> spécifiques au modèle Cowork-only (M7, M8).</p>
+
+<h3>7.1. Leviers techniques (T1-T8) — inchangés vs v1</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Levier</th>
+      <th class="num">Impact €/an</th>
+      <th>Statut v2</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>T1 — Cache Anthropic Haiku (scoring AO)</td><td class="num">9 000</td><td>✅ inchangé</td></tr>
+    <tr><td>T2 — Prompt caching Anthropic (system prompts)</td><td class="num">14 000</td><td>✅ inchangé</td></tr>
+    <tr><td>T3 — Compression jsonb LZ4</td><td class="num">3 000</td><td>✅ inchangé</td></tr>
+    <tr><td>T4 — CDN Vercel pour assets statiques</td><td class="num">2 000</td><td>✅ inchangé</td></tr>
+    <tr><td>T5 — Edge Functions Deno migration</td><td class="num">1 500</td><td>✅ inchangé</td></tr>
+    <tr><td>T6 — Optimisation prompts Sonnet→Haiku</td><td class="num">6 000</td><td>✅ inchangé</td></tr>
+    <tr><td>T7 — Drizzle batch upsert (acté ADR-013)</td><td class="num">1 000</td><td>✅ inchangé</td></tr>
+    <tr><td>T8 — Self-hosting scraping VPS OVH</td><td class="num">300</td><td>✅ inchangé</td></tr>
+    <tr class="subtotal"><td>Sous-total Techniques</td><td class="num">36 800</td><td></td></tr>
+  </tbody>
+</table>
+
+<h3>7.2. Leviers fonctionnels (F1-F7) — inchangés vs v1</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Levier</th>
+      <th class="num">Impact €/an</th>
+      <th>Statut v2</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>F1 — Quota Studio + overage 1,50 €/AO</td><td class="num">13 000</td><td>✅ inchangé</td></tr>
+    <tr><td>F2 — Engagement annuel -15 %</td><td class="num">4 000</td><td>✅ inchangé</td></tr>
+    <tr><td>F3 — Tier Sourcing+ 290 €/mo</td><td class="num">22 000</td><td>✅ inchangé</td></tr>
+    <tr><td>F4 — Self-serve onboarding</td><td class="num">18 000</td><td>✅ inchangé</td></tr>
+    <tr><td>F5 — Marketplace templates mémoires</td><td class="num">6 000</td><td>✅ inchangé</td></tr>
+    <tr><td>F6 — Surcharge Tandem &gt; 10 sollicitations</td><td class="num">3 000</td><td>✅ inchangé</td></tr>
+    <tr><td>F7 — Push upsell auto mois 4</td><td class="num">23 000</td><td>✅ inchangé</td></tr>
+    <tr class="subtotal"><td>Sous-total Fonctionnels</td><td class="num">89 000</td><td></td></tr>
+  </tbody>
+</table>
+
+<h3>7.3. Leviers managériaux (M1-M8) — actualisés v2</h3>
+
+<div class="lever mana obsolete">
+  <div class="head"><span class="id">M1</span><span class="title">Équipe lean : pas d'embauche avant 100 clients</span><span class="impact obs">Obsolète v2</span></div>
+  <div class="body"><em>Sans objet en modèle Cowork-only — il n'y a plus d'équipe salariée à dimensionner. L'abonnement Cowork 180 €/mo est fixe quel que soit le volume.</em></div>
+</div>
+
+<div class="lever mana obsolete">
+  <div class="head"><span class="id">M2</span><span class="title">Outsourcing support N1 plateforme externe</span><span class="impact obs">Obsolète v2 → fusionné dans M8</span></div>
+  <div class="body"><em>Repensé dans le contexte Cowork : le support client à volume devient un nouveau levier M8 spécifique (voir ci-dessous).</em></div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M3</span><span class="title">Acquisition via partenariats fédérations BTP (FFB / CAPEB / FNTP)</span><span class="impact">~30 k€/an</span></div>
+  <div class="body">Inchangé vs v1. Négocier « tarif adhérent -10 % » avec FFB/CAPEB/FNTP contre référencement. CAC quasi-nul sur ces leads. Reste pertinent en modèle Cowork — la négociation est portée par le Board (TEISSIER) avec assistance Léa (Cowork) pour les supports.</div>
+  <div class="effort">Effort : 10-15 j Board · Sourcing supports Cowork</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M4</span><span class="title">Programme ambassadeurs early adopters (3 mois gratuits par parrainage)</span><span class="impact">~20 k€/an</span></div>
+  <div class="body">Inchangé vs v1. 5 conversions parrainage/an × 350 € × 3 mois = 5,2 k€ de coût · 20-25 nouveaux clients × 600 € CAC évité = 13 k€ + effet rétention. Reste très pertinent.</div>
+  <div class="effort">Effort : 3 j Cowork (programme + landing + tracking) + 1 j Alex (codes referral)</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M5</span><span class="title">Revue trimestrielle coûts + alertes seuils</span><span class="impact">~8 k€/an</span></div>
+  <div class="body">Inchangé vs v1. Dashboard alertes Slack à 80 % et 100 % des seuils. Revue trimestrielle Board + Cowork CEO/CTO. Détection rapide d'anomalies évite 2-3 dépassements/an.</div>
+  <div class="effort">Effort : 2-3 j Alex (dashboard) + revue trimestrielle 1h Board+Cowork</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M6</span><span class="title">Réseau ambassadeurs verticalisé (CHR, scolaire, voirie)</span><span class="impact">~18 k€/an</span></div>
+  <div class="body">Inchangé vs v1. 3 verticales × 1 ambassadeur expert 1 j/mois rémunéré 500 € = 18 k€/an coût · 50 leads × 30 % conv × 350 € × 24 mois = 126 k€ revenus. <strong>Net ~18 k€/an dès An 2.</strong> Note v2 : la rémunération ambassadeur est une charge variable légitime, non couverte par Cowork (action humaine externe).</div>
+  <div class="effort">Effort : 5-10 j Cowork par verticale (recrutement, onboarding ambassadeur)</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M7</span><span class="title">⭐ NOUVEAU v2 — Optimisation usage Cowork (tâches haute valeur)</span><span class="impact">~6 k€/an</span></div>
+  <div class="body">L'abonnement Cowork 180 €/mo couvre un volume d'usage généreux mais pas infini. Optimisation : réserver Cowork aux tâches stratégiques (ADR, specs, copy marketing, comptes-rendus, études) et déléguer les tâches répétitives à Claude Code (sub-agents) ou à des scripts. Hypothèse : 30 % du temps Cowork v1 était sur des tâches répétitives → en automatisant, on libère 30 % de capacité Cowork = ~50 €/mo de valeur économisée × 12 = 600 € direct, mais surtout : possibilité de scaler à 2× le volume de projets edifio (Suivi, AO, ACT) sans surcoût Cowork → équivalent économique ~6 k€/an d'opportunité.</div>
+  <div class="effort">Effort : 5-8 j Alex (automatisation tâches récurrentes : commits, releases, sync repo Cowork↔Code) · 2 j Cowork pour cadrer le périmètre</div>
+</div>
+
+<div class="lever mana">
+  <div class="head"><span class="id">M8</span><span class="title">⭐ NOUVEAU v2 — Support client : modèle hybride Cowork + plateforme externe FR</span><span class="impact">~15 k€/an</span></div>
+  <div class="body">Pour le support client à volume (à partir de 100 clients actifs) : <strong>N1 externalisé</strong> via plateforme spécialisée SaaS BTP (Effisens, Webhelp SaaS, ou similaire) à ~250-400 €/mo pour 50-100 tickets/mois traités. <strong>N2 + N3</strong> gérés par Cowork (escalations techniques, demandes produit) et Board (clients VIP). Économie vs avoir un CS interne 0,5 ETP = 25 k€/an chargé - 4 k€/an externe = 21 k€/an. Net après réinvestissement qualité = ~15 k€/an. Ajustement de l'ancien M2 v1 au contexte Cowork.</div>
+  <div class="effort">Effort : 5-10 j Board + Cowork (sourcing partenaire, onboarding, playbook N1/N2)</div>
+</div>
+
+<h3>7.4. Récapitulatif leviers actualisés</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Catégorie</th>
+      <th class="num">Nombre actifs</th>
+      <th class="num">Impact total €/an</th>
+      <th>Changements vs v1</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Techniques (T1-T8)</td><td class="num">8</td><td class="num">36 800</td><td>Inchangé</td></tr>
+    <tr><td>Fonctionnels (F1-F7)</td><td class="num">7</td><td class="num">89 000</td><td>Inchangé</td></tr>
+    <tr><td>Managériaux (M3, M4, M5, M6, M7, M8)</td><td class="num">6</td><td class="num">97 000</td><td>-M1, -M2 · +M7, +M8</td></tr>
+    <tr class="total"><td>TOTAL leviers actifs v2</td><td class="num">21</td><td class="num">~222 800</td><td>~-50 k€ vs v1</td></tr>
+  </tbody>
+</table>
+
+<div class="box">
+  <p><strong>Note importante</strong> : l'impact total a légèrement baissé (-50 k€/an) car M1 (équipe lean) valait 55 k€/an dans la v1 mais n'a plus d'objet (il n'y a plus d'équipe). Les nouveaux M7 et M8 compensent partiellement (+21 k€). Mais surtout : <strong>le besoin d'optimisation est moins critique en v2</strong> car l'EBITDA baseline est déjà à +752 k€ (vs +451 k€ v1).</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 8. IMPACT ========= -->
+<h2>8. Impact cumulé sur l'EBITDA Année 5</h2>
+
+<h3>8.1. Sélection portefeuille 12 leviers prioritaires v2</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Phase</th>
+      <th>Leviers activés</th>
+      <th class="num">Impact cumulé €/an</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Phase 1 — Q4 2026 (lancement)</strong></td>
+      <td>T2 (caching), T7 (Drizzle), F1 (quota), M4 (ambassadeurs), M5 (revue), M7 (optimisation Cowork)</td>
+      <td class="num">~62 k€</td>
+    </tr>
+    <tr>
+      <td><strong>Phase 2 — H1 2027</strong></td>
+      <td>+ T1 (cache scoring), T3 (compression), F6 (surcharge Tandem), M3 (partenariats fédé)</td>
+      <td class="num">+45 k€</td>
+    </tr>
+    <tr>
+      <td><strong>Phase 3 — H2 2027 / 2028</strong></td>
+      <td>+ M8 (support hybride à 100+ clients), F3 (Sourcing+)</td>
+      <td class="num">+37 k€</td>
+    </tr>
+    <tr>
+      <td><strong>Phase 4 — An 2-3</strong></td>
+      <td>+ F7 (upsell auto), M6 (ambassadeurs verticales)</td>
+      <td class="num">+41 k€</td>
+    </tr>
+    <tr class="total">
+      <td>TOTAL portefeuille 12 leviers v2</td>
+      <td>An 5 atteint</td>
+      <td class="num">~185 k€/an</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>8.2. Impact projeté sur EBITDA Année 5 v2</h3>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">EBITDA An 5 baseline v2</div>
+    <div class="value">+752 k€</div>
+    <div class="unit">Modèle Cowork-only sans leviers</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA An 5 + 12 leviers</div>
+    <div class="value">+867 k€</div>
+    <div class="unit">+115 k€ effectif vs baseline · marge 78 %</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA An 5 (tous 21 leviers)</div>
+    <div class="value">+940 k€</div>
+    <div class="unit">Théorique max si tous activables</div>
+  </div>
+</div>
+
+<div class="chart-container">
+  <div class="chart-title">Comparaison EBITDA An 5 — modèle v1 (équipe) vs v2 (Cowork-only)</div>
+  <svg viewBox="0 0 700 240" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+    <!-- Y axis -->
+    <text x="10" y="25" font-size="9" fill="#5C5C5C">1 000 k€</text>
+    <text x="10" y="65" font-size="9" fill="#5C5C5C">800 k€</text>
+    <text x="10" y="105" font-size="9" fill="#5C5C5C">600 k€</text>
+    <text x="10" y="145" font-size="9" fill="#5C5C5C">400 k€</text>
+    <text x="10" y="185" font-size="9" fill="#5C5C5C">200 k€</text>
+    <text x="10" y="220" font-size="9" fill="#5C5C5C">0 €</text>
+    <line x1="60" y1="220" x2="690" y2="220" stroke="#1A1A1A" stroke-width="1.5"/>
+
+    <!-- v1 EBITDA baseline (gray) - 451 k€ → height ~90 -->
+    <rect x="100" y="130" width="80" height="90" fill="#5C5C5C"/>
+    <text x="140" y="125" font-size="11" font-weight="700" text-anchor="middle">451 k€</text>
+    <text x="140" y="237" font-size="9" text-anchor="middle">v1 baseline</text>
+
+    <!-- v1 + 12 leviers (gray darker) - 566 k€ → height ~113 -->
+    <rect x="200" y="107" width="80" height="113" fill="#3C3C3C"/>
+    <text x="240" y="102" font-size="11" font-weight="700" text-anchor="middle" fill="#1A1A1A">566 k€</text>
+    <text x="240" y="237" font-size="9" text-anchor="middle">v1 + 12 leviers</text>
+
+    <!-- v2 baseline (red light) - 752 k€ → height ~150 -->
+    <rect x="320" y="70" width="80" height="150" fill="#E0908C"/>
+    <text x="360" y="65" font-size="11" font-weight="700" text-anchor="middle">752 k€</text>
+    <text x="360" y="237" font-size="9" text-anchor="middle">v2 baseline</text>
+
+    <!-- v2 + 12 leviers (red full) - 867 k€ → height ~173 -->
+    <rect x="440" y="47" width="80" height="173" fill="#C8002A"/>
+    <text x="480" y="42" font-size="11" font-weight="700" text-anchor="middle">867 k€</text>
+    <text x="480" y="237" font-size="9" text-anchor="middle">v2 + 12 leviers</text>
+
+    <!-- v2 tous 21 leviers (green) - 940 k€ → height ~188 -->
+    <rect x="560" y="32" width="80" height="188" fill="#2D8659"/>
+    <text x="600" y="27" font-size="11" font-weight="700" text-anchor="middle">940 k€</text>
+    <text x="600" y="237" font-size="9" text-anchor="middle">v2 tous leviers</text>
+
+    <!-- Annotation arrow v1→v2 -->
+    <path d="M 180 130 Q 250 100 320 80" stroke="#C8002A" stroke-width="2" fill="none" stroke-dasharray="3 3"/>
+    <text x="265" y="80" font-size="9" fill="#C8002A" font-weight="600">+301 k€ effet Cowork</text>
+  </svg>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 9. RECO ========= -->
+<h2>9. Recommandation Board v2</h2>
+
+<div class="box positive">
+  <h4>Décision recommandée v2</h4>
+  <p>Le passage au modèle Cowork-only <strong>améliore l'EBITDA Année 5 de +301 k€</strong> (+66 %) avant même optimisations. Les 6 leviers Phase 1 v2 (T2, T7, F1, M4, M5, M7) ajoutent <strong>+62 k€/an</strong> pour <strong>&lt; 15 jours d'effort cumulés</strong>.</p>
+</div>
+
+<h3>9.1. Plan d'action immédiat v2 (avant Gate 9, 0-3 mois)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Levier</th>
+      <th>Pilote</th>
+      <th>Échéance</th>
+      <th class="num">Impact €/an</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>T2 — Prompt caching Anthropic</td>
+      <td>Alex (Claude Code)</td>
+      <td>1re PR module IA dossier</td>
+      <td class="num">14 000</td>
+    </tr>
+    <tr>
+      <td>T7 — Drizzle batch upsert</td>
+      <td>Alex (Claude Code)</td>
+      <td>Déjà acté (ADR-013)</td>
+      <td class="num">1 000</td>
+    </tr>
+    <tr>
+      <td>F1 — Quota Studio + overage</td>
+      <td>Alex (Claude Code)</td>
+      <td>1re PR module IA dossier</td>
+      <td class="num">13 000</td>
+    </tr>
+    <tr>
+      <td>M4 — Programme ambassadeurs</td>
+      <td>Léa (Cowork) + Board</td>
+      <td>Pré-Gate 9 (~Q3 2026)</td>
+      <td class="num">20 000</td>
+    </tr>
+    <tr>
+      <td>M5 — Dashboard coûts + alertes</td>
+      <td>Yann (Claude Code) + Board</td>
+      <td>Gate 9 (mise en prod)</td>
+      <td class="num">8 000</td>
+    </tr>
+    <tr>
+      <td>M7 — Optimisation usage Cowork ⭐</td>
+      <td>Alex (Claude Code) + Marc (Cowork)</td>
+      <td>Q4 2026</td>
+      <td class="num">6 000</td>
+    </tr>
+    <tr class="total">
+      <td colspan="3">TOTAL leviers Phase 1 v2</td>
+      <td class="num">62 000</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>9.2. Question stratégique nouvelle — emploi de la trésorerie</h3>
+
+<div class="box">
+  <p>Avec un EBITDA An 5 baseline à <strong>+752 k€/an</strong> (et possible +867 k€ avec leviers), edifio Sourcing dégage rapidement de la trésorerie disponible. Trois options pour le Board :</p>
+  <ol>
+    <li><strong>Distribution dividendes AlyoS Ingénierie</strong> — rapatrier directement la rentabilité dans la SARL existante</li>
+    <li><strong>Réinvestissement produit</strong> — lancer une 2e app de la fratrie edifio (Suivi v2, AO, ACT) sur les mêmes principes Cowork-only</li>
+    <li><strong>Acquisition / expansion européenne</strong> — racheter un concurrent type Doublet/AOS pour consolider, ou viser une expansion Belgique/Suisse romande/Espagne</li>
+  </ol>
+  <p>Cette question devient une vraie décision Board à formaliser au plus tard fin An 2 (2028).</p>
+</div>
+
+<h3>9.3. Risques spécifiques au modèle Cowork-only</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Risque</th>
+      <th class="center">Probabilité</th>
+      <th class="center">Impact</th>
+      <th>Mitigation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Augmentation tarif Cowork Anthropic (×2 à 360 €/mo)</td>
+      <td class="center">Faible (~10 %)</td>
+      <td class="center">-2 k€/an</td>
+      <td>Impact marginal. Pas de plan B nécessaire à court terme.</td>
+    </tr>
+    <tr>
+      <td>Cowork ne couvre pas un besoin spécifique (ex. levée de fonds, négo complexe)</td>
+      <td class="center">Modérée (~30 %)</td>
+      <td class="center">Externalisation ponctuelle 2-5 k€</td>
+      <td>Budget annuel « conseil externe » 5-10 k€ à provisionner dès An 2 (juriste, expert M&amp;A, etc.)</td>
+    </tr>
+    <tr>
+      <td>Charge cognitive Board (TEISSIER) sur les actions humaines non automatisables</td>
+      <td class="center">Élevée (~70 %)</td>
+      <td class="center">Capacité à scaler limitée</td>
+      <td>M7 (optimisation usage) + M8 (support hybride) + recrutement ponctuel mission ponctuelle (10-15 k€/an provision)</td>
+    </tr>
+    <tr>
+      <td>Dépendance Anthropic (fournisseur unique tooling + IA produit)</td>
+      <td class="center">Modérée (~25 %)</td>
+      <td class="center">Continuité service</td>
+      <td>Diversification IA produit (Llama-3 backup) déjà mentionnée. Migration Cowork → autre orchestrateur si nécessaire (Devin, etc.)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>9.4. Décisions Board demandées v2</h3>
+
+<div class="box">
+  <ul>
+    <li>☐ <strong>Validation principe</strong> du modèle Cowork-only (180 €/mo) à la place de l'équipe salariée — engagement formel pour 12-24 mois</li>
+    <li>☐ <strong>Validation</strong> des 6 leviers Phase 1 v2 (T2, T7, F1, M4, M5, M7)</li>
+    <li>☐ <strong>Provision annuelle conseil externe</strong> = 5-10 k€/an (juriste, comptable, expert ponctuel)</li>
+    <li>☐ <strong>Orientation</strong> stratégique sur l'emploi de la trésorerie EBITDA An 2+ : dividendes / réinvestissement produit / acquisition</li>
+    <li>☐ <strong>Confirmation</strong> que l'effort humain Board (TEISSIER) sur les actions non automatisables (signatures, négos commerciales clés, RH ponctuelle) reste soutenable</li>
+  </ul>
+</div>
+
+<div class="footer-note">
+  Document v2.0 — relivré le 2026-05-18 après directive Board « modèle Cowork-only ». Remplace v1.0 (équipe salariée) pour toutes les références futures. v1 conservée en archive pour traçabilité comparative.<br><br>
+  Sources : <code>specs/budget_infra_v1.md</code>, <code>design/copy/etude_marche_v2.html</code>, <code>specs/ai_prompts_v1.md</code>, <code>specs/module_ia_dossier_v1.md</code>, abonnement Claude Cowork 180 €/mo HT (devis 2026-05).<br><br>
+  — [CEO Marc] avec [CTO Sophie] et [CMO Léa] · edifio Sourcing · AlyoS Ingénierie · 2026-05-18
+</div>
+
+</body>
+</html>

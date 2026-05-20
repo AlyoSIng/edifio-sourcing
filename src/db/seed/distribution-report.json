@@ -1,0 +1,27 @@
+{
+  "seeded_at": "2026-05-20T09:33:29.558Z",
+  "tenders_total": 200,
+  "median_raw_data_kb": 23.57,
+  "distribution": {
+    "small": 30,
+    "medium": 120,
+    "large": 50
+  },
+  "buckets_kb": {
+    "small": "9.28-9.35",
+    "medium": "23.53-23.63",
+    "large": "43.20-43.31"
+  },
+  "counts": {
+    "organizations": 2,
+    "users": 10,
+    "memberships": 10,
+    "architects": 100,
+    "search_profiles": 2,
+    "tenders": 200,
+    "tender_events": 600,
+    "ai_runs": 20,
+    "brevo_messages": 40,
+    "audit_logs": 60
+  }
+}
