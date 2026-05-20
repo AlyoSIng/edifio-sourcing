@@ -7,16 +7,21 @@ import { getCookieFor, signInWith } from "./helpers/auth";
  *
  * Source : `specs/middleware_domain_gate.md` §4 (7 scénarios bloquants Gate 6).
  *
- * Activés à l'étape 3 (Supabase Auth magic-link branché). Les helpers
- * `signInWith` / `getCookieFor` (cf. `e2e/helpers/auth.ts`) utilisent l'API
- * admin Supabase (`auth.admin.generateLink`) pour se connecter à la volée
- * pour chaque test sans interaction utilisateur.
+ * **Refactor 2026-05-16 (clôture ticket backlog Phase 2)** : les helpers
+ * `signInWith` / `getCookieFor` passent désormais par la route gated
+ * `POST /api/test/seed-session` (cf. `e2e/helpers/auth.ts`). La pose de
+ * session est dé-couplée du chemin form-login + middleware, ce qui permet
+ * de :
+ *   - retirer les `test.fixme` qui couvraient C4/C7/C10/C12 ;
+ *   - ré-appliquer le pattern `propagateAuthCookies` dans le middleware
+ *     (commit f2c2e59 revert le 2026-05-15 par f14b0eb-ish) ;
+ *   - ajouter un test défensif `cookies-invalidation` qui constate
+ *     l'invariant spec §2 C4 « session invalidée immédiatement ».
  *
- * Prérequis local : `.env.local` à la racine avec `NEXT_PUBLIC_SUPABASE_URL`
- * et `SUPABASE_SERVICE_ROLE_KEY`. Le webServer Playwright démarre `pnpm dev`
- * automatiquement (cf. `playwright.config.ts`).
+ * Prérequis local : `.env.local` à la racine avec `NEXT_PUBLIC_SUPABASE_URL`,
+ * `SUPABASE_SERVICE_ROLE_KEY` ET `E2E_TEST_ROUTES_ENABLED=1`. Le webServer
+ * Playwright démarre `pnpm dev` automatiquement (cf. `playwright.config.ts`).
  */
-
 test.describe("Middleware de domaine — matrice spec §2 / scénarios §4", () => {
   test("C4 — un utilisateur @gmail.com est rejeté sur /sourcing/*", async ({ page }) => {
     await signInWith(page, "bob@gmail.com");
@@ -60,5 +65,31 @@ test.describe("Middleware de domaine — matrice spec §2 / scénarios §4", () 
     });
     expect(r.status()).toBe(403);
     expect(await r.json()).toEqual(expect.objectContaining({ error: "forbidden_domain" }));
+  });
+
+  /**
+   * Test défensif (nouveau 2026-05-16) — clôture la sous-action 2 du ticket
+   * backlog Phase 2 : « ajouter test E2E défensif `expect(context.cookies())
+   * .toHaveLength(0)` après rejet `/forbidden` ».
+   *
+   * Constat de l'invariant spec §2 C4 « session invalidée immédiatement » :
+   * après que le middleware ait redirigé un user out-of-domain vers /forbidden
+   * (et donc appelé `signOut` + propagé les cookies effacés), le contexte
+   * browser ne doit plus porter aucun cookie de session Supabase.
+   *
+   * On accepte que le contexte puisse porter des cookies non-session (par
+   * exemple un cookie tracking analytique futur) — on filtre strictement les
+   * cookies dont le nom commence par `sb-` (préfixe Supabase Auth).
+   */
+  test("cookies-invalidation — après /forbidden, aucun cookie sb-* ne subsiste", async ({
+    page,
+    context,
+  }) => {
+    await signInWith(page, "bob@gmail.com");
+    await page.goto("/sourcing/ao-du-jour");
+    await expect(page).toHaveURL(/\/forbidden/);
+
+    const supabaseCookies = (await context.cookies()).filter((c) => c.name.startsWith("sb-"));
+    expect(supabaseCookies).toHaveLength(0);
   });
 });

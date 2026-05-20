@@ -2,8 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * Tokens de design DTCG (cf. design/tokens.json) à intégrer à l'étape 3
- * via shadcn/ui hybride + variables CSS. Pour Gate 6 étape 1, on reste
- * sur la palette Tailwind par défaut + polices fontsource.
- */
+/* Tokens marketing (cf. design/tokens.json + specs/adr_012_alignment_edifio_fr_visual.md). */
+
+:root {
+  /* ADR-012 — patterns marketing extraits de edifio.fr */
+  --marketing-pill-bg: #ffe5ea;
+  --marketing-pill-color: #c8002a;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-size-marketing-h1: 52px;
+  --letter-spacing-marketing-h1: -1.5px;
+}
+
+@layer components {
+  /* Pill eyebrow — pour sections marketing publiques (cf. ADR-012 §Pattern 1).
+   * Usage : <span className="pill-eyebrow">SUITE LOGICIELLE POUR LES MOE</span> */
+  .pill-eyebrow {
+    display: inline-block;
+    background: var(--marketing-pill-bg);
+    color: var(--marketing-pill-color);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 999px;
+  }
+
+  /* Marketing H1 hero — scale 52px aligné edifio.fr (cf. ADR-012 §Pattern 2).
+   * À appliquer uniquement sur les pages publiques (/login, /forbidden,
+   * /auth/error, future M15). Ne PAS appliquer sur l'app interne. */
+  .marketing-h1 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-marketing-h1);
+    letter-spacing: var(--letter-spacing-marketing-h1);
+    line-height: 1.05;
+    font-weight: 700;
+  }
+}

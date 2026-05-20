@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Étude de marché v3 — edifio Sourcing challenger + flywheel cross-app</title>
+<style>
+  :root { --paper:#FFFFFF; --paper-alt:#FAFAF8; --ink:#1A1A1A; --ink-muted:#5C5C5C; --line:#E5E5E5; --alyos-red:#C8002A; --pill-bg:#FFE5EA; --pill-fg:#C8002A; --positive:#2D8659; --warning:#B5781C; --negative:#B83333; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:"Inter",-apple-system,BlinkMacSystemFont,sans-serif; font-size:11pt; line-height:1.5; }
+  body { max-width:210mm; margin:0 auto; padding:25mm 18mm; }
+  h1, h2, h3, h4 { font-family:"Space Grotesk","Inter",sans-serif; color:var(--ink); margin-top:1.5em; margin-bottom:0.5em; letter-spacing:-0.02em; }
+  h1 { font-size:30pt; line-height:1.05; margin-top:0; border-bottom:3px solid var(--alyos-red); padding-bottom:0.3em; }
+  h1 .accent { color:var(--alyos-red); }
+  h2 { font-size:17pt; margin-top:2em; padding-top:0.5em; border-top:1px solid var(--line); }
+  h3 { font-size:13pt; color:var(--alyos-red); }
+  h4 { font-size:11pt; font-weight:600; margin-bottom:0.25em; }
+  p { margin:0.5em 0 1em; }
+  ul, ol { margin:0.5em 0 1em; padding-left:1.5em; }
+  li { margin-bottom:0.3em; }
+  .pill { display:inline-block; background:var(--pill-bg); color:var(--pill-fg); padding:3px 10px; border-radius:20px; font-size:9pt; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }
+  .meta { color:var(--ink-muted); font-size:10pt; }
+  .meta strong { color:var(--ink); }
+  table { width:100%; border-collapse:collapse; margin:1em 0 1.5em; font-size:10pt; page-break-inside:avoid; }
+  table th, table td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table th { background:var(--paper-alt); font-weight:600; font-size:9.5pt; text-transform:uppercase; letter-spacing:0.04em; border-bottom:2px solid var(--ink); }
+  table tr:nth-child(even) td { background:var(--paper-alt); }
+  table td.num, table th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  table td.center, table th.center { text-align:center; }
+  table tr.total td { font-weight:700; background:var(--pill-bg) !important; border-top:2px solid var(--ink); }
+  table tr.subtotal td { font-weight:600; border-top:1px solid var(--ink); }
+  .box { background:var(--paper-alt); border-left:4px solid var(--alyos-red); padding:12px 16px; margin:1em 0 1.5em; border-radius:0 4px 4px 0; }
+  .box.positive { border-left-color:var(--positive); }
+  .box.warning { border-left-color:var(--warning); }
+  .box h4 { margin-top:0; }
+  .kpi-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:1em 0 1.5em; }
+  .kpi { background:var(--paper-alt); border:1px solid var(--line); padding:14px; border-radius:6px; }
+  .kpi .label { font-size:9pt; color:var(--ink-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .kpi .value { font-family:"Space Grotesk",sans-serif; font-size:20pt; font-weight:700; color:var(--alyos-red); line-height:1; }
+  .kpi .unit { font-size:9.5pt; color:var(--ink-muted); margin-top:4px; }
+  .toc { background:var(--paper-alt); padding:16px 24px; border-radius:6px; margin:1em 0 2em; font-size:10pt; }
+  .toc ol { padding-left:1.5em; }
+  .footer-note { margin-top:3em; padding-top:1em; border-top:1px solid var(--line); color:var(--ink-muted); font-size:9pt; font-style:italic; }
+  .page-break { page-break-after:always; }
+  .chart-container { margin:1.5em 0; background:var(--paper-alt); padding:16px; border-radius:6px; border:1px solid var(--line); }
+  .chart-container .chart-title { font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:11pt; margin-bottom:12px; }
+  .delta-pos { color:var(--positive); font-weight:600; }
+  .delta-neg { color:var(--negative); font-weight:600; }
+  .flywheel { display:flex; justify-content:center; margin:1.5em 0; }
+  @media print { body { padding:15mm 12mm; max-width:100%; } h2 { page-break-after:avoid; } table, .kpi-grid, .box, .chart-container { page-break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<!-- ========= PAGE DE GARDE ========= -->
+<div>
+  <span class="pill">Étude de marché · v3.0 — challenger + flywheel cross-app</span>
+  <h1>edifio <span class="accent">Sourcing</span><br>Repositionnement challenger &amp; flywheel suite edifio</h1>
+  <p class="meta">
+    <strong>Auteurs</strong> : [CMO Léa] (positionnement) + [CEO Marc] (modèle financier) + [CTO Sophie] (mutualisation)<br>
+    <strong>Date</strong> : 2026-05-18 · v3.0<br>
+    <strong>Statut</strong> : v3.0 — usage interne Board AlyoS Ingénierie<br>
+    <strong>Changements vs v2</strong> :
+    <ul style="margin-top:6px;">
+      <li>Mutualisation des charges fixes avec edifio Suivi et edifio ACT (allocation /3)</li>
+      <li>Flywheel cross-app : leads croisés entre les 3 apps → CAC effectif divisé par ~2,4</li>
+      <li>Repositionnement tarifaire <strong>challenger</strong> : -22 à -30 % vs v1/v2 → Sourcing 149 € · Cotraitance 299 € · Studio IA 549 €</li>
+      <li>Volume d'acquisition révisé +50 % (pricing agressif + leads gratuits cross-app)</li>
+    </ul>
+  </p>
+</div>
+
+<div class="box positive">
+  <h4>Impact synthétique des 3 changements v3 vs v2</h4>
+  <table style="margin:0;">
+    <tr style="background:transparent;"><th>Indicateur</th><th class="num">v1 (équipe + premium)</th><th class="num">v2 (Cowork + premium)</th><th class="num">v3 (Cowork + challenger + flywheel)</th></tr>
+    <tr><td>ARPU mensuel moyen</td><td class="num">350 €</td><td class="num">350 €</td><td class="num">261,5 €</td></tr>
+    <tr><td>CAC effectif moyen</td><td class="num">600 €</td><td class="num">600 €</td><td class="num">250 €</td></tr>
+    <tr><td>Coûts fixes mutualisés (an 1)</td><td class="num">150 k€</td><td class="num">4,1 k€</td><td class="num">1,4 k€</td></tr>
+    <tr><td>Clients fin An 5</td><td class="num">262</td><td class="num">262</td><td class="num">375</td></tr>
+    <tr><td>ARR An 5</td><td class="num">1,10 M€</td><td class="num">1,10 M€</td><td class="num">1,18 M€</td></tr>
+    <tr><td>EBITDA An 5</td><td class="num">+451 k€</td><td class="num">+752 k€</td><td class="num">+824 k€</td></tr>
+    <tr><td>Position de marché (clients = part SAM)</td><td class="num">2,6 %</td><td class="num">2,6 %</td><td class="num">3,75 %</td></tr>
+  </table>
+</div>
+
+<div class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li>Résumé exécutif v3</li>
+    <li>Flywheel cross-app : architecture des leads croisés</li>
+    <li>Repositionnement tarifaire challenger</li>
+    <li>Mutualisation des charges entre les 3 apps edifio</li>
+    <li>Marché &amp; ROI client recalculé (ARPU 261,5 €)</li>
+    <li>Prévisionnel 5 ans révisé</li>
+    <li>Sensibilités et risques v3</li>
+    <li>Recommandation Board v3</li>
+  </ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 1. RÉSUMÉ ========= -->
+<h2>1. Résumé exécutif v3</h2>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Cible 5 ans (clients)</div>
+    <div class="value">375</div>
+    <div class="unit">vs 262 v2 · +43 % de pénétration</div>
+  </div>
+  <div class="kpi">
+    <div class="label">ARR An 5</div>
+    <div class="value">~1,18 M€</div>
+    <div class="unit">ARPU 261,5 €/mo</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA An 5</div>
+    <div class="value">+824 k€</div>
+    <div class="unit">~70 % de marge EBITDA</div>
+  </div>
+</div>
+
+<h3>Conclusions clés v3</h3>
+
+<ol>
+  <li><strong>Le flywheel cross-app est le vrai moat.</strong> Chaque app génère des prospects pour les 2 autres : edifio Sourcing capture les architectes cotraitants → leads Suivi + ACT. edifio Suivi capture MOE + entreprises → leads Sourcing + ACT. edifio ACT capture acteurs projet → leads Sourcing + Suivi. C'est un avantage compétitif inimitable par les pure-players (Vecteur Plus, Klekoon…) qui n'ont qu'une app.</li>
+  <li><strong>Le pricing challenger crée la traction.</strong> En se positionnant 22-30 % sous Vecteur Plus avec un produit largement supérieur, edifio Sourcing devient le choix rationnel pour la majorité des PME BTP. Cible d'acquisition +50 % vs v2.</li>
+  <li><strong>La mutualisation des coûts fixes /3 amplifie la marge.</strong> Cowork 180 €/mo, GitHub Team, Sentry, comptable → tous partagés entre les 3 apps. Allocation par app ~120 €/mo An 1 (vs 345 v2).</li>
+  <li><strong>Position de marché ×1,5 à terme.</strong> 375 clients = 3,75 % du SAM (vs 2,6 % v2) → puissance d'attraction + crédibilité fédérations renforcée + base d'utilisateurs pour cross-app accélérée.</li>
+  <li><strong>EBITDA An 5 +824 k€</strong> (vs +752 k€ v2) malgré la baisse de l'ARPU, grâce au volume client supérieur et au CAC effondré.</li>
+  <li><strong>Risque #1 : capacité d'exécution Board sur le cross-app.</strong> Le flywheel ne fonctionne que si chaque app est bien intégrée techniquement (base prospects commune) et commercialement (séquences de nurturing automatisées). Sinon les leads pourrissent.</li>
+</ol>
+
+<div class="box positive">
+  <h4>Recommandation Board v3</h4>
+  <p><strong>GO challenger</strong> avec mutualisation infrastructure + repricing -25 % moyen + base prospects unifiée entre les 3 apps. Phase de lancement Q4 2026, mais <strong>développement parallèle du connecteur cross-app dès Gate 6</strong> pour activer le flywheel dès le 1er client.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 2. FLYWHEEL ========= -->
+<h2>2. Flywheel cross-app : architecture des leads croisés</h2>
+
+<h3>2.1. Schéma du flywheel</h3>
+
+<div class="chart-container">
+  <div class="chart-title">Flywheel cross-app suite edifio — circulation des leads</div>
+  <svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+    <!-- 3 nodes : edifio Sourcing top, Suivi bottom-left, ACT bottom-right -->
+    <!-- Sourcing node -->
+    <circle cx="350" cy="80" r="65" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="350" y="65" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="350" y="85" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">Sourcing</text>
+    <text x="350" y="103" text-anchor="middle" font-size="9" fill="#5C5C5C">PME BTP &amp; cotraitance</text>
+
+    <!-- Suivi node -->
+    <circle cx="180" cy="300" r="65" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="180" y="285" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="180" y="305" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">Suivi</text>
+    <text x="180" y="323" text-anchor="middle" font-size="9" fill="#5C5C5C">Architectes MOE</text>
+
+    <!-- ACT node -->
+    <circle cx="520" cy="300" r="65" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="520" y="285" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="520" y="305" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">ACT</text>
+    <text x="520" y="323" text-anchor="middle" font-size="9" fill="#5C5C5C">Phase ACT / chantier</text>
+
+    <!-- Arrows -->
+    <!-- Sourcing → Suivi : cotraitants architectes -->
+    <path d="M 305 130 Q 240 200 215 245" stroke="#C8002A" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+    <text x="220" y="180" font-size="9" fill="#C8002A" font-weight="600">Cotraitants archi</text>
+    <text x="220" y="193" font-size="9" fill="#C8002A">→ leads Suivi</text>
+
+    <!-- Sourcing → ACT : entreprises BTP -->
+    <path d="M 395 130 Q 460 200 485 245" stroke="#C8002A" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+    <text x="450" y="180" font-size="9" fill="#C8002A" font-weight="600">Entreprises BTP</text>
+    <text x="450" y="193" font-size="9" fill="#C8002A">→ leads ACT</text>
+
+    <!-- Suivi → Sourcing : MOE projets -->
+    <path d="M 220 245 Q 280 180 320 135" stroke="#2D5C86" stroke-width="2.5" fill="none" marker-end="url(#arrow2)"/>
+    <text x="240" y="230" font-size="9" fill="#2D5C86" font-weight="600">MOE projets BTP</text>
+    <text x="240" y="243" font-size="9" fill="#2D5C86">→ leads Sourcing</text>
+
+    <!-- Suivi → ACT : projets en cours -->
+    <path d="M 245 300 L 455 300" stroke="#2D5C86" stroke-width="2.5" fill="none" marker-end="url(#arrow2)"/>
+    <text x="350" y="295" font-size="9" fill="#2D5C86" font-weight="600" text-anchor="middle">Projets en phase exé</text>
+    <text x="350" y="308" font-size="9" fill="#2D5C86" text-anchor="middle">→ leads ACT</text>
+
+    <!-- ACT → Sourcing : entreprises chantier -->
+    <path d="M 480 245 Q 420 180 380 135" stroke="#2D8659" stroke-width="2.5" fill="none" marker-end="url(#arrow3)"/>
+    <text x="460" y="230" font-size="9" fill="#2D8659" font-weight="600">Entreprises chantier</text>
+    <text x="460" y="243" font-size="9" fill="#2D8659">→ leads Sourcing</text>
+
+    <!-- ACT → Suivi : projets ACT en MOE -->
+    <path d="M 455 300 L 245 300" stroke="#2D8659" stroke-width="2.5" fill="none" marker-end="url(#arrow3)" transform="translate(0,20)"/>
+
+    <defs>
+      <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L9,3 z" fill="#C8002A"/>
+      </marker>
+      <marker id="arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L9,3 z" fill="#2D5C86"/>
+      </marker>
+      <marker id="arrow3" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L0,6 L9,3 z" fill="#2D8659"/>
+      </marker>
+    </defs>
+  </svg>
+</div>
+
+<h3>2.2. Mécaniques de génération de leads cross-app</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>App source</th>
+      <th>Donnée capturée</th>
+      <th>App(s) bénéficiaire(s)</th>
+      <th>Volume estimé / client / an</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>edifio Sourcing</strong></td>
+      <td>Architectes cotraitants identifiés via module Tandem</td>
+      <td>edifio Suivi (cible MOE), edifio ACT</td>
+      <td class="num">~5-15 contacts archi qualifiés</td>
+    </tr>
+    <tr>
+      <td><strong>edifio Sourcing</strong></td>
+      <td>Maîtres d'ouvrage publics récurrents (acheteurs identifiés)</td>
+      <td>edifio Suivi + ACT (prospects MOA)</td>
+      <td class="num">~3-8 contacts MOA</td>
+    </tr>
+    <tr>
+      <td><strong>edifio Suivi</strong></td>
+      <td>Entreprises BTP travaillant avec l'architecte</td>
+      <td>edifio Sourcing</td>
+      <td class="num">~10-25 entreprises BTP</td>
+    </tr>
+    <tr>
+      <td><strong>edifio Suivi</strong></td>
+      <td>Projets en phase exé / ACT planifiée</td>
+      <td>edifio ACT</td>
+      <td class="num">~5-15 projets ACT prospectables</td>
+    </tr>
+    <tr>
+      <td><strong>edifio ACT</strong></td>
+      <td>Entreprises de chantier qualifiées (interventions ACT)</td>
+      <td>edifio Sourcing</td>
+      <td class="num">~10-20 entreprises BTP</td>
+    </tr>
+    <tr>
+      <td><strong>edifio ACT</strong></td>
+      <td>Architectes MOE des projets ACT</td>
+      <td>edifio Suivi</td>
+      <td class="num">~3-8 contacts archi MOE</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="box">
+  <h4>Hypothèse de conversion leads cross-app</h4>
+  <p>Si edifio Sourcing a 100 clients actifs et que chaque client génère ~15 leads BTP/an pour Sourcing (via Suivi + ACT), c'est <strong>1 500 leads/an gratuits</strong> qualifiés (déjà actifs sur l'écosystème edifio). Avec un taux de conversion de 5 % (vs 0,5 % sur du cold outbound), cela représente <strong>75 nouveaux clients Sourcing/an via le flywheel</strong>. CAC quasi-nul (juste l'effort de nurturing automatisé via Brevo).</p>
+</div>
+
+<h3>2.3. Calcul du CAC effectif v3</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Source d'acquisition</th>
+      <th class="num">CAC unitaire</th>
+      <th class="num">% du volume</th>
+      <th class="num">CAC pondéré</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Réseau AlyoS direct (Q4 2026 lancement)</td>
+      <td class="num">50 €</td>
+      <td class="num">15 %</td>
+      <td class="num">8 €</td>
+    </tr>
+    <tr>
+      <td>Cross-app flywheel (leads Suivi/ACT)</td>
+      <td class="num">100 €</td>
+      <td class="num">40 %</td>
+      <td class="num">40 €</td>
+    </tr>
+    <tr>
+      <td>Parrainage clients existants (M4)</td>
+      <td class="num">200 €</td>
+      <td class="num">15 %</td>
+      <td class="num">30 €</td>
+    </tr>
+    <tr>
+      <td>Partenariats fédérations (M3 — FFB/CAPEB)</td>
+      <td class="num">350 €</td>
+      <td class="num">15 %</td>
+      <td class="num">53 €</td>
+    </tr>
+    <tr>
+      <td>SEA / Google Ads / SEO inbound</td>
+      <td class="num">800 €</td>
+      <td class="num">15 %</td>
+      <td class="num">120 €</td>
+    </tr>
+    <tr class="total">
+      <td>CAC effectif moyen v3</td>
+      <td class="num">—</td>
+      <td class="num">100 %</td>
+      <td class="num">~250 €</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="color:var(--ink-muted); font-size:9.5pt;">Note : le mix d'acquisition évolue dans le temps. An 1 fortement biaisé réseau AlyoS + cross-app (~60 % du volume). An 5 plus diversifié avec SEA et partenariats matures.</p>
+
+<div class="page-break"></div>
+
+<!-- ========= 3. PRICING CHALLENGER ========= -->
+<h2>3. Repositionnement tarifaire challenger</h2>
+
+<h3>3.1. Nouveau positionnement</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Palier</th>
+      <th class="num">v1 / v2</th>
+      <th class="num">v3 challenger</th>
+      <th class="num">Delta</th>
+      <th>Positionnement marché</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Sourcing</strong></td>
+      <td class="num">190 €/mo</td>
+      <td class="num"><strong>149 €/mo</strong></td>
+      <td class="num delta-pos">-22 %</td>
+      <td>Au-dessus de Doublet (50-150 €), Klekoon (80-250 €). Premium mais accessible TPE BTP.</td>
+    </tr>
+    <tr>
+      <td><strong>Cotraitance</strong></td>
+      <td class="num">390 €/mo</td>
+      <td class="num"><strong>299 €/mo</strong></td>
+      <td class="num delta-pos">-23 %</td>
+      <td>Sous Vecteur Plus (250-670 €). Pas de concurrent direct sur la cotraitance.</td>
+    </tr>
+    <tr>
+      <td><strong>Studio IA</strong></td>
+      <td class="num">790 €/mo</td>
+      <td class="num"><strong>549 €/mo</strong></td>
+      <td class="num delta-pos">-30 %</td>
+      <td>Premium IA accessible aux PME (avant 790 € = ETI uniquement).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.2. Justification du repricing</h3>
+
+<div class="box">
+  <h4>Pourquoi baisser plutôt que monter ?</h4>
+  <p>Le modèle Cowork-only + flywheel cross-app permet de soutenir des marges élevées avec un ARPU plus bas. La stratégie passe de <strong>« valeur maximale par client »</strong> à <strong>« pénétration maximale du marché »</strong>. Trois arguments :</p>
+  <ul>
+    <li><strong>Volume × prix &gt; prix premium seul.</strong> -25 % de prix moyen, +43 % de clients → CA équivalent voire supérieur, marge brute préservée (88-94 % d'unitaire).</li>
+    <li><strong>Plus de clients = plus de leads cross-app.</strong> Chaque client Sourcing alimente la base Suivi/ACT → multiplicateur de croissance pour la suite edifio.</li>
+    <li><strong>Position de marché.</strong> 375 clients = ~4 % du SAM, soit assez pour devenir une référence sectorielle et négocier des partenariats fédérations en position de force.</li>
+  </ul>
+</div>
+
+<h3>3.3. Cartographie tarifaire visuelle révisée</h3>
+
+<div class="chart-container">
+  <div class="chart-title">Positionnement edifio Sourcing v3 dans le paysage concurrentiel</div>
+  <svg viewBox="0 0 700 320" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+    <!-- X axis (price) -->
+    <line x1="60" y1="280" x2="680" y2="280" stroke="#1A1A1A" stroke-width="1.5"/>
+    <text x="80" y="298" font-size="9" fill="#5C5C5C">0 €</text>
+    <text x="180" y="298" font-size="9" fill="#5C5C5C">100 €</text>
+    <text x="280" y="298" font-size="9" fill="#5C5C5C">200 €</text>
+    <text x="380" y="298" font-size="9" fill="#5C5C5C">300 €</text>
+    <text x="480" y="298" font-size="9" fill="#5C5C5C">400 €</text>
+    <text x="580" y="298" font-size="9" fill="#5C5C5C">500 €</text>
+    <text x="660" y="298" font-size="9" fill="#5C5C5C">600 €+</text>
+    <text x="370" y="315" font-size="10" fill="#1A1A1A" text-anchor="middle" font-weight="600">Tarif mensuel HT moyen</text>
+
+    <!-- Competitors as dots -->
+    <!-- Doublet 100€ -->
+    <circle cx="180" cy="220" r="6" fill="#5C5C5C"/>
+    <text x="180" y="210" font-size="9" fill="#1A1A1A" text-anchor="middle">Doublet</text>
+    <!-- France Marchés 125€ -->
+    <circle cx="205" cy="250" r="6" fill="#5C5C5C"/>
+    <text x="205" y="265" font-size="9" fill="#1A1A1A" text-anchor="middle">France Marchés</text>
+    <!-- MPI 125€ -->
+    <circle cx="205" cy="195" r="6" fill="#5C5C5C"/>
+    <text x="205" y="185" font-size="9" fill="#1A1A1A" text-anchor="middle">MP.info</text>
+    <!-- Klekoon 165€ -->
+    <circle cx="245" cy="240" r="6" fill="#5C5C5C"/>
+    <text x="245" y="255" font-size="9" fill="#1A1A1A" text-anchor="middle">Klekoon</text>
+
+    <!-- edifio Sourcing 149€ (highlighted) -->
+    <circle cx="225" cy="100" r="12" fill="#C8002A" stroke="#FFF" stroke-width="3"/>
+    <text x="225" y="80" font-size="10" fill="#C8002A" text-anchor="middle" font-weight="700">edifio Sourcing</text>
+    <text x="225" y="92" font-size="9" fill="#C8002A" text-anchor="middle">149 €</text>
+
+    <!-- AOS 225€ -->
+    <circle cx="285" cy="220" r="6" fill="#5C5C5C"/>
+    <text x="285" y="235" font-size="9" fill="#1A1A1A" text-anchor="middle">AOS-Concept</text>
+
+    <!-- TenderEye 225€ -->
+    <circle cx="285" cy="170" r="6" fill="#5C5C5C"/>
+    <text x="290" y="160" font-size="9" fill="#1A1A1A" text-anchor="middle">TenderEye (UK)</text>
+
+    <!-- Explore 275€ -->
+    <circle cx="335" cy="240" r="6" fill="#5C5C5C"/>
+    <text x="335" y="255" font-size="9" fill="#1A1A1A" text-anchor="middle">Explore</text>
+
+    <!-- edifio Cotraitance 299€ -->
+    <circle cx="359" cy="100" r="12" fill="#C8002A" stroke="#FFF" stroke-width="3"/>
+    <text x="359" y="80" font-size="10" fill="#C8002A" text-anchor="middle" font-weight="700">edifio Cotraitance</text>
+    <text x="359" y="92" font-size="9" fill="#C8002A" text-anchor="middle">299 €</text>
+
+    <!-- Vecteur Plus 460€ -->
+    <circle cx="520" cy="220" r="6" fill="#5C5C5C"/>
+    <text x="520" y="210" font-size="9" fill="#1A1A1A" text-anchor="middle">Vecteur Plus</text>
+
+    <!-- edifio Studio IA 549€ -->
+    <circle cx="609" cy="100" r="12" fill="#C8002A" stroke="#FFF" stroke-width="3"/>
+    <text x="609" y="80" font-size="10" fill="#C8002A" text-anchor="middle" font-weight="700">edifio Studio IA</text>
+    <text x="609" y="92" font-size="9" fill="#C8002A" text-anchor="middle">549 €</text>
+
+    <!-- Y axis annotation -->
+    <text x="35" y="100" font-size="9" fill="#C8002A" text-anchor="middle" transform="rotate(-90,35,100)" font-weight="600">Continuum 6 axes</text>
+    <text x="35" y="240" font-size="9" fill="#5C5C5C" text-anchor="middle" transform="rotate(-90,35,240)">Mono-axe sourcing</text>
+
+    <!-- Vertical line at 150 €/mo -->
+    <line x1="225" y1="60" x2="225" y2="280" stroke="#C8002A" stroke-width="0.5" stroke-dasharray="3 3" opacity="0.4"/>
+    <text x="375" y="50" font-size="10" fill="#1A1A1A" text-anchor="middle" font-weight="600" font-style="italic">edifio = seul à offrir le continuum bout-en-bout</text>
+  </svg>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 4. MUTUALISATION ========= -->
+<h2>4. Mutualisation des charges entre les 3 apps edifio</h2>
+
+<h3>4.1. Charges mutualisables identifiées</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">Total /mo</th>
+      <th class="num">Allocation edifio Sourcing</th>
+      <th>Logique d'allocation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Abonnement Claude Cowork (orchestration des 3 apps)</td>
+      <td class="num">180 €</td>
+      <td class="num">60 €</td>
+      <td>Allocation /3 — usage Cowork équilibré entre apps</td>
+    </tr>
+    <tr>
+      <td>GitHub Team (1 organisation pour 3 repos)</td>
+      <td class="num">12-16 €</td>
+      <td class="num">4-5 €</td>
+      <td>Allocation /3</td>
+    </tr>
+    <tr>
+      <td>DNS IONOS (déjà payé AlyoS)</td>
+      <td class="num">3 €</td>
+      <td class="num">1 €</td>
+      <td>Allocation /3</td>
+    </tr>
+    <tr>
+      <td>Sentry monitoring (compte unique 3 projets)</td>
+      <td class="num">26 €</td>
+      <td class="num">9 €</td>
+      <td>Allocation /3 (au seuil Team)</td>
+    </tr>
+    <tr>
+      <td>Comptable / juriste (RGPD audit, CGU/CGV)</td>
+      <td class="num">150-500 €</td>
+      <td class="num">50-167 €</td>
+      <td>Allocation /3 (services partagés)</td>
+    </tr>
+    <tr>
+      <td>Vercel Pro seats (1 équipe dev pour 3 projets)</td>
+      <td class="num">60-100 €</td>
+      <td class="num">20-33 €</td>
+      <td>Allocation /3</td>
+    </tr>
+    <tr class="total">
+      <td>TOTAL charges fixes mutualisables (An 1 → An 5)</td>
+      <td class="num">~430 → ~720 €</td>
+      <td class="num">~145 → ~240 €</td>
+      <td>~ 1,7 → 2,9 k€/an par app</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>4.2. Charges spécifiques à edifio Sourcing (non mutualisées)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">An 1</th>
+      <th class="num">An 5</th>
+      <th>Motif non-mutualisation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Supabase (1 projet dédié par app)</td>
+      <td class="num">24 €</td>
+      <td class="num">580 €</td>
+      <td>RLS + données isolées par app pour sécurité</td>
+    </tr>
+    <tr>
+      <td>Brevo (compte partagé mais quotas par app)</td>
+      <td class="num">0-25 €</td>
+      <td class="num">65 €</td>
+      <td>Templates et webhooks dédiés Sourcing</td>
+    </tr>
+    <tr>
+      <td>Resend (idem)</td>
+      <td class="num">0-20 €</td>
+      <td class="num">95 €</td>
+      <td>Volumes notifications utilisateurs distincts</td>
+    </tr>
+    <tr>
+      <td>Anthropic API (usage spécifique scoring + IA dossier)</td>
+      <td class="num">variable</td>
+      <td class="num">variable</td>
+      <td>Coût par appel = par client actif</td>
+    </tr>
+    <tr>
+      <td>Fly.io container scraping (dédié Sourcing)</td>
+      <td class="num">5-20 €</td>
+      <td class="num">20 €</td>
+      <td>Logique scraping spécifique BOAMP/PLACE</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>4.3. Coûts fixes mutualisés v3 par app — comparaison</h3>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Coûts fixes /mo edifio Sourcing An 1</div>
+    <div class="value">~145 €</div>
+    <div class="unit">vs 345 € v2 · -58 %</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Coûts fixes /mo edifio Sourcing An 5</div>
+    <div class="value">~240 €</div>
+    <div class="unit">vs 725 € v2 · -67 %</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Économie totale /3 apps An 5</div>
+    <div class="value">~17 k€/an</div>
+    <div class="unit">Coût équipe + outils mutualisés économisés</div>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 5. MARCHÉ ROI ========= -->
+<h2>5. Marché &amp; ROI client recalculé (ARPU 261,5 €)</h2>
+
+<h3>5.1. TAM / SAM / SOM révisé</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Segment</th>
+      <th class="num">Clients potentiels</th>
+      <th class="num">Valeur annuelle</th>
+      <th>Notes vs v1/v2</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>TAM</strong></td>
+      <td class="num">~35 000</td>
+      <td class="num">~110 M€/an</td>
+      <td>ARPU 261,5 € au lieu de 350 € → TAM en euros baisse de 27 %</td>
+    </tr>
+    <tr>
+      <td><strong>SAM</strong></td>
+      <td class="num">~10 000</td>
+      <td class="num">~31 M€/an</td>
+      <td>Idem</td>
+    </tr>
+    <tr>
+      <td><strong>SOM</strong> (5 ans)</td>
+      <td class="num">~375</td>
+      <td class="num">~1,18 M€/an</td>
+      <td>+43 % de clients vs v2 grâce au pricing challenger</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>5.2. ROI client v3 — recalculé</h3>
+
+<div class="box positive">
+  <p>Pour une PME BTP type (5 AO/mois en cotraitance), edifio Sourcing palier <strong>Cotraitance à 299 €/mo (= 3 588 €/an HT)</strong> :</p>
+  <ul>
+    <li>Économie temps : ~32 000 €/an (inchangé)</li>
+    <li>Remplace Vecteur Plus/Doublet : ~3 000-8 000 €/an (inchangé)</li>
+    <li>Génère 2-3 AO supplémentaires/mois : valeur potentielle &gt; 50 k€/an de CA additionnel</li>
+  </ul>
+  <p><strong>Payback period : &lt; 5 semaines</strong> (encore amélioré vs v2 grâce au tarif plus accessible). <strong>ROI annuel : &gt;9×</strong>.</p>
+</div>
+
+<h3>5.3. Argumentaire commercial challenger</h3>
+
+<div class="box">
+  <p style="font-size:13pt; font-weight:600; font-family:'Space Grotesk',sans-serif; text-align:center; padding:12px 0;">« edifio Sourcing à 149 € — c'est moins cher que Vecteur Plus, plus complet que Klekoon, et seul à inclure le module Tandem cotraitance + le scoring IA. »</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 6. PRÉVISIONNEL 5 ANS V3 ========= -->
+<h2>6. Prévisionnel 5 ans révisé</h2>
+
+<h3>6.1. Hypothèses v3</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Paramètre</th>
+      <th class="num">v2</th>
+      <th class="num">v3</th>
+      <th>Motif du changement</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Acquisition Année 1 (nouveaux clients)</td>
+      <td class="num">30</td>
+      <td class="num">45</td>
+      <td>+50 % volume grâce au pricing challenger + leads cross-app</td>
+    </tr>
+    <tr>
+      <td>Croissance acquisition % / an</td>
+      <td class="num">+50 %</td>
+      <td class="num">+50 %</td>
+      <td>Inchangé</td>
+    </tr>
+    <tr>
+      <td>Churn annuel</td>
+      <td class="num">15 %</td>
+      <td class="num">15 %</td>
+      <td>Inchangé</td>
+    </tr>
+    <tr>
+      <td>ARPU mensuel moyen</td>
+      <td class="num">350 €</td>
+      <td class="num">261,5 €</td>
+      <td>Pricing challenger (-25 % moyen pondéré)</td>
+    </tr>
+    <tr>
+      <td>CAC moyen</td>
+      <td class="num">600 €</td>
+      <td class="num">250 €</td>
+      <td>Flywheel cross-app + réseau AlyoS + parrainage</td>
+    </tr>
+    <tr>
+      <td>Coût variable / client / mois</td>
+      <td class="num">31 €</td>
+      <td class="num">31 €</td>
+      <td>Inchangé (lié à l'usage IA/infra)</td>
+    </tr>
+    <tr>
+      <td>Coûts fixes mensuels An 1 (alloués Sourcing)</td>
+      <td class="num">345 €</td>
+      <td class="num">145 €</td>
+      <td>Mutualisation /3</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>6.2. Détail année par année v3</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Indicateur</th>
+      <th class="num">An 1</th>
+      <th class="num">An 2</th>
+      <th class="num">An 3</th>
+      <th class="num">An 4</th>
+      <th class="num">An 5</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Nouveaux clients</td><td class="num">45</td><td class="num">68</td><td class="num">102</td><td class="num">143</td><td class="num">180</td></tr>
+    <tr><td>Churn (-15 %)</td><td class="num">-3</td><td class="num">-16</td><td class="num">-29</td><td class="num">-47</td><td class="num">-68</td></tr>
+    <tr><td><strong>Base clients fin année</strong></td><td class="num"><strong>42</strong></td><td class="num"><strong>94</strong></td><td class="num"><strong>167</strong></td><td class="num"><strong>263</strong></td><td class="num"><strong>375</strong></td></tr>
+    <tr><td><strong>MRR fin année</strong></td><td class="num"><strong>11,0 k€</strong></td><td class="num"><strong>24,6 k€</strong></td><td class="num"><strong>43,7 k€</strong></td><td class="num"><strong>68,8 k€</strong></td><td class="num"><strong>98,1 k€</strong></td></tr>
+    <tr><td>ARR fin année</td><td class="num">132 k€</td><td class="num">295 k€</td><td class="num">524 k€</td><td class="num">826 k€</td><td class="num">1 177 k€</td></tr>
+    <tr><td>Revenu annuel cumulé</td><td class="num">66 k€</td><td class="num">213 k€</td><td class="num">408 k€</td><td class="num">675 k€</td><td class="num">1 000 k€</td></tr>
+    <tr><td>Coûts variables</td><td class="num">-7,8 k€</td><td class="num">-25 k€</td><td class="num">-48 k€</td><td class="num">-80 k€</td><td class="num">-119 k€</td></tr>
+    <tr><td>CAC (250 €/nouveau)</td><td class="num">-11,3 k€</td><td class="num">-17 k€</td><td class="num">-25,5 k€</td><td class="num">-35,8 k€</td><td class="num">-45 k€</td></tr>
+    <tr><td>Coûts fixes mutualisés (alloc. Sourcing)</td><td class="num">-1,7 k€</td><td class="num">-2,0 k€</td><td class="num">-2,3 k€</td><td class="num">-2,5 k€</td><td class="num">-2,9 k€</td></tr>
+    <tr><td>Coûts semi-fixes infra</td><td class="num">-2 k€</td><td class="num">-3 k€</td><td class="num">-5 k€</td><td class="num">-7 k€</td><td class="num">-9 k€</td></tr>
+    <tr class="total">
+      <td>EBITDA</td>
+      <td class="num">+43 k€</td>
+      <td class="num">+166 k€</td>
+      <td class="num">+327 k€</td>
+      <td class="num">+550 k€</td>
+      <td class="num">+824 k€</td>
+    </tr>
+    <tr>
+      <td>Marge EBITDA (%)</td>
+      <td class="num">+65 %</td>
+      <td class="num">+78 %</td>
+      <td class="num">+80 %</td>
+      <td class="num">+81 %</td>
+      <td class="num">+82 %</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="box positive">
+  <p><strong>EBITDA positif dès l'Année 1</strong> (+43 k€) et marge EBITDA dépassant 80 % à partir de l'Année 3. Cumul EBITDA 5 ans = <strong>~1,91 M€</strong>.</p>
+</div>
+
+<h3>6.3. Comparatif 3 scénarios — vue d'ensemble</h3>
+
+<div class="chart-container">
+  <div class="chart-title">EBITDA Année 5 — comparatif v1 / v2 / v3</div>
+  <svg viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+    <text x="10" y="25" font-size="9" fill="#5C5C5C">1 000 k€</text>
+    <text x="10" y="65" font-size="9" fill="#5C5C5C">800 k€</text>
+    <text x="10" y="105" font-size="9" fill="#5C5C5C">600 k€</text>
+    <text x="10" y="145" font-size="9" fill="#5C5C5C">400 k€</text>
+    <text x="10" y="185" font-size="9" fill="#5C5C5C">200 k€</text>
+    <text x="10" y="220" font-size="9" fill="#5C5C5C">0 €</text>
+    <line x1="60" y1="220" x2="690" y2="220" stroke="#1A1A1A" stroke-width="1.5"/>
+
+    <!-- v1 (gray) - 451 k€ → height ~90 -->
+    <rect x="100" y="130" width="120" height="90" fill="#5C5C5C"/>
+    <text x="160" y="125" font-size="11" font-weight="700" text-anchor="middle">+451 k€</text>
+    <text x="160" y="240" font-size="10" text-anchor="middle">v1 (équipe + premium)</text>
+    <text x="160" y="253" font-size="8" fill="#5C5C5C" text-anchor="middle">262 clients · ARR 1,10 M€</text>
+
+    <!-- v2 (orange) - 752 k€ → height ~150 -->
+    <rect x="290" y="70" width="120" height="150" fill="#B5781C"/>
+    <text x="350" y="65" font-size="11" font-weight="700" text-anchor="middle">+752 k€</text>
+    <text x="350" y="240" font-size="10" text-anchor="middle">v2 (Cowork + premium)</text>
+    <text x="350" y="253" font-size="8" fill="#5C5C5C" text-anchor="middle">262 clients · ARR 1,10 M€</text>
+
+    <!-- v3 (red full) - 824 k€ → height ~165 -->
+    <rect x="480" y="55" width="120" height="165" fill="#C8002A"/>
+    <text x="540" y="50" font-size="11" font-weight="700" text-anchor="middle">+824 k€</text>
+    <text x="540" y="240" font-size="10" text-anchor="middle" font-weight="600">v3 (challenger + flywheel)</text>
+    <text x="540" y="253" font-size="8" fill="#5C5C5C" text-anchor="middle">375 clients · ARR 1,18 M€</text>
+  </svg>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 7. SENSIBILITÉS ========= -->
+<h2>7. Sensibilités et risques v3</h2>
+
+<h3>7.1. Top 5 risques v3</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Risque</th>
+      <th class="center">Probabilité</th>
+      <th class="center">Impact</th>
+      <th>Mitigation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><strong>Flywheel cross-app ne s'amorce pas</strong> (qualité leads insuffisante, segmentation cible imparfaite)</td>
+      <td class="center">Modérée (~30 %)</td>
+      <td class="center">CAC réel reste à 600 € → -50 k€ EBITDA An 5</td>
+      <td>Construire dès Gate 6 un module « cross-app prospects » avec scoring lead automatisé (Haiku). Test sur 50 premiers leads pour valider taux conversion.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>Vecteur Plus baisse ses prix</strong> en réponse au repositionnement (-20 % en 12 mois)</td>
+      <td class="center">Modérée (~35 %)</td>
+      <td class="center">Conversion ralentie · -15 % volume</td>
+      <td>Marketing centré sur le continuum, pas le prix. Communication produit massive sur module Tandem (unique).</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Mutualisation infra avec Suivi/ACT crée des incidents partagés</strong> (un bug bloque les 3 apps)</td>
+      <td class="center">Faible (~15 %)</td>
+      <td class="center">Réputation · -5 % churn impact</td>
+      <td>Isolation stricte des Supabase projects (déjà spécifié). Status pages dédiées par app. Audit annuel architecture mutualisée.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>Cannibalisation cross-app</strong> (un client utilise Sourcing au lieu de Suivi/ACT par méprise)</td>
+      <td class="center">Faible (~20 %)</td>
+      <td class="center">Mineur si bien positionné</td>
+      <td>Page comparative claire sur edifio.fr. Onboarding distinct par app. Stratégie « bundle 3 apps » à -15 % pour anticiper.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Pricing trop bas perçu comme « low quality »</strong> par certains prospects PME haut de gamme</td>
+      <td class="center">Faible (~15 %)</td>
+      <td class="center">Mineur · -10 % conversion segment ETI</td>
+      <td>Témoignages clients PME premium. Garder Studio IA à 549 € (signal qualité). Études de cas chiffrées.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>7.2. Analyse de sensibilité EBITDA An 5</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variation par rapport au scénario base v3</th>
+      <th class="num">EBITDA An 5</th>
+      <th class="num">Delta</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><em>Scénario base v3</em></td><td class="num">+824 k€</td><td class="num">—</td></tr>
+    <tr><td>Flywheel échec (CAC retour à 600 €)</td><td class="num">+711 k€</td><td class="num">-113 k€</td></tr>
+    <tr><td>Volume acquisition -30 % (32 nouveaux An 1)</td><td class="num">+580 k€</td><td class="num">-244 k€</td></tr>
+    <tr><td>ARPU -10 % (236 € au lieu de 261)</td><td class="num">+703 k€</td><td class="num">-121 k€</td></tr>
+    <tr><td>Churn ×2 (30 % au lieu de 15 %)</td><td class="num">+490 k€</td><td class="num">-334 k€</td></tr>
+    <tr><td>Combinaison adverse (flywheel échec + volume -30 %)</td><td class="num">+468 k€</td><td class="num">-356 k€</td></tr>
+  </tbody>
+</table>
+
+<div class="box warning">
+  <p><strong>Le risque le plus structurant reste le churn.</strong> Le pricing challenger attire potentiellement des clients moins matures (TPE qui veulent « tester » sans engagement) → vigilance sur le tier Sourcing 149 €. Mitigation : push upsell rapide vers Cotraitance (rétention ~3× supérieure).</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 8. RECO ========= -->
+<h2>8. Recommandation Board v3</h2>
+
+<div class="box positive">
+  <h4>GO challenger + flywheel</h4>
+  <p>Le repositionnement v3 améliore l'EBITDA An 5 de <strong>+72 k€</strong> (+10 %) tout en augmentant la <strong>position de marché de 43 %</strong> et en lançant simultanément la traction de Suivi et ACT via le flywheel. Le risque marginal est largement compensé par le gain structurel d'écosystème.</p>
+</div>
+
+<h3>8.1. Plan d'action 12 mois v3 — feuille de route</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Phase</th>
+      <th>Actions clés</th>
+      <th>Cible</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>T+0 à T+3 mois</strong> (Q4 2026)</td>
+      <td>
+        - Bascule pricing v3 (149/299/549)<br>
+        - Module cross-app prospects (table partagée 3 apps)<br>
+        - 10 pilotes AlyoS réseau direct<br>
+        - Stripe + landing v3<br>
+        - Onboarding self-serve
+      </td>
+      <td>10 clients</td>
+    </tr>
+    <tr>
+      <td><strong>T+3 à T+9 mois</strong> (Q1-Q2 2027)</td>
+      <td>
+        - Activation flywheel (leads Sourcing → Suivi/ACT)<br>
+        - Séquences nurturing automatisées Brevo<br>
+        - Partenariat FFB IDF + CAPEB<br>
+        - Programme parrainage M4
+      </td>
+      <td>30 clients (cumul)</td>
+    </tr>
+    <tr>
+      <td><strong>T+9 à T+12 mois</strong> (Q3 2027)</td>
+      <td>
+        - Bundle « 3 apps edifio -15 % »<br>
+        - Ambassadeurs verticales CHR / scolaire<br>
+        - 1re campagne SEA<br>
+        - Étude conversion cross-app
+      </td>
+      <td>42 clients · SEUIL ATTEINT</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>8.2. Décisions Board demandées</h3>
+
+<div class="box">
+  <ul>
+    <li>☐ <strong>Validation du repricing</strong> challenger : Sourcing 149 / Cotraitance 299 / Studio IA 549 €/mo HT</li>
+    <li>☐ <strong>Validation du bundle « 3 apps » -15 %</strong> à proposer dès Q3 2027 (mais à préparer dès le lancement pour signal marché)</li>
+    <li>☐ <strong>Validation architecture cross-app prospects</strong> : base unifiée des contacts BTP/MOE/MOA partagée RLS strict entre Sourcing/Suivi/ACT (à intégrer Gate 5 architecture)</li>
+    <li>☐ <strong>Confirmation</strong> que edifio Suivi et edifio ACT seront opérationnels en parallèle pour activer le flywheel dès le 1er client Sourcing</li>
+    <li>☐ <strong>Provisionnement</strong> d'un budget flywheel (séquences Brevo + scoring leads Haiku) ~3-5 k€/an</li>
+  </ul>
+</div>
+
+<div class="footer-note">
+  Document v3.0 — relivré le 2026-05-18 après directives Board « mutualisation + cross-app flywheel + challenger pricing ». Remplace v1.0 et v2.0 pour toute référence stratégique future. v1 et v2 conservées en archive comparative.<br><br>
+  Sources : <code>design/copy/competitive_matrix_v1.md</code>, <code>specs/budget_infra_v1.md</code>, <code>design/copy/etude_couts_v3.html</code>, abonnement Claude Cowork mutualisé 3 apps (180 €/mo HT), hypothèses flywheel basées sur volume saisie typique BTP/MOE/entreprises.<br><br>
+  — [CMO Léa] avec [CEO Marc] et [CTO Sophie] · edifio Sourcing · AlyoS Ingénierie · 2026-05-18
+</div>
+
+</body>
+</html>

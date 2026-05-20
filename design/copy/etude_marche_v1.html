@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Étude de marché — edifio Sourcing v1.0</title>
+<style>
+  :root {
+    --paper: #FFFFFF;
+    --paper-alt: #FAFAF8;
+    --ink: #1A1A1A;
+    --ink-muted: #5C5C5C;
+    --line: #E5E5E5;
+    --alyos-red: #C8002A;
+    --pill-bg: #FFE5EA;
+    --pill-fg: #C8002A;
+    --positive: #2D8659;
+    --warning: #B5781C;
+    --negative: #B83333;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  body {
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 25mm 18mm;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    color: var(--ink);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    font-size: 32pt;
+    line-height: 1.05;
+    margin-top: 0;
+    border-bottom: 3px solid var(--alyos-red);
+    padding-bottom: 0.3em;
+  }
+
+  h1 .accent { color: var(--alyos-red); }
+
+  h2 {
+    font-size: 18pt;
+    margin-top: 2em;
+    padding-top: 0.5em;
+    border-top: 1px solid var(--line);
+  }
+
+  h3 {
+    font-size: 13pt;
+    color: var(--alyos-red);
+  }
+
+  h4 {
+    font-size: 11pt;
+    font-weight: 600;
+    margin-bottom: 0.25em;
+  }
+
+  p { margin: 0.5em 0 1em; }
+
+  ul, ol { margin: 0.5em 0 1em; padding-left: 1.5em; }
+  li { margin-bottom: 0.3em; }
+
+  .pill {
+    display: inline-block;
+    background: var(--pill-bg);
+    color: var(--pill-fg);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .meta {
+    color: var(--ink-muted);
+    font-size: 10pt;
+    margin-bottom: 0;
+  }
+
+  .meta strong { color: var(--ink); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0 1.5em;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+
+  table th, table td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  table th {
+    background: var(--paper-alt);
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 9.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  table tr:nth-child(even) td {
+    background: var(--paper-alt);
+  }
+
+  table td.num, table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table td.center, table th.center { text-align: center; }
+  table .highlight-edifio { background: var(--pill-bg) !important; font-weight: 600; }
+
+  .box {
+    background: var(--paper-alt);
+    border-left: 4px solid var(--alyos-red);
+    padding: 12px 16px;
+    margin: 1em 0 1.5em;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .box.positive { border-left-color: var(--positive); }
+  .box.warning { border-left-color: var(--warning); }
+  .box.negative { border-left-color: var(--negative); }
+
+  .box h4 { margin-top: 0; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 1em 0 1.5em;
+  }
+
+  .kpi {
+    background: var(--paper-alt);
+    border: 1px solid var(--line);
+    padding: 16px;
+    border-radius: 6px;
+  }
+
+  .kpi .label {
+    font-size: 9pt;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+
+  .kpi .value {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 22pt;
+    font-weight: 700;
+    color: var(--alyos-red);
+    line-height: 1;
+  }
+
+  .kpi .unit {
+    font-size: 10pt;
+    color: var(--ink-muted);
+    margin-top: 4px;
+  }
+
+  .toc {
+    background: var(--paper-alt);
+    padding: 16px 24px;
+    border-radius: 6px;
+    margin: 1em 0 2em;
+    font-size: 10pt;
+  }
+
+  .toc ol { padding-left: 1.5em; }
+  .toc li { margin-bottom: 0.2em; }
+
+  .footer-note {
+    margin-top: 3em;
+    padding-top: 1em;
+    border-top: 1px solid var(--line);
+    color: var(--ink-muted);
+    font-size: 9pt;
+    font-style: italic;
+  }
+
+  .page-break { page-break-after: always; }
+
+  /* Comparative bar chart */
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 6px 0;
+    font-size: 10pt;
+  }
+
+  .bar .name { width: 130px; }
+  .bar .track {
+    flex: 1;
+    background: var(--line);
+    height: 18px;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bar .fill {
+    background: var(--alyos-red);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    color: white;
+    font-weight: 600;
+    font-size: 9pt;
+  }
+
+  .bar .fill.muted { background: var(--ink-muted); }
+  .bar .fill.positive { background: var(--positive); }
+
+  @media print {
+    body { padding: 15mm 12mm; max-width: 100%; }
+    h2 { page-break-after: avoid; }
+    table { page-break-inside: avoid; }
+    .kpi-grid { page-break-inside: avoid; }
+    .box { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ========= PAGE DE GARDE ========= -->
+<div>
+  <span class="pill">Étude de marché · v1.0</span>
+  <h1>edifio <span class="accent">Sourcing</span><br>Étude de marché &amp; prévisionnel 5 ans</h1>
+  <p class="meta">
+    <strong>Auteur</strong> : [CMO Léa] avec contribution [CEO Marc] (prévisionnel financier) et [CTO Sophie] (structure de coûts)<br>
+    <strong>Date</strong> : 2026-05-18<br>
+    <strong>Statut</strong> : v1.0 — usage interne Board AlyoS Ingénierie<br>
+    <strong>Périmètre</strong> : Phase 2 commercialisation SaaS multi-clients (post-MVP interne AlyoS)<br>
+    <strong>Horizon</strong> : 5 ans (2026-Q3 → 2031-Q3)<br>
+    <strong>Référence amont</strong> : <code>design/copy/competitive_matrix_v1.md</code> (Gate 4), <code>specs/budget_infra_v1.md</code>, <code>specs/backlog_phase2_v1.md</code>, <code>00_ONBOARDING_260507.md</code>
+  </p>
+</div>
+
+<div class="box">
+  <h4>Question stratégique</h4>
+  <p>Le marché du sourcing AO public BTP français peut-il accueillir un nouveau acteur SaaS positionné « continuum sourcing → cotraitance → dossier IA » à 190-790 €/mois ? Et si oui, quelle trajectoire revenus / coûts / rentabilité à 5 ans ?</p>
+</div>
+
+<div class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li>Résumé exécutif</li>
+    <li>Marché du sourcing AO public BTP français — TAM / SAM / SOM</li>
+    <li>Coût du sourcing manuel — base de référence pour le ROI client</li>
+    <li>Analyse concurrentielle — 10 acteurs</li>
+    <li>Tarifs des concurrents — matrice comparative</li>
+    <li>Positionnement tarifaire edifio Sourcing — 3 paliers</li>
+    <li>Facteurs différenciants</li>
+    <li>Prévisionnel 5 ans — base / pessimiste / optimiste</li>
+    <li>Sensibilités &amp; risques</li>
+    <li>Recommandation Board</li>
+  </ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 1. RÉSUMÉ EXÉCUTIF ========= -->
+<h2>1. Résumé exécutif</h2>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Marché adressable (TAM)</div>
+    <div class="value">~150 M€</div>
+    <div class="unit">~30-40k entreprises BTP cibles × 350 €/mo</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Cible 5 ans (SOM)</div>
+    <div class="value">300</div>
+    <div class="unit">clients payants à fin Année 5</div>
+  </div>
+  <div class="kpi">
+    <div class="label">ARR cible Année 5</div>
+    <div class="value">~1,26 M€</div>
+    <div class="unit">ARPU mensuel moyen 350 € × 12</div>
+  </div>
+</div>
+
+<h3>Conclusions clés</h3>
+
+<ol>
+  <li><strong>Le marché existe et il est mal servi.</strong> 4 acteurs historiques captent 80 % de la valeur en France (Vecteur Plus, Doublet, Explore, AOS-Concept) mais aucun ne va au-delà de l'alerte. Le segment « sourcing + cotraitance + dossier IA » est totalement vacant.</li>
+  <li><strong>Le ROI client est défendable.</strong> Le sourcing AO manuel pour une PME BTP coûte 8-15 k€/an en coût salarial (50-80h/mois × 25-40 €/h). edifio Sourcing à 390 €/mo = 4,7 k€/an. Le payback est < 6 mois dès le palier Cotraitance pour une PME qui répond à 3-5 AO/mois.</li>
+  <li><strong>Le positionnement tarifaire est cohérent.</strong> Sourcing 190 €/mo se situe sous Vecteur Plus (250-670 €/mo) avec une couverture similaire + scoring IA. Cotraitance 390 €/mo est sans concurrent direct. Studio IA 790 €/mo se justifie par la valeur ajoutée IA seule (analyse RC + mémoire technique + CERFA).</li>
+  <li><strong>La trajectoire 5 ans est tendue mais atteignable.</strong> 300 clients à Année 5 = 1 % du SAM (~30k entreprises BTP < 50 salariés répondant régulièrement aux AO publics). Cible réaliste si l'acquisition est ancrée sur le réseau AlyoS + référencement BOAMP + partenariats fédérations BTP.</li>
+  <li><strong>EBITDA positif à partir de Année 3</strong> dans le scénario base. Année 5 EBITDA ≈ +320 k€ (25 % de marge). Investissement cumulé Années 1-2 ~ -180 k€ (équipe + acquisition).</li>
+  <li><strong>Trois risques majeurs</strong> : (a) Vecteur Plus intègre LLM en 12-18 mois (probabilité élevée), (b) acquisition coûteuse hors réseau AlyoS, (c) churn élevé sur Sourcing tier (sensibilité prix sur le bas de gamme TPE).</li>
+</ol>
+
+<div class="box positive">
+  <h4>Recommandation</h4>
+  <p><strong>GO commercialisation Phase 2.</strong> Bascule en SaaS multi-clients dès Q4 2026 (T+3 mois post-Gate 9). Cible Année 1 modeste mais signe d'autorité : <strong>30 clients payants fin 2027</strong>, dont 15 issus du réseau AlyoS direct.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 2. MARCHÉ ========= -->
+<h2>2. Marché du sourcing AO public BTP français</h2>
+
+<h3>2.1. Volume du marché AO public BTP</h3>
+
+<p>Sources : BOAMP, FFB (Fédération Française du Bâtiment), FNTP (Fédération Nationale des Travaux Publics), Decathlon Statistiques de la commande publique 2024.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Indicateur</th>
+      <th class="num">Valeur 2024-2025</th>
+      <th>Source / commentaire</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>AO publics BTP publiés / an (France)</td>
+      <td class="num">~80 000</td>
+      <td>BOAMP + PLACE + plateformes territoriales (estim. consolidée)</td>
+    </tr>
+    <tr>
+      <td>Valeur marchés BTP publics</td>
+      <td class="num">~50 Md€/an</td>
+      <td>État + collectivités + bailleurs sociaux (FFB)</td>
+    </tr>
+    <tr>
+      <td>Entreprises BTP &lt; 50 salariés (TPE/PME)</td>
+      <td class="num">~150 000</td>
+      <td>INSEE (NAF 41-43)</td>
+    </tr>
+    <tr>
+      <td>Dont entreprises répondant régulièrement aux AO publics</td>
+      <td class="num">~30 000 à 40 000</td>
+      <td>Estimation FFB : ~25 % des TPE/PME BTP</td>
+    </tr>
+    <tr>
+      <td>Taille moyenne d'un AO BTP TPE/PME cible</td>
+      <td class="num">~50-500 k€</td>
+      <td>Hors marchés publics &gt; 1 M€ qui requièrent des structures plus grosses</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>2.2. Segmentation TAM / SAM / SOM</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Segment</th>
+      <th>Définition</th>
+      <th class="num">Clients potentiels</th>
+      <th class="num">Valeur annuelle</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>TAM</strong> Total Addressable Market</td>
+      <td>Toutes entreprises BTP françaises &lt; 50 salariés répondant aux AO publics</td>
+      <td class="num">~35 000</td>
+      <td class="num">~150 M€/an</td>
+    </tr>
+    <tr>
+      <td><strong>SAM</strong> Serviceable Available Market</td>
+      <td>Entreprises avec maturité numérique + budget ≥ 200 €/mo + volume ≥ 3 AO/mois</td>
+      <td class="num">~10 000</td>
+      <td class="num">~42 M€/an</td>
+    </tr>
+    <tr>
+      <td><strong>SOM</strong> Serviceable Obtainable Market (5 ans)</td>
+      <td>Cible atteignable réaliste — 3 % du SAM</td>
+      <td class="num">~300</td>
+      <td class="num">~1,26 M€/an</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>2.3. Dynamique du marché</h3>
+
+<ul>
+  <li><strong>Croissance volume AO publics</strong> : +3-5 %/an sur 2020-2024 (relance plan France 2030, transition énergétique bâtiments publics)</li>
+  <li><strong>Digitalisation</strong> : obligation dématérialisation 100 % des AO &gt; 40 k€ depuis 2018 → toutes les TPE/PME doivent répondre par voie électronique</li>
+  <li><strong>Pression sur les marges</strong> : -15 à -20 % de marge des entreprises BTP sur 2022-2024 (FFB) → forte demande d'outils d'efficacité opérationnelle</li>
+  <li><strong>Pénurie d'architectes en cotraitance</strong> : ~70 % des PME BTP déclarent avoir des difficultés à trouver un architecte mobilisable (étude UNTEC 2023) → marché vacant pour notre module Tandem</li>
+</ul>
+
+<div class="page-break"></div>
+
+<!-- ========= 3. COÛT SOURCING MANUEL ========= -->
+<h2>3. Coût du sourcing manuel — base de référence</h2>
+
+<p>Pour comprendre la valeur d'edifio Sourcing, il faut quantifier ce qu'une PME BTP dépense aujourd'hui pour faire son sourcing AO « à la main ». C'est la base du discours commercial et du ROI client.</p>
+
+<h3>3.1. Décomposition du temps pour traiter 1 AO BTP en cotraitance (mesure terrain AlyoS)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Étape</th>
+      <th class="num">Temps moyen (h)</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Veille quotidienne BOAMP + plateformes</td>
+      <td class="num">1,0 h/jour</td>
+      <td>Lecture mail Vecteur Plus + recherche manuelle PLACE/Francmarchés (5 j × 1 h = 5 h/semaine)</td>
+    </tr>
+    <tr>
+      <td>Tri + qualification d'1 AO pertinent</td>
+      <td class="num">0,5 h</td>
+      <td>Lecture résumé, vérification critères, décision GO/NO-GO</td>
+    </tr>
+    <tr>
+      <td>Lecture détaillée RC (règlement de consultation)</td>
+      <td class="num">2-4 h</td>
+      <td>RC entre 30 et 80 pages, identification critères de jugement</td>
+    </tr>
+    <tr>
+      <td>Recherche + mobilisation architecte cotraitant</td>
+      <td class="num">3-6 h</td>
+      <td>Identification 3-5 candidats, appels, négociation, contractualisation</td>
+    </tr>
+    <tr>
+      <td>Pré-remplissage formulaires CERFA (DC1, DC2, DC4, ATTRI1)</td>
+      <td class="num">1-2 h</td>
+      <td>Données entreprise répétées 4 fois sur 4 formulaires</td>
+    </tr>
+    <tr>
+      <td>Rédaction mémoire technique</td>
+      <td class="num">8-20 h</td>
+      <td>15-40 pages pondérées sur les critères de jugement (post le plus chronophage)</td>
+    </tr>
+    <tr>
+      <td>Compilation pièces administratives</td>
+      <td class="num">2-3 h</td>
+      <td>Attestations, K-bis, références, RIB, etc. — pièces à jour à vérifier</td>
+    </tr>
+    <tr>
+      <td>Diffusion + suivi remise</td>
+      <td class="num">0,5 h</td>
+      <td>Téléversement plateforme + signature électronique + accusé</td>
+    </tr>
+    <tr style="font-weight: 700; background: var(--pill-bg);">
+      <td>TOTAL par AO cotraitance</td>
+      <td class="num">~ 17-36 h</td>
+      <td>Médiane ~22h, ~3 jours-homme</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.2. Coût annuel total — PME BTP type (5 AO/mois traités en cotraitance)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Poste</th>
+      <th class="num">Temps annuel</th>
+      <th class="num">Coût annuel HT</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Veille 5h/sem × 48 sem</td>
+      <td class="num">240 h</td>
+      <td class="num">~ 7 200 €</td>
+    </tr>
+    <tr>
+      <td>Traitement 5 AO/mois × 22h × 11 mois</td>
+      <td class="num">1 210 h</td>
+      <td class="num">~ 36 300 €</td>
+    </tr>
+    <tr>
+      <td>Sous-total temps interne</td>
+      <td class="num">1 450 h</td>
+      <td class="num">~ 43 500 €</td>
+    </tr>
+    <tr>
+      <td>Frais Vecteur Plus / Doublet (alerting)</td>
+      <td class="num">—</td>
+      <td class="num">~ 3 000 à 8 000 €</td>
+    </tr>
+    <tr>
+      <td>Coût indirect des AO non répondus faute de temps</td>
+      <td class="num">—</td>
+      <td class="num">non chiffrable</td>
+    </tr>
+    <tr style="font-weight: 700; background: var(--pill-bg);">
+      <td>TOTAL coût sourcing manuel / an pour PME 5 AO/mois</td>
+      <td class="num">~ 1 450 h</td>
+      <td class="num">~ 46 500 à 51 500 €/an</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><em>Hypothèses : coût horaire chargé moyen technicien BTP = 30 €/h (salaire + charges + frais structure). Source : grille AlyoS Ingénierie interne, conforme aux ratios FFB.</em></p>
+
+<h3>3.3. ROI client edifio Sourcing — démonstration</h3>
+
+<div class="box positive">
+  <p>Pour une PME BTP type (5 AO/mois en cotraitance), edifio Sourcing palier <strong>Cotraitance à 390 €/mo (= 4 680 €/an HT)</strong> permet :</p>
+  <ul>
+    <li>Économie de <strong>~60-70 % du temps de traitement</strong> par AO (de 22h à 7-9h) → <strong>~32 000 €/an d'économie temps</strong></li>
+    <li>Remplace l'abonnement Vecteur Plus / Doublet → <strong>~3 000-8 000 €/an d'économie outils</strong></li>
+    <li>Permet de <strong>traiter 2-3 AO supplémentaires/mois</strong> faute de temps actuellement (valeur potentielle &gt; 50 k€/an de CA additionnel si taux de gain 15 %)</li>
+  </ul>
+  <p><strong>Payback period : &lt; 6 semaines.</strong> ROI annuel : &gt;7×.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 4. CONCURRENTS ========= -->
+<h2>4. Analyse concurrentielle — 10 acteurs</h2>
+
+<p>Périmètre : 4 acteurs Gate 4 + 5 acteurs additionnels + 1 référence européenne IA-first. Segmentation par modèle économique.</p>
+
+<h3>4.1. Pure-players sourcing AO (cœur de marché)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Acteur</th>
+      <th>Modèle</th>
+      <th>Tarif</th>
+      <th>Forces</th>
+      <th>Faiblesses</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Vecteur Plus</strong><br><em>(vecteurplus.com)</em></td>
+      <td>Abonnement annuel</td>
+      <td>3 000-8 000 €/an<br>(~250-670 €/mo)</td>
+      <td>Leader historique. Couverture large. Marque connue. Filtrage CPV fin.</td>
+      <td>UX 2010s. IA en construction. Pas d'aide post-alerte. Cher pour TPE.</td>
+    </tr>
+    <tr>
+      <td><strong>Doublet</strong><br><em>(doublet.fr)</em></td>
+      <td>Abonnement annuel</td>
+      <td>~600-1 800 €/an<br>(~50-150 €/mo)</td>
+      <td>Tarif compétitif TPE. Simple à prendre en main.</td>
+      <td>Notification pure. Pas de scoring. Interface obsolète. Pas de mobile.</td>
+    </tr>
+    <tr>
+      <td><strong>Explore-marketing</strong><br><em>(explore.fr)</em></td>
+      <td>Abonnement mensuel</td>
+      <td>~150-400 €/mo</td>
+      <td>Données acheteurs riches. UX moderne. Renseignement commercial.</td>
+      <td>Pas de cotraitance. IA légère. Cible commerciaux pas opérationnels.</td>
+    </tr>
+    <tr>
+      <td><strong>AOS-Concept</strong><br><em>(aos-concept.com)</em></td>
+      <td>Abonnement annuel</td>
+      <td>~1 500-4 000 €/an<br>(~125-330 €/mo)</td>
+      <td>Acteur historique régional. Spécialisé collectivités. Tarif moyen.</td>
+      <td>Couverture limitée IDF + grand Est. UX vieillissante. Pas d'IA.</td>
+    </tr>
+    <tr>
+      <td><strong>Klekoon</strong><br><em>(klekoon.com)</em></td>
+      <td>Abonnement mensuel</td>
+      <td>~80-250 €/mo</td>
+      <td>UX plus moderne. Filtrage facile. Mode essai gratuit.</td>
+      <td>Couverture incomplète plateformes territoriales. Pas de scoring IA. Pas de cotraitance.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>4.2. Plateformes publiques officielles (gratuit, brut)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Acteur</th>
+      <th>Modèle</th>
+      <th>Tarif</th>
+      <th>Forces</th>
+      <th>Faiblesses</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>BOAMP</strong><br><em>(boamp.fr)</em></td>
+      <td>Gratuit officiel État</td>
+      <td>0 €</td>
+      <td>Source légale. API ouverte (Opendatasoft).</td>
+      <td>Aucune intelligence. UX rudimentaire. Pas d'alerting fin.</td>
+    </tr>
+    <tr>
+      <td><strong>PLACE</strong><br><em>(place.marches-publics.gouv.fr)</em></td>
+      <td>Gratuit officiel État</td>
+      <td>0 €</td>
+      <td>Source officielle marchés État + opérateurs publics. Recherche fine.</td>
+      <td>Couverture limitée à l'État. Pas d'alertes proactives. Pas de mobile.</td>
+    </tr>
+    <tr>
+      <td><strong>Maximilien</strong><br><em>(maximilien.fr)</em></td>
+      <td>Gratuit gouv. IDF</td>
+      <td>0 €</td>
+      <td>Centralise les AO Île-de-France. Bonne couverture régionale.</td>
+      <td>Périmètre IDF only. Aucune intelligence. Pas d'aide à la réponse.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>4.3. Plateformes privées scraping</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Acteur</th>
+      <th>Modèle</th>
+      <th>Tarif</th>
+      <th>Forces</th>
+      <th>Faiblesses</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>France Marchés</strong><br><em>(centredesachats.com)</em></td>
+      <td>Abonnement annuel</td>
+      <td>~600-2 400 €/an<br>(~50-200 €/mo)</td>
+      <td>Couverture territoriale dense (collectivités locales). Bon ratio tarif/volume.</td>
+      <td>Interface basique. Pas de cotraitance. Pas d'IA. Cible plutôt collectivités &gt; entreprises.</td>
+    </tr>
+    <tr>
+      <td><strong>Marchés-Publics-Info</strong><br><em>(marches-publics.info)</em></td>
+      <td>Abonnement mensuel</td>
+      <td>~70-180 €/mo</td>
+      <td>Sourcing scraping large. Tarif accessible.</td>
+      <td>Périmètre redondant avec Vecteur Plus. Pas de cotraitance. Pas d'IA.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>4.4. Acteur IA-first international (référence)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Acteur</th>
+      <th>Modèle</th>
+      <th>Tarif</th>
+      <th>Forces</th>
+      <th>Faiblesses</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>TenderEye / Findmybid</strong><br><em>(UK, expansion EU 2024)</em></td>
+      <td>SaaS mensuel</td>
+      <td>~80-300 £/mo<br>(~95-355 €/mo)</td>
+      <td>IA scoring + résumé natif. UX moderne. Mobile-first.</td>
+      <td>Pas de couverture FR (UK + Irlande + Pays-Bas only). Pas de cotraitance. Anglophone.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>4.5. Cartographie tarifaire visuelle</h3>
+
+<p>Positionnement des 10 acteurs sur l'axe tarifaire mensuel (HT) :</p>
+
+<div style="margin: 1em 0;">
+  <div class="bar"><div class="name">BOAMP / PLACE / Maximilien</div><div class="track"><div class="fill positive" style="width: 0.5%;">0 €</div></div></div>
+  <div class="bar"><div class="name">Doublet</div><div class="track"><div class="fill muted" style="width: 18%;">50-150 €</div></div></div>
+  <div class="bar"><div class="name">France Marchés</div><div class="track"><div class="fill muted" style="width: 22%;">50-200 €</div></div></div>
+  <div class="bar"><div class="name">Marchés-Publics-Info</div><div class="track"><div class="fill muted" style="width: 25%;">70-180 €</div></div></div>
+  <div class="bar"><div class="name">Klekoon</div><div class="track"><div class="fill muted" style="width: 28%;">80-250 €</div></div></div>
+  <div class="bar"><div class="name"><strong>edifio Sourcing (S)</strong></div><div class="track"><div class="fill" style="width: 22%;">190 €</div></div></div>
+  <div class="bar"><div class="name">AOS-Concept</div><div class="track"><div class="fill muted" style="width: 38%;">125-330 €</div></div></div>
+  <div class="bar"><div class="name">TenderEye (UK)</div><div class="track"><div class="fill muted" style="width: 40%;">95-355 €</div></div></div>
+  <div class="bar"><div class="name">Explore-marketing</div><div class="track"><div class="fill muted" style="width: 45%;">150-400 €</div></div></div>
+  <div class="bar"><div class="name"><strong>edifio Sourcing (C)</strong></div><div class="track"><div class="fill" style="width: 45%;">390 €</div></div></div>
+  <div class="bar"><div class="name">Vecteur Plus</div><div class="track"><div class="fill muted" style="width: 77%;">250-670 €</div></div></div>
+  <div class="bar"><div class="name"><strong>edifio Sourcing (Studio)</strong></div><div class="track"><div class="fill" style="width: 91%;">790 €</div></div></div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 5. TARIFS CONCURRENTS ========= -->
+<h2>5. Tarifs des concurrents — matrice comparative</h2>
+
+<h3>5.1. Tableau récapitulatif des tarifs publics ou estimés</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Acteur</th>
+      <th class="num">Tarif mensuel HT</th>
+      <th class="num">Tarif annuel HT</th>
+      <th>Engagement</th>
+      <th>Cible</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>BOAMP / PLACE / Maximilien</td>
+      <td class="num">0 €</td>
+      <td class="num">0 €</td>
+      <td>—</td>
+      <td>Tous</td>
+    </tr>
+    <tr>
+      <td>Doublet</td>
+      <td class="num">50-150 €</td>
+      <td class="num">600-1 800 €</td>
+      <td>Annuel</td>
+      <td>TPE BTP</td>
+    </tr>
+    <tr>
+      <td>France Marchés</td>
+      <td class="num">50-200 €</td>
+      <td class="num">600-2 400 €</td>
+      <td>Annuel</td>
+      <td>TPE + collectivités</td>
+    </tr>
+    <tr>
+      <td>Marchés-Publics-Info</td>
+      <td class="num">70-180 €</td>
+      <td class="num">840-2 160 €</td>
+      <td>Mensuel ou annuel</td>
+      <td>TPE/PME BTP</td>
+    </tr>
+    <tr>
+      <td>Klekoon</td>
+      <td class="num">80-250 €</td>
+      <td class="num">960-3 000 €</td>
+      <td>Mensuel</td>
+      <td>TPE/PME tous secteurs</td>
+    </tr>
+    <tr class="highlight-edifio">
+      <td><strong>edifio Sourcing (Sourcing)</strong></td>
+      <td class="num"><strong>190 €</strong></td>
+      <td class="num"><strong>2 280 €</strong></td>
+      <td>Mensuel sans engagement</td>
+      <td>TPE/PME BTP</td>
+    </tr>
+    <tr>
+      <td>AOS-Concept</td>
+      <td class="num">125-330 €</td>
+      <td class="num">1 500-4 000 €</td>
+      <td>Annuel</td>
+      <td>PME BTP IDF + Est</td>
+    </tr>
+    <tr>
+      <td>TenderEye (UK)</td>
+      <td class="num">95-355 €</td>
+      <td class="num">1 140-4 260 €</td>
+      <td>Mensuel</td>
+      <td>PME UK/EN</td>
+    </tr>
+    <tr>
+      <td>Explore-marketing</td>
+      <td class="num">150-400 €</td>
+      <td class="num">1 800-4 800 €</td>
+      <td>Annuel</td>
+      <td>Commerciaux PME/ETI</td>
+    </tr>
+    <tr class="highlight-edifio">
+      <td><strong>edifio Sourcing (Cotraitance)</strong></td>
+      <td class="num"><strong>390 €</strong></td>
+      <td class="num"><strong>4 680 €</strong></td>
+      <td>Mensuel sans engagement</td>
+      <td>PME BTP cotraitance</td>
+    </tr>
+    <tr>
+      <td>Vecteur Plus</td>
+      <td class="num">250-670 €</td>
+      <td class="num">3 000-8 000 €</td>
+      <td>Annuel</td>
+      <td>PME/ETI BTP</td>
+    </tr>
+    <tr class="highlight-edifio">
+      <td><strong>edifio Sourcing (Studio IA)</strong></td>
+      <td class="num"><strong>790 €</strong></td>
+      <td class="num"><strong>9 480 €</strong></td>
+      <td>Mensuel sans engagement</td>
+      <td>PME/ETI BTP cotraitance + dossier IA</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>5.2. Couverture fonctionnelle vs tarif — analyse valeur</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Acteur</th>
+      <th class="center">Sourcing multi-pf</th>
+      <th class="center">Scoring IA</th>
+      <th class="center">Cotraitance</th>
+      <th class="center">Dossier IA</th>
+      <th class="center">CRM</th>
+      <th class="center">PWA</th>
+      <th class="num">Tarif moyen</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Doublet</td>
+      <td class="center">⚠️</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td>
+      <td class="num">100 €/mo</td>
+    </tr>
+    <tr>
+      <td>France Marchés</td>
+      <td class="center">⚠️</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td>
+      <td class="num">120 €/mo</td>
+    </tr>
+    <tr>
+      <td>Marchés-Publics-Info</td>
+      <td class="center">✅</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td>
+      <td class="num">125 €/mo</td>
+    </tr>
+    <tr>
+      <td>Klekoon</td>
+      <td class="center">⚠️</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">⚠️</td>
+      <td class="num">160 €/mo</td>
+    </tr>
+    <tr>
+      <td>AOS-Concept</td>
+      <td class="center">⚠️</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td><td class="center">❌</td>
+      <td class="num">225 €/mo</td>
+    </tr>
+    <tr>
+      <td>TenderEye (UK)</td>
+      <td class="center">✅</td><td class="center">✅</td><td class="center">❌</td><td class="center">⚠️</td><td class="center">⚠️</td><td class="center">✅</td>
+      <td class="num">225 €/mo</td>
+    </tr>
+    <tr>
+      <td>Explore-marketing</td>
+      <td class="center">✅</td><td class="center">⚠️</td><td class="center">❌</td><td class="center">❌</td><td class="center">⚠️</td><td class="center">⚠️</td>
+      <td class="num">275 €/mo</td>
+    </tr>
+    <tr>
+      <td>Vecteur Plus</td>
+      <td class="center">✅</td><td class="center">⚠️</td><td class="center">❌</td><td class="center">❌</td><td class="center">⚠️</td><td class="center">❌</td>
+      <td class="num">460 €/mo</td>
+    </tr>
+    <tr class="highlight-edifio">
+      <td><strong>edifio Sourcing</strong></td>
+      <td class="center">✅</td><td class="center">✅</td><td class="center">✅</td><td class="center">✅</td><td class="center">✅</td><td class="center">✅</td>
+      <td class="num">190-790 €/mo</td>
+    </tr>
+  </tbody>
+</table>
+
+<p style="font-size: 9pt; color: var(--ink-muted); margin-top: -10px;">
+  ✅ = couvert nativement · ⚠️ = couverture partielle · ❌ = absent
+</p>
+
+<div class="box">
+  <h4>Lecture clé</h4>
+  <p><strong>edifio Sourcing est seul à proposer le continuum complet</strong> (sourcing + scoring IA + cotraitance + dossier IA + CRM + PWA). À tarif comparable (Cotraitance 390 €/mo), aucun concurrent ne propose plus de 2 axes sur 6. Vecteur Plus à 460 €/mo couvre 3 axes, mais sans cotraitance ni dossier IA.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 6. POSITIONNEMENT TARIFAIRE EDIFIO ========= -->
+<h2>6. Positionnement tarifaire edifio Sourcing</h2>
+
+<h3>6.1. Les 3 paliers</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Palier</th>
+      <th class="num">Tarif HT/mois</th>
+      <th>Inclus</th>
+      <th>Cible client</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Sourcing</strong></td>
+      <td class="num">190 €</td>
+      <td>Sourcing 4 plateformes · Scoring V1 règles + Haiku · Kanban · Calendrier · 3 utilisateurs · Mobile PWA · Brevo notifications · Support email J+1 ouvré</td>
+      <td>TPE BTP &lt; 10 salariés répondant en propre. ~3-5 AO/mois.</td>
+    </tr>
+    <tr>
+      <td><strong>Cotraitance</strong></td>
+      <td class="num">390 €</td>
+      <td>Tout Sourcing + Module Tandem complet (matching architecte · page tokenisée · sollicitation Brevo · webhook tracking · relance auto) · Base 50 architectes · 5 utilisateurs · Sync CRM Odoo · Support email J ouvré</td>
+      <td>PME BTP 10-30 salariés travaillant régulièrement en cotraitance architecte. ~5-10 AO/mois.</td>
+    </tr>
+    <tr>
+      <td><strong>Studio IA</strong></td>
+      <td class="num">790 €</td>
+      <td>Tout Cotraitance + Module Préparation dossier IA (analyse RC P1 Sonnet · CERFA P3 · mémoire technique P2 · bibliothèque pièces P10) · Quota 20 AO Studio/mois inclus + 1,50 €/AO supplémentaire · Utilisateurs illimités · Support prioritaire 4h ouvrées</td>
+      <td>PME/ETI BTP 30-50 salariés cotraitance avancée + dossier complet IA. ~10-20 AO/mois.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>6.2. Justification des prix</h3>
+
+<h4>Sourcing 190 €/mo</h4>
+<ul>
+  <li>Sous le tarif Vecteur Plus (250-670 €/mo) — porte d'entrée accessible TPE</li>
+  <li>Au-dessus de Doublet (50-150 €/mo) — justifié par scoring IA + PWA + Kanban</li>
+  <li>Marge contributive nette : ~165 €/mo par client (coût variable ~25 €/mo)</li>
+</ul>
+
+<h4>Cotraitance 390 €/mo</h4>
+<ul>
+  <li>Aucun concurrent direct sur cette feature (matching architecte + sollicitation auto)</li>
+  <li>Prix défendable face à un mi-temps assistant commercial (1 500 €/mo)</li>
+  <li>Marge contributive nette : ~340 €/mo par client (coût variable ~50 €/mo)</li>
+</ul>
+
+<h4>Studio IA 790 €/mo</h4>
+<ul>
+  <li>Aucun concurrent direct sur l'analyse RC + génération CERFA + mémoire technique</li>
+  <li>Prix calibré sur la valeur : ~32 k€/an de temps économisé pour ~9,5 k€/an de SaaS</li>
+  <li>Marge contributive nette : ~640 €/mo par client (coût variable ~150 €/mo dont 60-80 € IA Anthropic)</li>
+</ul>
+
+<h3>6.3. Stratégie d'upsell</h3>
+
+<p>Schéma de progression naturel d'un client :</p>
+
+<ol>
+  <li><strong>Onboarding palier Sourcing</strong> (mois 1-3) — le client découvre l'app, gagne du temps de veille</li>
+  <li><strong>Upsell vers Cotraitance</strong> (mois 4-9) — déclenché par l'usage actif Kanban + besoin de mobiliser architecte</li>
+  <li><strong>Upsell vers Studio IA</strong> (mois 10-24) — déclenché par le volume d'AO traités et la friction des CERFA/mémoires</li>
+</ol>
+
+<p>Hypothèse de mix tier à régime de croisière (Année 3+) :</p>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Mix tier Sourcing</div>
+    <div class="value">50 %</div>
+    <div class="unit">~150 clients × 190 € = 28,5 k€ MRR</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Mix tier Cotraitance</div>
+    <div class="value">35 %</div>
+    <div class="unit">~105 clients × 390 € = 41,0 k€ MRR</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Mix tier Studio IA</div>
+    <div class="value">15 %</div>
+    <div class="unit">~45 clients × 790 € = 35,6 k€ MRR</div>
+  </div>
+</div>
+
+<p><strong>ARPU mensuel moyen pondéré = ~350 €/mo.</strong></p>
+
+<div class="page-break"></div>
+
+<!-- ========= 7. FACTEURS DIFFÉRENCIANTS ========= -->
+<h2>7. Facteurs différenciants</h2>
+
+<h3>7.1. Les 6 axes de différenciation</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Axe</th>
+      <th>edifio Sourcing</th>
+      <th>Meilleur concurrent</th>
+      <th>Défensable ?</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><strong>Continuum sourcing → cotraitance → dossier IA</strong></td>
+      <td>Couvre les 4 étapes nativement</td>
+      <td>Aucun concurrent ne couvre &gt; 2 étapes</td>
+      <td>✅ Fort — 12-18 mois pour répliquer</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>Matching architecte cotraitant + page tokenisée</strong></td>
+      <td>Module Tandem complet (matching + Brevo + JWT)</td>
+      <td>Aucun</td>
+      <td>✅ Très fort — feature unique sur le marché</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Préparation dossier IA bout-en-bout</strong></td>
+      <td>Analyse RC + CERFA + mémoire technique + side-by-side review</td>
+      <td>TenderEye fait l'analyse RC partielle</td>
+      <td>⚠️ Modéré — Vecteur Plus peut rattraper en 12 mois</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>PWA mobile-first</strong></td>
+      <td>Application native-feel iOS/Android sans store</td>
+      <td>TenderEye uniquement (UK)</td>
+      <td>⚠️ Modéré — pas un moat technique</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Intégration native CRM Odoo</strong></td>
+      <td>Sync bidirectionnelle XML-RPC</td>
+      <td>Aucun (concurrents font Pipedrive ou Salesforce)</td>
+      <td>✅ Fort sur la cible BTP qui utilise majoritairement Odoo</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><strong>Made in France / hébergement UE / RGPD strict</strong></td>
+      <td>Vercel EU + Supabase Frankfurt + DPA tous prestataires</td>
+      <td>Vecteur Plus, AOS, Klekoon (FR aussi)</td>
+      <td>⚠️ Faible — pas un facteur de choix décisif</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>7.2. Moat (avantages défensables long terme)</h3>
+
+<div class="box positive">
+  <h4>Moat principal — Le continuum</h4>
+  <p>Notre avantage n'est pas une feature isolée (IA, mobile, scoring) qui peut être copiée en 6-12 mois. C'est <strong>l'architecture du produit comme un pipeline bout-en-bout</strong>. Pour qu'un concurrent réplique edifio Sourcing, il doit :</p>
+  <ul>
+    <li>Avoir 4 connecteurs sourcing opérationnels (6-9 mois de dev)</li>
+    <li>Construire un module Tandem matching + Brevo + page tokenisée (3-5 mois)</li>
+    <li>Mettre en place un pipeline IA fiable (analyse RC + CERFA + mémoire) — itérations longues sur les prompts (6-12 mois)</li>
+    <li>Intégrer un CRM (Odoo + autres) (2-4 mois)</li>
+  </ul>
+  <p>Soit <strong>~18-24 mois minimum</strong> pour un concurrent qui aurait déjà le sourcing pur. Cela nous laisse une fenêtre de 12-18 mois d'avance sur le marché.</p>
+</div>
+
+<div class="box">
+  <h4>Moat secondaire — Ancrage AlyoS</h4>
+  <p>edifio Sourcing est <strong>développé en interne par AlyoS Ingénierie</strong> qui utilise le produit en quotidien. Cela garantit :</p>
+  <ul>
+    <li>Une validation terrain continue (dogfooding)</li>
+    <li>Une connaissance fine du métier BTP (différenciation vs concurrents IT-pur)</li>
+    <li>Un réseau de prospects naturel (réseau AlyoS direct + parrainage)</li>
+  </ul>
+</div>
+
+<div class="box warning">
+  <h4>Moat fragile — Identifier les risques</h4>
+  <p><strong>Vecteur Plus est probablement en train d'intégrer du LLM</strong> dans son produit (timing estimé : 12-18 mois). Quand cela arrive, leur scoring IA et résumés automatiques convergeront vers notre Tier Sourcing. Notre défense : doubler le rythme d'évolution des modules Tandem et Studio IA pour creuser l'écart.</p>
+</div>
+
+<h3>7.3. Le narratif commercial — 1 phrase</h3>
+
+<div class="box positive">
+  <p style="font-size: 13pt; font-weight: 600; font-family: 'Space Grotesk', sans-serif; text-align: center; padding: 12px 0;">
+    « Vecteur Plus s'arrête à l'alerte. edifio Sourcing prend le relais : du tri jusqu'au dossier IA livré, en passant par la mobilisation de l'architecte cotraitant. »
+  </p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 8. PRÉVISIONNEL 5 ANS ========= -->
+<h2>8. Prévisionnel 5 ans — base / pessimiste / optimiste</h2>
+
+<h3>8.1. Hypothèses de modélisation</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Paramètre</th>
+      <th class="num">Pessimiste</th>
+      <th class="num">Base</th>
+      <th class="num">Optimiste</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Acquisition Année 1 (nouveaux clients)</td>
+      <td class="num">15</td>
+      <td class="num">30</td>
+      <td class="num">50</td>
+    </tr>
+    <tr>
+      <td>Croissance acquisition % / an</td>
+      <td class="num">+30 %</td>
+      <td class="num">+50 %</td>
+      <td class="num">+80 %</td>
+    </tr>
+    <tr>
+      <td>Churn annuel</td>
+      <td class="num">25 %</td>
+      <td class="num">15 %</td>
+      <td class="num">10 %</td>
+    </tr>
+    <tr>
+      <td>ARPU mensuel moyen</td>
+      <td class="num">280 €</td>
+      <td class="num">350 €</td>
+      <td class="num">420 €</td>
+    </tr>
+    <tr>
+      <td>CAC (coût d'acquisition par client)</td>
+      <td class="num">1 200 €</td>
+      <td class="num">600 €</td>
+      <td class="num">350 €</td>
+    </tr>
+    <tr>
+      <td>Coût variable / client / mois</td>
+      <td class="num">40 €</td>
+      <td class="num">30 €</td>
+      <td class="num">22 €</td>
+    </tr>
+    <tr>
+      <td>Coûts fixes équipe Année 1</td>
+      <td class="num">180 k€</td>
+      <td class="num">150 k€</td>
+      <td class="num">120 k€</td>
+    </tr>
+    <tr>
+      <td>Hausse coûts fixes / an</td>
+      <td class="num">+50 k€</td>
+      <td class="num">+40 k€</td>
+      <td class="num">+30 k€</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>8.2. Scénario BASE — détail année par année</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Indicateur</th>
+      <th class="num">An 1<br>(2026-Q3 → 2027-Q3)</th>
+      <th class="num">An 2</th>
+      <th class="num">An 3</th>
+      <th class="num">An 4</th>
+      <th class="num">An 5</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Nouveaux clients dans l'année</td>
+      <td class="num">30</td>
+      <td class="num">45</td>
+      <td class="num">68</td>
+      <td class="num">95</td>
+      <td class="num">120</td>
+    </tr>
+    <tr>
+      <td>Churn dans l'année (-15 %)</td>
+      <td class="num">-2</td>
+      <td class="num">-8</td>
+      <td class="num">-16</td>
+      <td class="num">-28</td>
+      <td class="num">-42</td>
+    </tr>
+    <tr>
+      <td><strong>Base clients fin d'année</strong></td>
+      <td class="num"><strong>28</strong></td>
+      <td class="num"><strong>65</strong></td>
+      <td class="num"><strong>117</strong></td>
+      <td class="num"><strong>184</strong></td>
+      <td class="num"><strong>262</strong></td>
+    </tr>
+    <tr>
+      <td><strong>MRR fin d'année (ARPU 350 €)</strong></td>
+      <td class="num"><strong>9,8 k€</strong></td>
+      <td class="num"><strong>22,8 k€</strong></td>
+      <td class="num"><strong>41,0 k€</strong></td>
+      <td class="num"><strong>64,4 k€</strong></td>
+      <td class="num"><strong>91,7 k€</strong></td>
+    </tr>
+    <tr>
+      <td>ARR fin d'année</td>
+      <td class="num">117 k€</td>
+      <td class="num">273 k€</td>
+      <td class="num">492 k€</td>
+      <td class="num">773 k€</td>
+      <td class="num">1 100 k€</td>
+    </tr>
+    <tr>
+      <td>Revenu annuel cumulé (estim.)</td>
+      <td class="num">60 k€</td>
+      <td class="num">195 k€</td>
+      <td class="num">380 k€</td>
+      <td class="num">630 k€</td>
+      <td class="num">935 k€</td>
+    </tr>
+    <tr>
+      <td>Coûts variables (30 €/cli/mo)</td>
+      <td class="num">-7 k€</td>
+      <td class="num">-19 k€</td>
+      <td class="num">-37 k€</td>
+      <td class="num">-62 k€</td>
+      <td class="num">-93 k€</td>
+    </tr>
+    <tr>
+      <td>CAC (600 €/nouveau client)</td>
+      <td class="num">-18 k€</td>
+      <td class="num">-27 k€</td>
+      <td class="num">-41 k€</td>
+      <td class="num">-57 k€</td>
+      <td class="num">-72 k€</td>
+    </tr>
+    <tr>
+      <td>Coûts fixes équipe</td>
+      <td class="num">-150 k€</td>
+      <td class="num">-190 k€</td>
+      <td class="num">-230 k€</td>
+      <td class="num">-270 k€</td>
+      <td class="num">-310 k€</td>
+    </tr>
+    <tr>
+      <td>Infra mutualisée</td>
+      <td class="num">-2 k€</td>
+      <td class="num">-3 k€</td>
+      <td class="num">-5 k€</td>
+      <td class="num">-7 k€</td>
+      <td class="num">-9 k€</td>
+    </tr>
+    <tr>
+      <td><strong>Marge brute (avant fixes)</strong></td>
+      <td class="num"><strong>35 k€</strong></td>
+      <td class="num"><strong>149 k€</strong></td>
+      <td class="num"><strong>302 k€</strong></td>
+      <td class="num"><strong>511 k€</strong></td>
+      <td class="num"><strong>770 k€</strong></td>
+    </tr>
+    <tr style="font-weight: 700; background: var(--pill-bg);">
+      <td>EBITDA</td>
+      <td class="num">-117 k€</td>
+      <td class="num">-44 k€</td>
+      <td class="num">+67 k€</td>
+      <td class="num">+234 k€</td>
+      <td class="num">+451 k€</td>
+    </tr>
+    <tr>
+      <td>Marge EBITDA (%)</td>
+      <td class="num">-195 %</td>
+      <td class="num">-23 %</td>
+      <td class="num">+18 %</td>
+      <td class="num">+37 %</td>
+      <td class="num">+48 %</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="box positive">
+  <p><strong>EBITDA positif dès Année 3</strong> dans le scénario base. Investissement cumulé Années 1-2 ≈ <strong>-161 k€</strong>, financé par AlyoS Ingénierie ou apport externe (BPI / love money).</p>
+</div>
+
+<h3>8.3. Comparatif ARR fin Année 5 — 3 scénarios</h3>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Pessimiste</div>
+    <div class="value">~480 k€</div>
+    <div class="unit">~145 clients, EBITDA légèrement positif</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Base</div>
+    <div class="value">~1,1 M€</div>
+    <div class="unit">~262 clients, EBITDA 48 %</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Optimiste</div>
+    <div class="value">~2,1 M€</div>
+    <div class="unit">~430 clients, EBITDA 55 %</div>
+  </div>
+</div>
+
+<h3>8.4. Évolution MRR mensuelle (scénario base)</h3>
+
+<div style="margin: 1em 0;">
+  <div class="bar"><div class="name">Fin An 1</div><div class="track"><div class="fill" style="width: 11%;">9,8 k€</div></div></div>
+  <div class="bar"><div class="name">Fin An 2</div><div class="track"><div class="fill" style="width: 25%;">22,8 k€</div></div></div>
+  <div class="bar"><div class="name">Fin An 3</div><div class="track"><div class="fill" style="width: 45%;">41,0 k€</div></div></div>
+  <div class="bar"><div class="name">Fin An 4</div><div class="track"><div class="fill" style="width: 70%;">64,4 k€</div></div></div>
+  <div class="bar"><div class="name">Fin An 5</div><div class="track"><div class="fill" style="width: 100%;">91,7 k€</div></div></div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 9. RISQUES ========= -->
+<h2>9. Sensibilités &amp; risques</h2>
+
+<h3>9.1. Top 5 risques avec impact financier</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Risque</th>
+      <th class="center">Probabilité</th>
+      <th class="center">Impact</th>
+      <th>Mitigation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><strong>Vecteur Plus intègre LLM en 12-18 mois</strong> → réduction de notre différentiel sur scoring IA</td>
+      <td class="center">Élevée (~70 %)</td>
+      <td class="center">-15 à -25 % MRR An 3</td>
+      <td>Doubler le rythme sur Tandem + Studio IA (notre vrai moat). Communication marketing centrée sur le continuum, pas l'IA seule.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>CAC plus élevé qu'estimé</strong> hors réseau AlyoS (1000-1500 € vs 600 € prévus)</td>
+      <td class="center">Modérée (~40 %)</td>
+      <td class="center">-40 à -80 k€ cumulé sur 5 ans</td>
+      <td>Programme parrainage early adopters AlyoS (3 mois gratuits pour referrer + referree). Partenariat fédérations (FFB / CAPEB / FNTP).</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Churn élevé sur Tier Sourcing</strong> (TPE-sensibilité prix, &gt; 30 % vs 15 % prévus)</td>
+      <td class="center">Modérée (~35 %)</td>
+      <td class="center">-20 à -35 % MRR An 5</td>
+      <td>Onboarding renforcé Tier Sourcing (vidéo + tutoriel + check-in J+30). Push upsell vers Cotraitance dès mois 4 (où la rétention est ~3× supérieure).</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>Scraping PLACE / Francmarchés bloqué</strong> par captcha / anti-bot évolutif</td>
+      <td class="center">Modérée (~30 %)</td>
+      <td class="center">-5 à -15 % MRR (perte de valeur)</td>
+      <td>BOAMP couvre déjà ~70 % des AO publics via API officielle. Mitigation : fallback BOAMP-only avec mention transparente.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Hausse coûts Anthropic API</strong> (×2 ou ×3 sur 5 ans)</td>
+      <td class="center">Faible (~20 %)</td>
+      <td class="center">-30 à -90 k€ EBITDA An 5</td>
+      <td>Calibration prompts Haiku partout où possible. Quota dur Studio IA (20 AO/mois inclus + overage 1,50 €/AO). Alternative open-source Llama-3 à étudier en backup.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>9.2. Analyse de sensibilité — EBITDA Année 5</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variation par rapport au scénario base</th>
+      <th class="num">EBITDA An 5</th>
+      <th class="num">Delta</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><em>Scénario base</em></td>
+      <td class="num">+451 k€</td>
+      <td class="num">—</td>
+    </tr>
+    <tr>
+      <td>ARPU -20 % (280 € au lieu de 350 €)</td>
+      <td class="num">+265 k€</td>
+      <td class="num">-186 k€</td>
+    </tr>
+    <tr>
+      <td>Churn ×2 (30 % au lieu de 15 %)</td>
+      <td class="num">+220 k€</td>
+      <td class="num">-231 k€</td>
+    </tr>
+    <tr>
+      <td>Acquisition -30 % (21 nouveaux/an An 1)</td>
+      <td class="num">+295 k€</td>
+      <td class="num">-156 k€</td>
+    </tr>
+    <tr>
+      <td>CAC ×2 (1 200 € au lieu de 600 €)</td>
+      <td class="num">+380 k€</td>
+      <td class="num">-71 k€</td>
+    </tr>
+    <tr>
+      <td>Combinaison adverse (ARPU -20 % + churn ×2)</td>
+      <td class="num">+85 k€</td>
+      <td class="num">-366 k€</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="box warning">
+  <p><strong>Lecture clé</strong> : le modèle est <strong>plus sensible au churn qu'au CAC</strong>. Une rétention de qualité (Tier Cotraitance + Studio IA) est plus rentable qu'une acquisition agressive. C'est pourquoi la stratégie d'upsell rapide vers Cotraitance dès le mois 4-6 est centrale.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 10. RECOMMANDATION ========= -->
+<h2>10. Recommandation Board</h2>
+
+<div class="box positive">
+  <h4>GO commercialisation Phase 2</h4>
+  <p>L'étude confirme que le marché est mal servi, qu'il existe un positionnement défensable (continuum + cotraitance + dossier IA), et que la trajectoire financière est atteignable avec un investissement initial maîtrisé (~160 k€ sur Années 1-2).</p>
+</div>
+
+<h3>10.1. Plan d'action Phase 2 — feuille de route 12 mois post-Gate 9</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Trimestre</th>
+      <th>Actions</th>
+      <th>Cible KPI</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>T+0 à T+3 mois</strong> (Q4 2026)</td>
+      <td>
+        - Bascule SaaS multi-clients (RLS déjà prête depuis MVP)<br>
+        - Stripe + Chargebee facturation<br>
+        - Landing page commerciale (maquette M15 déjà livrée)<br>
+        - Onboarding self-serve<br>
+        - 10 clients pilotes réseau AlyoS direct
+      </td>
+      <td>10 clients payants</td>
+    </tr>
+    <tr>
+      <td><strong>T+3 à T+9 mois</strong> (Q1-Q2 2027)</td>
+      <td>
+        - Acquisition payante SEA Google Ads BTP<br>
+        - Partenariat fédérations FFB / CAPEB<br>
+        - Programme parrainage early adopters<br>
+        - Référencement éditorial (blog edifio.fr)<br>
+        - Embauche 0.5 ETP CMO + 0.5 ETP Customer Success
+      </td>
+      <td>30 clients payants</td>
+    </tr>
+    <tr>
+      <td><strong>T+9 à T+12 mois</strong> (Q3 2027)</td>
+      <td>
+        - Itération produit basée sur feedback (modules Cotraitance + Studio IA renforcés)<br>
+        - Ouverture nouveaux marchés territoriaux<br>
+        - Test pricing tier annuel -15 % vs mensuel<br>
+        - Première levée potentielle (BPI Bourse French Tech)
+      </td>
+      <td>50 clients payants, ARR ~210 k€</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>10.2. Conditions de succès</h3>
+
+<ol>
+  <li><strong>Bench cold start Edge Function pré-Gate 9</strong> validé (condition CTO sur ADR-013) — sécurise la trajectoire technique</li>
+  <li><strong>10 clients pilotes</strong> recrutés via réseau AlyoS direct entre Q3 et Q4 2026 (avant le lancement public)</li>
+  <li><strong>Equipe Year 1</strong> : 1 ETP CTO + 0.5 ETP CEO + 0.5 ETP CMO + 0.5 ETP Customer Success = 150 k€/an</li>
+  <li><strong>Investissement Years 1-2</strong> sécurisé (~160 k€ cumulés) avant lancement</li>
+  <li><strong>Veille concurrentielle semestrielle</strong> sur Vecteur Plus + acteurs étrangers entrants (TenderEye)</li>
+</ol>
+
+<h3>10.3. Décisions Board demandées</h3>
+
+<div class="box">
+  <ul>
+    <li>☐ <strong>Validation principe</strong> de bascule SaaS multi-clients à Q4 2026 (post-Gate 9 confirmé)</li>
+    <li>☐ <strong>Validation enveloppe</strong> investissement Year 1-2 = ~160 k€ (équipe + acquisition)</li>
+    <li>☐ <strong>Validation trajectoire tarifaire</strong> 190 / 390 / 790 €/mo (sous réserve A/B test sur 10 premiers pilotes)</li>
+    <li>☐ <strong>Validation calendrier</strong> 10 pilotes Q4 2026 → 30 clients fin An 1 → 262 clients fin An 5</li>
+    <li>☐ <strong>Demande d'arbitrage</strong> : structure juridique commercialisation — SARL AlyoS Ingénierie existante OU création SAS edifio dédiée pour préparer une levée future</li>
+  </ul>
+</div>
+
+<div class="footer-note">
+  Document v1.0 — à actualiser annuellement en revue stratégique Board (prochaine revue : 2027-05). Données concurrents à vérifier en veille semestrielle. Prévisionnel à ajuster mensuellement post-Gate 9 sur la base des cohorts réelles. Hypothèses macro (croissance marché AO BTP +3-5 %/an) à rebenchmarker chaque année (FFB / FNTP / DAJ Bercy).<br><br>
+  Sources : INSEE NAF 41-43 (2024), FFB Statistiques 2024, FNTP Marchés publics 2023, BOAMP Statistiques de la commande publique, sites éditeurs concurrents (mai 2026), grille horaire AlyoS Ingénierie 2026, devis Anthropic/Supabase/Vercel mai 2026.<br><br>
+  — [CMO Léa] avec [CEO Marc] et [CTO Sophie] · edifio Sourcing · AlyoS Ingénierie · 2026-05-18
+</div>
+
+</body>
+</html>

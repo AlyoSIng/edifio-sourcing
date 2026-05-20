@@ -38,10 +38,18 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm dev",
+    // En CI, on bascule sur le build de prod (`next start`) : `next dev`
+    // compile chaque route à la première requête, ce qui sur les runners
+    // ubuntu dépasse fréquemment les timeouts de navigation (10 s par défaut
+    // sur `page.waitForURL`). Le build initial prend ~30-45 s mais le
+    // routing devient instantané ensuite.
+    // En local on garde `pnpm dev` pour le hot-reload.
+    command: isCI ? "pnpm build && pnpm start" : "pnpm dev",
     url: baseURL,
     reuseExistingServer: !isCI,
-    timeout: 120_000,
+    // 240 s en CI pour absorber le build initial ; 120 s en local pour le
+    // démarrage normal de next dev.
+    timeout: isCI ? 240_000 : 120_000,
     stdout: "ignore",
     stderr: "pipe",
   },

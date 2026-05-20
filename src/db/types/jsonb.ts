@@ -233,7 +233,15 @@ export interface AuditLogDataMembershipChange {
   target_email: string;
   from_role?: "admin" | "user" | "viewer";
   to_role?: "admin" | "user" | "viewer";
-  operation: "invite" | "update" | "revoke";
+  /**
+   * `regenerate_provisional` ajouté 2026-05-20 par [DEV Alex],
+   * **validé CTO Sophie 2026-05-20** via
+   * `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`. Couvre le
+   * bouton « Renvoyer » admin qui regénère le mot de passe provisoire
+   * d'un user existant sans changer son rôle (convention :
+   * `from_role === to_role` quand `operation === "regenerate_provisional"`).
+   */
+  operation: "invite" | "update" | "revoke" | "regenerate_provisional";
 }
 
 export interface AuditLogDataSearchProfileChange {
