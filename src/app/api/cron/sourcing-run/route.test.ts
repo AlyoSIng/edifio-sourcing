@@ -1,5 +1,5 @@
 /**
- * Tests d'intégration de la route POST `/api/cron/sourcing-run`.
+ * Tests d'intégration de la route GET / POST `/api/cron/sourcing-run`.
  *
  * Stratégie : on mocke `@/db/client` (Proxy lazy normalement) et le connecteur
  * BOAMP. Le reste (normalize / dedup / filter / score / insertTender via mock
@@ -7,12 +7,16 @@
  * Playwright ni Supabase live (couverts par les vrais E2E Gate 7).
  *
  * Couvre :
- *  - 401 si CRON_SECRET absent
- *  - 401 si Bearer manquant ou faux
- *  - 200 + summary si OK
- *  - 200 + comptage filter + insert via vrai pipeline
- *  - 200 + dedup intra-batch
- *  - 200 + failedProfiles si connecteur throw
+ *  - **GET** est exporté (sans cet export, Vercel Cron tape `405 Method Not
+ *    Allowed` à chaque tick — bug post-merge corrigé après observation des
+ *    logs Vercel)
+ *  - GET 401 si CRON_SECRET absent / Bearer manquant / Bearer faux
+ *  - GET 200 + summary si OK
+ *  - GET 200 + comptage filter + insert via vrai pipeline
+ *  - GET 200 + dedup intra-batch
+ *  - GET 200 + failedProfiles si connecteur throw
+ *  - POST (conservé pour déclenchement manuel) : parité comportementale
+ *    stricte avec GET sur l'auth + le pipeline (smoke tests)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -98,7 +102,7 @@ vi.mock("@/lib/sourcing/connectors/boamp", () => ({
 
 // On importe la route APRÈS les vi.mock — les imports internes (db, connector)
 // récupéreront les versions mockées grâce au hoisting de vi.mock.
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 // ============================================================================
 // Helpers
@@ -145,11 +149,11 @@ function makeRaw(idweb: string, fields: Partial<BoampApiRecord> = {}): RawTender
   };
 }
 
-function buildRequest(authHeader: string | null): Request {
+function buildRequest(authHeader: string | null, method: "GET" | "POST" = "GET"): Request {
   const headers = new Headers();
   if (authHeader !== null) headers.set("authorization", authHeader);
   return new Request("http://localhost/api/cron/sourcing-run", {
-    method: "POST",
+    method,
     headers,
   });
 }
@@ -160,7 +164,24 @@ function buildRequest(authHeader: string | null): Request {
 
 const SECRET = "test-secret-32-bytes-aaaaaaaaaaaaaaaa";
 
-describe("POST /api/cron/sourcing-run — authentification", () => {
+// ============================================================================
+// Anti-régression 405 — Vercel Cron tape exclusivement GET sur la route.
+// Sans `export GET` côté `route.ts`, Next.js App Router répond automatiquement
+// `405 Method Not Allowed` aux ticks cron — bug observé en prod après le
+// premier déploiement (logs Vercel : `GET 405 /api/cron/sourcing-run`).
+// ============================================================================
+
+describe("exports HTTP — anti-régression 405", () => {
+  it("exporte un handler GET (sinon Vercel cron → 405 Method Not Allowed)", () => {
+    expect(typeof GET).toBe("function");
+  });
+
+  it("exporte un handler POST (déclenchement manuel curl / scripts ops)", () => {
+    expect(typeof POST).toBe("function");
+  });
+});
+
+describe("GET /api/cron/sourcing-run — authentification", () => {
   beforeEach(() => {
     mockProfiles = [];
     mockConnector = { fetchSinceLastRun: async () => [] };
@@ -173,27 +194,27 @@ describe("POST /api/cron/sourcing-run — authentification", () => {
   it("renvoie 401 si CRON_SECRET n'est pas configuré côté env", async () => {
     vi.stubEnv("CRON_SECRET", "");
     const consoleErrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const res = await POST(buildRequest(`Bearer ${SECRET}`) as never);
+    const res = await GET(buildRequest(`Bearer ${SECRET}`, "GET") as never);
     expect(res.status).toBe(401);
     consoleErrSpy.mockRestore();
   });
 
   it("renvoie 401 si le header Authorization est absent", async () => {
     vi.stubEnv("CRON_SECRET", SECRET);
-    const res = await POST(buildRequest(null) as never);
+    const res = await GET(buildRequest(null, "GET") as never);
     expect(res.status).toBe(401);
   });
 
   it("renvoie 401 si le Bearer ne matche pas le secret", async () => {
     vi.stubEnv("CRON_SECRET", SECRET);
-    const res = await POST(buildRequest("Bearer wrong-secret") as never);
+    const res = await GET(buildRequest("Bearer wrong-secret", "GET") as never);
     expect(res.status).toBe(401);
   });
 
   it("renvoie 200 et un summary vide si aucun profil actif", async () => {
     vi.stubEnv("CRON_SECRET", SECRET);
     mockProfiles = [];
-    const res = await POST(buildRequest(`Bearer ${SECRET}`) as never);
+    const res = await GET(buildRequest(`Bearer ${SECRET}`, "GET") as never);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; totalProfiles: number };
     expect(body.ok).toBe(true);
@@ -201,7 +222,7 @@ describe("POST /api/cron/sourcing-run — authentification", () => {
   });
 });
 
-describe("POST /api/cron/sourcing-run — pipeline", () => {
+describe("GET /api/cron/sourcing-run — pipeline", () => {
   beforeEach(() => {
     mockProfiles = [];
     mockConnector = { fetchSinceLastRun: async () => [] };
@@ -222,7 +243,7 @@ describe("POST /api/cron/sourcing-run — pipeline", () => {
       ],
     };
 
-    const res = await POST(buildRequest(`Bearer ${SECRET}`) as never);
+    const res = await GET(buildRequest(`Bearer ${SECRET}`, "GET") as never);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       ok: boolean;
@@ -268,7 +289,7 @@ describe("POST /api/cron/sourcing-run — pipeline", () => {
       ],
     };
 
-    const res = await POST(buildRequest(`Bearer ${SECRET}`) as never);
+    const res = await GET(buildRequest(`Bearer ${SECRET}`, "GET") as never);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       results: Array<{ dedupSkipped: number; inserted: number }>;
@@ -292,7 +313,7 @@ describe("POST /api/cron/sourcing-run — pipeline", () => {
     };
     const consoleErrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const res = await POST(buildRequest(`Bearer ${SECRET}`) as never);
+    const res = await GET(buildRequest(`Bearer ${SECRET}`, "GET") as never);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       results: Array<{ profileId: string; inserted: number }>;
@@ -304,5 +325,38 @@ describe("POST /api/cron/sourcing-run — pipeline", () => {
     expect(body.failedProfiles[0]?.profileId).toBe(profileB.id);
     expect(body.failedProfiles[0]?.message).toMatch(/BOAMP indisponible/);
     consoleErrSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// POST — parité de comportement avec GET (déclenchement manuel curl/ops).
+// Smoke tests uniquement : on prouve que POST traverse le même handler que
+// GET sur les chemins auth + pipeline OK. Les cas détaillés sont couverts
+// par les blocs GET ci-dessus.
+// ============================================================================
+
+describe("POST /api/cron/sourcing-run — parité déclenchement manuel", () => {
+  beforeEach(() => {
+    mockProfiles = [];
+    mockConnector = { fetchSinceLastRun: async () => [] };
+    mockInserts.length = 0;
+    vi.stubEnv("CRON_SECRET", SECRET);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("POST sans Bearer → 401 (parité GET)", async () => {
+    const res = await POST(buildRequest(null, "POST") as never);
+    expect(res.status).toBe(401);
+  });
+
+  it("POST avec bon Bearer + aucun profil → 200 summary vide (parité GET)", async () => {
+    mockProfiles = [];
+    const res = await POST(buildRequest(`Bearer ${SECRET}`, "POST") as never);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; totalProfiles: number };
+    expect(body.ok).toBe(true);
+    expect(body.totalProfiles).toBe(0);
   });
 });

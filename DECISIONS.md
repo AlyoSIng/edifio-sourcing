@@ -669,7 +669,7 @@
 - **2026-05-20 · G6 · Board + Alex · Pas de seuil d'insertion sur le score en PR #3 (insert exhaustif).** [BOARD-OK 2026-05-20]
   *Tout AO qui passe `filter.matchesProfile` est inséré, peu importe le score (un AO base 50 sans bonus reste inséré). Traçabilité totale en BDD. Seuil de notification user (≥ 60 envisagé) sera traité dans la PR push notifications Realtime — il s'agit d'un filtre UI/notif, pas d'un filtre persistance.*
 
-- **2026-05-20 · G6 · Board + Alex · Cron Vercel = `30 4 * * 1-5` UTC = 6h30 Europe/Paris (CEST été) / 5h30 (CET hiver).** [BOARD-OK 2026-05-20]
+- **2026-05-20 · G6 · Board + Alex · Cron Vercel = `30 4 * * 1-5` UTC = 6h30 Europe/Paris (CEST été) / 5h30 (CET hiver).** [BOARD-OK 2026-05-20] [REVU 2026-05-20 → cf. entrée suivante]
   *Vercel cron tourne en UTC. Choix d'aligner sur l'heure d'été (mai-octobre) car période active courante (2026-05-20). En hiver, le cron tournera à 5h30 Paris — toujours avant l'arrivée de l'équipe. À ré-ajuster si l'usage glisse vers un besoin temps réel (cf. backlog Phase 2 : cron multiples par profil selon `search_profiles.cron_time`).*
 
 - **2026-05-20 · G6 · Alex · Dédup intra-batch + hash composite SHA-256 sur `(buyer_norm | title_norm[:100] | deadline_jour_UTC)`.** [TECHNIQUE]
@@ -684,3 +684,20 @@
 ---
 
 *Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — PR #3 scoring V1 + cron Vercel livrée sur branche `feat/sourcing-scoring-cron` (61 tests verts, 396/396 suite globale).*
+
+---
+
+## 2026-05-20 — PR #3 hotfix — Cron Vercel : 405 → GET handler + révision schedule
+
+- **2026-05-20 · G6 · Board + Alex · Fix bug 405 Method Not Allowed sur ticks Vercel cron.** [BOARD-OK 2026-05-20]
+  *Observation logs Vercel après premier preview deploy : `GET 405 /api/cron/sourcing-run` à chaque tick. Cause : Vercel Cron Jobs déclenchent **exclusivement en GET** (doc officielle Vercel), or la route ne déclarait que `POST`. Fix : factorisation logique métier dans `handleCronRequest()` + double export `GET` (Vercel cron, chemin prod) et `POST` (curl/ops/tests, déclenchement manuel) avec parité comportementale stricte. Nouveau bloc de tests anti-régression « exports HTTP » qui assert `typeof GET === 'function'` et `typeof POST === 'function'` — si l'un disparaît, Next.js renvoie 405 → tests échouent à la régression.*
+
+- **2026-05-20 · G6 · Board · Cron Vercel révisé = `30 6 * * 1-5` UTC = 8h30 Europe/Paris (CEST été) / 7h30 (CET hiver).** [BOARD-OK 2026-05-20] [SURCLASSE entrée précédente `30 4`]
+  *Décision Board en clarification de la PR #3. Vercel cron tourne en UTC : `30 6` UTC produit 8h30 Paris en été (mai-octobre) et 7h30 en hiver. Trade-off accepté : les AO BOAMP arrivent quand l'équipe est en place (vs. 6h30 avec `30 4` UTC) — meilleure visibilité immédiate pour Sandrine qui consulte « AO du jour » dès son arrivée bureau.*
+
+- **2026-05-20 · G6 · Alex · Tests PR #3 hotfix : 400/400 verts, +4 tests (2 anti-régression exports HTTP + 2 parité POST).** [LIVRABLE]
+  *TS strict OK, ESLint OK. Aucune régression sur les 396 tests précédents.*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — Hotfix cron Vercel (GET handler + schedule `30 6` UTC) sur branche `feat/sourcing-scoring-cron`.*

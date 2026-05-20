@@ -1,18 +1,25 @@
 /**
- * POST /api/cron/sourcing-run — déclencheur quotidien du sourcing AO.
+ * GET / POST /api/cron/sourcing-run — déclencheur quotidien du sourcing AO.
  *
  * Étape 5/5 de la PR #3 scoring V1 + cron.
  *
  * Source de vérité :
  *  - `specs/module_sourcing_engine_v1.md` §3.8 (cron Vercel + auth secret)
- *  - `vercel.json` (schedule `30 4 * * 1-5` UTC = 6h30 Europe/Paris en été)
+ *  - `vercel.json` (schedule `30 6 * * 1-5` UTC = 8h30 Europe/Paris en été
+ *    / 7h30 en hiver)
  *  - `src/lib/sourcing/orchestrator.ts` (pipeline complet)
+ *
+ * Méthodes HTTP exposées :
+ *  - **GET** : utilisé par Vercel Cron Jobs (doc Vercel : les crons tapent
+ *    exclusivement GET). C'est la méthode principale en prod.
+ *  - **POST** : conservé pour le déclenchement manuel (curl, scripts ops,
+ *    tests d'intégration historiques). Comportement strictement identique.
  *
  * Authentification :
  *  - Vercel Cron pose automatiquement le header `Authorization: Bearer
  *    ${CRON_SECRET}` quand `vercel.json` déclare un cron et que la variable
  *    `CRON_SECRET` est configurée côté Vercel project settings.
- *  - En local : `curl -X POST -H "Authorization: Bearer $CRON_SECRET"
+ *  - En local : `curl -H "Authorization: Bearer $CRON_SECRET"
  *    http://localhost:3000/api/cron/sourcing-run`.
  *  - Toute requête sans header valide → **401**.
  *
@@ -68,7 +75,13 @@ function checkCronAuth(req: NextRequest): NextResponse | null {
   return null;
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+/**
+ * Handler partagé GET + POST — toute la logique métier vit ici. Les deux
+ * exports délèguent directement, ce qui garantit une parité comportementale
+ * stricte (Vercel cron en GET et déclenchement manuel en POST exécutent
+ * exactement le même code).
+ */
+async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
   const authError = checkCronAuth(req);
   if (authError) return authError;
 
@@ -109,4 +122,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 500 },
     );
   }
+}
+
+/**
+ * GET — méthode utilisée par Vercel Cron Jobs (déclenchement automatique
+ * quotidien selon `vercel.json`). Sans cet export, Next.js App Router
+ * répondrait `405 Method Not Allowed` aux ticks cron.
+ */
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  return handleCronRequest(req);
+}
+
+/**
+ * POST — méthode de déclenchement manuel (curl, scripts ops, tests). Conserve
+ * la compatibilité descendante avec les tests d'intégration historiques.
+ */
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  return handleCronRequest(req);
 }
