@@ -635,4 +635,44 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-19 par [DEV Alex] — Fix pgTAP RLS PR #14 itération 2 (enum `platform_code` + policy `insert_by_member AS RESTRICTIVE`), commit suggéré prêt pour `ps_operator`.*
+## 2026-05-20 — PR #2 module sourcing engine (connecteur BOAMP) — choix structurants
+
+**Agent** : Alex (DEV) via Board (Steve)
+**Branche** : `feat/sourcing-boamp-connector` → `feat/sourcing-mvp` (6 commits `15d6e9d..693f6dc`, étapes 1 à 6/7 + cette entrée étape 7/7)
+**Effort réel** : ~1 session orchestrateur direct (estimation brouillon initiale 1,5-2,5 j)
+**Référence note** : `notes-de-suivi/CC_260520_1000_PR2_BOAMP.md`
+
+- **2026-05-20 · PR #2 · DEV Alex · Politique re-source conservatrice sur `insertTender` `ON CONFLICT (dedup_hash)`.** [DÉCISION TECH — à valider CTO]
+  *Seules `raw_data` et `updated_at` sont updatées sur conflit. `score`, `status`, `matching_profile_id` et l'ensemble des champs normalisés (`title`, `deadline`, `cpv`, `lots`, …) sont préservés. Motif : re-source quotidien BOAMP ne doit pas écraser un statut utilisateur (`selected`, `discarded`) ni un scoring recalculé manuellement. La spec module `specs/module_sourcing_engine_v1.md` §4.2 ne tranche pas explicitement → décision à confirmer en revue CTO Sophie avant merge.*
+
+- **2026-05-20 · PR #2 · DEV Alex · Helper `audit()` non-throw en prod, throw en test.** [DÉCISION TECH — à valider CTO]
+  *`src/lib/audit/index.ts` log un échec d'insertion `audit_logs` via `console.error` quand `NODE_ENV !== 'test'`, mais throw en `NODE_ENV='test'` pour matérialiser les régressions CI. Motif : un log d'audit ne doit jamais casser un flow utilisateur critique (ex : Tandem accepté → la réponse archi prime sur le log A6), tout en garantissant traçabilité stricte des 13 actions sensibles côté tests. Préférence Alex : single source of truth côté helper plutôt que `try/catch` répété sur chaque call-site. Arbitrage tolérance vs traçabilité demandé en revue CTO.*
+
+- **2026-05-20 · PR #2 · DEV Alex · Catalogue `ai_prompts.output_schema_zod` stocké en source TS texte, pas en JSON Schema.** [DÉCISION TECH]
+  *La colonne `ai_prompts.output_schema_zod` reçoit la source TypeScript brute du schéma Zod (string), pas une sérialisation JSON Schema. Motif : Zod 4 ne garantit pas la stabilité de `.toJSONSchema()` entre versions mineures, et la rétro-ingénierie JSON Schema → schéma Zod reste lossy (refinements, transforms, custom). Côté consommateur, choix `eval()` runtime vs mapping versionné repoussé à la PR n°7 (scoring IA Haiku — premier vrai consommateur des prompts P1-P12).*
+
+- **2026-05-20 · PR #2 · DEV Alex · A4 `tender_select` strict, A1-A3 et A5-A13 = placeholders Zod `passthrough()`.** [DÉCISION TECH]
+  *Sur les 13 schémas Zod des actions audit (`src/lib/audit/schemas.ts`), seul A4 `tender_select` reçoit un schéma strictement typé en PR #2 (seule action déclenchable par le pipeline `insertTender` livré ici). Les 12 autres (A1-A3 auth/admin, A5 profile, A6-A13 tandem/IA/dossier) sont posées en `z.object({}).passthrough()` — acceptent tout payload sans validation. Motif : éviter l'over-engineering sur des payloads encore mouvants ; chaque PR ultérieure resserrera le schéma de l'action qu'elle déclenche au moment du call-site. Couverture test `schemas.test.ts` : inférence sur les 13 + mode strict sur A4.*
+
+- **2026-05-20 · PR #2 · DEV Alex · `url_dce` double-champ + trigger `touch_tenders` + `isNew` dérivé.** [DÉCISION TECH]
+  *Trois micro-décisions liées au schéma `tenders` : (1) `normalize.ts` lit `url_dce` ET `urlDce` avec fallback explicite (drift Opendatasoft observé sur fixture réelle, Zod `.optional()` plutôt que `.url()` strict) ; (2) trigger `touch_tenders` met à jour `updated_at` sur INSERT/UPDATE, cohérent avec les 5 triggers `touch_updated_at` posés en PR #1 ; (3) flag `isNew` non stocké en colonne mais dérivé au lecteur via `created_at >= now() - interval '24h' AND status = 'pending'` — évite la dette d'un job de reset périodique.*
+
+### Métriques de livraison
+
+- **Vitest unit** : 229 / 229 PASS (extension des 108 de PR #1 + 6 suites BOAMP).
+- **pgTAP RLS** : plan total 78 = 68 (PR #1) + 10 nouveaux (`05_tenders_insert_idempotence.sql` 7 + `06_ai_prompts_seed.sql` 3).
+- **tsc / lint / prettier** : verts.
+
+### Dépendances pour PR ultérieures
+
+- **PR n°3** (filtre profil + scoring V1 + cron Vercel `30 6 * * 1-5` Europe/Paris) : hérite directement de `insertTender`, `audit()` helper, types `NormalizedTender` / `RawTender` posés par cette PR.
+- **PR n°7** (scoring IA Haiku) : réévaluera la stratégie `output_schema_zod` — choix entre `eval()` runtime de la source TS texte vs mapping versionné import-statique.
+- **PR à définir** : A13 `access_attempt` audit Edge Runtime middleware (helper `audit()` actuel postgres-js Node serverful, incompatible Edge Runtime du `middleware.ts`).
+
+### Dette technique acceptée (à traiter en mini-PR)
+
+- Fix `scripts/db-dry-run.ps1` ligne 168 : ajout `$env:DEBIAN_FRONTEND='noninteractive'` avant `apt-get install pgTAP` côté script local (sans incidence PR #2 — container Postgres 15 déjà préparé). Mini-PR séparée ou piggyback PR #3.
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [DEV Alex] — Clôture étape 7/7 PR #2 module sourcing engine (connecteur BOAMP + normalize + insert idempotent + audit helper + ai_prompts v1). Note de suivi `CC_260520_1000_PR2_BOAMP.md` posée. PR à ouvrir par Yann après validation Steve.*
