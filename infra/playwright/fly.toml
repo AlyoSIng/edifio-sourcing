@@ -1,0 +1,46 @@
+# ------------------------------------------------------------
+# edifio Sourcing — Worker Playwright (Fly.io)
+# Région primaire : cdg (Paris CDG, France).
+# Fallback documenté : fra (Frankfurt, Germany) — UE également.
+# Doc régions Fly : https://fly.io/docs/reference/regions/
+# ------------------------------------------------------------
+app = "edifio-playwright-worker"
+primary_region = "cdg"
+# primary_region = "fra"  # fallback UE si saturation cdg
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+
+# Les secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+# SCRAPER_TRIGGER_SECRET, WEBHOOK_TARGET_URL) sont injectés via
+# `fly secrets set …` — JAMAIS dans ce fichier.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 50
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"
+  cpu_kind = "shared"
+  cpus = 2

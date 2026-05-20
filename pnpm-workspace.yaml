@@ -1,3 +1,4 @@
+# esbuild : binaire natif désactivé — JS pur suffit, sécurité par défaut (arbitrage CTO 2026-05-18)
 allowBuilds:
-  esbuild: true
+  esbuild: false
   unrs-resolver: true

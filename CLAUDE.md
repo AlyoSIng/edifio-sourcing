@@ -64,8 +64,12 @@ et les opérations système via deux sub-agents :
   Odoo XML-RPC, Playwright sur container Fly.io EU.
 - **Repo de travail : `AlyoSIng/edifio-sourcing` (greenfield Next.js 14 standalone).**
 - **Auth email + mot de passe durable**, restreinte au domaine `@alyosingenierie.fr` (middleware Next.js). Workflow admin-create + mot de passe provisoire Resend.
-- **ORM Drizzle vs Prisma** : décision REPORTÉE → spike de 2 jours par Alex
-  en début Gate 6. AUCUNE MIGRATION COMMITTÉE AVANT DÉCISION.
+- **ORM = Drizzle** *(décision ACTÉE 2026-05-18 — voir `specs/adr_013_orm_drizzle.md` + `gates/06_ORM/DECISION_ORM_260518.md`)*.
+  Stack ORM : `drizzle-orm@0.39` + `drizzle-kit@0.30` + `postgres@3.4` (Deno-natif Edge Functions).
+  Score pondéré Gate 5 : Drizzle 7,80 / 10 vs Prisma 5,30 / 10 (écart 2,50 points).
+  3 conditions formelles CTO : (1) bench cold start Edge Function réel bloquant pré-Gate 9,
+  (2) re-seed payload Opendatasoft réel 25 KB médiane à la 1re PR module sourcing,
+  (3) conservation branches spike jusqu'au 2026-06-17.
 
 ## Règles globales
 
@@ -109,11 +113,11 @@ et les opérations système via deux sub-agents :
    Flow first-login obligatoire (force changement password). Test E2E qui prouve
    qu'un email hors domaine est rejeté et que le flow admin-create + first-login
    fonctionne.
-5. **`dev`** : spike ORM Drizzle vs Prisma (2 jours). Prototype `tenders`
-   + `architects` + `architect_responses` avec RLS strict + JSON columns
-   + cron Edge Function exécutant scoring sur 100 AO. Critères pondérés :
-   cold start (50 %), DX migrations + types (25 %), compat Supabase + RLS (15 %),
-   maturité (10 %).
+5. **`dev`** : ~~spike ORM Drizzle vs Prisma~~ **TRANCHÉ 2026-05-18 → Drizzle retenu**
+   (cf. `specs/adr_013_orm_drizzle.md`). Place à la **1re PR module sourcing engine** :
+   (a) migration `0000_init.sql` enum `subscription_tier` + colonne `organizations.tier`,
+   (b) schema Drizzle v1 (22+ tables), (c) RLS FORCE 12 policies SQL natif,
+   (d) seed payload Opendatasoft réel 25 KB médiane. Effort ~9-13 jours / 2-2.5 semaines.
 6. **`ps_operator`** : setup container Fly.io EU pour Playwright (déclenché par
    message Supabase Realtime depuis l'orchestrateur).
 7. **`ps_operator`** : configuration GitHub Actions (lint + typecheck + tests + build
@@ -140,7 +144,7 @@ et les opérations système via deux sub-agents :
 - Déployer en production sans validation Gate 9
 - Communiquer avec un service tiers payant non autorisé
 - **Désactiver le middleware de domaine `@alyosingenierie.fr`** (même temporairement)
-- **Committer une migration BDD avant la décision ORM (Drizzle vs Prisma)**
+- **Modifier le schéma BDD sans `drizzle-kit generate` puis revue CTO** *(décision ORM actée 2026-05-18 — toute migration passe désormais par Drizzle ; cf. `specs/adr_013_orm_drizzle.md`)*
 
 ## Commandes utiles
 
@@ -149,10 +153,16 @@ et les opérations système via deux sub-agents :
 git status
 git log --oneline -10
 
-# Tests (à adapter une fois le spike ORM tranché)
+# Drizzle (ORM acté 2026-05-18 — ADR-013)
+pnpm drizzle-kit generate   # Génère une nouvelle migration depuis src/db/schema.ts
+pnpm drizzle-kit migrate    # Applique les migrations en local / CI
+pnpm db:seed                # Seed Opendatasoft réel (25 KB médiane)
+pnpm db:reset               # TRUNCATE + reseed (dev/CI only — JAMAIS sur prod)
+
+# Tests
 pnpm test                # Vitest unit
 pnpm test:e2e            # Playwright E2E
-pnpm test:rls            # pgTAP RLS
+pnpm test:rls            # pgTAP RLS (SQL natif, hors ORM)
 
 # Lancer en local
 pnpm dev                 # Next.js + Supabase local

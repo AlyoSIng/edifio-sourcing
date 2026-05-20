@@ -1,0 +1,43 @@
+{
+  "orm": "drizzle",
+  "version": "0.39.3",
+  "timestamp": "2026-05-16T19:39:43.852Z",
+  "machine": {
+    "platform": "win32-arm64",
+    "os_release": "10.0.26200",
+    "node": "v24.11.1",
+    "total_mem_gb": 15.6
+  },
+  "iterations_config": {
+    "cold_start": 5,
+    "upsert": 5,
+    "migration": 3
+  },
+  "metrics": {
+    "cold_start": {
+      "median_ms": 554.84,
+      "p95_ms": 590.65,
+      "stdev_ms": 26.01,
+      "mean_ms": 554.66,
+      "iterations": [590.65, 573.67, 516.95, 554.84, 537.21]
+    },
+    "upsert_per_tender": {
+      "median_ms": 315.64,
+      "p95_ms": 410.64,
+      "stdev_ms": 45.25,
+      "mean_ms": 324.46,
+      "iterations": [315.64, 298.49, 410.64, 279.54, 317.98]
+    },
+    "upsert_batch_100": {
+      "median_ms": 60.21,
+      "p95_ms": 61.95,
+      "stdev_ms": 2.67,
+      "mean_ms": 59.11,
+      "iterations": [61.45, 55.17, 56.79, 61.95, 60.21]
+    },
+    "migration_replay": {
+      "skipped": true,
+      "reason": "psql introuvable dans le PATH (requis pour DROP SCHEMA)"
+    }
+  }
+}
