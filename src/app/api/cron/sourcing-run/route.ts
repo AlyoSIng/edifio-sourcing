@@ -5,8 +5,8 @@
  *
  * Source de vérité :
  *  - `specs/module_sourcing_engine_v1.md` §3.8 (cron Vercel + auth secret)
- *  - `vercel.json` (schedule `30 6 * * 1-5` UTC = 8h30 Europe/Paris en été
- *    / 7h30 en hiver)
+ *  - `vercel.json` (schedule `30 4 * * 1-5` UTC = 6h30 Europe/Paris en été
+ *    CEST / 5h30 en hiver CET — voir DECISIONS.md 2026-05-20)
  *  - `src/lib/sourcing/orchestrator.ts` (pipeline complet)
  *
  * Méthodes HTTP exposées :
