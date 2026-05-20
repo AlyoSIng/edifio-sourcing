@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { signInWith } from "./helpers/auth";
 import {
   createDurableUser,
   createProvisionalUser,
@@ -100,43 +101,37 @@ test.describe("Auth password — 6 scénarios verbatim spec Board", () => {
   });
 
   /**
-   * S3 — Email hors-domaine : le flow form login ne doit pas ouvrir /sourcing.
+   * S3 — Email hors-domaine : le middleware rejette l'accès à /sourcing.
    *
-   * Complémentaire de C4 (middleware-domain.spec.ts) qui pose la session via
-   * la route gated `/api/test/seed-session` : ici on exerce le **chemin form
-   * login** (Server Action `signInWithPasswordAction` → redirect → middleware).
-   * Depuis ADR-011, la Server Action ne pré-valide plus le domaine côté
-   * serveur — la garde est centralisée dans le middleware Next.js, source
-   * unique de vérité (cf. `specs/middleware_domain_gate.md` §2 C4). On vérifie
-   * donc que même avec des credentials valides côté Supabase, un email hors-
-   * domaine n'atteint pas l'app et atterrit sur /forbidden.
+   * **Refactor 2026-05-20 (clôture oubli ticket Phase 2)** : on aligne S3 sur
+   * le pattern seed-session déjà adopté par C4/C7/C10/C12 le 2026-05-16
+   * (cf. commit `81958dd` + décision CTO Sophie). Avant ce refactor, S3
+   * exerçait le chemin `form submit → Server Action signInWithPasswordAction
+   * → redirect → middleware`, qui souffrait d'une race entre la pose des
+   * cookies par la Server Action et leur effacement immédiat par le
+   * middleware sur user out-of-domain. Le flakiness était irréductible côté
+   * test, même après le ré-application de `propagateAuthCookies` (commit
+   * `695ce41`).
    *
-   * **Spécificité préservée** : on garde le `form submit` (vs un appel direct
-   * à la route seed-session) pour exercer précisément la chaîne UI → Server
-   * Action → redirect → middleware. C'est cette chaîne qui était cassée avant
-   * le refactor helper (cf. DECISIONS.md 2026-05-15) et qui doit rester
-   * couverte par un test dédié.
+   * **Tradeoff assumé** (validé Steve 2026-05-19) : on perd la couverture
+   * `form login` pour le cas out-of-domain. Compensation : S1/S2/S4/S5/S6
+   * couvrent toujours le chemin `form login` pour les emails in-domain, et
+   * la chaîne UI → Server Action → middleware reste exercée de bout en bout
+   * pour le happy path.
    *
-   * Refactor 2026-05-16 : on `waitForURL(/\/forbidden/)` directement après le
-   * submit, sans `waitForLoadState` ni double `goto`. Le `redirect()` posé par
-   * la Server Action déclenche le middleware en aval, qui voit l'email hors-
-   * domaine et redirige vers /forbidden en un seul tour de boucle browser.
+   * **Invariant préservé** : « un email hors-domaine ne peut pas accéder à
+   * `/sourcing/*` ». La session est posée serveur via la route gated
+   * `/api/test/seed-session` (déterministe, pas de race cookies), puis le
+   * `page.goto('/sourcing/ao-du-jour')` déclenche le middleware qui voit
+   * l'email hors-domaine, `signOut` + propage les cookies effacés, et
+   * redirige vers /forbidden — exactement comme en chemin form-login mais
+   * sans la race que Playwright peinait à observer.
    */
-  test("S3 — Email hors-domaine : le flow login UI n'ouvre pas l'accès à /sourcing", async ({
-    page,
-  }) => {
+  test("S3 — Email hors-domaine : le middleware rejette l'accès à /sourcing", async ({ page }) => {
     const email = TEST_EMAILS.scenario3;
-    // createDurableUser passe par auth.admin.createUser qui n'impose pas le
-    // domaine côté Supabase — la garde est applicative (middleware).
-    await createDurableUser({ email, password: STRONG_PASSWORD });
-
-    await page.goto("/login");
-    await page.fill("input#email", email);
-    await page.fill("input#password", STRONG_PASSWORD);
-    await page.click("button[type=submit]");
-
-    await page.waitForURL(/\/forbidden/, { timeout: 10_000 });
-    await expect(page).not.toHaveURL(/\/sourcing\//);
+    await signInWith(page, email);
+    await page.goto("/sourcing/ao-du-jour");
+    await expect(page).toHaveURL(/\/forbidden/);
   });
 
   test("S4 — Mot de passe oublié (ADR-011) → nouveau provisoire → login → force reset → app", async ({
