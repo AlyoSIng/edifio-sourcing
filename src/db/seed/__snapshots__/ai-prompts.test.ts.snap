@@ -1,0 +1,90 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AI_PROMPTS_V1_CATALOG — snapshot (verrou versioning) > snapshot conforme (toute modification = revue CTO + bump version) 1`] = `
+[
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000001",
+    "model": "sonnet-4-6",
+    "name": "rc_analysis_full",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000002",
+    "model": "sonnet-4-6",
+    "name": "memo_technique_generation",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000003",
+    "model": "sonnet-4-6",
+    "name": "cerfa_field_inference",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000004",
+    "model": "haiku-4-5",
+    "name": "tender_scoring_complementary",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000005",
+    "model": "haiku-4-5",
+    "name": "architect_matching_rationale",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000006",
+    "model": "haiku-4-5",
+    "name": "email_subject_solicitation",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000007",
+    "model": "haiku-4-5",
+    "name": "email_subject_followup",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000008",
+    "model": "haiku-4-5",
+    "name": "tender_summary_short",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-000000000009",
+    "model": "haiku-4-5",
+    "name": "decline_motif_categorize",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-00000000000a",
+    "model": "haiku-4-5",
+    "name": "library_piece_match",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-00000000000b",
+    "model": "haiku-4-5",
+    "name": "attestation_expiry_alert_text",
+    "version": 1,
+  },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-00000000000c",
+    "model": "haiku-4-5",
+    "name": "accroche_memo_intro",
+    "version": 1,
+  },
+]
+`;

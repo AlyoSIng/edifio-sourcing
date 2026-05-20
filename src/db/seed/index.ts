@@ -63,6 +63,7 @@ import type {
   TenderEventData,
   TenderRawData,
 } from "../types/jsonb";
+import { AI_PROMPTS_V1_CATALOG } from "./data/ai-prompts";
 import { assertDistribution, recordSizeKb } from "./lib/distribution";
 import { loadBoampFixture } from "./lib/fixture-loader";
 
@@ -97,24 +98,13 @@ const SPECIALTIES = [
 ] as const;
 
 // --- Prompts IA (table de reference) ---------------------------------------
-const AI_PROMPTS = [
-  {
-    id: "bbbbbbbb-0000-0000-0000-000000000001",
-    name: "tender_score_full",
-    version: 1,
-    model: "sonnet-4-6",
-    systemPrompt: "Analyse un AO et calcule un score 0-100 selon le profil.",
-    userPromptTemplate: "Profil: {{profile}}\nAO: {{tender}}",
-  },
-  {
-    id: "bbbbbbbb-0000-0000-0000-000000000002",
-    name: "architect_match",
-    version: 1,
-    model: "sonnet-4-6",
-    systemPrompt: "Propose les meilleurs architectes pour un AO en cotraitance.",
-    userPromptTemplate: "AO: {{tender}}\nArchis: {{architects}}",
-  },
-] as const;
+// Source : `src/db/seed/data/ai-prompts.ts` -- catalogue v1 figé (12 prompts
+// P1-P12 alignés `specs/ai_prompts_v1.md`). Etape 6/7 PR #2.
+// La structure precedente (2 prompts stub `tender_score_full` +
+// `architect_match`) a ete REMPLACEE le 2026-05-20 -- toutes les sections
+// suivantes du seed (notamment ai_runs section 9) referencent desormais le
+// premier prompt du catalogue v1 (`rc_analysis_full`).
+const AI_PROMPTS = AI_PROMPTS_V1_CATALOG;
 
 // ============================================================================
 // SECTION 1 -- Buildeurs (logique pure, possibles a sortir si besoin de test)
@@ -569,21 +559,10 @@ export async function runSeed(): Promise<SeedReport> {
     .values([...SPECIALTIES])
     .onConflictDoNothing();
 
-  // --- 3. Prompts IA -------------------------------------------------------
-  await db
-    .insert(aiPrompts)
-    .values(
-      AI_PROMPTS.map((p) => ({
-        id: p.id,
-        name: p.name,
-        version: p.version,
-        model: p.model as "sonnet-4-6" | "haiku-4-5",
-        systemPrompt: p.systemPrompt,
-        userPromptTemplate: p.userPromptTemplate,
-        active: true,
-      })),
-    )
-    .onConflictDoNothing();
+  // --- 3. Prompts IA (12 prompts P1-P12, cf. ai_prompts_v1.md) ------------
+  // Idempotent : `onConflictDoNothing()` sur la contrainte UNIQUE (name,
+  // version) -- relancer le seed ne reduplique pas (CI re-seed safe).
+  await db.insert(aiPrompts).values(AI_PROMPTS).onConflictDoNothing();
 
   // --- 4. Users + memberships ---------------------------------------------
   // Typage strict (vs Record<string, number> qui declenche noUncheckedIndexedAccess).
@@ -760,9 +739,16 @@ export async function runSeed(): Promise<SeedReport> {
   }
 
   // --- 9. AI runs (10 par org) -------------------------------------------
+  // Reference le 1er prompt du catalogue v1 (P1 rc_analysis_full / sonnet-4-6).
+  // Le typage `AiPromptSeed.id` est `string | undefined` (default UUID cote
+  // DB), mais notre catalogue garantit un UUID explicite -- narrow ici.
+  const firstPrompt = AI_PROMPTS[0];
+  if (!firstPrompt || !firstPrompt.id || !firstPrompt.name) {
+    throw new Error("[seed] catalogue AI_PROMPTS vide ou premier prompt sans id/name");
+  }
   for (const org of orgConfig) {
     const aiBatch = Array.from({ length: 10 }, (_, i) =>
-      buildAiRun(org.id, AI_PROMPTS[0]!.id, AI_PROMPTS[0]!.name, i),
+      buildAiRun(org.id, firstPrompt.id!, firstPrompt.name, i),
     );
     await db.insert(aiRuns).values(aiBatch);
     counts.ai_runs += aiBatch.length;

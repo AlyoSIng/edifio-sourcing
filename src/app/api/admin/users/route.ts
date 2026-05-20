@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { insertAuditLog } from "@/lib/audit/insert";
+import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
 import { computeProvisionalExpiresAt } from "@/lib/auth/password";
@@ -140,20 +140,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ---------- 5. Audit log ----------
     // GARDE-FOU SÉCURITÉ (Board Q1/B 2026-05-12) : ne JAMAIS inclure le
-    // password provisoire dans le payload audit. Cf. invariant 3 de
-    // `src/lib/audit/insert.ts` et `password-server.ts`.
-    await insertAuditLog({
-      req,
+    // password provisoire dans le payload audit. Cf. JSDoc en-tête de
+    // `src/lib/audit/index.ts` et `password-server.ts`.
+    await audit({
       action: "membership_change",
-      actor: callerProfile,
-      subject: { type: "user", id: created.user.id },
       data: {
         target_user_id: created.user.id,
         target_email: email,
-        from_role: undefined,
         to_role: role,
         operation: "invite",
       },
+      subjectType: "user",
+      subjectId: created.user.id,
+      request: req,
     });
 
     return NextResponse.json(

@@ -1,0 +1,76 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`BoampApiRecord — fixture boamp-real.json > snapshot de la shape d'un record large 1`] = `
+{
+  "codecpv_principal": "string",
+  "codecpv_secondaire": "array<string>",
+  "contact_email": "string",
+  "contact_nom": "string",
+  "contact_telephone": "string",
+  "criteres_attribution": "array<string>",
+  "datelimitereponse": "string",
+  "dateparution": "string",
+  "departement": "string",
+  "descripteur": "string",
+  "description_marche": "string",
+  "famille_supports": "string",
+  "idweb": "string",
+  "montant_estime": "number",
+  "nomacheteur": "string",
+  "objet": "string",
+  "procedure": "string",
+  "region": "string",
+  "type_marche": "string",
+  "url_dce": "string",
+}
+`;
+
+exports[`BoampApiRecord — fixture boamp-real.json > snapshot de la shape d'un record medium 1`] = `
+{
+  "codecpv_principal": "string",
+  "codecpv_secondaire": "array<string>",
+  "contact_email": "string",
+  "contact_nom": "string",
+  "contact_telephone": "string",
+  "criteres_attribution": "array<string>",
+  "datelimitereponse": "string",
+  "dateparution": "string",
+  "departement": "string",
+  "descripteur": "string",
+  "description_marche": "string",
+  "famille_supports": "string",
+  "idweb": "string",
+  "montant_estime": "number",
+  "nomacheteur": "string",
+  "objet": "string",
+  "procedure": "string",
+  "region": "string",
+  "type_marche": "string",
+  "url_dce": "string",
+}
+`;
+
+exports[`BoampApiRecord — fixture boamp-real.json > snapshot de la shape d'un record small (clefs + types primitifs) 1`] = `
+{
+  "codecpv_principal": "string",
+  "codecpv_secondaire": "array<empty>",
+  "contact_email": "string",
+  "contact_nom": "string",
+  "contact_telephone": "string",
+  "criteres_attribution": "array<string>",
+  "datelimitereponse": "string",
+  "dateparution": "string",
+  "departement": "string",
+  "descripteur": "string",
+  "description_marche": "string",
+  "famille_supports": "string",
+  "idweb": "string",
+  "montant_estime": "number",
+  "nomacheteur": "string",
+  "objet": "string",
+  "procedure": "string",
+  "region": "string",
+  "type_marche": "string",
+  "url_dce": "string",
+}
+`;

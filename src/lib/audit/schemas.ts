@@ -1,0 +1,279 @@
+/**
+ * Schémas Zod par action — helper audit log edifio Sourcing.
+ *
+ * Source de vérité : `specs/audit_log_v1.md` §A1-A13 (payloads détaillés).
+ *
+ * Pourquoi un fichier dédié ?
+ *  - Séparation responsabilités : ce fichier ne dépend QUE de Zod, donc
+ *    testable hors contexte Supabase / Drizzle (cf. `schemas.test.ts`).
+ *  - Le helper `audit()` (cf. `./index.ts`) consomme la map `AUDIT_SCHEMAS`
+ *    pour valider le payload avant INSERT — typing via discriminated lookup.
+ *
+ * Périmètre PR #2 :
+ *  - **A4 `tender_select`** est implémenté en strict — c'est l'action
+ *    déclenchée par la prochaine PR (sélection AO dans « AO du jour »).
+ *  - Les **12 autres actions** sont déclarées en placeholder
+ *    `z.object({}).passthrough()` pour exposer dès maintenant la surface
+ *    générique du helper (`audit<'membership_change'>({...})` typo-check à
+ *    la compilation). Les schémas stricts arrivent dans les PR qui
+ *    déclenchent l'action correspondante.
+ *
+ * Toute action ajoutée ici DOIT :
+ *  1. exister dans l'enum Postgres `audit_action` (cf. `enums.ts`)
+ *  2. être documentée dans `specs/audit_log_v1.md`
+ *  3. avoir un test positif + négatif dans `schemas.test.ts` quand implémentée
+ *    en strict (placeholder = 1 test smoke uniquement).
+ */
+
+import { z } from "zod";
+
+// ============================================================================
+// 1. Union literal des 13 actions — aligné enum Postgres `audit_action`
+// ============================================================================
+
+/**
+ * Liste fermée des 13 actions sensibles tracées en audit log.
+ *
+ * IMPORTANT : tout ajout ici nécessite :
+ *  - bump du payload spec `audit_log_v1.md`
+ *  - ALTER TYPE audit_action ADD VALUE ... dans une nouvelle migration
+ *  - ajout du schéma Zod ci-dessous (placeholder ou strict)
+ */
+export const AUDIT_ACTIONS = [
+  "login",
+  "membership_change",
+  "search_profile_change",
+  "tender_select",
+  "architect_solicit",
+  "dossier_diffuse",
+  "ai_run",
+  "odoo_opportunity_create",
+  "architect_change",
+  "rgpd_export",
+  "token_revoke",
+  "data_delete",
+  "access_attempt",
+] as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+// ============================================================================
+// 2. Schémas Zod — A4 strict, les 12 autres en placeholder
+// ============================================================================
+
+/**
+ * Placeholder réutilisable pour les actions pas encore implémentées en strict.
+ *
+ * `passthrough()` autorise n'importe quel champ — on conserve donc la donnée
+ * brute sans la rejeter. Le test smoke (`schemas.test.ts`) vérifie juste que
+ * le placeholder accepte un objet vide ET un objet avec champs arbitraires.
+ *
+ * TODO(PR ultérieures) : remplacer chaque placeholder par le schéma strict
+ * quand la PR qui déclenche l'action est mergée. Cf. JSDoc en-tête.
+ */
+const placeholder = z.object({}).passthrough();
+
+/**
+ * A1 — `login` (placeholder)
+ *
+ * Spec : `{ method, success, session_id? }`.
+ * Déclenchée par la PR auth callback Supabase (déjà mergée mais l'audit
+ * n'a pas encore été branché côté `auth/callback/route.ts`).
+ *
+ * TODO: implémenter à la PR qui branche audit sur le callback Supabase Auth.
+ */
+const loginSchema = placeholder;
+
+/**
+ * A2 — `membership_change` (STRICT — implémenté par la PR auth-password-pivot).
+ *
+ * Couvre 4 sous-cas d'`operation` :
+ *  - `invite` : admin crée un nouveau collaborateur AlyoS via `POST /api/admin/users`.
+ *    `from_role` omis (le user n'existe pas avant), `to_role` = rôle assigné.
+ *  - `update` : admin modifie le rôle d'un user existant (interface admin Gate 7).
+ *    `from_role` ≠ `to_role`.
+ *  - `revoke` : admin retire un user (interface admin Gate 7+).
+ *    `to_role` omis (perte de membership).
+ *  - `regenerate_provisional` : bouton « Renvoyer » admin sur un user existant
+ *    via `POST /api/admin/users/[id]/regenerate-password`. Convention validée
+ *    CTO Sophie 2026-05-20 (cf. `handoff/ANSWER_260520_1810_*.md`) :
+ *    `from_role === to_role` (pas de changement de rôle, juste rotation du
+ *    credential provisoire). Le password régénéré n'est **JAMAIS** loggué
+ *    (invariant `src/lib/auth/password-server.ts`).
+ *
+ * Contraintes :
+ *  - `target_user_id` : UUID shape (regex inline `8-4-4-4-12` hex —
+ *    permissif v4-strict vs déterministes de test, cf. `UUID_SHAPE`
+ *    plus bas réutilisé par A4).
+ *  - `target_email` : email simple (regex non-RFC, suffisant pour audit).
+ *  - `from_role` / `to_role` : optionnels selon l'opération, enum
+ *    `admin | user | viewer` aligné sur `membership_role` Postgres.
+ *  - `operation` : enum strict 4 valeurs.
+ */
+const membershipChangeSchema = z.object({
+  target_user_id: z
+    .string()
+    .regex(
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+      "target_user_id doit être un UUID",
+    ),
+  target_email: z
+    .string()
+    .min(3)
+    .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "email invalide"),
+  from_role: z.enum(["admin", "user", "viewer"]).optional(),
+  to_role: z.enum(["admin", "user", "viewer"]).optional(),
+  operation: z.enum(["invite", "update", "revoke", "regenerate_provisional"]),
+});
+
+/**
+ * A3 — `search_profile_change` (placeholder)
+ * TODO: implémenter à la PR CRUD profils de recherche.
+ */
+const searchProfileChangeSchema = placeholder;
+
+/**
+ * A4 — `tender_select` (STRICT — implémenté PR #2).
+ *
+ * Déclenchée quand un utilisateur sélectionne un AO dans « AO du jour »
+ * (mode solo ou tandem). C'est la première action audit live du module
+ * sourcing.
+ *
+ * Contraintes :
+ *  - `tender_id` : UUID v4 valide (FK logique vers `tenders.id`)
+ *  - `tender_ref` : non vide (externalRef BOAMP, ex. `25-AO-00142`)
+ *  - `mode` : enum strict `solo | tandem` (cf. enum Postgres `selection_mode`)
+ *  - `score` : entier 0-100 (contrainte CHECK BDD côté `tenders.score`)
+ */
+/**
+ * Regex UUID « shape-only » (8-4-4-4-12 hex), volontairement plus permissive
+ * que `z.string().uuid()` de Zod 4 qui exige variante RFC 4122 stricte
+ * (`[1-8]` version + `[89abAB]` variant). Les UUIDs côté Postgres sont
+ * générés par `uuid_generate_v4()` (v4 strict) mais nous voulons accepter
+ * aussi les UUIDs de test/déterministes (ex. `11111111-...`) sans rendre
+ * la validation Zod inutilisable.
+ *
+ * Source v4 stricte rejetée volontairement : on n'a aucune valeur ajoutée
+ * à imposer la variante côté audit (la BDD le fait déjà via la colonne
+ * `uuid` typée Postgres).
+ */
+const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+const tenderSelectSchema = z.object({
+  tender_id: z.string().regex(UUID_SHAPE, { message: "tender_id doit être un UUID" }),
+  tender_ref: z.string().min(1, { message: "tender_ref ne peut pas être vide" }),
+  mode: z.enum(["solo", "tandem"]),
+  score: z.number().int().min(0).max(100),
+});
+
+/**
+ * A5 — `architect_solicit` (placeholder)
+ * TODO: implémenter à la PR sollicitation architectes (workflow Tandem).
+ */
+const architectSolicitSchema = placeholder;
+
+/**
+ * A6 — `dossier_diffuse` (placeholder)
+ * TODO: implémenter à la PR diffusion dossier acheteur public.
+ */
+const dossierDiffuseSchema = placeholder;
+
+/**
+ * A7 — `ai_run` (placeholder)
+ * TODO: implémenter à la PR scoring IA Haiku (PR #7).
+ */
+const aiRunSchema = placeholder;
+
+/**
+ * A8 — `odoo_opportunity_create` (placeholder)
+ * TODO: implémenter à la PR sync Odoo XML-RPC.
+ */
+const odooOpportunityCreateSchema = placeholder;
+
+/**
+ * A9 — `architect_change` (placeholder)
+ * TODO: implémenter à la PR CRUD architectes + import bulk.
+ */
+const architectChangeSchema = placeholder;
+
+/**
+ * A10 — `rgpd_export` (placeholder)
+ * TODO: implémenter à la PR RGPD export.
+ */
+const rgpdExportSchema = placeholder;
+
+/**
+ * A11 — `token_revoke` (placeholder)
+ * TODO: implémenter à la PR tokens architectes (page tokenisée).
+ */
+const tokenRevokeSchema = placeholder;
+
+/**
+ * A12 — `data_delete` (placeholder)
+ * TODO: implémenter à la PR RGPD droit à l'oubli.
+ */
+const dataDeleteSchema = placeholder;
+
+/**
+ * A13 — `access_attempt` (placeholder)
+ *
+ * NB : déjà émis par le middleware `middleware.ts` côté allowed=false. Le
+ * branchement audit a été reporté à une PR dédiée car le middleware tourne
+ * en Edge Runtime (pas d'accès au client Supabase service_role en l'état) —
+ * cf. note de suivi `CC_260514_AUDIT_ACCESS_ATTEMPT.md`.
+ *
+ * TODO: implémenter à la PR audit Edge Runtime.
+ */
+const accessAttemptSchema = placeholder;
+
+// ============================================================================
+// 3. Map action → schéma Zod
+// ============================================================================
+
+/**
+ * Lookup central utilisé par le helper `audit()` pour valider le payload
+ * avant INSERT. Type fortement contraint : chaque clef est une `AuditAction`
+ * et la valeur est un `ZodSchema` (pas de `any`).
+ *
+ * Ne pas exporter l'objet en `as const` strict pour conserver le typage
+ * `ZodTypeAny` côté Zod (sinon le `parse()` retourne `never`).
+ */
+export const AUDIT_SCHEMAS = {
+  login: loginSchema,
+  membership_change: membershipChangeSchema,
+  search_profile_change: searchProfileChangeSchema,
+  tender_select: tenderSelectSchema,
+  architect_solicit: architectSolicitSchema,
+  dossier_diffuse: dossierDiffuseSchema,
+  ai_run: aiRunSchema,
+  odoo_opportunity_create: odooOpportunityCreateSchema,
+  architect_change: architectChangeSchema,
+  rgpd_export: rgpdExportSchema,
+  token_revoke: tokenRevokeSchema,
+  data_delete: dataDeleteSchema,
+  access_attempt: accessAttemptSchema,
+} as const satisfies Record<AuditAction, z.ZodTypeAny>;
+
+// ============================================================================
+// 4. Type-level helpers : data attendue par action
+// ============================================================================
+
+/**
+ * Type de la `data` validée pour une action donnée.
+ *
+ * Permet `audit<'tender_select'>({ action: 'tender_select', data: { ... } })`
+ * où `data` est strictement contraint au schéma A4 (autocomplétion + erreur
+ * de compilation si champ manquant / mauvais type).
+ *
+ * Pour les placeholders, le type résout vers `Record<string, unknown>` (forme
+ * passthrough de Zod), ce qui est volontaire : on n'impose pas encore de
+ * structure aux 12 actions non-implémentées.
+ */
+export type AuditLogDataFor<A extends AuditAction> = z.infer<(typeof AUDIT_SCHEMAS)[A]>;
+
+/**
+ * Re-export des schémas individuels pour les tests + les call-sites stricts.
+ * Le call-site `audit({ action: 'tender_select', data: ... })` n'a PAS besoin
+ * d'importer le schéma : la validation est interne au helper.
+ */
+export { tenderSelectSchema };

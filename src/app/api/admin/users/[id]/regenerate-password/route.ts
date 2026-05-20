@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { insertAuditLog } from "@/lib/audit/insert";
+import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
 import { computeProvisionalExpiresAt } from "@/lib/auth/password";
@@ -145,11 +145,8 @@ export async function POST(
     // `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`).
     // GARDE-FOU : on ne logge JAMAIS le password en clair.
     const currentRole = (currentMeta.role ?? "user") as "admin" | "user" | "viewer";
-    await insertAuditLog({
-      req,
+    await audit({
       action: "membership_change",
-      actor: callerProfile,
-      subject: { type: "user", id: targetId },
       data: {
         target_user_id: targetId,
         target_email: targetEmail,
@@ -157,6 +154,9 @@ export async function POST(
         to_role: currentRole,
         operation: "regenerate_provisional",
       },
+      subjectType: "user",
+      subjectId: targetId,
+      request: req,
     });
 
     return NextResponse.json(
