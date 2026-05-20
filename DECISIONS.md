@@ -652,6 +652,14 @@
 - **2026-05-20 · DEV Alex · Statut validation locale.** [VALIDATION]
   *`pnpm tsc --noEmit` vert, `pnpm test src/lib/audit src/lib/sourcing` vert (incl. 2 nouveaux cas CTO-2), `pnpm test:rls` vert (07 ajouté), `pnpm db:dry-run` vert, `pnpm prettier --check` + `pnpm lint` verts sur fichiers modifiés. Pas de commit/push côté Alex — Yann (ps_operator) reprend la main pour `git add` + Conventional Commit `test(rls): preuve preservation status post-sourcing` + `feat(audit): structured error reporting + TODO Sentry` + `docs(decisions): trace CTO-1/CTO-2/CTO-3 PR #2`.*
 
+### Cleanup Vercel — alias production `edifio-platform.vercel.app` retiré
+
+- **2026-05-20 · PS_OPERATOR Yann · Cleanup vestige Vercel post-pivot 2026-05-10.** [LIVRABLE — exécuté dashboard]
+  *Suite au pivot `edifio-platform` → `edifio-sourcing` (2026-05-10), le projet Vercel avait été renommé `edifio-sourcing` (repo connecté `AlyoSIng/edifio-sourcing`, production branch `main`) mais l'alias production était resté `edifio-platform.vercel.app` (vestige de l'ancien nom de marque). Steve a exécuté la séquence safe A→B→C→D dans le dashboard Vercel : (A) ajout alias `edifio-sourcing.vercel.app`, (B) promotion `edifio-sourcing.vercel.app` en domaine production, (C) suppression alias `edifio-platform.vercel.app`, (D) vérification env vars Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) toujours en place. État après : URL production stable `https://edifio-sourcing.vercel.app`, aucune interruption prod (add → promote → remove), env vars Supabase intactes.*
+
+- **2026-05-20 · BOARD · Custom domain reporté en Gate 7.** [REPORTÉ]
+  *Arbitrage Board à venir entre `sourcing.alyosingenierie.fr` et `app.alyosingenierie.fr/sourcing` (cf. CLAUDE.md « Déploiement Vercel »). Non bloquant : URL `edifio-sourcing.vercel.app` suffit pour les tests internes AlyoS jusqu'à Gate 7.*
+
 ---
 
-*Dernière mise à jour : 2026-05-20 par [DEV Alex] — CTO-1 (pgTAP 07) + CTO-2 (structured audit error reporting) livrés ; CTO-3 NO_OP tracé.*
+*Dernière mise à jour : 2026-05-20 par [PS_OPERATOR Yann] — Cleanup Vercel exécuté (alias `edifio-platform.vercel.app` retiré, URL prod stable `edifio-sourcing.vercel.app`) ; custom domain reporté Gate 7.*
