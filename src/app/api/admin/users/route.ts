@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { insertAuditLog } from "@/lib/audit/insert";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
 import { computeProvisionalExpiresAt } from "@/lib/auth/password";
@@ -137,18 +138,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // ---------- 5. Audit log (stub) ----------
-    // TODO post-ORM : INSERT INTO audit_logs (action='user_invited', ...)
+    // ---------- 5. Audit log ----------
     // GARDE-FOU SÉCURITÉ (Board Q1/B 2026-05-12) : ne JAMAIS inclure le
-    // password provisoire dans l'audit log. Le champ `provisional` reste
-    // côté Resend uniquement. Voir l'invariante documentée dans
-    // `src/lib/auth/password-server.ts`.
-    console.warn("[audit_log:user_invited]", {
-      actor_id: callerProfile.id,
-      actor_email: callerProfile.email,
-      target_user_id: created.user.id,
-      target_email: email,
-      role,
+    // password provisoire dans le payload audit. Cf. invariant 3 de
+    // `src/lib/audit/insert.ts` et `password-server.ts`.
+    await insertAuditLog({
+      req,
+      action: "membership_change",
+      actor: callerProfile,
+      subject: { type: "user", id: created.user.id },
+      data: {
+        target_user_id: created.user.id,
+        target_email: email,
+        from_role: undefined,
+        to_role: role,
+        operation: "invite",
+      },
     });
 
     return NextResponse.json(

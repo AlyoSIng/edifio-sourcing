@@ -644,4 +644,24 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-20 par [DEV Alex] — Merge `feat/sourcing-mvp` → `feat/auth-password-pivot` résolu, validation locale verte, prêt pour commit de merge.*
+---
+
+## 2026-05-20 — Audit log post-ORM : stubs admin/users branchés sur Drizzle
+
+- **2026-05-20 · DEV Alex · Helper `insertAuditLog` créé + 2 routes admin branchées sur `audit_logs` Drizzle.** [LIVRABLE]
+  *Le merge `feat/sourcing-mvp` → `feat/auth-password-pivot` a rendu Drizzle + table `audit_logs` disponibles. Les 2 stubs `console.warn("[audit_log:user_invited]")` et `console.warn("[audit_log:user_provisional_regenerated]")` (cf. TODO post-ORM dans `src/app/api/admin/users/route.ts:146` et `[id]/regenerate-password/route.ts:148`) deviennent de vrais INSERT immutables, traçables sur 5 ans (rétention Gate 5).*
+  *3 fichiers livrés : (a) `src/lib/audit/insert.ts` — helper avec 4 invariants documentés (audit ≠ correctness, snapshot acteur, pas de secret en payload, org via memberships). Catch-no-throw : un échec d'INSERT log un `console.error` mais ne casse jamais la business logic (création user, regen, sollicitation, etc.). (b) `tests/unit/lib/audit/insert.test.ts` — 5 tests vitest couvrant le happy path, l'extraction IP/UA, le skip no-membership, le catch-no-throw, le subject optionnel. Mocks `vi.mock` sur `@/db/client`, `@/db/schema`, `drizzle-orm`. (c) Les 2 routes admin appellent désormais `insertAuditLog({...})` avec mapping sémantique cohérent (cf. décision ci-dessous).*
+  *Validation locale verte : `tsc --noEmit` = 0 erreur, `next lint` = 0 warning, `vitest run` = **211 tests / 14 fichiers PASS** (+5 nouveaux tests, +1 nouveau fichier vs `54bf7df`).*
+
+- **2026-05-20 · DEV Alex · Mapping `user_invited` → A2 `membership_change` `operation: "invite"`.** [DÉCISION DEV]
+  *L'action « invitation user » s'inscrit dans le lifecycle d'un membership — A2 (`membership_change`) couvre déjà ce cas par design (`operation` ∈ `invite | update | revoke` dans `audit_log_v1.md:60` + `AuditLogDataMembershipChange` dans `jsonb.ts:231`). Aucun amendement spec/enum nécessaire. INSERT branché direct.*
+
+- **2026-05-20 · DEV Alex · Extension `operation` A2 → `regenerate_provisional` (option B).** [AMENDEMENT SPEC — VALIDATION CTO ATTENDUE]
+  *L'action « regen mot de passe provisoire » (`POST /api/admin/users/[id]/regenerate-password`, bouton « Renvoyer » Board Q1/A.3 2026-05-12) ne map sur **aucune** des 13 actions Gate 5. 3 options identifiées dans `handoff/REQUEST_260520_1700_ETENDRE_A2_OPERATION_REGEN.md` : (A) garder `console.warn` conservatif, (B) étendre `operation` A2 (membership lifecycle), (C) nouvel enum value + ADR-014. **Option B retenue** (validation Steve 2026-05-20) — l'extension est sémantiquement cohérente avec A2 (admin reprovisionne l'accès d'un user existant, `from_role === to_role`), n'exige pas de migration BDD (le pgEnum `audit_action` reste à 13 valeurs), trace minimale (`jsonb.ts:236` + 1 paragraphe `audit_log_v1.md`). Validation CTO Sophie attendue — handoff dédié posté.*
+
+- **2026-05-20 · DEV Alex · TODO suivant (hors scope ce commit).** [PROCHAINE ÉTAPE]
+  *Les autres `console.warn("[audit_log:...]")` du code (s'il en reste après ce passage) sont à brancher via le même `insertAuditLog` au fil des PR à venir : login (A1), `dossier_diffuse` (A6), `architect_solicit` (A5), `tender_select` (A4), `architect_change` (A9), etc. Le helper est conçu pour être réutilisé sans modification — chaque action branche son payload typé via la discriminée `AuditLogData`.*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [DEV Alex] — Helper `insertAuditLog` + 2 stubs admin/users branchés sur Drizzle. Handoff CTO Sophie posté pour validation option B (extension A2.operation).*

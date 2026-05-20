@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { insertAuditLog } from "@/lib/audit/insert";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
 import { computeProvisionalExpiresAt } from "@/lib/auth/password";
@@ -40,10 +41,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
-  // Note : `req` n'est pas lu (pas de body) — on conserve la signature
-  // Next.js route handler standard pour homogénéité.
-  void req;
-
   try {
     // ---------- 1. Vérification admin ----------
     const supabase = createSupabaseServerClient();
@@ -142,14 +139,24 @@ export async function POST(
       );
     }
 
-    // ---------- 5. Audit log (stub) ----------
-    // TODO post-ORM : INSERT INTO audit_logs (action='user_provisional_regenerated', ...)
-    // Comme pour user_invited : on ne logge JAMAIS le password en clair.
-    console.warn("[audit_log:user_provisional_regenerated]", {
-      actor_id: callerProfile.id,
-      actor_email: callerProfile.email,
-      target_user_id: targetId,
-      target_email: targetEmail,
+    // ---------- 5. Audit log ----------
+    // Action mappée sur A2 `membership_change` avec `operation: "regenerate_provisional"`
+    // (amendement spec 2026-05-20 — cf. handoff
+    // `REQUEST_260520_1700_ETENDRE_A2_OPERATION_REGEN.md` en attente CTO).
+    // GARDE-FOU : on ne logge JAMAIS le password en clair.
+    const currentRole = (currentMeta.role ?? "user") as "admin" | "user" | "viewer";
+    await insertAuditLog({
+      req,
+      action: "membership_change",
+      actor: callerProfile,
+      subject: { type: "user", id: targetId },
+      data: {
+        target_user_id: targetId,
+        target_email: targetEmail,
+        from_role: currentRole,
+        to_role: currentRole,
+        operation: "regenerate_provisional",
+      },
     });
 
     return NextResponse.json(
