@@ -203,7 +203,12 @@ CREATE TABLE tenders (
 );
 
 CREATE INDEX idx_tenders_org_status ON tenders(organization_id, status);
-CREATE INDEX idx_tenders_deadline ON tenders(deadline) WHERE deadline > now();
+-- FIX 2026-05-18 : retrait du prédicat WHERE deadline > now() (bug 42P17)
+-- Postgres exige des fonctions IMMUTABLE dans les prédicats d'index partiels ;
+-- now() est STABLE. Solution : index full sur deadline (queries filtrent au runtime
+-- via la clause WHERE applicative). Cf. DECISIONS.md batch n°12 (post-mortem CTO) +
+-- commit Alex 6f4a10f sur feat/sourcing-mvp.
+CREATE INDEX idx_tenders_deadline ON tenders(deadline);
 CREATE INDEX idx_tenders_title_trgm ON tenders USING gin(title gin_trgm_ops);
 CREATE INDEX idx_tenders_score ON tenders(organization_id, score DESC) WHERE status = 'sourced';
 
@@ -548,11 +553,7 @@ CREATE POLICY tenant_isolation ON learning_events
   USING (organization_id = current_organization_id());
 
 -- Insertion : admin OU user
--- AS RESTRICTIVE : sans ce qualificatif, le check est OR'd avec la policy
--- PERMISSIVE tenant_isolation FOR ALL (qui couvre l'INSERT par defaut),
--- ce qui laisse un viewer inserer dans sa propre org. RESTRICTIVE force le AND.
--- Cf. DECISIONS.md 2026-05-19 (post-mortem 6e derive Postgres consecutive).
-CREATE POLICY insert_by_member ON architects AS RESTRICTIVE FOR INSERT
+CREATE POLICY insert_by_member ON architects FOR INSERT
   WITH CHECK (organization_id = current_organization_id() AND current_user_role() IN ('admin','user'));
 -- (À répliquer sur tables où insert nécessite membre actif. Volontairement laissé minimal — Alex complétera selon contraintes métier.)
 
