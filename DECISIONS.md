@@ -658,3 +658,29 @@
 ---
 
 *Dernière mise à jour : 2026-05-18 par [CEO Marc] — Merges PR #7/#14/#16, clôture PR #15 (superédée ADR-011), INC recovery résolu, jalon main documenté.*
+
+---
+
+## 2026-05-20 — PR #3 scoring V1 + cron Vercel *(branche `feat/sourcing-scoring-cron`)*
+
+- **2026-05-20 · G6 · Board + Alex · Scoring V1 = règles pures (sans IA Haiku), barème spec §3.6 intact.** [BOARD-OK 2026-05-20]
+  *Barème additif : base 50 + 20 (exact match `keywords.exact`) + 10 par positif matché (cumulable) + 15 (CPV exact, pas préfixe) → clamp [0, 100]. Choix V1 = règles seules, déterministes, explicables. Le scoring complémentaire Haiku 4.5 décrit en spec §3.6 (`score_final = (rules + ai) / 2`) est reporté à une PR dédiée (dépend des prompts versionnés `ai_prompt_versions` + branche audit `ai_run`).*
+
+- **2026-05-20 · G6 · Board + Alex · Pas de seuil d'insertion sur le score en PR #3 (insert exhaustif).** [BOARD-OK 2026-05-20]
+  *Tout AO qui passe `filter.matchesProfile` est inséré, peu importe le score (un AO base 50 sans bonus reste inséré). Traçabilité totale en BDD. Seuil de notification user (≥ 60 envisagé) sera traité dans la PR push notifications Realtime — il s'agit d'un filtre UI/notif, pas d'un filtre persistance.*
+
+- **2026-05-20 · G6 · Board + Alex · Cron Vercel = `30 4 * * 1-5` UTC = 6h30 Europe/Paris (CEST été) / 5h30 (CET hiver).** [BOARD-OK 2026-05-20]
+  *Vercel cron tourne en UTC. Choix d'aligner sur l'heure d'été (mai-octobre) car période active courante (2026-05-20). En hiver, le cron tournera à 5h30 Paris — toujours avant l'arrivée de l'équipe. À ré-ajuster si l'usage glisse vers un besoin temps réel (cf. backlog Phase 2 : cron multiples par profil selon `search_profiles.cron_time`).*
+
+- **2026-05-20 · G6 · Alex · Dédup intra-batch + hash composite SHA-256 sur `(buyer_norm | title_norm[:100] | deadline_jour_UTC)`.** [TECHNIQUE]
+  *Implémente spec §3.4. Politique : première occurrence rencontrée gagne (stable, ordre préservé). Cross-plateforme effectif quand PR scrapers PLACE/FM/MP livreront leur batch en parallèle. En PR #3 (BOAMP seul) la dédup retire les doublons internes BOAMP (cas rare mais possible).*
+
+- **2026-05-20 · G6 · Alex · Périmètre PR #3 *(rappel hors scope)*.**
+  *Inclus : BOAMP (API ouverte) + normalize + dedup + filter §3.5 + scoring V1 §3.6 + insert idempotent + cron `30 4 * * 1-5` UTC + `CRON_SECRET` Bearer auth + route `POST /api/cron/sourcing-run`. **Exclus** (PRs futures) : connecteurs PLACE/Francmarchés/MP.info via container Fly.io, scoring IA Haiku, push notifications Realtime, branche audit log `cron_run` (l'enum `audit_action` ne contient pas encore cette valeur — trace métier via `console.log` structuré Vercel logs en V1).*
+
+- **2026-05-20 · G6 · Alex · Tests PR #3 : 61 tests Vitest (filter 15 / dedup 17 / scoring 14 / orchestrator 8 / route 7).** [LIVRABLE]
+  *Total suite globale : 396/396 verts. TS strict OK, ESLint OK, `next build` env-clean OK (route `/api/cron/sourcing-run` reconnue dynamique). Aucun test E2E Playwright en PR #3 — le scénario S1.1 de `plan_recette_gate7_v1.md` (cron sourcing → 7 AO retenus) restera à câbler quand l'env Supabase test sera disponible (Gate 7).*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — PR #3 scoring V1 + cron Vercel livrée sur branche `feat/sourcing-scoring-cron` (61 tests verts, 396/396 suite globale).*
