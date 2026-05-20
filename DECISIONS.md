@@ -664,4 +664,16 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-20 par [DEV Alex] — Helper `insertAuditLog` + 2 stubs admin/users branchés sur Drizzle. Handoff CTO Sophie posté pour validation option B (extension A2.operation).*
+---
+
+## 2026-05-20 — Fix CI build : lazy init du client Drizzle (régression `6f19c1d`)
+
+- **2026-05-20 · DEV Alex · Refactor `src/db/client.ts` en lazy init via Proxy.** [FIX CI + RÉGRESSION POST-MORTEM]
+  *Le commit `6f19c1d` (audit log post-ORM) a cassé `ci-build` + `ci-e2e` sur le run `26172408907` avec `Failed to collect page data for /api/admin/users` → `Error: DATABASE_URL is not set`. **Cause racine** : avant ce commit, les 2 routes admin user lifecycle ne tiraient AUCUN code Drizzle. En branchant `insertAuditLog`, elles ont commencé à importer `@/db/client` qui faisait `process.env.DATABASE_URL` + `throw` au top-level du module. Quand `next build` collecte la page data des routes API, il importe chaque module → throw → fail. Le job `ci-build` n'a pas `DATABASE_URL` dans son `env:` (et n'a aucune raison de l'avoir, le build n'a pas besoin de DB).*
+  ***Fix retenu** : Proxy lazy sur l'export `db`. La validation `DATABASE_URL` + l'appel `postgres()` sont différés au premier accès `db.*`. Le module s'importe sans side effect, `next build` passe, et l'invariant catch-no-throw d'`insertAuditLog` absorbe gracieusement le cas runtime où la DB serait absente (CI e2e qui n'a pas `DATABASE_URL` non plus → SELECT échoue → catch logge l'erreur → route continue). 8e dérive CI consécutive sur la 1re semaine ORM (les 7 précédentes étant côté Postgres pur — pgtap host, pgtap container, NOW() index, auth.jwt() stub, auth.users seed, superuser bypass + collision seed, enum + PERMISSIVE OR'd). Première fois côté Next.js build.*
+  ***Vérification locale ré-jouant la condition CI** : `Remove-Item Env:\DATABASE_URL; .\node_modules\.bin\next build` → ✅ collecte les 15 pages dont les 2 routes admin sans throw. Avant ce fix, échec identique au log CI. Tests vitest restent 14/211 verts. Aucun changement de schéma — le pattern Proxy est documenté Next.js et largement éprouvé pour ce type de singleton serveur. Pas de revue CTO Sophie requise (infra client, hors schéma).*
+  *Recommandation pour memory `feedback-postgres-dry-run-local` : ajouter une note « tout import de `@/db/client` dans une route API doit être testé via `next build` SANS `DATABASE_URL` avant push, car les jobs CI build n'ont pas la var ». Le dry-run Postgres ne couvre pas ce cas — c'est un dry-run Next.js qu'il faut.*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [DEV Alex] — Fix CI build lazy init `src/db/client.ts` (régression `6f19c1d`), Proxy pattern validé localement par `next build` sans DATABASE_URL.*
