@@ -41,6 +41,7 @@ const tenderRow1: TenderOfTheDay = {
   score: "94.00",
   platformCode: "boamp",
   externalRef: "BOAMP-AO-001",
+  deferredUntil: null,
 };
 
 const tenderRow2: TenderOfTheDay = {
@@ -53,6 +54,7 @@ const tenderRow2: TenderOfTheDay = {
   score: "81.00",
   platformCode: "place",
   externalRef: "PLACE-AO-002",
+  deferredUntil: null,
 };
 
 const tenderRow3: TenderOfTheDay = {
@@ -65,6 +67,27 @@ const tenderRow3: TenderOfTheDay = {
   score: null,
   platformCode: "francmarches",
   externalRef: "FM-AO-003",
+  deferredUntil: null,
+};
+
+/**
+ * Row qui a été différée *dans le passé* — donc *réapparait* dans le digest.
+ * En prod : `getTendersOfTheDay` filtre `deferred_until IS NULL OR
+ * deferred_until < now()`. Un mock peut renvoyer cette ligne ; le test vérifie
+ * que la projection conserve bien le champ `deferredUntil` (utile UI debug).
+ */
+const tenderRow4PreviouslyDeferred: TenderOfTheDay = {
+  id: "11110000-0000-0000-0000-000000000004",
+  title: "AO précédemment différé",
+  buyer: "Mairie test deferral",
+  amount: "500000.00",
+  deadline: new Date("2026-07-01T12:00:00.000Z"),
+  cpv: ["45000000"],
+  score: "72.00",
+  platformCode: "boamp",
+  externalRef: "BOAMP-AO-004",
+  // Différé expiré (1 heure dans le passé) — visible dans le digest
+  deferredUntil: new Date(Date.now() - 60 * 60 * 1000),
 };
 
 // ----------------------------------------------------------------------------
@@ -185,6 +208,42 @@ describe("getTendersOfTheDay", () => {
     // Garde-fou contre un futur refactor qui oublierait ces colonnes.
     expect(result[0]?.externalRef).toBe("BOAMP-AO-001");
     expect(result[0]?.platformCode).toBe("boamp");
+  });
+
+  /**
+   * PR n°5 (Arbitrage Board B 2026-05-21) : projection `deferredUntil`.
+   *
+   * Le filtre WHERE `deferred_until IS NULL OR deferred_until < now()` est
+   * appliqué côté SQL ; on ne peut pas le tester sans BDD réelle. En revanche
+   * on vérifie ici que :
+   *  - la projection expose bien `deferredUntil`
+   *  - une ligne précédemment différée mais expirée est conservée telle quelle
+   *
+   * Le rejet d'une ligne *encore* différée (deferred_until > now()) est couvert
+   * par le test pgTAP 08_tender_actions_cross_tenant.sql + manuellement.
+   */
+  it("expose deferredUntil dans la projection — null par défaut", async () => {
+    const { db } = buildFakeDb<TenderOfTheDay>([tenderRow1, tenderRow2, tenderRow3]);
+
+    const result = await getTendersOfTheDay(ORG_ALYOS, db);
+
+    expect(result[0]?.deferredUntil).toBeNull();
+    expect(result[1]?.deferredUntil).toBeNull();
+    expect(result[2]?.deferredUntil).toBeNull();
+  });
+
+  it("garde un AO précédemment différé (deferred_until expiré) — réapparait dans digest", async () => {
+    // Cas semblable au cron du lendemain : un AO différé 24h hier matin doit
+    // réapparaitre aujourd'hui. Le mock simule la sortie SQL post-filtre.
+    const { db } = buildFakeDb<TenderOfTheDay>([tenderRow4PreviouslyDeferred]);
+
+    const result = await getTendersOfTheDay(ORG_ALYOS, db);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe(tenderRow4PreviouslyDeferred.id);
+    // Le champ deferredUntil est exposé tel quel pour debug — pas filtré
+    // applicativement, c'est le SQL qui filtre.
+    expect(result[0]?.deferredUntil).toBeInstanceOf(Date);
   });
 
   /**

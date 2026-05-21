@@ -1,19 +1,23 @@
 import type { TenderOfTheDay } from "@/lib/sourcing/queries";
 
 import { formatAmount, formatDeadline } from "./format";
+import { TenderCardActions } from "./TenderCardActions";
 
 /**
- * Carte AO « du jour » — V1 read-only.
+ * Carte AO « du jour ».
  *
- * Server Component pur (pas de `"use client"`). Affichage strict, aucune
- * interactivité au V1.
- *
- * V1 read-only — actions Sélectionner / Différer / Rejeter wireup PR suivante
- * avec audit log A4 `tender_select` + transition vers `selected_solo` /
- * `selected_tandem` via modal Solo/Tandem (Maquette 3 + spec `audit_log_v1.md`).
+ * Server Component pour le rendu, **avec un sous-composant Client**
+ * `<TenderCardActions />` qui porte les 3 boutons Sélectionner / Différer /
+ * Rejeter (PR n°5).
  *
  * Source design : `design/maquettes/maquettes_v1.html` lignes 195-220
- * (Maquette 1 mobile + Maquette 2 desktop kanban-card).
+ * (Maquette 1 mobile + Maquette 2 desktop kanban-card) + lignes 294-323
+ * (Maquette 3 modale Solo/Tandem, déclenchée depuis le bouton « Sélectionner »).
+ *
+ * Copy verbatim (cf. `design/copy/onboarding_and_push_v1.md` l.68-70 +
+ * `guide_utilisateur_1page.html` l.137-145) : « Sélectionner / Différer /
+ * Rejeter ». Tooltips alignés sur le même fichier (hover desktop, focus
+ * keyboard).
  */
 export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
   // CPV principal (premier code) — V1 affiche le code brut ; un mapping
@@ -43,7 +47,7 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
         {formatAmount(tender.amount)} · Remise {formatDeadline(tender.deadline)} · CPV {mainCpv}
       </p>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-blue-800">
           {platformLabel}
         </span>
@@ -54,6 +58,13 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
           {tender.externalRef}
         </span>
       </div>
+
+      <TenderCardActions
+        tenderId={tender.id}
+        tenderTitle={tender.title}
+        tenderAmount={formatAmount(tender.amount)}
+        tenderDeadline={formatDeadline(tender.deadline)}
+      />
     </article>
   );
 }

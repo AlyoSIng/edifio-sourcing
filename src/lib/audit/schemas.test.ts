@@ -12,7 +12,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { AUDIT_ACTIONS, AUDIT_SCHEMAS, tenderSelectSchema } from "./schemas";
+import {
+  AUDIT_ACTIONS,
+  AUDIT_SCHEMAS,
+  tenderDeferSchema,
+  tenderRejectSchema,
+  tenderSelectSchema,
+} from "./schemas";
 import type { AuditAction } from "./schemas";
 
 // ----------------------------------------------------------------------------
@@ -257,8 +263,8 @@ describe("placeholders (11 actions non-strictes)", () => {
 // ----------------------------------------------------------------------------
 
 describe("AUDIT_ACTIONS + AUDIT_SCHEMAS — couverture", () => {
-  it("AUDIT_ACTIONS contient exactement 13 actions (spec)", () => {
-    expect(AUDIT_ACTIONS).toHaveLength(13);
+  it("AUDIT_ACTIONS contient exactement 15 actions (spec post-PR n°5)", () => {
+    expect(AUDIT_ACTIONS).toHaveLength(15);
   });
 
   it("chaque action dans AUDIT_ACTIONS a un schéma dans AUDIT_SCHEMAS", () => {
@@ -267,9 +273,129 @@ describe("AUDIT_ACTIONS + AUDIT_SCHEMAS — couverture", () => {
     }
   });
 
-  it("AUDIT_SCHEMAS n'a pas de clef en plus que les 13 actions", () => {
+  it("AUDIT_SCHEMAS n'a pas de clef en plus que les 15 actions", () => {
     const schemaKeys = Object.keys(AUDIT_SCHEMAS).sort();
     const expectedKeys = [...AUDIT_ACTIONS].sort();
     expect(schemaKeys).toEqual(expectedKeys);
+  });
+
+  it("AUDIT_ACTIONS contient bien tender_defer (A14) et tender_reject (A15)", () => {
+    expect(AUDIT_ACTIONS).toContain("tender_defer");
+    expect(AUDIT_ACTIONS).toContain("tender_reject");
+  });
+});
+
+// ----------------------------------------------------------------------------
+// A14 — tender_defer STRICT
+// ----------------------------------------------------------------------------
+
+describe("tenderDeferSchema (A14 strict)", () => {
+  const validBase = {
+    tender_id: "11111111-1111-1111-1111-111111111111",
+    tender_ref: "25-AO-00142",
+    deferred_until: "2026-05-22T06:30:00.000Z",
+    hours_offset: 24,
+  };
+
+  it("valide un payload conforme (24h offset)", () => {
+    expect(tenderDeferSchema.safeParse(validBase).success).toBe(true);
+  });
+
+  it("valide un autre offset positif (168h = 1 semaine)", () => {
+    expect(tenderDeferSchema.safeParse({ ...validBase, hours_offset: 168 }).success).toBe(true);
+  });
+
+  it("rejette un tender_id non-UUID", () => {
+    expect(tenderDeferSchema.safeParse({ ...validBase, tender_id: "not-a-uuid" }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejette un tender_ref vide", () => {
+    expect(tenderDeferSchema.safeParse({ ...validBase, tender_ref: "" }).success).toBe(false);
+  });
+
+  it("rejette un deferred_until non-ISO", () => {
+    expect(tenderDeferSchema.safeParse({ ...validBase, deferred_until: "demain" }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejette un hours_offset négatif", () => {
+    expect(tenderDeferSchema.safeParse({ ...validBase, hours_offset: -1 }).success).toBe(false);
+  });
+
+  it("rejette un hours_offset zéro (positive strict)", () => {
+    expect(tenderDeferSchema.safeParse({ ...validBase, hours_offset: 0 }).success).toBe(false);
+  });
+
+  it("rejette un hours_offset non-entier", () => {
+    expect(tenderDeferSchema.safeParse({ ...validBase, hours_offset: 24.5 }).success).toBe(false);
+  });
+});
+
+// ----------------------------------------------------------------------------
+// A15 — tender_reject STRICT
+// ----------------------------------------------------------------------------
+
+describe("tenderRejectSchema (A15 strict)", () => {
+  const validBase = {
+    tender_id: "22222222-2222-2222-2222-222222222222",
+    tender_ref: "25-AO-00142",
+    reason: "Hors zone géo (Île-de-France, hors périmètre AlyoS)",
+    score_at_reject: 87,
+  };
+
+  it("valide un payload conforme avec motif", () => {
+    expect(tenderRejectSchema.safeParse(validBase).success).toBe(true);
+  });
+
+  it("valide un payload sans motif (reason = null)", () => {
+    expect(tenderRejectSchema.safeParse({ ...validBase, reason: null }).success).toBe(true);
+  });
+
+  it("valide un payload sans score (score_at_reject = null)", () => {
+    expect(tenderRejectSchema.safeParse({ ...validBase, score_at_reject: null }).success).toBe(
+      true,
+    );
+  });
+
+  it("valide un motif vide string (autorisé : c'est nullable, pas non-vide)", () => {
+    // Distinct de reason=null : ici l'utilisateur a soumis "" -- on accepte.
+    // Le côté UI peut transformer "" en null avant audit si voulu.
+    expect(tenderRejectSchema.safeParse({ ...validBase, reason: "" }).success).toBe(true);
+  });
+
+  it("rejette un tender_id non-UUID", () => {
+    expect(tenderRejectSchema.safeParse({ ...validBase, tender_id: "not-uuid" }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejette un tender_ref vide", () => {
+    expect(tenderRejectSchema.safeParse({ ...validBase, tender_ref: "" }).success).toBe(false);
+  });
+
+  it("rejette un motif > 280 caractères", () => {
+    const longReason = "x".repeat(281);
+    expect(tenderRejectSchema.safeParse({ ...validBase, reason: longReason }).success).toBe(false);
+  });
+
+  it("valide un motif pile à 280 caractères (borne incluse)", () => {
+    const reason280 = "x".repeat(280);
+    expect(tenderRejectSchema.safeParse({ ...validBase, reason: reason280 }).success).toBe(true);
+  });
+
+  it("rejette un score_at_reject hors 0-100", () => {
+    expect(tenderRejectSchema.safeParse({ ...validBase, score_at_reject: 150 }).success).toBe(
+      false,
+    );
+    expect(tenderRejectSchema.safeParse({ ...validBase, score_at_reject: -1 }).success).toBe(false);
+  });
+
+  it("rejette un score_at_reject non-entier", () => {
+    expect(tenderRejectSchema.safeParse({ ...validBase, score_at_reject: 87.5 }).success).toBe(
+      false,
+    );
   });
 });

@@ -35,7 +35,15 @@
 
 ---
 
-## 13 actions × payload détaillé
+## 15 actions × payload détaillé
+
+> **Amendement 2026-05-21 (PR n°5 `feat/tender-actions`)** : ajout de deux actions
+> **A14 `tender_defer`** et **A15 `tender_reject`** séparées, validation Board
+> Steve TEISSIER 2026-05-21. Compteur passé de 13 → 15 actions. Justification du
+> split (vs un seul code `tender_decision` polymorphe) : signaux d'apprentissage
+> IA scoring distincts (différé = signal faible, rejet = signal fort), filtrage
+> analytics simple par `action`, et payload schemas Zod dédiés sans `discriminator`.
+
 
 ### A1 — `login`
 ```json
@@ -194,6 +202,41 @@ Toute suppression hors workflow normal exige approbation Board (cf. CLAUDE.md).
 ```
 `denied_reason` ∈ `no_session | domain_not_alyosingenierie | session_expired | token_revoked`.
 
+### A14 — `tender_defer`
+```json
+{
+  "tender_id": "uuid",
+  "tender_ref": "25-AO-00142",
+  "deferred_until": "2026-05-22T06:30:00.000Z",
+  "hours_offset": 24
+}
+```
+Déclencheur : bouton « Différer » sur `TenderCard` (page `/sourcing/ao-du-jour`).
+`hours_offset` indique la durée de différé demandée (V1 = **24h par défaut, fixe** ;
+extensible Phase 2 pour « différer jusqu'à demain matin », « 1 semaine », etc.).
+`deferred_until` est la résultante calculée `now() + hours_offset` côté Server
+Action. L'AO reste `status='sourced'` mais est **exclu de la vue « AO du jour »**
+jusqu'à expiration via le filtre `(deferred_until IS NULL OR deferred_until < now())`
+de `getTendersOfTheDay`. *Validation Board 2026-05-21 (Steve TEISSIER), code A14 alloué.*
+
+### A15 — `tender_reject`
+```json
+{
+  "tender_id": "uuid",
+  "tender_ref": "25-AO-00142",
+  "reason": "Hors zone géo (Île-de-France, hors périmètre AlyoS)",
+  "score_at_reject": 87
+}
+```
+Déclencheur : bouton « Rejeter » sur `TenderCard` + confirmation modale avec
+textarea optionnelle (max 280 chars). `reason` peut être `null` si l'utilisateur
+n'a pas saisi de motif. `score_at_reject` snapshot du score au moment du rejet
+(également `null` si l'AO n'avait pas encore été scoré) pour analyse a posteriori
+du delta scoring/jugement humain. L'AO bascule `status='dropped'`. **Bloc
+apprentissage IA scoring débloqué** (signal négatif explicite + motif libre,
+exploité côté `learning_events.event_type='rejected'` PR ultérieure).
+*Validation Board 2026-05-21 (Steve TEISSIER), code A15 alloué.*
+
 ---
 
 ## Implémentation côté app — helper TypeScript
@@ -207,6 +250,7 @@ type AuditAction =
   | 'tender_select' | 'architect_solicit' | 'dossier_diffuse'
   | 'ai_run' | 'odoo_opportunity_create' | 'architect_change'
   | 'rgpd_export' | 'token_revoke' | 'data_delete' | 'access_attempt'
+  | 'tender_defer' | 'tender_reject'
 
 export async function audit(params: {
   action: AuditAction

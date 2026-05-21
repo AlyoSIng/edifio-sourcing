@@ -842,4 +842,68 @@
 
 ---
 
-*Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — INCIDENT P1bis BOAMP endpoint décommissionné résolu en code (Vitest 421/421, tsc 0 erreur). En attente de revue Yann + Board pour commit/push/merge. 3 follow-ups ouverts pour arbitrage Cowork.*
+## 2026-05-21 — PR n°5 : actions métier sur TenderCard *(branche `feat/tender-actions`)*
+
+> Trois actions Sélectionner / Différer / Rejeter sur la carte AO. Boucle
+> fermée avec l'audit log + apprentissage IA scoring (signal positif de
+> sélection + signal négatif explicite de rejet).
+
+- **2026-05-21 · PR5 · Board · Arbitrage A — Codes audit A14 + A15 SÉPARÉS.** [BOARD-OK 2026-05-21]
+  *Décision : 2 codes audit distincts `tender_defer` (A14) et `tender_reject`
+  (A15), pas un unique `tender_decision` polymorphe. Motif : signaux
+  d'apprentissage IA scoring distincts (différé = signal faible, rejet =
+  signal fort), filtrage analytics simple par `action`, schémas Zod stricts
+  dédiés sans discriminator. Conséquence : enum Postgres `audit_action` passe
+  de 13 → 15 valeurs (cf. migration 0004) + `AUDIT_ACTIONS` côté TS.*
+
+- **2026-05-21 · PR5 · Board · Arbitrage B — Mécanique « Différer » via colonne `deferred_until`.** [BOARD-OK 2026-05-21]
+  *Décision : ajouter `tenders.deferred_until timestamptz NULL` + index
+  partiel `WHERE deferred_until IS NOT NULL`. Le statut tender RESTE `sourced`
+  pendant le différé — l'AO est filtré côté `getTendersOfTheDay`
+  `(deferred_until IS NULL OR deferred_until < now())`. À expiration,
+  réapparition automatique dans le digest. Motif : éviter de polluer le cycle
+  de vie 14 statuts validé Gate 4 avec un faux statut « deferred ». V1 fixe
+  24h, extensible Phase 2 (« demain matin », « 1 semaine »). Migration
+  `0004_tender_deferral.sql` (Drizzle 0.30 generate + IF NOT EXISTS sur
+  ALTER TYPE).*
+
+- **2026-05-21 · PR5 · Board · Arbitrage C — Motif rejet optionnel (textarea max 280).** [BOARD-OK 2026-05-21]
+  *Décision : textarea autoFocus dans `RejectReasonModal`, max 280 chars,
+  optionnelle (peut être vide → stocké `null` en BDD). Stocké dans
+  `tender_events.data.reason` ET `audit_logs.data.reason`. Motif : motif libre
+  = signal d'or pour le moteur scoring V2 (prompt P12 IA Haiku), sans
+  alourdir l'UX en imposant la saisie. Compteur live UI rouge dès 250+ chars.*
+
+- **2026-05-21 · PR5 · DEV Alex · Décision technique — Server Actions Next.js 14 + transaction Drizzle + audit non-bloquant post-commit.** [DÉCISION DEV]
+  *Pattern retenu pour les 3 actions :
+  (1) Auth check `getUser()` + domaine `@alyosingenierie.fr` (defense in
+  depth vs middleware) ; (2) Validation input (UUID shape + énums + bornes
+  numériques) ; (3) Transaction Drizzle `db.transaction(async tx => ...)`
+  contenant `SELECT FOR UPDATE` + `UPDATE tenders` + `INSERT tender_events`
+  (rollback automatique sur erreur métier propagée via classe
+  `BusinessError`) ; (4) Audit log HORS transaction (post-commit) via helper
+  `audit()` non-bloquant best-effort ; (5) `revalidatePath` final pour
+  rafraîchir le RSC cache. Codes erreur exposés UI : `not_authenticated`,
+  `forbidden_domain`, `invalid_input`, `tender_not_found`, `invalid_state`,
+  `internal_error`. Mappés en messages FR côté `TenderCardActions` →
+  `CustomEvent('tender-action-error')` → toast `role="alert"`.*
+
+- **2026-05-21 · PR5 · DEV Alex · Livrables récap.** [LIVRABLE]
+  *Fichiers créés : `src/app/sourcing/ao-du-jour/{actions.ts, actions.test.ts,
+  TenderCardActions.tsx, SoloTandemModal.tsx, RejectReasonModal.tsx,
+  TenderActionsErrorToast.tsx}`, `src/db/migrations/0004_tender_deferral.sql`
+  (+ snapshot meta), `e2e/tender-actions.spec.ts`,
+  `tests/rls/08_tender_actions_cross_tenant.sql`,
+  `notes-de-suivi/CC_260521_1845_TENDER_ACTIONS.md`. Fichiers modifiés :
+  `specs/audit_log_v1.md` (13→15 actions + A14/A15), `src/db/schema/enums.ts`
+  (auditAction étendu), `src/db/schema/tenders.ts` (deferredUntil + index),
+  `src/lib/audit/schemas.ts` + `schemas.test.ts` (A14/A15 stricts),
+  `src/db/types/jsonb.ts` (interfaces A14/A15), `src/lib/sourcing/queries.ts`
+  + `queries.test.ts` (filtre + projection deferredUntil),
+  `src/app/sourcing/ao-du-jour/{page.tsx, TenderCard.tsx}`. Tests : ~30 nouveaux
+  cas unit Vitest, 3 scénarios E2E (skip-policy CI sans BDD), 8 assertions
+  pgTAP cross-tenant. Commit + push à venir par Yann après revue Board.*
+
+---
+
+*Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — PR n°5 (actions métier TenderCard) implémentée, en attente revue Steve avant commit/push par Yann.*
