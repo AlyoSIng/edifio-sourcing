@@ -38,4 +38,5 @@ src/db/migrations/
 # JSON.stringify(2) natif. Pas de reformatage prettier sur ces ~10 MB.
 src/db/seed/fixtures/*.json
 src/db/seed/distribution-report.json
+src/db/seed/prod-seed-report.json
 
