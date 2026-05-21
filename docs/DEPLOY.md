@@ -61,6 +61,36 @@ git log origin/main --oneline | Select-Object -First 5
 
 ---
 
+## Conventions password BDD prod (URI-safe-only)
+
+Tout password BDD posé sur le projet Supabase prod doit n'utiliser **QUE** les
+caractères suivants : `A-Z`, `a-z`, `0-9`, `-`, `_`, `.` (point).
+
+**Interdits explicitement** : `#`, `&`, `$`, `!`, `+`, `@`, `:`, `/`, `?`, `=`,
+`%`, ainsi que tout autre caractère réservé URI (cf. RFC 3986 section 2.2).
+
+**Pourquoi** : le 2026-05-21, un password contenant un `#` non percent-encodé
+dans l'URI Session Pooler a fait throw `postgres-js@3.4.9` avec leak du password
+dans le stack trace (`TypeError: Invalid URL`, champ `input`). Un password
+URI-safe pur élimine la classe entière de ce bug et casse le piège du
+percent-encoding manuel. Préférer une passphrase 24+ caractères composée de
+mots-points (ex: `correct.horse.battery.staple.2026`) à un mot de passe court
+truffé de symboles spéciaux.
+
+**Génération recommandée** :
+
+```powershell
+# 32 caractères URI-safe (A-Za-z0-9-_.)
+$chars = ([char[]](48..57 + 65..90 + 97..122)) + '-','_','.'
+-join (1..32 | ForEach-Object { $chars | Get-Random })
+```
+
+Coller le résultat directement dans Supabase Dashboard → Settings → Database
+→ Reset password. **Ne jamais transiter ce password par un chat, un outil
+tiers, ou un fichier non-volatile.**
+
+---
+
 ## RÈGLE D'OR : `DATABASE_URL` jamais persistée
 
 Pendant TOUTE la procédure ci-dessous, `DATABASE_URL` reste **en mémoire
@@ -72,6 +102,14 @@ PowerShell uniquement** :
 
 À la fin de l'opération, `$env:DATABASE_URL = $null` (ou simplement fermer
 le terminal).
+
+**Alternative recommandée : forme éclatée `PG*`.** Plutôt que de manipuler
+une URI complète (qui contient le password et peut leaker dans un log), le
+script `src/db/migrate.ts` accepte aussi les variables séparées `PGHOST`,
+`PGUSER`, `PGPASSWORD`, `PGDATABASE`, `PGPORT` (optionnel, défaut 5432). Si
+les 4 obligatoires sont posées, elles **priment** sur `DATABASE_URL`. Cette
+forme élimine le piège du percent-encoding URI et garantit que le password
+ne transite jamais dans une chaîne susceptible d'être loguée comme URI.
 
 ---
 
@@ -94,20 +132,56 @@ le terminal).
 `pooler.supabase.com`. Si elle contient `:6543` ou `pgbouncer=true`,
 **STOP** — choisir l'onglet `Session pooler` (pas Transaction).
 
-### Étape 2 — Pose temporaire de `DATABASE_URL`
+### Étape 2 — Pose temporaire des credentials BDD
 
-Dans PowerShell (terminal AlyoS dev) :
+Le script `src/db/migrate.ts` accepte deux formes d'env. **Préférer la
+forme éclatée** pour éviter tout risque de leak du password via URI.
+
+#### Option A (recommandée) — Forme éclatée `PG*`
+
+Récupérer les 4 valeurs séparées depuis le Dashboard Supabase :
+- `PGHOST` = `aws-0-eu-central-1.pooler.supabase.com` (Session pooler)
+- `PGUSER` = `postgres.<project-ref>` (ex: `postgres.loogmtltwkhvczdiurqs`)
+- `PGPASSWORD` = le password BDD (URI-safe, cf. section précédente)
+- `PGDATABASE` = `postgres`
+- `PGPORT` = `5432` (optionnel, c'est le défaut)
+
+Dans PowerShell :
 
 ```powershell
-$env:DATABASE_URL = "postgresql://postgres.xxxx:PASSWORD@aws-0-eu-central-1.pooler.supabase.com:5432/postgres"
+$env:PGHOST = "aws-0-eu-central-1.pooler.supabase.com"
+$env:PGUSER = "postgres.xxxx"
+$env:PGPASSWORD = "<password-URI-safe-32-car>"
+$env:PGDATABASE = "postgres"
+$env:PGPORT = "5432"
 ```
 
 **Validation** (sans afficher le password) :
 
 ```powershell
-$env:DATABASE_URL -replace ':[^@]+@', ':***@'
-# Doit afficher : postgresql://postgres.xxxx:***@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+"$($env:PGHOST):$($env:PGPORT) user=$($env:PGUSER) db=$($env:PGDATABASE) pwd=***"
 ```
+
+#### Option B (legacy) — URI `DATABASE_URL`
+
+Si la forme éclatée n'est pas disponible (ex: outil tiers qui n'expose que
+l'URI), poser `DATABASE_URL`. **Attention** : si le password contient un
+caractère URI-réservé non percent-encodé, `postgres-js` throw avec leak du
+password dans le stack trace — c'est pourquoi la règle URI-safe-only est
+obligatoire.
+
+```powershell
+$env:DATABASE_URL = "postgresql://postgres.xxxx:PASSWORD@aws-0-eu-central-1.pooler.supabase.com:5432/postgres"
+```
+
+Validation masquée :
+
+```powershell
+$env:DATABASE_URL -replace ':[^@]+@', ':***@'
+```
+
+> Si les deux formes sont posées simultanément, la forme éclatée prime
+> (le script loggue un warn `[migrate] PG*+DATABASE_URL tous posés...`).
 
 ### Étape 3 — Application des migrations Drizzle
 
@@ -323,6 +397,12 @@ SELECT count(*), max(created_at) FROM tenders;
 ```powershell
 $env:DATABASE_URL = $null
 $env:NODE_ENV = $null
+# Forme éclatée (si Option A utilisée à l'étape 2)
+$env:PGHOST = $null
+$env:PGUSER = $null
+$env:PGPASSWORD = $null
+$env:PGDATABASE = $null
+$env:PGPORT = $null
 # Ou simplement : fermer le terminal PowerShell.
 ```
 
@@ -434,6 +514,12 @@ ORDER BY tablename, policyname;
 | 0003_fk_supabase.sql   | FK `users.id` → `auth.users(id)` (post-Auth)     |
 
 ### A.4 — Commandes utiles ops
+
+> Note : les snippets ci-dessous supposent la forme URL (`$env:DATABASE_URL`
+> posé). Équivalent éclaté trivial — remplacer `postgres(process.env.DATABASE_URL)`
+> par `postgres({host: process.env.PGHOST, port: Number(process.env.PGPORT)||5432,
+> user: process.env.PGUSER, password: process.env.PGPASSWORD,
+> database: process.env.PGDATABASE, ssl: 'require'})`.
 
 ```powershell
 # Etat des migrations appliquees

@@ -907,3 +907,75 @@
 ---
 
 *Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — PR n°5 (actions métier TenderCard) implémentée, en attente revue Steve avant commit/push par Yann.*
+
+---
+
+## 2026-05-21 — Follow-up sécurité post-incident BDD prod : règle password URI-safe + hardening `migrate.ts` *(branche `feat/migrate-pgenv-uri-safe-doc`)*
+
+> Suite immédiate au double incident P1/P2 du 2026-05-21 (cf. plus haut,
+> commit `08be830` documentant l'incident). Le password BDD prod a leaké
+> 2 fois dans la journée — paste chat coordination + stack trace
+> `postgres-js@3.4.9 TypeError: Invalid URL`. Trois chantiers correctifs
+> exécutés avant rotation finale du password (reportée post-MVP).
+
+- **2026-05-21 · G6 · Board · Décision règle password BDD URI-safe-only.** [BOARD-OK 2026-05-21]
+  *Tout password BDD posé sur le projet Supabase prod doit n'utiliser QUE
+  les caractères `A-Z`, `a-z`, `0-9`, `-`, `_`, `.`. Interdits explicitement :
+  tout caractère URI-réservé (RFC 3986 §2.2) — notamment `#`, `&`, `$`, `!`,
+  `+`, `@`, `:`, `/`, `?`, `=`, `%`. Motif : un password URI-safe pur élimine
+  la classe entière du bug `postgres-js TypeError: Invalid URL` (qui leak le
+  password en stack trace) et casse le piège du percent-encoding manuel.
+  Passphrase 24+ caractères mots-points (ex: `correct.horse.battery.staple.2026`)
+  préférée. Documenté nouvelle section `docs/DEPLOY.md` « Conventions password
+  BDD prod (URI-safe-only) ». Enforcement humain à chaque rotation (pas de
+  hook Supabase).*
+
+- **2026-05-21 · G6 · Alex · Hardening `src/db/migrate.ts` : support forme éclatée `PG*`.** [LIVRABLE]
+  *Nouvelle fonction pure exportée `resolveDbConfig(env)` qui résout la
+  config BDD depuis l'env avec préférence pour la forme éclatée
+  (`PGHOST`+`PGUSER`+`PGPASSWORD`+`PGDATABASE`, port défaut 5432 via
+  `PGPORT` optionnel) sur `DATABASE_URL`. Si les 4 vars PG obligatoires sont
+  posées non-vides : retourne `{kind:'parts', ...}` et warn si DATABASE_URL
+  aussi posée. Si forme éclatée incomplète (1 à 3 vars sur 4) : throw clair
+  listant les manquants. Si aucune PG* et pas de DATABASE_URL : throw existant
+  préservé. `assertDatabaseUrl` et `isPgBouncerPooler` conservées telles
+  quelles (rétro-compat 8 tests existants). `main()` instancie `postgres()`
+  soit en URI soit en options object `{host, port, user, password, database,
+  ssl: 'require'}` (forme documentée postgres-js v3.4, Supabase managed
+  exige `ssl: 'require'`). Log de démarrage explicite `[migrate] Mode env :
+  URL` ou `[migrate] Mode env : eclate (PG*)`. Tests : +7 nouveaux cas Vitest
+  (`resolveDbConfig`) couvrant les 7 branches du contrat (no env / URL seule /
+  PG* complet sans PGPORT / PG* + PGPORT=6543 / PG* incomplet / précédence
+  PG* vs DATABASE_URL / vars PG vides comptent comme absentes). Total
+  `tests/unit/db/migrate.test.ts` : 15 cas (vs 8 baseline).*
+
+- **2026-05-21 · G6 · Alex · Documentation `docs/DEPLOY.md` : 3 sections étendues.** [LIVRABLE]
+  *(a) Nouvelle section « Conventions password BDD prod (URI-safe-only) »
+  insérée avant la règle d'or `DATABASE_URL`, avec charset autorisé, liste
+  des interdits, justification incident 2026-05-21, snippet PowerShell de
+  génération 32 car URI-safe. (b) Section « Règle d'or `DATABASE_URL`
+  jamais persistée » étendue avec un paragraphe « Alternative recommandée :
+  forme éclatée `PG*` » qui pointe vers le nouveau support `migrate.ts`.
+  (c) Étape 2 du runbook refondue en deux options : Option A (recommandée)
+  forme éclatée `PG*` avec validation masquée, Option B (legacy) URI
+  `DATABASE_URL` avec rappel du risque leak password si non URI-safe.
+  Étape 9 nettoyage étendue aux 5 vars PG*. Note A.4 ajoutée pour signaler
+  que les snippets ops supposent la forme URL et donner l'équivalent éclaté
+  trivial.*
+
+- **2026-05-21 · G6 · Alex · Portée et exécution.** [PORTÉE]
+  *Follow-up exécuté AVANT la rotation finale du password BDD prod (4ᵉ
+  rotation explicitement reportée post-MVP par décision Board 2026-05-21 —
+  cf. memory locale `followup_post_mvp_security_rotations.md`). Le risque
+  résiduel (password historiquement leaké dans 2 endroits) reste assumé
+  par Steve sur la durée du MVP. Cette PR referme les chantiers
+  correctifs 3 et 4 de l'entrée « Apprentissages process » 2026-05-21
+  (cf. plus haut). Chantiers 1 (checklist setup Vercel) et 2 (vérification
+  post-déploiement durcie) restent ouverts pour PRs ultérieures.
+  Références : memory locale `followup_post_mvp_security_rotations.md`,
+  commit `08be830` doc incident BDD prod, nouveau script de référence
+  pattern options object désormais en dur dans `src/db/migrate.ts`.*
+
+---
+
+*Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — Follow-up sécurité post-incident BDD prod : règle password URI-safe + hardening `migrate.ts` (forme éclatée PG*) + sections étendues `docs/DEPLOY.md`. Commit/push à venir par Yann après revue Board.*
