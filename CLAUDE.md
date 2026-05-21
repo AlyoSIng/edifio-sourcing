@@ -125,6 +125,17 @@ et les opérations système via deux sub-agents :
 8. **`ps_operator`** : connecter le repo à Vercel (compte AlyoS), preview deploy
    sur la branche `feat/sourcing-mvp`. URL preview servira aux premiers tests.
 
+## Délégation & autonomie — niveau ÉQUILIBRÉ (décision Board 2026-05-21)
+
+- 🟢 **Zone verte (faire sans demander)** : travail dans une spec validée — code, tests,
+  migrations locales drizzle-kit, refacto, doc, préparation de commits. Plan court posté pour info.
+- 🟠 **Zone orange (validation CTO Sophie, pas Board)** : choix technique non trivial, écart de
+  spec, doute d'archi → `/handoff/REQUEST_*.md`.
+- 🔴 **Zone rouge (Board obligatoire)** : passage de gate, action irréversible, déploiement prod,
+  dépense, RGPD, changement de périmètre.
+
+Filtres en boucle : Camille (`qa`) garantit les tests verts, Hugo (`reviewer`) relit chaque PR.
+
 ## Workflow standard pour une tâche
 
 1. Le Board ou le sub-agent reçoit une demande.

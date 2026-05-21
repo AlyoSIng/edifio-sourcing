@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>edifio Sourcing — Maquettes v4 (AO du jour + modules Solo / Tandem)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --alyos-red: #FF0033; --alyos-red-dark: #CC0029;
+    --ink: #0F1A2E; --ink-2: #1F2937;
+    --paper: #FAF9F6; --paper-2: #F3F1EC; --paper-3: #E8E5DD;
+    --line: #E2DFD6; --line-2: #CFCBC0; --muted: #6B7280; --white: #FFFFFF;
+    --success: #15803D; --success-bg: #DCFCE7;
+    --warn: #B45309; --warn-bg: #FEF3C7;
+    --error: #B91C1C; --error-bg: #FEE2E2;
+    --info: #1E40AF; --info-bg: #DBEAFE;
+    --pill-bg: #FFE5EA; --pill-color: #C8002A;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); background: var(--paper-2); color: var(--ink); }
+  .page-wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
+  .page-header h1 { font-family: var(--font-display); font-size: 32px; margin: 0 0 8px; letter-spacing: -1px; }
+  .page-header .meta { color: var(--muted); font-size: 14px; }
+  .legend { background: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; margin: 18px 0 28px; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+  .legend b { font-family: var(--font-display); }
+  .mockup { background: var(--white); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 32px; overflow: hidden; box-shadow: 0 2px 12px rgba(15,26,46,0.04); }
+  .mockup-label { background: var(--ink); color: var(--white); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px; }
+  .mockup-frame { padding: 20px; background: var(--paper); }
+
+  .edifio-logo { display: inline-flex; align-items: center; gap: 8px; }
+  .edifio-pin { width: 28px; height: 28px; border-radius: 50%; background: var(--alyos-red); display: grid; place-items: center; box-shadow: 0 4px 16px rgba(255,0,51,0.25); }
+  .edifio-pin svg { width: 14px; height: 17px; }
+  .edifio-word { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -1px; }
+
+  .pill-eyebrow { display: inline-block; background: var(--pill-bg); color: var(--pill-color); font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; }
+
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 12px; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--alyos-red); color: var(--white); }
+  .btn-primary:hover { background: var(--alyos-red-dark); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+  .btn-danger-ghost { background: transparent; color: var(--error); border: 1px solid var(--line-2); }
+  .btn-sm { padding: 6px 10px; font-size: 11px; }
+  .chip { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+  .chip-success { background: var(--success-bg); color: var(--success); }
+  .chip-warn { background: var(--warn-bg); color: var(--warn); }
+  .chip-error { background: var(--error-bg); color: var(--error); }
+  .chip-info { background: var(--info-bg); color: var(--info); }
+  .chip-red { background: rgba(255,0,51,0.1); color: var(--alyos-red); }
+  .chip-neutral { background: var(--paper-3); color: var(--muted); }
+
+  /* App layout */
+  .app-layout { display: grid; grid-template-columns: 220px 1fr; min-height: 640px; background: var(--paper); position: relative; }
+  .sidebar { background: var(--ink); color: var(--white); padding: 20px 16px; }
+  .sidebar-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
+  .sidebar-logo .edifio-word { color: var(--white); font-size: 20px; }
+  .sidebar-logo .edifio-sub { color: rgba(255,255,255,0.45); font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px; }
+  .sidebar-section { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.4); margin: 20px 0 8px; }
+  .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; color: rgba(255,255,255,0.75); font-size: 13px; border-radius: 6px; cursor: pointer; margin-bottom: 2px; }
+  .sidebar-link:hover { background: rgba(255,255,255,0.05); color: var(--white); }
+  .sidebar-link.active { background: var(--alyos-red); color: var(--white); }
+  .sidebar-link .icon { font-size: 14px; opacity: 0.9; }
+  .sidebar-link .badge { margin-left: auto; background: var(--alyos-red); color: #fff; font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: 999px; }
+  .sidebar-link.active .badge { background: var(--white); color: var(--alyos-red); }
+  .main-content { padding: 24px 28px; overflow: auto; }
+  .page-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.5px; }
+  .page-subtitle { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 8px; }
+  .toolbar-left { display: flex; align-items: center; gap: 10px; }
+  .search-input { padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 6px; font-family: var(--font-body); font-size: 12px; width: 240px; background: var(--white); }
+  .seg { display: inline-flex; background: var(--white); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { background: transparent; border: none; padding: 7px 12px; font-family: var(--font-body); font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; border-right: 1px solid var(--line); }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--ink); color: var(--white); }
+
+  /* KPI row */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+  .kpi { background: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+  .kpi .k { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1; }
+  .kpi .l { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+  .kpi .k.red { color: var(--alyos-red); }
+
+  /* Tender card */
+  .tender-list { display: flex; flex-direction: column; gap: 14px; }
+  .tender-card { background: var(--white); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; grid-template-columns: 64px 1fr auto; gap: 16px; align-items: start; transition: box-shadow .15s; }
+  .tender-card:hover { box-shadow: 0 4px 18px rgba(15,26,46,0.08); }
+  .tender-card.is-leaving { opacity: .45; }
+
+  /* Score ring */
+  .score-ring { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; position: relative; }
+  .score-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .score-ring .score-val { font-family: var(--font-display); font-weight: 700; font-size: 19px; }
+  .score-ring .score-lbl { font-family: var(--font-mono); font-size: 7.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); position: absolute; bottom: 9px; }
+
+  .tender-main h3 { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin: 0 0 4px; line-height: 1.25; }
+  .tender-meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .tender-meta .mono { font-family: var(--font-mono); }
+  .tender-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+  .score-bd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--ink-2); }
+  .score-bd .bar { display: inline-flex; align-items: center; gap: 6px; }
+  .score-bd .track { width: 46px; height: 5px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+  .score-bd .fill { height: 100%; background: var(--alyos-red); border-radius: 999px; }
+  .score-bd .lab { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--muted); }
+
+  .tender-actions { display: flex; flex-direction: column; gap: 7px; min-width: 132px; }
+  .tender-actions .deadline { font-size: 11px; color: var(--warn); font-family: var(--font-mono); text-align: right; margin-bottom: 2px; }
+
+  /* Modal */
+  .modal-backdrop { background: rgba(15,26,46,0.45); border-radius: 10px; padding: 32px; display: grid; place-items: center; }
+  .modal { background: var(--white); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,0.18); width: 100%; max-width: 540px; overflow: hidden; }
+  .modal-head { padding: 18px 22px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .modal-head h3 { font-family: var(--font-display); font-size: 17px; margin: 0; font-weight: 600; }
+  .modal-head .x { color: var(--muted); cursor: pointer; font-size: 18px; }
+  .modal-body { padding: 22px; }
+  .modal-foot { padding: 16px 22px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; background: var(--paper); }
+  .modal-sub { font-size: 13px; color: var(--muted); margin: 0 0 18px; }
+
+  /* Mode choice cards */
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .mode-card { border: 1.5px solid var(--line); border-radius: 10px; padding: 16px; cursor: pointer; transition: border-color .15s, background .15s; }
+  .mode-card:hover { border-color: var(--line-2); }
+  .mode-card.selected { border-color: var(--alyos-red); background: rgba(255,0,51,0.03); }
+  .mode-card .mc-icon { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; font-size: 19px; margin-bottom: 10px; }
+  .mode-card .mc-icon.solo { background: var(--info-bg); color: var(--info); }
+  .mode-card .mc-icon.tandem { background: var(--pill-bg); color: var(--pill-color); }
+  .mode-card h4 { font-family: var(--font-display); font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+  .mode-card p { font-size: 12px; color: var(--muted); margin: 0; line-height: 1.45; }
+
+  /* Architect short-list */
+  .archi-card { border: 1px solid var(--line); border-radius: 9px; padding: 14px; margin-bottom: 10px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
+  .archi-card.top { border-color: var(--alyos-red); background: rgba(255,0,51,0.025); }
+  .archi-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+  .archi-name { font-family: var(--font-display); font-weight: 600; font-size: 14px; }
+  .archi-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .archi-rationale { font-size: 11.5px; color: var(--ink-2); margin-top: 6px; background: var(--paper-2); border-radius: 6px; padding: 7px 9px; line-height: 1.4; }
+  .archi-rationale .ia { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--pill-color); letter-spacing: .5px; }
+  .archi-score { font-family: var(--font-display); font-weight: 700; font-size: 22px; text-align: center; }
+  .archi-score small { display: block; font-family: var(--font-mono); font-size: 8px; color: var(--muted); text-transform: uppercase; font-weight: 400; }
+
+  /* Toast */
+  .toast { position: absolute; bottom: 18px; right: 18px; background: var(--ink); color: #fff; border-radius: 9px; padding: 13px 16px; display: flex; gap: 11px; align-items: center; box-shadow: 0 12px 36px rgba(0,0,0,0.28); max-width: 340px; }
+  .toast .t-icon { width: 30px; height: 30px; border-radius: 50%; background: var(--success); display: grid; place-items: center; flex-shrink: 0; }
+  .toast .t-title { font-family: var(--font-display); font-weight: 600; font-size: 13px; }
+  .toast .t-text { font-size: 11.5px; color: rgba(255,255,255,0.75); margin-top: 1px; }
+  .toast a { color: #fff; font-size: 11.5px; font-weight: 600; }
+
+  /* Brevo preview */
+  .mail-preview { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .mail-head { background: var(--paper-2); padding: 10px 14px; font-size: 12px; border-bottom: 1px solid var(--line); }
+  .mail-head .row { display: flex; gap: 8px; margin-bottom: 3px; }
+  .mail-head .lbl { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; color: var(--muted); width: 52px; }
+  .mail-body { padding: 16px 14px; font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+  .mail-body .cta-fake { display: inline-block; background: var(--alyos-red); color: #fff; padding: 9px 16px; border-radius: 6px; font-weight: 600; font-size: 12px; margin: 10px 0; }
+
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); }
+  .empty-state .es-icon { font-size: 38px; opacity: .35; margin-bottom: 12px; }
+  .empty-state h3 { font-family: var(--font-display); color: var(--ink); margin: 0 0 6px; }
+
+  .note { font-size: 11.5px; color: var(--muted); font-style: italic; margin-top: 10px; }
+  .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <header class="page-header">
+    <div class="edifio-logo">
+      <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+      <span class="edifio-word">edifio</span>
+      <span style="color: var(--muted); font-size: 13px; margin-left: 6px;">Sourcing — Maquettes v4</span>
+    </div>
+    <div class="meta" style="margin-top: 12px;">2026-05-21 · Théo Renard, Designer Senior · charte edifio (DS vérifié edifio.fr, ADR-012)</div>
+  </header>
+
+  <div class="legend">
+    <b>Périmètre v4 :</b> habillage charte edifio de l'écran « AO du jour » (M-A) + parcours des deux modes après sélection :
+    <b>Solo</b> (création d'opportunité Odoo, M-C) et <b>Tandem</b> (short-list architectes + sollicitation Brevo, M-D).
+    La modale de choix Solo/Tandem (M-B) reprend la Maquette 3 validée Gate 3.
+    Tagline produit : « AO publics, du sourcing au pli ». Tous les libellés de statut sont ceux validés Gate 4.
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- M-A — AO DU JOUR                                                     -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">M-A — /sourcing/ao-du-jour · liste scorée du jour (état nominal)</div>
+    <div class="mockup-frame">
+      <div class="app-layout">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+            <div>
+              <div class="edifio-word">edifio</div>
+              <div class="edifio-sub">Sourcing</div>
+            </div>
+          </div>
+          <div class="sidebar-section">Sourcing</div>
+          <div class="sidebar-link active"><span class="icon">📥</span> AO du jour <span class="badge">7</span></div>
+          <div class="sidebar-link"><span class="icon">⭐</span> Sélectionnés</div>
+          <div class="sidebar-link"><span class="icon">🕓</span> Différés</div>
+          <div class="sidebar-link"><span class="icon">🗂️</span> Tous les AO</div>
+          <div class="sidebar-section">Pilotage</div>
+          <div class="sidebar-link"><span class="icon">🤝</span> Cotraitance</div>
+          <div class="sidebar-link"><span class="icon">⚙️</span> Profils de recherche</div>
+          <div class="sidebar-link"><span class="icon">🔔</span> Notifications</div>
+          <div class="sidebar-section">Admin</div>
+          <div class="sidebar-link"><span class="icon">👥</span> Utilisateurs</div>
+        </aside>
+        <div class="main-content">
+          <div class="pill-eyebrow" style="margin-bottom:10px;">Jeudi 21 mai 2026</div>
+          <h1 class="page-title">AO du jour</h1>
+          <p class="page-subtitle">7 avis publiés depuis hier correspondent à vos profils de recherche, triés par score de pertinence.</p>
+
+          <div class="kpi-row">
+            <div class="kpi"><div class="k red">7</div><div class="l">Nouveaux AO sourcés</div></div>
+            <div class="kpi"><div class="k">3</div><div class="l">Score élevé (≥ 75)</div></div>
+            <div class="kpi"><div class="k">2</div><div class="l">Clôture &lt; 10 jours</div></div>
+            <div class="kpi"><div class="k">14</div><div class="l">En attente (différés)</div></div>
+          </div>
+
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <input class="search-input" placeholder="Rechercher un AO, un acheteur, un CPV…">
+            </div>
+            <div class="seg">
+              <button class="active">Par score</button>
+              <button>Par clôture</button>
+              <button>Par montant</button>
+            </div>
+          </div>
+
+          <div class="tender-list">
+            <!-- Tender 1 — high score -->
+            <div class="tender-card">
+              <div class="score-ring">
+                <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#E8E5DD" stroke-width="6"/><circle cx="32" cy="32" r="28" fill="none" stroke="#FF0033" stroke-width="6" stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="26"/></svg>
+                <span class="score-val">85</span><span class="score-lbl">score</span>
+              </div>
+              <div class="tender-main">
+                <h3>Réhabilitation thermique du groupe scolaire Jean-Moulin — maîtrise d'œuvre complète</h3>
+                <div class="tender-meta">
+                  <span>Ville de Vienne (38)</span>
+                  <span class="mono">CPV 71221000</span>
+                  <span class="mono">Réf. BOAMP 26-48291</span>
+                  <span>Procédure adaptée</span>
+                </div>
+                <div class="tender-tags">
+                  <span class="chip chip-red">SCOLAIRE</span>
+                  <span class="chip chip-neutral">RÉHABILITATION</span>
+                  <span class="chip chip-neutral">THERMIQUE</span>
+                  <span class="chip chip-info">MŒ COMPLÈTE</span>
+                </div>
+                <div class="score-bd">
+                  <span class="bar"><span class="lab">CPV</span><span class="track"><span class="fill" style="width:95%"></span></span></span>
+                  <span class="bar"><span class="lab">Géo</span><span class="track"><span class="fill" style="width:88%"></span></span></span>
+                  <span class="bar"><span class="lab">Montant</span><span class="track"><span class="fill" style="width:70%"></span></span></span>
+                  <span class="bar"><span class="lab">Délai</span><span class="track"><span class="fill" style="width:80%"></span></span></span>
+                </div>
+              </div>
+              <div class="tender-actions">
+                <div class="deadline">Clôture J-12 · 02/06</div>
+                <button class="btn btn-primary">⭐ Sélectionner</button>
+                <button class="btn btn-ghost btn-sm">🕓 Différer</button>
+                <button class="btn btn-danger-ghost btn-sm">✕ Rejeter</button>
+              </div>
+            </div>
+
+            <!-- Tender 2 — mid score -->
+            <div class="tender-card">
+              <div class="score-ring">
+                <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#E8E5DD" stroke-width="6"/><circle cx="32" cy="32" r="28" fill="none" stroke="#FF0033" stroke-width="6" stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="70"/></svg>
+                <span class="score-val">60</span><span class="score-lbl">score</span>
+              </div>
+              <div class="tender-main">
+                <h3>Construction d'un centre technique municipal — mission de base + OPC</h3>
+                <div class="tender-meta">
+                  <span>CC Bièvre Isère (38)</span>
+                  <span class="mono">CPV 71200000</span>
+                  <span class="mono">Réf. BOAMP 26-48177</span>
+                  <span>Appel d'offres ouvert</span>
+                </div>
+                <div class="tender-tags">
+                  <span class="chip chip-neutral">NEUF</span>
+                  <span class="chip chip-neutral">TERTIAIRE</span>
+                  <span class="chip chip-info">MISSION BASE + OPC</span>
+                </div>
+                <div class="score-bd">
+                  <span class="bar"><span class="lab">CPV</span><span class="track"><span class="fill" style="width:70%"></span></span></span>
+                  <span class="bar"><span class="lab">Géo</span><span class="track"><span class="fill" style="width:80%"></span></span></span>
+                  <span class="bar"><span class="lab">Montant</span><span class="track"><span class="fill" style="width:45%"></span></span></span>
+                  <span class="bar"><span class="lab">Délai</span><span class="track"><span class="fill" style="width:40%"></span></span></span>
+                </div>
+              </div>
+              <div class="tender-actions">
+                <div class="deadline" style="color:var(--muted)">Clôture J-28 · 18/06</div>
+                <button class="btn btn-primary">⭐ Sélectionner</button>
+                <button class="btn btn-ghost btn-sm">🕓 Différer</button>
+                <button class="btn btn-danger-ghost btn-sm">✕ Rejeter</button>
+              </div>
+            </div>
+
+            <!-- Tender 3 — leaving (just rejected) -->
+            <div class="tender-card is-leaving">
+              <div class="score-ring">
+                <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#E8E5DD" stroke-width="6"/><circle cx="32" cy="32" r="28" fill="none" stroke="#CFCBC0" stroke-width="6" stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="130"/></svg>
+                <span class="score-val">26</span><span class="score-lbl">score</span>
+              </div>
+              <div class="tender-main">
+                <h3>Entretien des espaces verts — accord-cadre à bons de commande</h3>
+                <div class="tender-meta">
+                  <span>Métropole de Lyon (69)</span>
+                  <span class="mono">CPV 77310000</span>
+                  <span class="mono">Réf. BOAMP 26-48203</span>
+                </div>
+                <div class="tender-tags">
+                  <span class="chip chip-neutral">HORS PÉRIMÈTRE MŒ</span>
+                </div>
+                <div class="note" style="margin-top:2px;">Rejeté à l'instant — la carte disparaît de la liste (animation), statut <b>rejeté</b> tracé (audit A4).</div>
+              </div>
+              <div class="tender-actions">
+                <div class="deadline" style="color:var(--muted)">Annulation possible 5 s</div>
+                <button class="btn btn-ghost btn-sm">↩ Annuler</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer-note" style="text-align:left; padding:18px 0 0;">© AlyoS Ingénierie 2026 — Outil interne · via edifio Sourcing</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- M-B — MODALE SOLO / TANDEM                                           -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">M-B — Modale « Comment répondez-vous ? » (déclenchée par Sélectionner · reprise Maquette 3)</div>
+    <div class="mockup-frame">
+      <div class="modal-backdrop">
+        <div class="modal">
+          <div class="modal-head">
+            <h3>Comment répondez-vous à cet AO ?</h3>
+            <span class="x">✕</span>
+          </div>
+          <div class="modal-body">
+            <p class="modal-sub">Groupe scolaire Jean-Moulin · Ville de Vienne (38) · clôture le 02/06</p>
+            <div class="mode-grid">
+              <div class="mode-card selected">
+                <div class="mc-icon solo">🧑‍💼</div>
+                <h4>Solo</h4>
+                <p>AlyoS Ingénierie répond seul. L'AO bascule directement en opportunité dans Odoo, étape « Sourcing ».</p>
+              </div>
+              <div class="mode-card">
+                <div class="mc-icon tandem">🤝</div>
+                <h4>Tandem</h4>
+                <p>Réponse en cotraitance. edifio vous propose des architectes pertinents à solliciter avant de basculer.</p>
+              </div>
+            </div>
+            <p class="note">Choix réversible tant que l'opportunité n'est pas créée. Le statut passe à <b>sélectionné — solo</b> ou <b>sélectionné — tandem</b>.</p>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-ghost">Annuler</button>
+            <button class="btn btn-primary">Confirmer en Solo →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- M-C — FLUX SOLO → OPPORTUNITÉ ODOO                                   -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">M-C — Flux Solo : confirmation + opportunité Odoo créée (toast Realtime)</div>
+    <div class="mockup-frame">
+      <div class="app-layout">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+            <div><div class="edifio-word">edifio</div><div class="edifio-sub">Sourcing</div></div>
+          </div>
+          <div class="sidebar-section">Sourcing</div>
+          <div class="sidebar-link"><span class="icon">📥</span> AO du jour <span class="badge">6</span></div>
+          <div class="sidebar-link active"><span class="icon">⭐</span> Sélectionnés</div>
+          <div class="sidebar-link"><span class="icon">🕓</span> Différés</div>
+          <div class="sidebar-link"><span class="icon">🗂️</span> Tous les AO</div>
+        </aside>
+        <div class="main-content">
+          <h1 class="page-title">AO sélectionnés</h1>
+          <p class="page-subtitle">Dossiers retenus pour réponse. Le mode (Solo / Tandem) et l'état de l'opportunité Odoo sont rappelés sur chaque ligne.</p>
+
+          <div class="tender-card" style="grid-template-columns: 1fr auto;">
+            <div class="tender-main">
+              <h3>Réhabilitation thermique du groupe scolaire Jean-Moulin</h3>
+              <div class="tender-meta">
+                <span>Ville de Vienne (38)</span>
+                <span class="mono">CPV 71221000</span>
+                <span class="mono">Réf. BOAMP 26-48291</span>
+              </div>
+              <div class="tender-tags">
+                <span class="chip chip-info">SÉLECTIONNÉ — SOLO</span>
+                <span class="chip chip-success">OPPORTUNITÉ ODOO CRÉÉE</span>
+                <span class="chip chip-neutral">ODOO #OPP-2026-0413</span>
+              </div>
+              <div class="archi-rationale" style="margin-top:8px;">
+                <span class="ia">Synchronisation Odoo</span><br>
+                Opportunité créée dans le pipeline « AO publics », étape <b>Sourcing</b>, montant estimé renseigné, échéance = date de clôture de l'AO. Le lien BOAMP et la fiche edifio sont joints en note.
+              </div>
+            </div>
+            <div class="tender-actions" style="min-width:150px;">
+              <button class="btn btn-primary btn-sm">↗ Ouvrir dans Odoo</button>
+              <button class="btn btn-ghost btn-sm">📄 Voir le dossier</button>
+              <button class="btn btn-ghost btn-sm">↺ Repasser en Tandem</button>
+            </div>
+          </div>
+
+          <div class="toast">
+            <div class="t-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div>
+              <div class="t-title">Opportunité Odoo créée</div>
+              <div class="t-text">Jean-Moulin → pipeline « AO publics » · <a href="#">Ouvrir #OPP-2026-0413</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- M-D1 — TANDEM SHORT-LIST                                             -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">M-D1 — Tandem : short-list des architectes (matching V1 + rationale IA Haiku)</div>
+    <div class="mockup-frame">
+      <div class="modal-backdrop" style="padding:24px;">
+        <div class="modal" style="max-width:600px;">
+          <div class="modal-head">
+            <h3>Quel architecte solliciter ?</h3>
+            <span class="x">✕</span>
+          </div>
+          <div class="modal-body">
+            <p class="modal-sub">Centre technique municipal · CC Bièvre Isère (38) · 3 architectes les plus pertinents de votre réseau</p>
+
+            <div class="archi-card top">
+              <div class="archi-avatar">MC</div>
+              <div>
+                <div class="archi-name">Atelier Marc Caron <span class="chip chip-red" style="margin-left:4px;">RECOMMANDÉ</span></div>
+                <div class="archi-meta">Tertiaire & équipements publics · Isère + Rhône · 4 collaborations réussies</div>
+                <div class="archi-rationale"><span class="ia">Pourquoi cet architecte</span> — Spécialité bâtiment tertiaire alignée avec l'objet, zone d'intervention couvrant le 38, et trois réponses gagnées ensemble depuis 2024.</div>
+              </div>
+              <div class="archi-score">88<small>match</small></div>
+            </div>
+
+            <div class="archi-card">
+              <div class="archi-avatar">SL</div>
+              <div>
+                <div class="archi-name">Sophie Lemaire Architecture</div>
+                <div class="archi-meta">Équipements publics · Isère · 1 collaboration</div>
+                <div class="archi-rationale"><span class="ia">Pourquoi cet architecte</span> — Bonne couverture géographique et spécialité proche, mais historique commun plus limité.</div>
+              </div>
+              <div class="archi-score">64<small>match</small></div>
+            </div>
+
+            <div class="archi-card">
+              <div class="archi-avatar">DB</div>
+              <div>
+                <div class="archi-name">Cabinet Durand-Berthier</div>
+                <div class="archi-meta">Logement & tertiaire · Rhône (zone limitrophe) · disponible</div>
+                <div class="archi-rationale"><span class="ia">Pourquoi cet architecte</span> — Peu sollicité ce mois-ci, donc réactif, mais zone limitrophe et spécialité partiellement alignée.</div>
+              </div>
+              <div class="archi-score">51<small>match</small></div>
+            </div>
+
+            <p class="note">Aucun ne convient ? <a href="#" style="color:var(--alyos-red);font-weight:600;">Voir tous les architectes du réseau</a></p>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-ghost">Retour</button>
+            <button class="btn btn-primary">Préparer la sollicitation pour Marc Caron →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- M-D2 — TANDEM PREVIEW BREVO                                          -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">M-D2 — Tandem : prévisualisation & édition du mail Brevo avant envoi (toggle TU / VOUS)</div>
+    <div class="mockup-frame">
+      <div class="modal-backdrop" style="padding:24px;">
+        <div class="modal" style="max-width:600px;">
+          <div class="modal-head">
+            <h3>Solliciter Atelier Marc Caron</h3>
+            <span class="x">✕</span>
+          </div>
+          <div class="modal-body">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <p class="modal-sub" style="margin:0;">Le registre est pré-rempli selon la fiche de l'architecte.</p>
+              <div class="seg">
+                <button class="active">Tu</button>
+                <button>Vous</button>
+              </div>
+            </div>
+
+            <div class="mail-preview">
+              <div class="mail-head">
+                <div class="row"><span class="lbl">À</span><span>marc.caron@atelier-caron.fr</span></div>
+                <div class="row"><span class="lbl">Objet</span><span>Un AO pour nous deux ? Centre technique — Bièvre Isère</span></div>
+              </div>
+              <div class="mail-body">
+                Salut Marc,<br><br>
+                On vient de repérer un AO qui pourrait nous intéresser tous les deux : la construction d'un centre technique municipal pour la CC Bièvre Isère (38). Mission de base + OPC, clôture le 18/06.<br>
+                Ça colle bien à ce qu'on a fait ensemble. Tu serais partant pour qu'on y réponde en cotraitance ?
+                <span class="cta-fake">Voir l'AO et répondre</span><br>
+                À très vite,<br>
+                L'équipe AlyoS Ingénierie <span style="color:var(--muted);">— via edifio Sourcing</span>
+              </div>
+            </div>
+            <p class="note">Vous pouvez ajouter un mot personnel ci-dessus avant l'envoi. Le lien est valable 30 jours et l'architecte répond sans créer de compte.</p>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-ghost">Retour</button>
+            <button class="btn btn-primary">✉ Envoyer la sollicitation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================== -->
+  <!-- M-E — ÉTATS VIDE / CHARGEMENT / ERREUR                               -->
+  <!-- =================================================================== -->
+  <section class="mockup">
+    <div class="mockup-label">M-E — États « AO du jour » : vide, chargement, erreur de sourcing</div>
+    <div class="mockup-frame" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+      <div style="background:var(--white); border:1px solid var(--line); border-radius:10px;">
+        <div class="empty-state">
+          <div class="es-icon">☕</div>
+          <h3>Rien de neuf ce matin</h3>
+          <p style="font-size:12.5px;">Aucun nouvel AO ne correspond à vos profils depuis hier. Le prochain sourcing tourne demain à 6h30.</p>
+          <button class="btn btn-ghost btn-sm" style="margin-top:12px;">Voir les AO différés (14)</button>
+        </div>
+      </div>
+      <div style="background:var(--white); border:1px solid var(--line); border-radius:10px;">
+        <div class="empty-state">
+          <div class="es-icon">⏳</div>
+          <h3>Sourcing en cours…</h3>
+          <p style="font-size:12.5px;">edifio interroge BOAMP et score les avis publiés. Quelques secondes.</p>
+        </div>
+      </div>
+      <div style="background:var(--white); border:1px solid var(--line); border-radius:10px;">
+        <div class="empty-state">
+          <div class="es-icon" style="color:var(--error);opacity:.5;">⚠️</div>
+          <h3>Sourcing indisponible</h3>
+          <p style="font-size:12.5px;">La source BOAMP n'a pas répondu au dernier passage. Les AO déjà connus restent consultables.</p>
+          <button class="btn btn-ghost btn-sm" style="margin-top:12px;">Réessayer</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">edifio Sourcing — Maquettes v4 · charte edifio · © AlyoS Ingénierie 2026 — Outil interne</div>
+</div>
+</body>
+</html>

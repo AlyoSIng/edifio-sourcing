@@ -8,6 +8,17 @@
 .env.preview
 .env.production
 
+# --- PII architectes / bases nominatives (JAMAIS commit — cf. specs/rgpd_registre_architectes_DRAFT.md) ---
+# Source Odoo brute (~3805 cabinets, ~1900 emails, ~1750 noms dirigeants)
+Contact_complete*.xlsx
+Contact_complete*.csv
+# Tout export PII via le round-trip admin (export/ré-import Excel/CSV)
+*_PII*
+# Le dossier seed ne doit JAMAIS accueillir de XLSX/CSV PII
+src/db/seed/*.xlsx
+src/db/seed/*.csv
+src/db/seed/architects_real*
+
 # --- Dépendances ---
 node_modules/
 .pnp
