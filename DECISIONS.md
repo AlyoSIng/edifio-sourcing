@@ -715,3 +715,29 @@
 ---
 
 *Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — Retour cron `30 4` UTC (= 6h30 Paris été) sur branche `fix/cron-schedule-paris` depuis `main`.*
+
+---
+
+## 2026-05-20 — Init BDD prod (Phase A : seed prod minimal + DEPLOY.md) *(branche `infra/init-prod-db`)*
+
+- **2026-05-20 · G6 · Board (Steve) · OK pour franchir la limite CLAUDE.md « pas d'opé prod hors Gate 9 » sur le cas remédiation infra.** [BOARD-OK 2026-05-20] [EXCEPTION TRACÉE]
+  *Justification : la BDD prod Supabase `edifio-sourcing-prod` est vide (0 table). Le cron Vercel `/api/cron/sourcing-run` crashe en prod à chaque tick depuis le merge PR #18 sur `relation "search_profiles" does not exist`. Les 4 migrations Drizzle (`0000_init.sql` → `0003_fk_supabase.sql`) ont été appliquées en local + CI mais jamais à la prod réelle. Arbitrage Board : on procède à l'init prod en deux phases (Phase A code, Phase B exécution), avec traçabilité maximale en BDD via le script `prod.ts` + en doc via `docs/DEPLOY.md` opposable. Décision Gate 9 « pas d'opé prod » réaffirmée pour le futur — cette exception est ponctuelle, motivée par la criticité (cron prod KO), et bornée à la remédiation infra (pas de changement métier).*
+
+- **2026-05-20 · G6 · Board (Steve) · Périmètre seed prod minimal validé (« 1 ok 2 ok 3 ok »).** [BOARD-OK 2026-05-20]
+  *5 tables seedées : (1) `organizations` 1 ligne AlyoS Ingénierie UUID stable `11111111-1111-1111-1111-111111111111`, subscription_tier='studio' ; (2) `platforms` 4 lignes boamp/place/francmarches/mp_info (UUIDs identiques au seed dev pour cohérence pgTAP future) ; (3) `architect_specialties` 7 lignes (table de référence) ; (4) `ai_prompts` 12 lignes via import direct du catalogue figé `AI_PROMPTS_V1_CATALOG` (P1-P12, pas de duplication) ; (5) `search_profiles` 1 ligne AlyoS active (`Profil AlyoS BTP - sourcing principal`, CPV 45+71, geo 33/40/47/64/33000, cron 06h30 L-V). Tables explicitement NON touchées : `auth.users` (managed Supabase), `users` + `memberships` (peuplés au 1er login admin), `tenders` + `tender_events` (viendront du cron BOAMP réel), `architects` (user-driven), `ai_runs` / `brevo_messages` / `audit_logs` (peuplés à l'usage). Pas de fixture, pas de donnée métier inventée.*
+
+- **2026-05-20 · G6 · Board (Steve) · Découpe Phase A code / Phase B exécution validée.** [BOARD-OK 2026-05-20]
+  *Phase A (Alex, branche `infra/init-prod-db`) : 100 % code, aucune action sur la prod réelle. Livrables : `src/db/seed/prod.ts` + `src/db/seed/prod.test.ts` (mock Drizzle, double garde testée, tables interdites assertées par exclusion) + `docs/DEPLOY.md` (runbook opposable 9 étapes + revert + annexes) + script `package.json` `db:seed:prod` + cette entrée. Phase B (Yann, séparément) : exécution `pnpm db:migrate` + `pnpm db:seed:prod` contre l'URI prod Session Pooler (port 5432) fournie par Steve, suivant `docs/DEPLOY.md`. La séparation phase A/B est l'écho du protocole Gate-9 « jamais d'opé prod sans deux humains » dans une version dégradée acceptée (Board + Yann au lieu de CTO + opérateur).*
+
+- **2026-05-20 · G6 · Alex · Double garde anti-régression du seed prod (defense in depth).** [TECHNIQUE]
+  *Le script `prod.ts` refuse de tourner si : (a) `NODE_ENV !== "production"` sans flag `--allow-prod`, OU (b) `DATABASE_URL` contient `localhost` ou `127.0.0.1` sans flag `--allow-prod`. Le flag `--allow-prod` est documenté pour les dry-runs locaux manuels d'Alex contre un sandbox prod, mais reste interdit en CI et en automate (cf. `docs/DEPLOY.md`). Cette double garde est testée Vitest dans `prod.test.ts` (7 cas : 4 throw, 3 passe). Sans elle : risque qu'un dev pose accidentellement le seed prod sur sa BDD locale (l'org `1111-...` dupliquerait celle du seed dev = état incohérent) OU qu'un seed dev soit posé sur prod (peuple 2 orgs au lieu de 1, AlyoS + « Seed Test Org B »).*
+
+- **2026-05-20 · G6 · Alex · Action ouverte : Phase B (exécution prod par Yann).** [ACTION OUVERTE]
+  *Pré-requis Phase B : (1) Steve fournit l'URI Session Pooler prod à Yann via canal sécurisé Vault ; (2) merge PR Phase A sur `main` ; (3) Yann exécute la procédure pas-à-pas de `docs/DEPLOY.md` étapes 1 à 9, en signalant au Board chaque sanity check OK/KO ; (4) après seed, Yann crée le 1er admin AlyoS via Supabase Dashboard (Étape 7 Option A) ; (5) Yann déclenche le cron manuellement via curl `GET /api/cron/sourcing-run` Bearer `CRON_SECRET` pour valider que `200 OK` remplace l'erreur précédente `500 relation "search_profiles" does not exist`. Toute friction signalée immédiatement au Board, pas de retry silencieux.*
+
+- **2026-05-20 · G6 · Alex · Livrables Phase A.** [LIVRABLE]
+  *Fichiers créés : `src/db/seed/prod.ts` (script seed minimal idempotent + double garde) ; `src/db/seed/prod.test.ts` (mock Drizzle, 3 blocs critiques : double garde, tables présentes, tables interdites exclues) ; `docs/DEPLOY.md` (runbook 9 sections + revert + 5 annexes). Fichiers modifiés : `package.json` (ajout script `db:seed:prod`). Test suite globale : suite complète Vitest verte, aucune régression. TS strict + ESLint OK.*
+
+---
+
+*Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — Phase A init BDD prod livrée sur branche `infra/init-prod-db` (seed prod minimal + DEPLOY.md opposable).*
