@@ -186,6 +186,30 @@ describe("getTendersOfTheDay", () => {
     expect(result[0]?.externalRef).toBe("BOAMP-AO-001");
     expect(result[0]?.platformCode).toBe("boamp");
   });
+
+  /**
+   * Contrat de propagation d'erreur (hotfix PR #22 — Board 2026-05-21).
+   *
+   * Le helper `getTendersOfTheDay` NE DOIT PAS try/catch en interne : c'est
+   * la couche appelante (page Server Component `/sourcing/ao-du-jour`) qui
+   * décide quoi faire d'un échec — bascule sur `ErrorBanner` + `console.error`
+   * structuré (cf. JSDoc `page.tsx` et alignement sur `src/lib/audit/index.ts`).
+   *
+   * Si un futur refactor déplace par erreur le try/catch dans ce helper,
+   * la page perdrait l'info d'erreur et afficherait silencieusement
+   * l'EmptyState — comportement trompeur. Ce test verrouille la séparation
+   * des responsabilités.
+   */
+  it("propage l'erreur si le client Drizzle throw (pas de try/catch interne)", async () => {
+    const boomError = new Error("DATABASE_URL is not set");
+    const fakeDb = {
+      select: () => {
+        throw boomError;
+      },
+    } as unknown as DrizzleClient;
+
+    await expect(getTendersOfTheDay(ORG_ALYOS, fakeDb)).rejects.toThrow("DATABASE_URL is not set");
+  });
 });
 
 // ----------------------------------------------------------------------------

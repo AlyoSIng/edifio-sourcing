@@ -9,6 +9,7 @@ import { getActiveSearchProfileName, getTendersOfTheDay } from "@/lib/sourcing/q
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { EmptyState } from "./EmptyState";
+import { ErrorBanner } from "./ErrorBanner";
 import { formatTodayLongFr } from "./format";
 import { TenderCard } from "./TenderCard";
 
@@ -56,10 +57,51 @@ export default async function AoDuJourPage() {
   // Données — appel uniquement dans la fonction async (jamais en module-scope)
   // pour que le Proxy lazy de `db` ne déclenche pas la lecture de
   // `DATABASE_URL` à l'import (env-clean `next build`).
-  const [tenders, profileName] = await Promise.all([
-    getTendersOfTheDay(ALYOS_ORG_ID, db),
-    getActiveSearchProfileName(ALYOS_ORG_ID, db),
-  ]);
+  //
+  // -------------------------------------------------------------------------
+  // Résilience runtime (hotfix PR #22, Board 2026-05-21)
+  // -------------------------------------------------------------------------
+  // (a) Pourquoi : on encapsule les fetches BDD dans un try/catch absorbé,
+  //     pattern aligné sur `src/lib/audit/index.ts` (cf. JSDoc en-tête).
+  //     Motivations :
+  //       1. CI E2E — le job `ci-e2e` ne fournit PAS `DATABASE_URL` au
+  //          webServer Playwright (par design — il couvre middleware/auth/
+  //          Resend, pas le métier BDD). Sans ce try/catch, le Proxy lazy
+  //          `db` throw `Error: DATABASE_URL is not set` au premier `.select`,
+  //          la page plante en 500, le <h1> n'est jamais rendu → 4 tests E2E
+  //          rouges (le nouveau ao-du-jour + 3 auth-password qui font
+  //          `waitForURL` sur cette page).
+  //       2. Prod — si Supabase plante 30s, on préfère rendre une page
+  //          dégradée plutôt que renvoyer un 500 brutal. C'est la même
+  //          logique « defense applicative » qu'audit/index.ts.
+  // (b) Comportement en cas d'erreur :
+  //       - stack complète tracée via `console.error` structuré (capté
+  //         par Vercel logs aujourd'hui ; futur Sentry — cf. ci-dessous).
+  //       - `tenders = []` + `profileName = null` + `fetchError` non null.
+  //       - JSX bascule sur <ErrorBanner /> (role="alert", visuellement
+  //         distinct de <EmptyState /> qui est role="status").
+  //       - Le <h1>AO du jour</h1> est TOUJOURS rendu — c'est l'invariant
+  //         qui débloque les 4 tests E2E.
+  // (c) Observabilité future : quand `@sentry/nextjs` sera branché en
+  //     Gate 8, remplacer le `console.error` ci-dessous par :
+  //         Sentry.captureException(err, {
+  //           tags: { route: "ao-du-jour", fetch_failed: true },
+  //           contexts: { fetch: { organizationId: ALYOS_ORG_ID } },
+  //         });
+  //     Convention de tags alignée sur `reportAuditFailure()`.
+  let tenders: Awaited<ReturnType<typeof getTendersOfTheDay>> = [];
+  let profileName: Awaited<ReturnType<typeof getActiveSearchProfileName>> = null;
+  let fetchError: string | null = null;
+  try {
+    [tenders, profileName] = await Promise.all([
+      getTendersOfTheDay(ALYOS_ORG_ID, db),
+      getActiveSearchProfileName(ALYOS_ORG_ID, db),
+    ]);
+  } catch (err) {
+    // TODO(Gate 8) : remplacer par Sentry.captureException — cf. note (c) supra.
+    console.error("[ao-du-jour:fetch-failed]", err);
+    fetchError = err instanceof Error ? err.message : String(err);
+  }
 
   const todayLabel = formatTodayLongFr();
   const tendersCount = tenders.length;
@@ -86,9 +128,9 @@ export default async function AoDuJourPage() {
         <div className="flex flex-col items-end gap-2">
           <span
             className="font-mono text-xs text-neutral-500"
-            aria-label={`${tendersCount} AO listés`}
+            aria-label={fetchError ? "Nombre d'AO indisponible" : `${tendersCount} AO listés`}
           >
-            {tendersCount} AO
+            {fetchError ? "—" : `${tendersCount} AO`}
           </span>
           {isAdmin(profile) ? (
             <Link
@@ -101,7 +143,9 @@ export default async function AoDuJourPage() {
         </div>
       </header>
 
-      {tendersCount === 0 ? (
+      {fetchError ? (
+        <ErrorBanner message={fetchError} />
+      ) : tendersCount === 0 ? (
         <EmptyState profileName={profileName} />
       ) : (
         <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
