@@ -66,6 +66,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+import { ALYOS_ORG_ID, ALYOS_ORG_NAME } from "@/lib/constants/organization";
+
 import { db } from "../client";
 import {
   aiPrompts,
@@ -81,12 +83,18 @@ import { AI_PROMPTS_V1_CATALOG } from "./data/ai-prompts";
 // SECTION 1 -- Constantes (alignees `src/db/seed/index.ts` pour coherence
 // pgTAP future : un test pgTAP doit retrouver les memes UUIDs dev et prod)
 // ============================================================================
+//
+// Refactor 2026-05-21 (PR n°4 page AO du jour) : ORG_A_ID / ORG_A_NAME sont
+// desormais importes depuis `src/lib/constants/organization.ts` (source de
+// verite partagee app + seeds, cf. JSDoc du module pour le rationale
+// mono-tenant V1). On les re-exporte ici sous leurs noms historiques pour ne
+// PAS casser les tests (`prod.test.ts` import nomme ORG_A_ID / ORG_A_NAME).
 
-/** UUID stable AlyoS Ingenierie -- IDENTIQUE au seed dev (ORG_A_ID). */
-export const ORG_A_ID = "11111111-1111-1111-1111-111111111111";
+/** UUID stable AlyoS Ingenierie -- IDENTIQUE au seed dev (re-export DRY). */
+export const ORG_A_ID = ALYOS_ORG_ID;
 
-/** Nom AlyoS sans accent -- coherence stricte avec seed dev (cf. JSDoc seed/index.ts ligne 78). */
-export const ORG_A_NAME = "AlyoS Ingenierie";
+/** Nom AlyoS sans accent -- IDENTIQUE au seed dev (re-export DRY). */
+export const ORG_A_NAME = ALYOS_ORG_NAME;
 
 /** IDs deterministes des 4 plateformes -- IDENTIQUES au seed dev (PLATFORM_IDS). */
 export const PROD_PLATFORM_IDS = {

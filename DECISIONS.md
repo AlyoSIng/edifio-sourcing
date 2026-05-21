@@ -761,3 +761,23 @@
 ---
 
 *Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — Restauration spec audit_log_v1.md + clôture handoff stash obsolète sur branche `chore/cleanup-cto-validation-and-stash-archive`.*
+
+---
+
+## 2026-05-21 — PR n°4 : page liste AO du jour V1 read-only *(branche `feat/sourcing-ao-du-jour-list`)*
+
+- **2026-05-21 · G6 · Alex · Mono-tenancy V1 via constante centralisée `ALYOS_ORG_ID`.** [DÉCISION TECHNIQUE]
+  *Création de `src/lib/constants/organization.ts` exportant `ALYOS_ORG_ID = "11111111-1111-1111-1111-111111111111"` + `ALYOS_ORG_NAME = "AlyoS Ingenierie"` — source de vérité unique partagée par les 2 seeds (`src/db/seed/index.ts`, `src/db/seed/prod.ts`) et l'app (`src/app/sourcing/ao-du-jour/page.tsx`). Refactor DRY zero-impact-sémantique : les seeds conservent leurs exports nommés `ORG_A_ID` / `ORG_A_NAME` (re-export depuis la constante) pour ne pas casser les tests qui les référencent (`src/lib/audit/index.test.ts:51`, `src/db/seed/prod.test.ts:87`). Justification : la table `memberships` n'est PAS peuplée par l'admin API actuelle (`src/app/api/admin/users/route.ts` ne crée que `auth.users` + metadata), donc impossible de dériver l'org via lookup en V1. JSDoc explicite documente le passage Phase 2 multi-tenant (remplacer par `getCurrentOrgId(userId)` avec lookup `memberships` + peupler `public.users` au 1er login via hook auth).*
+
+- **2026-05-21 · G6 · Alex · Page `/sourcing/ao-du-jour` V1 strictement read-only — pas de stubs d'actions.** [DÉCISION UX]
+  *Pas de boutons « Sélectionner » / « Différer » / « Rejeter » sur la `TenderCard` V1. JSDoc explicite sur le composant pointe vers la PR n°5. Justification : honnêteté UX > stubs morts qui ne font rien au clic ; l'audit log A4 `tender_select` exige un payload typé non trivial (cf. `specs/audit_log_v1.md`) qu'on ne câble pas à la sauvette ; la transition `tenders.status` impose la modal Solo/Tandem (Maquette 3) packagée naturellement avec la PR n°5. Le menu utilisateur reste sobre — info essentielle (titre, acheteur, montant, deadline, CPV, plateforme, score) sans bruit décisionnel.*
+
+- **2026-05-21 · G6 · Alex · Filtre tenant explicite dans la SQL (defense applicative) + RLS defense-in-depth.** [SÉCURITÉ]
+  *`getTendersOfTheDay(organizationId, db)` et `getActiveSearchProfileName(organizationId, db)` posent un `WHERE organization_id = $1` explicite. Justification : le client Drizzle (`src/db/client.ts`) ouvre la connexion avec le rôle Postgres `postgres` via `DATABASE_URL` direct (pas via JWT Supabase) — les policies RLS non-FORCE sont implicitement bypassées par ce rôle. Le filtre applicatif est donc la ligne de défense PRIMAIRE en V1. La RLS reste en defense-in-depth (couverture pgTAP cross-tenant via `tests/rls/`). Tri `score DESC NULLS LAST, created_at DESC` aligné sur l'index partiel `idx_tenders_score (organization_id, score DESC) WHERE status='sourced'` posé migration 0001. `LIMIT 50` (volume cible MVP AlyoS ~5-30 AO/jour, marge confortable).*
+
+- **2026-05-21 · G6 · Alex · Livrables PR n°4.** [LIVRABLE]
+  *Fichiers créés : `src/lib/constants/organization.ts` ; `src/lib/sourcing/queries.ts` + `.test.ts` (5 tests Vitest) ; `src/app/sourcing/ao-du-jour/{page.tsx,TenderCard.tsx,EmptyState.tsx,format.ts}` ; `e2e/ao-du-jour.spec.ts` (2 scénarios) ; `notes-de-suivi/CC_260521_AO_DU_JOUR_V1.md`. Fichiers modifiés : `src/db/seed/index.ts` + `src/db/seed/prod.ts` (refactor import + re-export DRY). TS strict respecté (0 `any`, 0 `// @ts-ignore`). Aucune migration BDD, aucune nouvelle dépendance npm. `next build` env-clean préservé (lazy db Proxy). Prochaine PR identifiée : PR n°5 actions Sélectionner / Différer / Rejeter avec modal Solo/Tandem + audit log A4.*
+
+---
+
+*Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — Page AO du jour V1 read-only livrée sur branche `feat/sourcing-ao-du-jour-list`.*
