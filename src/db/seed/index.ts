@@ -39,6 +39,8 @@ import { dirname, resolve } from "node:path";
 import { faker } from "@faker-js/faker/locale/fr";
 import { sql } from "drizzle-orm";
 
+import { ALYOS_ORG_ID, ALYOS_ORG_NAME } from "@/lib/constants/organization";
+
 import { db } from "../client";
 import {
   aiPrompts,
@@ -72,10 +74,17 @@ faker.seed(20260518);
 // --- UUID stables ----------------------------------------------------------
 // Permet l'idempotence (relancer le seed ne reduplique pas) + permet aux
 // tests pgTAP de retrouver les orgs via UUID predictible.
-const ORG_A_ID = "11111111-1111-1111-1111-111111111111"; // AlyoS Ingenierie
-const ORG_B_ID = "22222222-2222-2222-2222-222222222222"; // Seed Test Org B (dev/CI only)
+//
+// Refactor 2026-05-21 (PR n°4 page AO du jour) : ORG_A_ID / ORG_A_NAME sont
+// desormais importes depuis `src/lib/constants/organization.ts` (source de
+// verite partagee app + seeds, cf. JSDoc du module pour le rationale
+// mono-tenant V1). On les re-exporte ici sous leurs noms historiques pour ne
+// PAS casser les tests internes du seed et les tests d'audit qui les
+// referencent par UUID en dur (`src/lib/audit/index.test.ts:51`).
+export const ORG_A_ID = ALYOS_ORG_ID;
+export const ORG_A_NAME = ALYOS_ORG_NAME;
 
-const ORG_A_NAME = "AlyoS Ingenierie";
+const ORG_B_ID = "22222222-2222-2222-2222-222222222222"; // Seed Test Org B (dev/CI only)
 const ORG_B_NAME = "Seed Test Org B";
 
 // IDs deterministes pour les 4 plateformes
