@@ -741,3 +741,23 @@
 ---
 
 *Dernière mise à jour : 2026-05-20 par [Alex via Claude Code] — Phase A init BDD prod livrée sur branche `infra/init-prod-db` (seed prod minimal + DEPLOY.md opposable).*
+
+---
+
+## 2026-05-21 — Cleanup post-merge : régression spec audit + clôture handoff stash obsolète *(branche `chore/cleanup-cto-validation-and-stash-archive`)*
+
+- **2026-05-21 · G6 · Alex · Régression `specs/audit_log_v1.md:60` détectée et restaurée.** [POST-MORTEM MINEUR]
+  *Audit de l'action ouverte ANSWER_260520_1810 (« nettoyer 2 mentions validation CTO ») a révélé que la mise à jour faite par le commit `ba97352` (2026-05-20 18:05) avait été partiellement écrasée par le commit suivant `8b18b9a` (2026-05-20 21:21, titre « docs: sync cowork decisions batch 14 + brief pr3 scoring cron »). 3 lignes regressées dans `audit_log_v1.md` : (a) l'extension de l'enum `operation` à 4 valeurs (`regenerate_provisional` retiré), (b) le paragraphe d'amendement daté 2026-05-20 (supprimé), (c) la mention « Validé CTO Sophie 2026-05-20 » avec le pointeur vers ANSWER (supprimée). Le JSDoc équivalent dans `src/db/types/jsonb.ts:236-243` est resté correct (non impacté par 8b18b9a). Le code applicatif est aligné depuis ba97352 — la régression est purement documentaire mais désaligne la spec figée vs l'implémentation, ce qui contredit l'invariant Gate 5 « spec = source de vérité immuable ». Cause racine probable : conflit de merge silencieux lors du sync Cowork, fichier édité depuis une base pré-ba97352.*
+
+- **2026-05-21 · G6 · Alex · Restauration des 3 lignes spec à l'identique du contenu post-ba97352.** [LIVRABLE]
+  *`specs/audit_log_v1.md` ligne 60 → enum étendu (`invite | update | revoke | regenerate_provisional`) + paragraphe amendement avec « Validé CTO Sophie 2026-05-20 » + pointeur `handoff/ANSWER_260520_1810_ETENDRE_A2_OPERATION_REGEN.md`. Aucun changement de code applicatif, aucune migration. Test suite globale Vitest inchangée (la spec n'est pas exécutée).*
+
+- **2026-05-21 · G6 · Alex · Clôture handoff `REQUEST_260519_2030_STASH_COWORK_DECISIONS_SCHEMA.md` (obsolète).** [HANDOFF CLOS]
+  *Le handoff demandait à Cowork d'arbitrer un stash isolé sur la branche `feat/sourcing-mvp` (DECISIONS.md condensé Cowork + retrait `AS RESTRICTIVE` involontaire sur policy `insert_by_member`). La branche `feat/sourcing-mvp` a été mergée puis supprimée local + origin entre-temps. Les fixes RLS it2 (`AS RESTRICTIVE` sur `insert_by_member`) sont en vigueur sur `main` depuis PR #14 (cf. `src/db/migrations/0002_rls.sql`). Le contenu condensé du stash n'a pas été récupéré et ne le sera pas — la trace détaillée des post-mortems CI Postgres reste préservée sur `main`. Footer de clôture ajouté au fichier handoff en place (pas de move vers `archive/` pour préserver les liens DECISIONS.md). Pas d'action Cowork attendue.*
+
+- **2026-05-21 · G6 · Alex · Apprentissage process : détection conflits silencieux sync Cowork.** [APPRENTISSAGE]
+  *Quand un commit `docs: sync cowork decisions ...` touche un fichier figé spec, audit systématique du diff doc vs implémentation avant push pour s'assurer qu'aucune entrée applicative actée (ex. ADR, ANSWER handoff) n'a été écrasée. À intégrer en checklist review PR Cowork-driven.*
+
+---
+
+*Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — Restauration spec audit_log_v1.md + clôture handoff stash obsolète sur branche `chore/cleanup-cto-validation-and-stash-archive`.*
