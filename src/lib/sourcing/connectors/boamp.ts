@@ -8,43 +8,61 @@
  *  - `specs/module_sourcing_engine_v1.md` §3.1 (BOAMP API Opendatasoft)
  *  - `src/lib/sourcing/types.ts` (`RawTender`, `BoampApiRecord`, `PlatformCode`)
  *
- * Endpoint : `https://data.boamp.fr/api/2/datasets/boamp/records` (Opendatasoft,
- * ouvert, ~500 req/min sans clé). Pagination via `rows` + `start`.
+ * Endpoint : `https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records`
+ * (portail Opendatasoft DILA officiel, ouvert, ~500 req/min sans clé).
+ * Pagination via `limit` + `offset` (max 100 v2.1).
+ *
+ * Endpoint refacto 2026-05-21 (incident P1 prod). Précédent endpoint
+ * `data.boamp.fr/api/2/...` décommissionné — cf. DECISIONS.md.
  *
  * Comportement :
- *  - Itère jusqu'à épuisement (record vide OU `total_count` atteint).
+ *  - Itère jusqu'à épuisement (page vide OU `total_count` atteint).
  *  - Retry exponentiel sur 429 + 5xx (3 tentatives, backoff 1 s / 2 s / 4 s).
  *  - Mappe chaque record vers `RawTender` (pas de parsing métier ici, c'est
  *    le rôle de `normalize.ts` — étape 3).
  *  - Injection de `fetch` via `opts` pour permettre les tests sans réseau.
  *
  * Choix non triviaux :
- *  - On lit la projection « fields » d'Opendatasoft (`record.record.fields`)
- *    pour produire un `BoampApiRecord` strict. Voir handoff Cowork si la
- *    structure d'enveloppe Opendatasoft change.
+ *  - En v2.1 Opendatasoft, les records sont renvoyés FLAT dans `results[]`
+ *    (pas de wrapper `record.fields`). On les consomme directement comme
+ *    `BoampApiRecord`. Voir handoff Cowork si la structure change.
  *  - `fetchedAt` est un `string` ISO (pas un `Date`) pour respecter le contrat
  *    `RawTender.fetchedAt` posé à l'étape 1 — Date sérialisée à la frontière.
  */
 
 import type { BoampApiRecord, RawTender } from "../types";
 
-/** Endpoint Opendatasoft BOAMP (constant). */
-const BOAMP_ENDPOINT = "https://data.boamp.fr/api/2/datasets/boamp/records";
+/**
+ * Endpoint Opendatasoft v2.1 — portail DILA officiel (cf. diagnostic 2026-05-21).
+ * Ancien endpoint `data.boamp.fr/api/2/...` décommissionné — host ne résout plus.
+ */
+const BOAMP_ENDPOINT =
+  "https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records";
 
-/** Taille de page maximale Opendatasoft (cf. doc API v2). */
-const PAGE_SIZE = 1000;
+/**
+ * Taille de page max v2.1 Opendatasoft (cf. doc explore API). Volume cible AlyoS
+ * ~3-5K records/jour glissant → 30-50 pages séquentielles. Acceptable cron 6h30.
+ */
+const PAGE_SIZE = 100;
 
 /** Backoff exponentiel (ms) appliqué entre 2 tentatives sur 429 / 5xx. */
 const RETRY_BACKOFF_MS = [1000, 2000, 4000] as const;
 
 /**
- * Enveloppe Opendatasoft v2 : on ne décrit ici que les champs réellement
- * utilisés. Tout le reste (links, total_count partiel, etc.) reste `unknown`
- * et n'est pas exposé en dehors du module.
+ * Garde-fou d'itérations de pagination. 200 itérations × `PAGE_SIZE` = 20 000
+ * records — largement supérieur au cap quotidien AlyoS de ~5K. Au-delà on jette.
  */
-interface OpendatasoftResponseV2 {
+const MAX_PAGINATION_ITERATIONS = 200;
+
+/**
+ * Enveloppe Opendatasoft v2.1 : on ne décrit ici que les champs réellement
+ * utilisés. Tout le reste (links, etc.) reste `unknown` et n'est pas exposé
+ * en dehors du module. En v2.1 les records sont FLAT directement dans
+ * `results[]` (plus de wrapper `record.fields` comme en v2).
+ */
+interface OpendatasoftResponseV21 {
   total_count?: number;
-  records?: Array<{ record?: { fields?: BoampApiRecord } }>;
+  results?: BoampApiRecord[];
 }
 
 /**
@@ -86,17 +104,20 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Encode l'URL Opendatasoft avec les paramètres demandés.
+ * Encode l'URL Opendatasoft v2.1 avec les paramètres demandés.
  *
- * @param lastRunAt — borne inférieure de `datepublication` (ISO 8601)
- * @param start     — offset de pagination (0-based)
+ * v2.1 syntax : champ renommé `datepublication` → `dateparution`, format date ISO
+ * accepté (`YYYY-MM-DDTHH:MM:SSZ`). Quote simple recommandée par doc Opendatasoft.
+ *
+ * @param lastRunAt — borne inférieure de `dateparution` (ISO 8601)
+ * @param offset    — offset de pagination (0-based)
  */
-function buildBoampUrl(lastRunAt: Date, start: number): string {
+function buildBoampUrl(lastRunAt: Date, offset: number): string {
   const params = new URLSearchParams({
-    rows: String(PAGE_SIZE),
-    start: String(start),
-    where: `datepublication >= "${lastRunAt.toISOString()}"`,
-    sort: "datepublication desc",
+    limit: String(PAGE_SIZE),
+    offset: String(offset),
+    where: `dateparution >= "${lastRunAt.toISOString()}"`,
+    order_by: "dateparution desc",
   });
   return `${BOAMP_ENDPOINT}?${params.toString()}`;
 }
@@ -122,7 +143,7 @@ class BoampNonRetryableError extends Error {
 async function fetchWithRetry(
   url: string,
   fetchImpl: typeof fetch,
-): Promise<OpendatasoftResponseV2> {
+): Promise<OpendatasoftResponseV21> {
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < RETRY_BACKOFF_MS.length; attempt++) {
@@ -131,10 +152,10 @@ async function fetchWithRetry(
 
       if (response.ok) {
         // Opendatasoft renvoie toujours du JSON sur 200 — `as unknown` puis
-        // narrow vers `OpendatasoftResponseV2` (forme partielle, on tolère
+        // narrow vers `OpendatasoftResponseV21` (forme partielle, on tolère
         // les champs additionnels via `unknown` côté enveloppe).
         const payload = (await response.json()) as unknown;
-        return payload as OpendatasoftResponseV2;
+        return payload as OpendatasoftResponseV21;
       }
 
       if (!isRetryableStatus(response.status)) {
@@ -216,29 +237,24 @@ export function createBoampConnector(opts: BoampConnectorOptions = {}): BoampCon
     async fetchSinceLastRun(_profileId: string, lastRunAt: Date): Promise<RawTender[]> {
       const fetchedAtIso = new Date().toISOString();
       const accumulator: RawTender[] = [];
-      let start = 0;
+      let offset = 0;
 
       // Boucle de pagination — on stoppe sur page vide OU total_count atteint.
-      // Garde-fou : 1000 itérations max (1 M de records) — au-delà on jette.
-      for (let iter = 0; iter < 1000; iter++) {
-        const url = buildBoampUrl(lastRunAt, start);
+      // Garde-fou : MAX_PAGINATION_ITERATIONS itérations max — au-delà on jette.
+      for (let iter = 0; iter < MAX_PAGINATION_ITERATIONS; iter++) {
+        const url = buildBoampUrl(lastRunAt, offset);
         const response = await fetchWithRetry(url, fetchImpl);
 
-        const records = response.records ?? [];
+        const records = response.results ?? [];
         if (records.length === 0) {
           // Page vide → fin naturelle
           break;
         }
 
-        for (const wrapper of records) {
-          const fields = wrapper.record?.fields;
-          if (!fields) {
-            // Record vide / mal formé côté Opendatasoft — on logge en throw
-            // pour ne pas masquer une régression amont.
-            throw new Error(
-              "BOAMP API a renvoyé un wrapper sans record.fields — schéma Opendatasoft inattendu",
-            );
-          }
+        for (const fields of records) {
+          // En v2.1 les records sont FLAT directement dans results[] — pas de
+          // wrapper. On valide juste la présence d'idweb dans projectRecord()
+          // comme avant.
           accumulator.push(projectRecord(fields, fetchedAtIso));
         }
 
@@ -250,7 +266,7 @@ export function createBoampConnector(opts: BoampConnectorOptions = {}): BoampCon
           break;
         }
 
-        start += PAGE_SIZE;
+        offset += PAGE_SIZE;
       }
 
       return accumulator;
