@@ -221,10 +221,11 @@ describe("schema Drizzle v1 — inférence de types", () => {
     expectTypeOf<Row["payload"]>().toEqualTypeOf<NotificationPayload | null>();
   });
 
-  it("audit_logs : data typé AuditLogData (jsonb union) + action enum 13 valeurs", () => {
+  it("audit_logs : data typé AuditLogData (jsonb union) + action enum 15 valeurs", () => {
     type Row = typeof auditLogs.$inferSelect;
     expectTypeOf<Row["data"]>().toEqualTypeOf<AuditLogData | null>();
-    // audit_action = 13 valeurs (cf. audit_log_v1.md). Union complète.
+    // audit_action = 15 valeurs (cf. audit_log_v1.md — post-PR n°5 2026-05-21
+    // ajout de tender_defer (A14) et tender_reject (A15)). Union complète.
     expectTypeOf<Row["action"]>().toEqualTypeOf<
       | "login"
       | "membership_change"
@@ -239,6 +240,8 @@ describe("schema Drizzle v1 — inférence de types", () => {
       | "token_revoke"
       | "data_delete"
       | "access_attempt"
+      | "tender_defer"
+      | "tender_reject"
     >();
     // actor_role est nullable (snapshot)
     expectTypeOf<Row["actorRole"]>().toEqualTypeOf<"admin" | "user" | "viewer" | null>();

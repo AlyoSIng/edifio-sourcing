@@ -65,6 +65,19 @@ export const tenders = pgTable(
     matchingProfileId: uuid("matching_profile_id").references(() => searchProfiles.id, {
       onDelete: "set null",
     }),
+    /**
+     * Différé utilisateur (PR n°5 — Arbitrage Board B 2026-05-21).
+     *
+     * Quand l'utilisateur clique « Différer » sur la `TenderCard`, on pose
+     * `deferred_until = now() + N hours` (V1 fixe à 24h, extensible Phase 2).
+     * Le statut tender reste `sourced` — c'est `getTendersOfTheDay` qui
+     * filtre `(deferred_until IS NULL OR deferred_until < now())` pour
+     * exclure l'AO du digest du jour. À expiration de `deferred_until`,
+     * l'AO réapparait automatiquement.
+     *
+     * Nullable par défaut : un AO neuf n'est jamais différé.
+     */
+    deferredUntil: timestamp("deferred_until", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -78,6 +91,18 @@ export const tenders = pgTable(
     /** Borne score 0..100 */
     scoreRange: check("tenders_score_check", sql`${table.score} >= 0 AND ${table.score} <= 100`),
     orgStatusIdx: index("idx_tenders_org_status").on(table.organizationId, table.status),
+    /**
+     * Index partiel sur `deferred_until` — n'indexe que les lignes différées
+     * (généralement une minorité). Utilisé pour requêtes futures de type
+     * « lister les AO différés », et accélère le filtre négatif côté
+     * `getTendersOfTheDay` même si Postgres peut aussi traiter NULL hors
+     * index. Prédicat `IS NOT NULL` strictement IMMUTABLE — pas de souci
+     * SQLSTATE 42P17 contrairement à `WHERE deadline > now()` (cf. JSDoc
+     * `deadlineIdx`).
+     */
+    deferredUntilIdx: index("idx_tenders_deferred_until")
+      .on(table.deferredUntil)
+      .where(sql`${table.deferredUntil} IS NOT NULL`),
     /**
      * Index full sur deadline. Divergence assumée vs `specs/schema_v1.sql:206`
      * qui posait un index partiel `WHERE deadline > now()` — Postgres refuse

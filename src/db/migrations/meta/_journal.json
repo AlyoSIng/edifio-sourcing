@@ -29,6 +29,13 @@
       "when": 1779624060000,
       "tag": "0003_fk_supabase",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779381444916,
+      "tag": "0004_tender_deferral",
+      "breakpoints": true
     }
   ]
 }

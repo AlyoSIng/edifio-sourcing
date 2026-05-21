@@ -337,6 +337,33 @@ export interface AuditLogDataAccessAttempt {
 }
 
 /**
+ * A14 — `tender_defer` (PR n°5, 2026-05-21).
+ *
+ * Cf. `specs/audit_log_v1.md` §A14 + `src/lib/audit/schemas.ts` (tenderDeferSchema).
+ */
+export interface AuditLogDataTenderDefer {
+  tender_id: string;
+  tender_ref: string;
+  deferred_until: string;
+  hours_offset: number;
+}
+
+/**
+ * A15 — `tender_reject` (PR n°5, 2026-05-21).
+ *
+ * `reason` et `score_at_reject` sont nullables — l'utilisateur peut rejeter
+ * sans motif, et un AO peut ne pas avoir de score au moment du rejet.
+ *
+ * Cf. `specs/audit_log_v1.md` §A15 + `src/lib/audit/schemas.ts` (tenderRejectSchema).
+ */
+export interface AuditLogDataTenderReject {
+  tender_id: string;
+  tender_ref: string;
+  reason: string | null;
+  score_at_reject: number | null;
+}
+
+/**
  * Union discriminée fonctionnelle côté app via le champ `action` (colonne
  * dédiée de la table, pas dans le jsonb). On expose ici un type union plat
  * pour le `.$type<>()` Drizzle.
@@ -354,4 +381,6 @@ export type AuditLogData =
   | AuditLogDataRgpdExport
   | AuditLogDataTokenRevoke
   | AuditLogDataDataDelete
-  | AuditLogDataAccessAttempt;
+  | AuditLogDataAccessAttempt
+  | AuditLogDataTenderDefer
+  | AuditLogDataTenderReject;

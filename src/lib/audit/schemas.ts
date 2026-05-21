@@ -32,12 +32,17 @@ import { z } from "zod";
 // ============================================================================
 
 /**
- * Liste fermée des 13 actions sensibles tracées en audit log.
+ * Liste fermée des 15 actions sensibles tracées en audit log.
  *
  * IMPORTANT : tout ajout ici nécessite :
  *  - bump du payload spec `audit_log_v1.md`
  *  - ALTER TYPE audit_action ADD VALUE ... dans une nouvelle migration
  *  - ajout du schéma Zod ci-dessous (placeholder ou strict)
+ *
+ * **Alignement strict avec enum Postgres `audit_action`** (cf.
+ * `src/db/schema/enums.ts`). L'ordre doit être identique pour que les
+ * snapshots Drizzle soient déterministes — `tender_defer` et `tender_reject`
+ * en fin de liste comme dans la migration 0004 (PR n°5, 2026-05-21).
  */
 export const AUDIT_ACTIONS = [
   "login",
@@ -53,6 +58,8 @@ export const AUDIT_ACTIONS = [
   "token_revoke",
   "data_delete",
   "access_attempt",
+  "tender_defer",
+  "tender_reject",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -226,6 +233,60 @@ const dataDeleteSchema = placeholder;
  */
 const accessAttemptSchema = placeholder;
 
+/**
+ * A14 — `tender_defer` (STRICT — implémenté PR n°5, Arbitrage Board B 2026-05-21).
+ *
+ * Déclenchée quand un utilisateur clique « Différer » sur une `TenderCard`.
+ * L'AO reste `status='sourced'` mais est exclu de la vue « AO du jour »
+ * jusqu'à expiration de `deferred_until` (cf. filtre `getTendersOfTheDay`).
+ *
+ * Contraintes :
+ *  - `tender_id` : UUID shape (cf. `UUID_SHAPE` réutilisé depuis A4)
+ *  - `tender_ref` : non vide (externalRef snapshot)
+ *  - `deferred_until` : ISO 8601 datetime (résultante calculée `now() + offset`)
+ *  - `hours_offset` : entier positif (V1 fixe à 24, extensible Phase 2)
+ */
+const tenderDeferSchema = z.object({
+  tender_id: z.string().regex(UUID_SHAPE, { message: "tender_id doit être un UUID" }),
+  tender_ref: z.string().min(1, { message: "tender_ref ne peut pas être vide" }),
+  deferred_until: z
+    .string()
+    .datetime({ message: "deferred_until doit être ISO 8601 (ex. 2026-05-22T06:30:00.000Z)" }),
+  hours_offset: z
+    .number()
+    .int({ message: "hours_offset doit être entier" })
+    .positive({ message: "hours_offset doit être strictement positif" }),
+});
+
+/**
+ * A15 — `tender_reject` (STRICT — implémenté PR n°5, Arbitrage Board A 2026-05-21).
+ *
+ * Déclenchée quand un utilisateur clique « Rejeter » sur une `TenderCard` puis
+ * confirme via la modale `RejectReasonModal`. L'AO bascule `status='dropped'`.
+ * Le motif libre `reason` (max 280 chars, nullable) alimente le bloc
+ * apprentissage IA scoring — signal négatif explicite, distinct du simple
+ * différé (A14).
+ *
+ * Contraintes :
+ *  - `tender_id` : UUID shape (cf. `UUID_SHAPE`)
+ *  - `tender_ref` : non vide
+ *  - `reason` : string max 280 chars OU null (Arbitrage Board C 2026-05-21,
+ *    motif optionnel)
+ *  - `score_at_reject` : entier 0-100 OU null (un AO non scoré peut être
+ *    rejeté avant calcul de score — robustesse)
+ */
+const tenderRejectSchema = z.object({
+  tender_id: z.string().regex(UUID_SHAPE, { message: "tender_id doit être un UUID" }),
+  tender_ref: z.string().min(1, { message: "tender_ref ne peut pas être vide" }),
+  reason: z.string().max(280, { message: "reason ne peut pas dépasser 280 caractères" }).nullable(),
+  score_at_reject: z
+    .number()
+    .int({ message: "score_at_reject doit être entier" })
+    .min(0, { message: "score_at_reject doit être >= 0" })
+    .max(100, { message: "score_at_reject doit être <= 100" })
+    .nullable(),
+});
+
 // ============================================================================
 // 3. Map action → schéma Zod
 // ============================================================================
@@ -252,6 +313,8 @@ export const AUDIT_SCHEMAS = {
   token_revoke: tokenRevokeSchema,
   data_delete: dataDeleteSchema,
   access_attempt: accessAttemptSchema,
+  tender_defer: tenderDeferSchema,
+  tender_reject: tenderRejectSchema,
 } as const satisfies Record<AuditAction, z.ZodTypeAny>;
 
 // ============================================================================
@@ -276,4 +339,4 @@ export type AuditLogDataFor<A extends AuditAction> = z.infer<(typeof AUDIT_SCHEM
  * Le call-site `audit({ action: 'tender_select', data: ... })` n'a PAS besoin
  * d'importer le schéma : la validation est interne au helper.
  */
-export { tenderSelectSchema };
+export { tenderDeferSchema, tenderRejectSchema, tenderSelectSchema };

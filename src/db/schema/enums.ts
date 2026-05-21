@@ -108,8 +108,15 @@ export const aiModel = pgEnum("ai_model", ["sonnet-4-6", "haiku-4-5"]);
 export const brevoRegister = pgEnum("brevo_register", ["tu", "vous", "neutre"]);
 
 /**
- * audit_action — 13 actions sensibles tracées en audit log immutable.
+ * audit_action — 15 actions sensibles tracées en audit log immutable.
  * Cf. `specs/audit_log_v1.md` pour les payloads détaillés par action.
+ *
+ * NB : `tender_defer` et `tender_reject` ajoutés à la fin du tableau par
+ * PR n°5 (2026-05-21). Cet ordre se reflète dans le SQL côté Drizzle
+ * sous forme de `ALTER TYPE audit_action ADD VALUE 'tender_defer'`
+ * puis `ALTER TYPE audit_action ADD VALUE 'tender_reject'` — l'ordre
+ * d'ajout est important car `ALTER TYPE ... ADD VALUE` ne peut pas
+ * tourner dans une transaction Postgres (cf. migration 0004).
  */
 export const auditAction = pgEnum("audit_action", [
   "login",
@@ -125,6 +132,8 @@ export const auditAction = pgEnum("audit_action", [
   "token_revoke",
   "data_delete",
   "access_attempt",
+  "tender_defer",
+  "tender_reject",
 ]);
 
 /**

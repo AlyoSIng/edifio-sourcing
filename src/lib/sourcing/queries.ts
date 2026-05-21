@@ -28,7 +28,7 @@
  * `Page()` appelle effectivement le helper.
  */
 
-import { and, asc, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 
 import type { db as defaultDb } from "@/db/client";
 import { platforms, searchProfiles } from "@/db/schema/config";
@@ -70,6 +70,13 @@ export interface TenderOfTheDay {
   score: string | null;
   platformCode: PlatformCode;
   externalRef: string;
+  /**
+   * Différé utilisateur (PR n°5). `null` = pas différé. Une valeur future
+   * exclurait la ligne du résultat de `getTendersOfTheDay` (cf. filtre WHERE),
+   * donc en pratique pour les rows retournées : soit `null`, soit une date
+   * passée. Exposé pour debug et pour un futur tag UI « précédemment différé ».
+   */
+  deferredUntil: Date | null;
 }
 
 // ============================================================================
@@ -116,6 +123,7 @@ export async function getTendersOfTheDay(
       score: tenders.score,
       platformCode: platforms.code,
       externalRef: tenders.externalRef,
+      deferredUntil: tenders.deferredUntil,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
@@ -124,6 +132,12 @@ export async function getTendersOfTheDay(
         eq(tenders.organizationId, organizationId),
         eq(tenders.status, "sourced"),
         or(isNull(tenders.deadline), gt(tenders.deadline, sql`now()`)),
+        // PR n°5 (Arbitrage Board B 2026-05-21) : exclure les AO différés
+        // dont la date butoir n'est pas encore passée. Un AO sans différé
+        // (deferred_until IS NULL) reste visible, ce qui couvre 100 % du
+        // stock cron normal. À expiration, l'AO réapparait automatiquement
+        // dans le digest.
+        or(isNull(tenders.deferredUntil), lt(tenders.deferredUntil, sql`now()`)),
       ),
     )
     // NULLS LAST sur score (postgres-js + Drizzle : on passe par `sql` brut

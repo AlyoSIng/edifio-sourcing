@@ -11,6 +11,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { EmptyState } from "./EmptyState";
 import { ErrorBanner } from "./ErrorBanner";
 import { formatTodayLongFr } from "./format";
+import { TenderActionsErrorToast } from "./TenderActionsErrorToast";
 import { TenderCard } from "./TenderCard";
 
 export const metadata = {
@@ -142,6 +143,10 @@ export default async function AoDuJourPage() {
           ) : null}
         </div>
       </header>
+
+      {/* Toast d'erreur pour les server actions (PR n°5). Toujours monté
+          côté Client, devient visible uniquement en cas d'erreur action. */}
+      <TenderActionsErrorToast />
 
       {fetchError ? (
         <ErrorBanner message={fetchError} />
