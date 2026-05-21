@@ -1,3 +1,8 @@
+> **[CLOS 2026-05-21]** — Handoff obsolète, plus d'action Cowork attendue.
+> La branche `feat/sourcing-mvp` (porteuse du stash `stash@{0} cowork-sync-260519-pre-pr2`) a été mergée puis supprimée local + origin. Les fixes RLS it2 (`AS RESTRICTIVE` sur `insert_by_member`) sont en vigueur sur `main` depuis PR #14 (cf. `src/db/migrations/0002_rls.sql`). Le contenu condensé du stash n'a pas été récupéré et ne le sera pas. Trace dans `DECISIONS.md` (entrée 2026-05-21).
+
+---
+
 # REQUEST — Arbitrage stash Cowork sur `DECISIONS.md` + `specs/schema_v1.sql`
 
 **Date** : 2026-05-19 20:30
