@@ -45,6 +45,21 @@ export function InviteUserDialog() {
       fd.set("role", form.role);
 
       const resp = await fetch("/api/admin/users", { method: "POST", body: fd });
+
+      // P3 (2026-05-22) — Le middleware renvoie désormais un JSON 401 plutôt
+      // qu'un 307 vers /login sur les routes API. On gère ici le cas session
+      // expirée : message inline + redirect manuel vers /login avec un `next`
+      // pour reprendre l'admin après reconnexion.
+      if (resp.status === 401) {
+        setState({
+          status: "error",
+          message: "Session expirée — redirection vers la page de connexion...",
+        });
+        const next = encodeURIComponent("/sourcing/admin/users");
+        window.location.href = `/login?next=${next}`;
+        return;
+      }
+
       const json = (await resp.json().catch(() => ({}))) as {
         ok?: boolean;
         message?: string;

@@ -71,6 +71,16 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       console.warn(
         "[middleware] NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY manquant — comportement anonyme par défaut.",
       );
+      // P3 (2026-05-22) — Les routes API doivent répondre JSON. Sinon le
+      // browser suit le redirect 307 vers /login (page HTML) et le caller
+      // côté UI plante avec `Unexpected token <` au `JSON.parse`.
+      if (isProtectedApiRoute(pathname)) {
+        return jsonUnauthorizedApi(
+          503,
+          "service_unavailable",
+          "Service indisponible (configuration Supabase manquante).",
+        );
+      }
       return redirectToLogin(req, pathname);
     }
 
@@ -101,6 +111,15 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 
     // ---------- 4. Session absente ----------
     if (!user) {
+      // P3 (2026-05-22) — Les routes API renvoient JSON 401 plutôt qu'un
+      // 307 vers /login. Sans ça, les fetch côté UI (`InviteUserDialog`,
+      // `RegeneratePasswordButton`) suivent le redirect par défaut, reçoivent
+      // la page HTML du login et plantent à `await resp.json()` avec
+      // `Unexpected token <`. Le caller UI gère le 401 (cf. composants
+      // patchés dans la même PR) en redirigeant manuellement vers /login.
+      if (isProtectedApiRoute(pathname)) {
+        return jsonUnauthorizedApi(401, "unauthorized", "Authentification requise.");
+      }
       return redirectToLogin(req, pathname);
     }
 
@@ -212,8 +231,39 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       message: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : null,
     });
+    // P3 (2026-05-22) — Même règle que les autres branches : sur une route
+    // API, on renvoie du JSON, pas un redirect HTML. Le caller UI traite
+    // alors l'erreur proprement (état d'erreur inline) plutôt que de planter
+    // au JSON.parse.
+    if (isProtectedApiRoute(pathname)) {
+      return jsonUnauthorizedApi(
+        500,
+        "internal_error",
+        "Une erreur serveur est survenue. Veuillez réessayer.",
+      );
+    }
     return redirectToLogin(req, pathname);
   }
+}
+
+/**
+ * Helper — construit une réponse JSON pour les routes `/api/protected/*` et
+ * `/api/admin/*` quand le middleware doit refuser l'accès. Le statut HTTP
+ * dépend de la raison (401 session absente, 403 domaine/role refusé, 503 env
+ * indisponible, 500 erreur inattendue).
+ *
+ * Pourquoi : Next.js `redirect()` produit un 307 vers une page HTML. Les
+ * fetch côté browser suivent ce redirect par défaut et reçoivent du HTML
+ * inattendu. Le caller UI plante alors à `await resp.json()`. En renvoyant
+ * du JSON dès le middleware, le caller voit `resp.status === 401` (ou 403,
+ * 503, 500) et peut afficher un message « session expirée » + redirect
+ * manuel vers `/login`.
+ */
+function jsonUnauthorizedApi(status: number, error: string, message: string): NextResponse {
+  return new NextResponse(JSON.stringify({ ok: false, error, message }), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 function redirectToLogin(req: NextRequest, pathname: string): NextResponse {
