@@ -25,45 +25,48 @@ export const metadata = {
  *      redirect direct vers ici par la page.
  *
  * Cf. ADR-011 (specs/adr_011_reset_password_scanner.md).
+ *
+ * Habillage DS edifio aligné `/login` et `/forbidden`.
  */
 export default function AuthErrorPage({
   searchParams,
 }: {
   searchParams?: { code?: string; description?: string };
 }) {
+  const year = new Date().getFullYear();
   const code = searchParams?.code ?? "unknown";
   const { title, message, actionLabel, actionHref } = describeError(code);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-12">
-      <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-8 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-paper-2 px-4 py-12">
+      <div className="w-full max-w-md rounded-lg border border-line bg-white p-8 shadow-card">
         <div className="mb-6 flex justify-center">
           <EdifioLogo />
         </div>
-        <h1 className="marketing-h1 mb-4 text-center">{title}</h1>
+        <h1 className="marketing-h1 mb-4 text-center text-ink">{title}</h1>
         <p
           data-testid="auth-error"
           role="alert"
-          className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="mb-6 rounded-sm border border-warn bg-warn-bg px-3 py-2 text-sm text-warn"
         >
           {message}
         </p>
         <div className="flex flex-col items-center gap-3">
           <Link
             href={actionHref}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-800"
+            className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
           >
             {actionLabel}
           </Link>
           <Link
             href="/login"
-            className="text-xs text-neutral-600 underline-offset-4 hover:underline"
+            className="text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
           >
             ← Retour à la connexion
           </Link>
         </div>
-        <p className="mt-6 text-center text-xs text-neutral-500">
-          <span className="font-mono text-[10px]">© AlyoS Ingénierie 2026 — Outil interne</span>
+        <p className="mt-6 text-center text-xs text-muted">
+          <span className="font-mono text-[10px]">© AlyoS Ingénierie {year} — Outil interne</span>
         </p>
       </div>
     </main>

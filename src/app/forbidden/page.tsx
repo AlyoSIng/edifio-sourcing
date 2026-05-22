@@ -17,11 +17,14 @@ export const metadata = {
  * Détails techniques (email tenté, timestamp) volontairement absents de l'UI :
  * exposer l'email dans un query string serait un risque privacy. Les détails
  * sont tracés côté serveur via `audit_logs` (cf. `specs/audit_log_v1.md`).
+ *
+ * Habillage DS edifio : surfaces `paper-2` + `white` + `line` + accent `brand-red`.
  */
 export default function Forbidden() {
+  const year = new Date().getFullYear();
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-12">
-      <div className="w-full max-w-lg rounded-lg border border-neutral-200 bg-white p-10 text-center shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-paper-2 px-4 py-12">
+      <div className="w-full max-w-lg rounded-lg border border-line bg-white p-10 text-center shadow-card">
         <div className="mb-6 flex justify-center">
           <EdifioLogo />
         </div>
@@ -30,17 +33,18 @@ export default function Forbidden() {
           🚫
         </div>
 
-        <h1 className="marketing-h1 mb-4">Accès réservé</h1>
+        <h1 className="marketing-h1 mb-4 text-ink">Accès réservé</h1>
 
-        <p className="mb-4 text-neutral-700">
-          <strong>edifio Sourcing</strong> est un outil interne réservé aux membres d&apos;
-          <strong>AlyoS Ingénierie</strong> (adresse email en{" "}
-          <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-sm">
+        <p className="mb-4 text-ink-2">
+          <strong className="font-semibold text-ink">edifio Sourcing</strong> est un outil interne
+          réservé aux membres d&apos;
+          <strong className="font-semibold text-ink">AlyoS Ingénierie</strong> (adresse email en{" "}
+          <code className="rounded-xs bg-paper-2 px-1.5 py-0.5 font-mono text-sm text-ink">
             @alyosingenierie.fr
           </code>
           ).
         </p>
-        <p className="mb-8 text-neutral-700">
+        <p className="mb-8 text-ink-2">
           Votre session a été clôturée. Si vous pensez qu&apos;il s&apos;agit d&apos;une erreur,
           contactez l&apos;équipe IT d&apos;AlyoS.
         </p>
@@ -48,22 +52,22 @@ export default function Forbidden() {
         <div className="flex justify-center gap-3">
           <Link
             href="/"
-            className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400"
+            className="rounded-sm border border-line bg-transparent px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-paper-2"
           >
             ← Retour à l&apos;accueil
           </Link>
           <a
             href="mailto:it@alyosingenierie.fr"
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-800"
+            className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
           >
             Contacter le support
           </a>
         </div>
 
-        <p className="mt-8 text-xs text-neutral-500">
+        <p className="mt-8 text-xs text-muted">
           Cet incident a été tracé dans le journal d&apos;audit pour la sécurité du système.
           <br />
-          <span className="font-mono text-[10px]">© AlyoS Ingénierie 2026</span>
+          <span className="font-mono text-[10px]">© AlyoS Ingénierie {year} — Outil interne</span>
         </p>
       </div>
     </main>

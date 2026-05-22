@@ -14,6 +14,14 @@ import "@fontsource/jetbrains-mono/400.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  // `metadataBase` est utilisé pour résoudre les URLs relatives des images OG /
+  // Twitter (cf. landing `src/app/page.tsx`). En preview Vercel, on retombe
+  // automatiquement sur `VERCEL_URL` ; en local sur `localhost:3000`. URL prod
+  // définitive à arbitrer Gate 7 (custom domain).
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ??
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
+  ),
   title: "edifio Sourcing",
   description: "Outil interne AlyoS Ingénierie — sourcing automatique de marchés publics BTP",
   // Robots : on bloque l'indexation tant qu'on est en preview AlyoS interne.
