@@ -111,6 +111,31 @@ describe("matchesProfile — positifs", () => {
       reason: "all_criteria_pass",
     });
   });
+
+  // Normalisation accents + casse — cf. DECISIONS.md 2026-05-22 (d)
+  it("matche un positif sans accent contre un titre avec accents (kw 'batiment' / title 'bâtiment')", () => {
+    const tender = makeTender({ title: "Travaux de bâtiment" });
+    const profile = makeProfile({
+      keywords: { positive: ["batiment"], negative: [], exact: [] },
+    });
+    expect(matchesProfile(tender, profile).matched).toBe(true);
+  });
+
+  it("matche un positif avec accent contre un titre sans accent (kw 'école' / title 'ECOLE PRIMAIRE')", () => {
+    const tender = makeTender({ title: "ECOLE PRIMAIRE" });
+    const profile = makeProfile({
+      keywords: { positive: ["école"], negative: [], exact: [] },
+    });
+    expect(matchesProfile(tender, profile).matched).toBe(true);
+  });
+
+  it("matche en ignorant la casse pure (kw 'BTP' / title 'travaux btp')", () => {
+    const tender = makeTender({ title: "travaux btp" });
+    const profile = makeProfile({
+      keywords: { positive: ["BTP"], negative: [], exact: [] },
+    });
+    expect(matchesProfile(tender, profile).matched).toBe(true);
+  });
 });
 
 // ============================================================================
@@ -135,6 +160,23 @@ describe("matchesProfile — négatifs", () => {
       keywords: { positive: ["rénovation"], negative: ["amiante", "désamiantage"], exact: [] },
     });
     expect(matchesProfile(tender, profile).matched).toBe(true);
+  });
+
+  // Normalisation accents + casse — la raison de rejet remonte le keyword ORIGINAL
+  it("rejette un négatif avec accents matchant un titre majuscule (kw 'démolition' / title 'DEMOLITION') — raison = kw original", () => {
+    const tender = makeTender({ title: "Marché de DEMOLITION" });
+    const profile = makeProfile({
+      keywords: { positive: ["rénovation"], negative: ["démolition"], exact: [] },
+    });
+    // Le positif doit matcher d'abord pour ne pas court-circuiter sur "no_positive_keyword".
+    // Ici le titre ne contient pas "rénovation" → le test est ajusté pour isoler le négatif.
+    const tender2 = makeTender({ title: "Rénovation et DEMOLITION partielle" });
+    expect(matchesProfile(tender2, profile)).toEqual({
+      matched: false,
+      reason: "negative_keyword:démolition",
+    });
+    // tender (sans positif) rejeté sur no_positive_keyword en premier
+    expect(matchesProfile(tender, profile).reason).toBe("no_positive_keyword");
   });
 });
 
