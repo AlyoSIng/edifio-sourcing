@@ -17,11 +17,21 @@
  *
  * Reference ADR-013 (specs/adr_013_orm_drizzle.md), driver postgres-js 3.4.
  *
+ * Workaround postgres-js Windows (DECISIONS.md 2026-05-22, Task #5) : passer un
+ * objet `{ host, port, user, password, database, ssl }` a `postgres()` declenche
+ * sur Windows un fallback `PipeConnectWrap` -> `ENOENT host/.s.PGSQL.5432` au
+ * lieu d'ouvrir un TCP. Mitigation : en mode `PG*` eclate, on construit une URL
+ * via `buildUrlFromParts(cfg)` avec `encodeURIComponent` du password, et on
+ * passe cette URL a postgres-js. La regle URI-safe-only post-incident 21/05
+ * reste respectee : le password reste URI-safe en BDD, l'encodage interne du
+ * wrapper ne masque pas un password mal forme (l'invariant est verrouille en
+ * amont par la regle de generation password).
+ *
  * Testabilite : les gardes pures sont extraites en fonctions exportees
- * (`assertDatabaseUrl`, `resolveDbConfig`, `isPgBouncerPooler`) -- testees
- * dans tests/unit/db/migrate.test.ts. Le `main()` n'est execute QUE quand le
- * module est lance directement (pattern Node.js `import.meta.url`-based entry
- * guard).
+ * (`assertDatabaseUrl`, `resolveDbConfig`, `isPgBouncerPooler`,
+ * `buildUrlFromParts`) -- testees dans tests/unit/db/migrate.test.ts. Le
+ * `main()` n'est execute QUE quand le module est lance directement (pattern
+ * Node.js `import.meta.url`-based entry guard).
  */
 
 import { readFileSync } from "node:fs";
@@ -104,36 +114,61 @@ export function isPgBouncerPooler(databaseUrl: string): boolean {
   return databaseUrl.includes(":6543") || databaseUrl.includes("pgbouncer=true");
 }
 
+/**
+ * Construit une URL postgres canonique a partir d'une config eclatee `PG*`.
+ *
+ * Pourquoi : workaround bug postgres-js Windows (cf. JSDoc fichier + DECISIONS
+ * Task #5 2026-05-22). Passer un objet d'options eclate au driver declenche un
+ * fallback `PipeConnectWrap` -> ENOENT au lieu d'ouvrir un TCP. En convertissant
+ * en URL string, le driver prend la voie TCP normale.
+ *
+ * Le password est passe a `encodeURIComponent` a la frontiere (RFC 3986) pour
+ * que l'URL reste parsable meme si le password contient des caracteres
+ * speciaux. La regle URI-safe-only de generation password reste l'invariant
+ * primaire (cf. DECISIONS incident 21/05) : cet encodage est une ceinture en
+ * complement de la bretelle, pas un substitut.
+ *
+ * `sslmode=require` est l'equivalent canonique URL du `ssl: 'require'` qu'on
+ * passait jusqu'ici en option objet (coherent Supabase managed).
+ *
+ * Exportee pour testabilite (validation parsabilite via `new URL()`).
+ */
+export function buildUrlFromParts(cfg: {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+}): string {
+  const encodedPwd = encodeURIComponent(cfg.password);
+  return `postgresql://${cfg.user}:${encodedPwd}@${cfg.host}:${cfg.port}/${cfg.database}?sslmode=require`;
+}
+
 async function main(): Promise<void> {
   const cfg = resolveDbConfig();
 
-  let sql: ReturnType<typeof postgres>;
+  // Construction URL unique cote wrapper -- workaround bug postgres-js Windows
+  // sur les options eclatees { host, port, ... } (cf. DECISIONS.md Task #5
+  // 2026-05-22). Le password est encodeURIComponent-e a la frontiere : conforme
+  // regle URI-safe-only post-incident 21/05.
+  let connectionUrl: string;
   if (cfg.kind === "url") {
     console.log("[migrate] Mode env : URL (DATABASE_URL).");
-    if (isPgBouncerPooler(cfg.url)) {
-      console.warn(
-        "[migrate] WARNING : DATABASE_URL semble pointer sur le pooler 6543. Le migrator drizzle exige une connexion directe (port 5432).",
-      );
-    }
-    sql = postgres(cfg.url, { max: 1, prepare: false });
+    connectionUrl = cfg.url;
   } else {
-    console.log("[migrate] Mode env : eclate (PG*)");
-    if (cfg.port === 6543) {
-      console.warn(
-        "[migrate] WARNING : PGPORT=6543 (pooler PgBouncer). Le migrator drizzle exige une connexion directe (port 5432).",
-      );
-    }
-    sql = postgres({
-      host: cfg.host,
-      port: cfg.port,
-      user: cfg.user,
-      password: cfg.password,
-      database: cfg.database,
-      max: 1,
-      prepare: false,
-      ssl: "require",
-    });
+    console.log(
+      "[migrate] Mode env : eclate (PG*) -- conversion en URL interne (workaround postgres-js Windows).",
+    );
+    connectionUrl = buildUrlFromParts(cfg);
   }
+
+  if (isPgBouncerPooler(connectionUrl)) {
+    console.warn(
+      "[migrate] WARNING : connexion semble pointer sur le pooler 6543. Le migrator drizzle exige une connexion directe (port 5432).",
+    );
+  }
+
+  const sql = postgres(connectionUrl, { max: 1, prepare: false });
 
   try {
     // 1. Pre-amorce : extensions Postgres requises (idempotent).
