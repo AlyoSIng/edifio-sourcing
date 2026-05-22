@@ -108,10 +108,25 @@ describe("schema Drizzle v1 — inférence de types", () => {
     expectTypeOf<Row["labelFr"]>().toEqualTypeOf<string>();
   });
 
-  it("architects : tutoiement boolean + partnership_status enum + specialty_codes array", () => {
+  it("architects : tutoiement boolean + cabinet NOT NULL + email nullable + specialty_codes array + solicitable GENERATED", () => {
+    // Refonte 2026-05-25 (PR feat/tandem-engine etape 1) : drop firstname/
+    // lastname/title/siret/references/partnership_status — refonte propre
+    // cabinet/contact_name/email/siren/odoo_external_id/preferred/active/
+    // solicitable GENERATED/past_collabs_count. Cf. DECISIONS.md 2026-05-22 (a).
     type Row = typeof architects.$inferSelect;
     expectTypeOf<Row["tutoiement"]>().toEqualTypeOf<boolean>();
-    expectTypeOf<Row["partnershipStatus"]>().toEqualTypeOf<"actif" | "inactif" | "prospect">();
+    expectTypeOf<Row["cabinet"]>().toEqualTypeOf<string>(); // NOT NULL
+    expectTypeOf<Row["contactName"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<Row["email"]>().toEqualTypeOf<string | null>(); // devenu nullable
+    expectTypeOf<Row["siren"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<Row["odooExternalId"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<Row["preferred"]>().toEqualTypeOf<boolean>();
+    expectTypeOf<Row["active"]>().toEqualTypeOf<boolean>();
+    // solicitable est une colonne GENERATED ALWAYS AS (email IS NOT NULL) STORED.
+    // Drizzle l'infere boolean | null (nullable car generee, mais en pratique
+    // jamais null cote DB puisque l'expression IS NOT NULL ne renvoie jamais NULL).
+    expectTypeOf<Row["solicitable"]>().toEqualTypeOf<boolean | null>();
+    expectTypeOf<Row["pastCollabsCount"]>().toEqualTypeOf<number>();
     expectTypeOf<Row["specialtyCodes"]>().toEqualTypeOf<string[]>();
   });
 
@@ -221,11 +236,13 @@ describe("schema Drizzle v1 — inférence de types", () => {
     expectTypeOf<Row["payload"]>().toEqualTypeOf<NotificationPayload | null>();
   });
 
-  it("audit_logs : data typé AuditLogData (jsonb union) + action enum 15 valeurs", () => {
+  it("audit_logs : data typé AuditLogData (jsonb union) + action enum 16 valeurs", () => {
     type Row = typeof auditLogs.$inferSelect;
     expectTypeOf<Row["data"]>().toEqualTypeOf<AuditLogData | null>();
-    // audit_action = 15 valeurs (cf. audit_log_v1.md — post-PR n°5 2026-05-21
-    // ajout de tender_defer (A14) et tender_reject (A15)). Union complète.
+    // audit_action = 16 valeurs (cf. audit_log_v1.md).
+    // - PR n°5 2026-05-21 : ajout A14 tender_defer + A15 tender_reject.
+    // - PR feat/tandem-engine etape 1 2026-05-25 : ajout A16 architect_response
+    //   (decision Board 2026-05-22 (b)).
     expectTypeOf<Row["action"]>().toEqualTypeOf<
       | "login"
       | "membership_change"
@@ -242,6 +259,7 @@ describe("schema Drizzle v1 — inférence de types", () => {
       | "access_attempt"
       | "tender_defer"
       | "tender_reject"
+      | "architect_response"
     >();
     // actor_role est nullable (snapshot)
     expectTypeOf<Row["actorRole"]>().toEqualTypeOf<"admin" | "user" | "viewer" | null>();

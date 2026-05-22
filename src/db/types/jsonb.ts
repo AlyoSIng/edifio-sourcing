@@ -364,6 +364,32 @@ export interface AuditLogDataTenderReject {
 }
 
 /**
+ * A16 — `architect_response` (PR `feat/tandem-engine` etape 1, 2026-05-25).
+ *
+ * Tracé chaque réponse architecte (accepted/declined/info_requested) reçue
+ * via la page tokenisée publique `/archi/[token]` (cas standard) ou saisie
+ * manuellement par admin (fallback hors-canal, `via_token = false`).
+ *
+ * Décision Board 2026-05-22 (b) — code A16 alloué.
+ * Cf. `specs/audit_log_v1.md` §A16 + Zod schema à ajouter à
+ * `src/lib/audit/schemas.ts` lors de l'étape 5 du plan Tandem (page
+ * tokenisée publique).
+ */
+export interface AuditLogDataArchitectResponse {
+  tender_id: string;
+  tender_ref: string;
+  architect_id: string;
+  architect_email: string;
+  response_status: "accepted" | "declined" | "info_requested";
+  via_token: boolean;
+  /** `jti` du JWT tokenisé — null si via_token = false (saisie admin). */
+  token_jti: string | null;
+  /** Texte libre architecte si response_status = 'info_requested', max 1000 chars. */
+  info_request_text: string | null;
+  responded_at: string;
+}
+
+/**
  * Union discriminée fonctionnelle côté app via le champ `action` (colonne
  * dédiée de la table, pas dans le jsonb). On expose ici un type union plat
  * pour le `.$type<>()` Drizzle.
@@ -383,4 +409,5 @@ export type AuditLogData =
   | AuditLogDataDataDelete
   | AuditLogDataAccessAttempt
   | AuditLogDataTenderDefer
-  | AuditLogDataTenderReject;
+  | AuditLogDataTenderReject
+  | AuditLogDataArchitectResponse;
