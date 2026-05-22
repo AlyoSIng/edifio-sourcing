@@ -979,3 +979,53 @@
 ---
 
 *Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — Follow-up sécurité post-incident BDD prod : règle password URI-safe + hardening `migrate.ts` (forme éclatée PG*) + sections étendues `docs/DEPLOY.md`. Commit/push à venir par Yann après revue Board.*
+
+---
+
+## 2026-05-22 — Hotfix prod : migration 0004_tender_deferral + bug postgres-js Windows
+
+**Contexte** : page AO du jour KO en prod (« column tenders.deferred_until does not exist »).
+Diagnostic Alex : migration 0004 sur main depuis 38acbdd (PR n°5, 21/05) jamais
+appliquée sur prod après Phase β. Pas de bug de code.
+
+**Décision Board** : OK explicite pour appliquer 0004 sur prod (zone rouge).
+
+**Exécution** (22/05) :
+- Tentatives initiales avec wrapper `pnpm db:migrate` (mode PG* éclaté) → ENOENT
+  `host/.s.PGSQL.5432` reproductible sur 3 hostnames différents (pooler eu-central-1
+  inventé, direct connection IPv6-only `db.<ref>.supabase.co`, pooler eu-west-1
+  IPv4 correct). Confirmé bug postgres-js Windows : passer un objet
+  `{ host, port, user, password, database }` à postgres-js fait fallback
+  PipeConnectWrap au lieu de TCP propre.
+- Workaround : Steve a posé `DATABASE_URL` depuis `.env.local` dans sa session
+  PowerShell + lancé `pnpm drizzle-kit migrate` (URL string → TCP propre).
+- Résultat : `[✓] migrations applied successfully!` + 2 NOTICES attendues
+  (`42P06`/`42P07`).
+- Smoke test prod page AO du jour : `Invoke-WebRequest` vers
+  `https://edifio-sourcing.vercel.app/sourcing/ao-du-jour` → 307 redirect vers
+  `/login?next=/sourcing/ao-du-jour` (middleware domaine `@alyosingenierie.fr`
+  fait son job), suivi par HTTP 200 sur `/login`. Aucune occurrence
+  `ErrorBanner` ni `deferred_until does not exist` dans le HTML retourné. 🟠 À
+  noter : sans credentials AlyoS le rendu réel de `/sourcing/ao-du-jour`
+  (Server Component qui exécute `db.select(...)`) n'a PAS été frappé — ce
+  smoke valide l'absence de 500 / `ErrorBanner` côté `/login` uniquement.
+  Validation complète post-cron 6h30 demain.
+
+**Follow-ups** :
+- Task #5 : patch `src/db/migrate.ts:126-135` pour construire l'URL en
+  interne avec `encodeURIComponent` du password → mode PG* fonctionnel sur
+  Windows.
+- Cron 6h30 demain (2026-05-23) remplira la table tenders naturellement.
+  Vérif Board demain matin que le cron tourne et que la page rend des AOs
+  (smoke authentifié côté Steve).
+- Rotation password BDD prod reste en backlog (memory
+  followup_post_mvp_security_rotations.md) — d'autant plus que le password
+  vient de transiter (dans une URI, mais quand même) depuis `.env.local`
+  vers une env var session.
+
+**Tâche associée** : Task #3 (P1 prod fix deferred_until) + Task #27 / #4
+(BOAMP fixture host) bundlés ci-dessous.
+
+---
+
+*Dernière mise à jour : 2026-05-22 par [Yann via Claude Code] — Hotfix prod migration 0004 tracé + smoke prod 307→200 (page login, pas d'ErrorBanner / pas de deferred_until), commits locaux en attente de validation Board avant push.*
