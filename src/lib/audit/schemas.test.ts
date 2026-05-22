@@ -127,12 +127,12 @@ describe("tenderSelectSchema (A4 strict)", () => {
 // Placeholders — 12 actions non-strictes (smoke tests)
 // ----------------------------------------------------------------------------
 
-// `membership_change` retiré de la liste : implémenté STRICT par la PR
-// auth-password-pivot (2026-05-20) — couvert par son propre describe block
-// plus bas. Reste 11 placeholders.
+// `membership_change` retiré : implémenté STRICT par la PR auth-password-pivot
+// (2026-05-20). `search_profile_change` retiré : implémenté STRICT par P2
+// Gate 6 (2026-05-22). Couverts par leur propre describe block plus bas.
+// Reste 10 placeholders.
 const PLACEHOLDER_ACTIONS = [
   "login",
-  "search_profile_change",
   "architect_solicit",
   "dossier_diffuse",
   "ai_run",
@@ -236,7 +236,65 @@ describe("membershipChangeSchema (A2 strict)", () => {
   });
 });
 
-describe("placeholders (11 actions non-strictes)", () => {
+describe("searchProfileChangeSchema (A3 strict — P2 Gate 6)", () => {
+  const validUpdate = {
+    profile_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    profile_name: "Profil AlyoS BTP - sourcing principal",
+    operation: "update" as const,
+    diff: {
+      "keywords.positive": [["btp"], ["btp", "construction"]] as [unknown, unknown],
+    },
+  };
+
+  it("accepte un update avec diff complet", () => {
+    const schema = AUDIT_SCHEMAS.search_profile_change;
+    expect(schema.safeParse(validUpdate).success).toBe(true);
+  });
+
+  it("accepte un update sans diff (champ optionnel)", () => {
+    const schema = AUDIT_SCHEMAS.search_profile_change;
+    const { diff: _drop, ...withoutDiff } = validUpdate;
+    void _drop;
+    expect(schema.safeParse(withoutDiff).success).toBe(true);
+  });
+
+  it("accepte les 5 opérations du domaine (create/update/delete/activate/deactivate)", () => {
+    const schema = AUDIT_SCHEMAS.search_profile_change;
+    for (const op of ["create", "update", "delete", "activate", "deactivate"] as const) {
+      expect(schema.safeParse({ ...validUpdate, operation: op }).success).toBe(true);
+    }
+  });
+
+  it("rejette un operation hors enum", () => {
+    const schema = AUDIT_SCHEMAS.search_profile_change;
+    expect(schema.safeParse({ ...validUpdate, operation: "rename" }).success).toBe(false);
+  });
+
+  it("rejette un profile_id non-UUID", () => {
+    const schema = AUDIT_SCHEMAS.search_profile_change;
+    expect(schema.safeParse({ ...validUpdate, profile_id: "not-a-uuid" }).success).toBe(false);
+  });
+
+  it("rejette un profile_name vide", () => {
+    const schema = AUDIT_SCHEMAS.search_profile_change;
+    expect(schema.safeParse({ ...validUpdate, profile_name: "" }).success).toBe(false);
+  });
+
+  it("accepte un diff avec tuples [unknown, unknown] arbitraires", () => {
+    const schema = AUDIT_SCHEMAS.search_profile_change;
+    expect(
+      schema.safeParse({
+        ...validUpdate,
+        diff: {
+          cpv_codes: [["45000000"], ["45000000", "71000000"]] as [unknown, unknown],
+          amount_min: [null, "50000.00"] as [unknown, unknown],
+        },
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe("placeholders (10 actions non-strictes)", () => {
   // Test smoke : chaque placeholder accepte un objet vide ET un objet arbitraire
   // via `passthrough()`. Garantit qu'on peut déjà coder `audit({action: 'login',
   // data: {...}})` côté call-site sans attendre l'implémentation stricte.
