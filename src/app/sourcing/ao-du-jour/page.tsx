@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { EdifioLogo } from "@/components/EdifioLogo";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { db } from "@/db/client";
@@ -27,27 +25,33 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Page « AO du jour » — V1 read-only (PR n°4).
+ * Page « AO du jour » — refonte UI v1 (PR refonte-ui-pages-v1).
  *
- * Source de vérité : `design/maquettes/maquettes_v1.html` lignes 173-225
- * (Maquette 1 mobile « AO du jour » persona Patrick + Maquette 2 desktop).
+ * Source de vérité visuelle :
+ * `design/maquettes/maquettes_v4_sourcing_modules.html` lignes 187-333 (M-A)
+ * + lignes 537-562 (M-E états vide/erreur).
  *
- * Périmètre V1 :
- *  - Server Component, pas de `"use client"` (aucune interactivité)
- *  - Auth check défensif (redirect /login si pas de session)
- *  - Filtre tenant explicite via `ALYOS_ORG_ID` (mono-tenant MVP V1 — cf.
- *    `src/lib/constants/organization.ts` JSDoc pour le rationale Phase 2)
- *  - Liste responsive : 1 col mobile, 2 cols md, 3 cols lg
- *  - Pas de filtres / tri interactif (PR ultérieure)
- *  - Pas d'actions (Sélectionner / Différer / Rejeter — PR n°5)
+ * Périmètre fonctionnel (inchangé) :
+ *  - Server Component
+ *  - Auth check défensif
+ *  - Filtre tenant explicite via `ALYOS_ORG_ID`
+ *  - Liste verticale (un AO = une carte), tri par score serveur
+ *  - Pattern de résilience runtime (hotfix PR #22) — try/catch absorbé
  *
- * Pattern Server Component aligné sur `src/app/sourcing/admin/users/page.tsx`
- * (auth-check + `EdifioLogo` + footer mono).
+ * **Changements UI vs PR n°4** :
+ *  - Plus de logo/footer/EdifioLogo locaux : c'est l'AppShell global qui
+ *    fournit la chrome (cf. `src/components/app-shell/AppShell.tsx`).
+ *  - Header de page : eyebrow pill « date du jour » + h1 « AO du jour » +
+ *    sous-titre dynamique (compteur + profil actif).
+ *  - KPI row à 3 cases (Nouveaux / Score élevé / Clôture < 10 j) — calculée
+ *    côté Server à partir de `tenders[]`.
+ *  - Toolbar avec lien admin (visible admins uniquement) à droite.
+ *  - Layout liste : `flex flex-col gap-3` (vertical) — la carte fait toute
+ *    la largeur, conforme M-A (la grille 3 colonnes de la PR n°4 n'est pas
+ *    dans la maquette définitive).
  */
 export default async function AoDuJourPage() {
-  // Auth check défensif (le middleware a normalement déjà filtré, mais on
-  // re-vérifie ici car Next 14 n'invoque pas systématiquement le middleware
-  // en mode RSC streaming sur certains chemins).
+  // Auth check défensif (le middleware a normalement déjà filtré).
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -55,41 +59,14 @@ export default async function AoDuJourPage() {
   if (!user) redirect("/login?next=/sourcing/ao-du-jour");
   const profile = toUserProfile(user);
 
-  // Données — appel uniquement dans la fonction async (jamais en module-scope)
-  // pour que le Proxy lazy de `db` ne déclenche pas la lecture de
-  // `DATABASE_URL` à l'import (env-clean `next build`).
-  //
   // -------------------------------------------------------------------------
-  // Résilience runtime (hotfix PR #22, Board 2026-05-21)
+  // Résilience runtime (hotfix PR #22, Board 2026-05-21) — INCHANGÉ
   // -------------------------------------------------------------------------
-  // (a) Pourquoi : on encapsule les fetches BDD dans un try/catch absorbé,
-  //     pattern aligné sur `src/lib/audit/index.ts` (cf. JSDoc en-tête).
-  //     Motivations :
-  //       1. CI E2E — le job `ci-e2e` ne fournit PAS `DATABASE_URL` au
-  //          webServer Playwright (par design — il couvre middleware/auth/
-  //          Resend, pas le métier BDD). Sans ce try/catch, le Proxy lazy
-  //          `db` throw `Error: DATABASE_URL is not set` au premier `.select`,
-  //          la page plante en 500, le <h1> n'est jamais rendu → 4 tests E2E
-  //          rouges (le nouveau ao-du-jour + 3 auth-password qui font
-  //          `waitForURL` sur cette page).
-  //       2. Prod — si Supabase plante 30s, on préfère rendre une page
-  //          dégradée plutôt que renvoyer un 500 brutal. C'est la même
-  //          logique « defense applicative » qu'audit/index.ts.
-  // (b) Comportement en cas d'erreur :
-  //       - stack complète tracée via `console.error` structuré (capté
-  //         par Vercel logs aujourd'hui ; futur Sentry — cf. ci-dessous).
-  //       - `tenders = []` + `profileName = null` + `fetchError` non null.
-  //       - JSX bascule sur <ErrorBanner /> (role="alert", visuellement
-  //         distinct de <EmptyState /> qui est role="status").
-  //       - Le <h1>AO du jour</h1> est TOUJOURS rendu — c'est l'invariant
-  //         qui débloque les 4 tests E2E.
-  // (c) Observabilité future : quand `@sentry/nextjs` sera branché en
-  //     Gate 8, remplacer le `console.error` ci-dessous par :
-  //         Sentry.captureException(err, {
-  //           tags: { route: "ao-du-jour", fetch_failed: true },
-  //           contexts: { fetch: { organizationId: ALYOS_ORG_ID } },
-  //         });
-  //     Convention de tags alignée sur `reportAuditFailure()`.
+  // (a) try/catch absorbé pour les fetches BDD afin de ne pas casser CI E2E
+  //     (DATABASE_URL absent) et de rendre une bannière dégradée en prod si
+  //     Supabase blip 30s. (b) Comportement : stack tracée `console.error`,
+  //     fallback `tenders = []` + `profileName = null` + `fetchError` non null,
+  //     <ErrorBanner /> rendu. (c) Observabilité future Sentry Gate 8.
   let tenders: Awaited<ReturnType<typeof getTendersOfTheDay>> = [];
   let profileName: Awaited<ReturnType<typeof getActiveSearchProfileName>> = null;
   let fetchError: string | null = null;
@@ -99,72 +76,108 @@ export default async function AoDuJourPage() {
       getActiveSearchProfileName(ALYOS_ORG_ID, db),
     ]);
   } catch (err) {
-    // TODO(Gate 8) : remplacer par Sentry.captureException — cf. note (c) supra.
+    // TODO(Gate 8) : Sentry.captureException — cf. `src/lib/audit/index.ts`.
     console.error("[ao-du-jour:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
   }
 
   const todayLabel = formatTodayLongFr();
   const tendersCount = tenders.length;
-  const year = new Date().getFullYear();
+  const highScoreCount = tenders.filter((t) => Number(t.score ?? "0") >= 75).length;
+  const closingSoonCount = tenders.filter((t) => isClosingSoon(t.deadline)).length;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4 sm:mb-8">
-        <div>
-          <EdifioLogo />
-          <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-neutral-900">
-            AO du jour
-          </h1>
-          <p className="text-sm text-neutral-600">
-            {todayLabel}
-            {profileName ? (
-              <>
-                {" · "}
-                <span className="text-neutral-500">profil&nbsp;: {profileName}</span>
-              </>
-            ) : null}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <span
-            className="font-mono text-xs text-neutral-500"
-            aria-label={fetchError ? "Nombre d'AO indisponible" : `${tendersCount} AO listés`}
-          >
-            {fetchError ? "—" : `${tendersCount} AO`}
-          </span>
-          {isAdmin(profile) ? (
-            <Link
-              href="/sourcing/admin/users"
-              className="font-mono text-[11px] uppercase tracking-wider text-neutral-500 underline-offset-4 hover:text-neutral-900 hover:underline"
-            >
-              Administration
-            </Link>
-          ) : null}
-        </div>
+    <div className="mx-auto max-w-6xl">
+      {/* En-tête de page */}
+      <header className="mb-6">
+        <span className="pill-eyebrow">{todayLabel}</span>
+        <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
+          AO du jour
+        </h1>
+        <p className="mt-1 text-sm text-muted">
+          {fetchError ? (
+            "Erreur de chargement — voir détail ci-dessous."
+          ) : tendersCount === 0 ? (
+            "Aucun avis publié ne correspond à votre profil de recherche actif."
+          ) : (
+            <>
+              {tendersCount} avis publié{tendersCount > 1 ? "s" : ""} depuis hier
+              {profileName ? (
+                <>
+                  {" "}
+                  · profil&nbsp;: <span className="text-ink">{profileName}</span>
+                </>
+              ) : null}
+              , triés par score de pertinence.
+            </>
+          )}
+        </p>
       </header>
 
-      {/* Toast d'erreur pour les server actions (PR n°5). Toujours monté
-          côté Client, devient visible uniquement en cas d'erreur action. */}
+      {/* KPI row — 3 cases (cf. M-A lignes 216-221, on retire « différés » MVP) */}
+      {!fetchError ? (
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <KpiCard label="Nouveaux AO sourcés" value={tendersCount} accent />
+          <KpiCard label="Score élevé (≥ 75)" value={highScoreCount} />
+          <KpiCard label="Clôture < 10 jours" value={closingSoonCount} />
+        </div>
+      ) : null}
+
+      {/* Toast erreur server action (PR n°5) — toujours monté côté Client. */}
       <TenderActionsErrorToast />
 
+      {/* Contenu principal */}
       {fetchError ? (
         <ErrorBanner message={fetchError} />
       ) : tendersCount === 0 ? (
-        <EmptyState profileName={profileName} />
+        <EmptyState profileName={profileName} isAdmin={isAdmin(profile)} />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <ul className="flex flex-col gap-3.5">
           {tenders.map((tender) => (
-            <li key={tender.id} className="contents">
+            <li key={tender.id}>
               <TenderCard tender={tender} />
             </li>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
 
-      <p className="mt-12 text-center font-mono text-[10px] text-neutral-500">
-        © AlyoS Ingénierie {year} — Outil interne
-      </p>
-    </main>
+/**
+ * Compte un AO comme « clôture < 10 jours » si sa deadline tombe dans les 10
+ * jours à venir. Null = pas de clôture renseignée, ne compte pas.
+ */
+function isClosingSoon(deadline: Date | null): boolean {
+  if (!deadline) return false;
+  const now = Date.now();
+  const diffMs = deadline.getTime() - now;
+  if (diffMs < 0) return false;
+  const tenDaysMs = 10 * 24 * 3600 * 1000;
+  return diffMs <= tenDaysMs;
+}
+
+/**
+ * Carte KPI réutilisable — chiffre en font-display + libellé en muted.
+ * `accent` met le chiffre en `brand-red` (cf. M-A 1er KPI).
+ */
+function KpiCard({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-line bg-white px-4 py-3.5">
+      <div
+        className={`font-display text-3xl font-bold leading-none ${accent ? "text-brand-red" : "text-ink"}`}
+      >
+        {value}
+      </div>
+      <div className="mt-1.5 text-xs text-muted">{label}</div>
+    </div>
   );
 }

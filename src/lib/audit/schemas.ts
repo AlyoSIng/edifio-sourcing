@@ -81,6 +81,22 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 const placeholder = z.object({}).passthrough();
 
 /**
+ * Regex UUID « shape-only » (8-4-4-4-12 hex), volontairement plus permissive
+ * que `z.string().uuid()` de Zod 4 qui exige variante RFC 4122 stricte
+ * (`[1-8]` version + `[89abAB]` variant). Les UUIDs côté Postgres sont
+ * générés par `uuid_generate_v4()` (v4 strict) mais nous voulons accepter
+ * aussi les UUIDs de test/déterministes (ex. `11111111-...`) sans rendre
+ * la validation Zod inutilisable.
+ *
+ * Source v4 stricte rejetée volontairement : on n'a aucune valeur ajoutée
+ * à imposer la variante côté audit (la BDD le fait déjà via la colonne
+ * `uuid` typée Postgres). Déclarée ici (avant A3) car partagée par
+ * `searchProfileChangeSchema` (A3) + `tenderSelectSchema` (A4) +
+ * `tenderDeferSchema` (A14) + `tenderRejectSchema` (A15).
+ */
+const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/**
  * A1 — `login` (placeholder)
  *
  * Spec : `{ method, success, session_id? }`.
@@ -134,10 +150,33 @@ const membershipChangeSchema = z.object({
 });
 
 /**
- * A3 — `search_profile_change` (placeholder)
- * TODO: implémenter à la PR CRUD profils de recherche.
+ * A3 — `search_profile_change` (STRICT — implémenté P2 Gate 6, 2026-05-22).
+ *
+ * Déclenchée par la Server Action `updateProfileAction`
+ * (`src/app/sourcing/admin/profil/actions.ts`). V1 ne couvre que l'opération
+ * `update` (l'édition du profil unique AlyoS — Q2 Board 22/05). Les autres
+ * opérations (`create | delete | activate | deactivate`) restent acceptées
+ * par le schéma pour anticiper la PR Phase 2 multi-profils — pas besoin
+ * d'ALTER de l'enum côté code.
+ *
+ * Contraintes :
+ *  - `profile_id` : UUID shape (cf. `UUID_SHAPE`)
+ *  - `profile_name` : non vide, snapshot (utile post-suppression de profil)
+ *  - `operation` : enum strict 5 valeurs alignées spec `audit_log_v1.md` §A3
+ *  - `diff` : optionnel, map `field → [before, after]`. On reste permissif
+ *    sur le type des valeurs (`z.unknown()`) car le diff couvre des arrays,
+ *    des objets `keywords` JSONB, des montants `numeric` Postgres (string)
+ *    et des nullables — typer plus strictement coûterait sans vraie valeur
+ *    pour l'audit (relecture humaine). La spec dit `Record<string, [unknown,
+ *    unknown]>` côté `AuditLogDataSearchProfileChange` (cf.
+ *    `src/db/types/jsonb.ts:247`).
  */
-const searchProfileChangeSchema = placeholder;
+const searchProfileChangeSchema = z.object({
+  profile_id: z.string().regex(UUID_SHAPE, { message: "profile_id doit être un UUID" }),
+  profile_name: z.string().min(1, { message: "profile_name ne peut pas être vide" }),
+  operation: z.enum(["create", "update", "delete", "activate", "deactivate"]),
+  diff: z.record(z.string(), z.tuple([z.unknown(), z.unknown()])).optional(),
+});
 
 /**
  * A4 — `tender_select` (STRICT — implémenté PR #2).
@@ -151,21 +190,9 @@ const searchProfileChangeSchema = placeholder;
  *  - `tender_ref` : non vide (externalRef BOAMP, ex. `25-AO-00142`)
  *  - `mode` : enum strict `solo | tandem` (cf. enum Postgres `selection_mode`)
  *  - `score` : entier 0-100 (contrainte CHECK BDD côté `tenders.score`)
- */
-/**
- * Regex UUID « shape-only » (8-4-4-4-12 hex), volontairement plus permissive
- * que `z.string().uuid()` de Zod 4 qui exige variante RFC 4122 stricte
- * (`[1-8]` version + `[89abAB]` variant). Les UUIDs côté Postgres sont
- * générés par `uuid_generate_v4()` (v4 strict) mais nous voulons accepter
- * aussi les UUIDs de test/déterministes (ex. `11111111-...`) sans rendre
- * la validation Zod inutilisable.
  *
- * Source v4 stricte rejetée volontairement : on n'a aucune valeur ajoutée
- * à imposer la variante côté audit (la BDD le fait déjà via la colonne
- * `uuid` typée Postgres).
+ * (Regex `UUID_SHAPE` partagée — déclarée plus haut, juste après `placeholder`.)
  */
-const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
 const tenderSelectSchema = z.object({
   tender_id: z.string().regex(UUID_SHAPE, { message: "tender_id doit être un UUID" }),
   tender_ref: z.string().min(1, { message: "tender_ref ne peut pas être vide" }),

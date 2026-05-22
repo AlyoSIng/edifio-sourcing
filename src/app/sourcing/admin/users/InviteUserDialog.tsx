@@ -3,7 +3,10 @@
 import { useState } from "react";
 
 /**
- * Modale d'invitation d'un nouveau collaborateur AlyoS.
+ * Modale d'invitation d'un nouveau collaborateur AlyoS — refonte UI v1.
+ *
+ * Source design : pattern modale `design/maquettes/maquettes_v5_admin_architectes.html`
+ * lignes 86-104 + 218-274 (M16-B fiche éditable).
  *
  * Appelle `POST /api/admin/users` avec form-encoded. La route handler
  * (cf. `src/app/api/admin/users/route.ts`) :
@@ -12,9 +15,11 @@ import { useState } from "react";
  *   - crée le user via `auth.admin.createUser`
  *   - envoie un email Resend avec le provisoire
  *
- * UX minimaliste — affichage inline d'un état succès / erreur. Sur succès,
- * on demande à l'utilisateur de rafraîchir la page (pas de revalidatePath
- * pour le moment — à enrichir plus tard).
+ * UX :
+ *   - Bouton primaire `bg-brand-red` pour ouvrir
+ *   - Modale fond `--paper-3` overlay + carte `white` shadow-modal
+ *   - Champs DS edifio (bordure `--line-2`, focus `brand-red`)
+ *   - Erreur 401 → redirect manuel /login (P3 2026-05-22)
  */
 type Role = "admin" | "user" | "viewer";
 
@@ -45,6 +50,19 @@ export function InviteUserDialog() {
       fd.set("role", form.role);
 
       const resp = await fetch("/api/admin/users", { method: "POST", body: fd });
+
+      // P3 (2026-05-22) — middleware renvoie JSON 401 plutôt qu'un 307 HTML.
+      // On gère ici le cas session expirée.
+      if (resp.status === 401) {
+        setState({
+          status: "error",
+          message: "Session expirée — redirection vers la page de connexion...",
+        });
+        const next = encodeURIComponent("/sourcing/admin/users");
+        window.location.href = `/login?next=${next}`;
+        return;
+      }
+
       const json = (await resp.json().catch(() => ({}))) as {
         ok?: boolean;
         message?: string;
@@ -79,29 +97,36 @@ export function InviteUserDialog() {
           setOpen(true);
           setState({ status: "idle" });
         }}
-        className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
+        className="rounded-sm bg-brand-red px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
       >
-        Inviter un collaborateur
+        + Inviter un collaborateur
       </button>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">Inviter un collaborateur</h2>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="invite-user-title"
+      className="bg-ink/45 fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-lg bg-white shadow-modal">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h2 id="invite-user-title" className="font-display text-base font-semibold text-ink">
+            Inviter un collaborateur
+          </h2>
           <button
             type="button"
             aria-label="Fermer"
             onClick={() => setOpen(false)}
-            className="text-neutral-500 hover:text-neutral-900"
+            className="rounded-sm px-2 py-1 text-muted transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red"
           >
             ✕
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-5">
           <Field
             label="Email AlyoS"
             id="email"
@@ -128,14 +153,14 @@ export function InviteUserDialog() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="role" className="text-sm font-medium text-neutral-700">
+            <label htmlFor="role" className="text-xs font-semibold text-ink">
               Rôle
             </label>
             <select
               id="role"
               value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="rounded-sm border border-line-2 bg-white px-3 py-2 text-sm text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
             >
               <option value="user">Utilisateur</option>
               <option value="admin">Administrateur</option>
@@ -146,7 +171,7 @@ export function InviteUserDialog() {
           {state.status === "error" ? (
             <p
               role="alert"
-              className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+              className="rounded-sm border-l-4 border-error bg-error-bg px-3 py-2 text-sm text-error"
             >
               {state.message}
             </p>
@@ -154,24 +179,24 @@ export function InviteUserDialog() {
           {state.status === "success" ? (
             <p
               role="status"
-              className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900"
+              className="rounded-sm border-l-4 border-success bg-success-bg px-3 py-2 text-sm text-success"
             >
               {state.message}
             </p>
           ) : null}
 
-          <div className="mt-2 flex justify-end gap-2">
+          <div className="mt-2 flex items-center justify-end gap-2 border-t border-line pt-4">
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-md border border-neutral-300 px-4 py-2 text-sm"
+              className="rounded-sm border border-line-2 bg-white px-3.5 py-1.5 text-xs font-semibold text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2"
             >
               Fermer
             </button>
             <button
               type="submit"
               disabled={state.status === "submitting"}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:bg-neutral-400"
+              className="rounded-sm bg-brand-red px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red disabled:bg-line-2 disabled:opacity-70"
             >
               {state.status === "submitting" ? "Création…" : "Créer et envoyer"}
             </button>
@@ -201,7 +226,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-neutral-700">
+      <label htmlFor={id} className="text-xs font-semibold text-ink">
         {label}
       </label>
       <input
@@ -212,7 +237,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+        className="rounded-sm border border-line-2 bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
       />
     </div>
   );

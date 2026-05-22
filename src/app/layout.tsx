@@ -27,7 +27,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body className="font-sans antialiased">{children}</body>
+      {/* Surfaces par défaut alignées DS edifio (cf. design/tokens.json) :
+       * `bg-paper` = #FAF9F6 (fond app principal), `text-ink` = #0F1A2E (texte
+       * principal). Les pages publiques marketing-like (/login, /forbidden)
+       * peuvent surclasser via leurs propres conteneurs si nécessaire. */}
+      <body className="bg-paper font-sans text-ink antialiased">{children}</body>
     </html>
   );
 }

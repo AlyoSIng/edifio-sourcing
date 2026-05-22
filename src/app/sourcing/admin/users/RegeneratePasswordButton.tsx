@@ -29,6 +29,21 @@ export function RegeneratePasswordButton({ userId, email }: { userId: string; em
       const resp = await fetch(`/api/admin/users/${userId}/regenerate-password`, {
         method: "POST",
       });
+
+      // P3 (2026-05-22) — Le middleware renvoie désormais un JSON 401 plutôt
+      // qu'un 307 vers /login sur les routes API. On gère ici le cas session
+      // expirée : redirect manuel vers /login avec un `next` pour reprendre
+      // l'écran admin après reconnexion.
+      if (resp.status === 401) {
+        setState({
+          status: "error",
+          message: "Session expirée — redirection vers la page de connexion...",
+        });
+        const next = encodeURIComponent("/sourcing/admin/users");
+        window.location.href = `/login?next=${next}`;
+        return;
+      }
+
       const json = (await resp.json().catch(() => ({}))) as {
         ok?: boolean;
         message?: string;
@@ -55,7 +70,7 @@ export function RegeneratePasswordButton({ userId, email }: { userId: string; em
 
   if (state.status === "success") {
     return (
-      <span role="status" className="text-xs text-green-700">
+      <span role="status" className="text-[11px] font-medium text-success">
         {state.message}
       </span>
     );
@@ -63,7 +78,7 @@ export function RegeneratePasswordButton({ userId, email }: { userId: string; em
 
   if (state.status === "error") {
     return (
-      <span role="alert" className="text-xs text-red-700">
+      <span role="alert" className="text-[11px] font-medium text-error">
         {state.message}
       </span>
     );
@@ -74,7 +89,7 @@ export function RegeneratePasswordButton({ userId, email }: { userId: string; em
       type="button"
       onClick={handleClick}
       disabled={state.status === "submitting"}
-      className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
+      className="rounded-sm border border-line-2 bg-white px-2.5 py-1 text-[11px] font-semibold text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-paper-3 disabled:text-muted"
     >
       {state.status === "submitting" ? "Envoi…" : "Renvoyer"}
     </button>

@@ -979,3 +979,123 @@
 ---
 
 *Dernière mise à jour : 2026-05-21 par [Alex via Claude Code] — Follow-up sécurité post-incident BDD prod : règle password URI-safe + hardening `migrate.ts` (forme éclatée PG*) + sections étendues `docs/DEPLOY.md`. Commit/push à venir par Yann après revue Board.*
+
+---
+
+## 2026-05-22 — Hotfix prod : migration 0004_tender_deferral + bug postgres-js Windows
+
+**Contexte** : page AO du jour KO en prod (« column tenders.deferred_until does not exist »).
+Diagnostic Alex : migration 0004 sur main depuis 38acbdd (PR n°5, 21/05) jamais
+appliquée sur prod après Phase β. Pas de bug de code.
+
+**Décision Board** : OK explicite pour appliquer 0004 sur prod (zone rouge).
+
+**Exécution** (22/05) :
+- Tentatives initiales avec wrapper `pnpm db:migrate` (mode PG* éclaté) → ENOENT
+  `host/.s.PGSQL.5432` reproductible sur 3 hostnames différents (pooler eu-central-1
+  inventé, direct connection IPv6-only `db.<ref>.supabase.co`, pooler eu-west-1
+  IPv4 correct). Confirmé bug postgres-js Windows : passer un objet
+  `{ host, port, user, password, database }` à postgres-js fait fallback
+  PipeConnectWrap au lieu de TCP propre.
+- Workaround : Steve a posé `DATABASE_URL` depuis `.env.local` dans sa session
+  PowerShell + lancé `pnpm drizzle-kit migrate` (URL string → TCP propre).
+- Résultat : `[✓] migrations applied successfully!` + 2 NOTICES attendues
+  (`42P06`/`42P07`).
+- Smoke test prod page AO du jour : `Invoke-WebRequest` vers
+  `https://edifio-sourcing.vercel.app/sourcing/ao-du-jour` → 307 redirect vers
+  `/login?next=/sourcing/ao-du-jour` (middleware domaine `@alyosingenierie.fr`
+  fait son job), suivi par HTTP 200 sur `/login`. Aucune occurrence
+  `ErrorBanner` ni `deferred_until does not exist` dans le HTML retourné. 🟠 À
+  noter : sans credentials AlyoS le rendu réel de `/sourcing/ao-du-jour`
+  (Server Component qui exécute `db.select(...)`) n'a PAS été frappé — ce
+  smoke valide l'absence de 500 / `ErrorBanner` côté `/login` uniquement.
+  Validation complète post-cron 6h30 demain.
+
+**Follow-ups** :
+- Task #5 : patch `src/db/migrate.ts:126-135` pour construire l'URL en
+  interne avec `encodeURIComponent` du password → mode PG* fonctionnel sur
+  Windows.
+- Cron 6h30 demain (2026-05-23) remplira la table tenders naturellement.
+  Vérif Board demain matin que le cron tourne et que la page rend des AOs
+  (smoke authentifié côté Steve).
+- Rotation password BDD prod reste en backlog (memory
+  followup_post_mvp_security_rotations.md) — d'autant plus que le password
+  vient de transiter (dans une URI, mais quand même) depuis `.env.local`
+  vers une env var session.
+
+**Tâche associée** : Task #3 (P1 prod fix deferred_until) + Task #27 / #4
+(BOAMP fixture host) bundlés ci-dessous.
+
+---
+
+*Dernière mise à jour : 2026-05-22 par [Yann via Claude Code] — Hotfix prod migration 0004 tracé + smoke prod 307→200 (page login, pas d'ErrorBanner / pas de deferred_until), commits locaux en attente de validation Board avant push.*
+
+---
+
+## 2026-05-22 (soir) — Arbitrage en bloc 9 recos Alex + Nadia (modules UI/admin/Tandem)
+
+**Contexte** : fin de session post-hotfix prod. Alex (dev) a rendu son plan `handoff/PLAN_ALEX_260522_REFONTE_UI.md` (P1 refonte UI + P2 admin profil + P3 bug /admin/users, 6.5-7.5 j) avec 5 questions ouvertes. Nadia (dev_tandem, sub-agent créé ce soir) a rendu `handoff/PLAN_TANDEM_NADIA_260522.md` (~7.5 j, gain 1j vs plan Alex du matin grâce aux 4 décisions du 22/05) + `handoff/REQUEST_260522_NADIA_TANDEM_CTO.md` (4 questions résiduelles, chacune avec reco + plan B).
+
+**Décision Board** : OK explicite en bloc sur les 9 recos perso telles que posées (cf. tableau ci-dessous). Arbitrages réversibles si désaccord détecté en cours d'implémentation.
+
+| # | Sujet | Reco validée |
+|---|---|---|
+| Alex Q1 | Sidebar mobile P1 | Hamburger mobile |
+| Alex Q2 | Profil de recherche V1 | 1 row éditable AlyoS |
+| Alex Q3 | exact_keywords casse | Case-insensitive (cohérent normalisation matcher) |
+| Alex Q4 | market_types | Enum fermé travaux/services/fournitures/moe |
+| Alex Q5 | geo_zones | Codes département FR V1 |
+| Nadia Q1 | Pondération matching | geo 30 / specialty 15 / history 35 / availability 15 / preference 5 + flag MATCHING_WEIGHTS_PROFILE |
+| Nadia Q3 | RGPD art.14 | Variable code {{rgpd_block}} (testable CI) |
+| Nadia Q4 | solicitable | GENERATED ALWAYS AS (email IS NOT NULL) STORED |
+| Nadia Q5 | JWT architecte | Clé RS256 dédiée ARCHITECT_JWT_* |
+
+**Suite** : Alex et Nadia démarrent lundi 25/05 en zone verte sur leurs périmètres respectifs. Yann génère la paire de clés JWT architecte avant l'étape 2 Tandem. Coordination Alex/Nadia : palette tokens en petite PR isolée d'abord (Alex), Nadia rebase ensuite. Sidebar data-driven NAV_ITEMS pour évolution sans conflit.
+
+---
+
+*Dernière mise à jour : 2026-05-22 (soir) par [Yann via Claude Code] — Arbitrage Board en bloc 9 recos perso Alex (5) + Nadia (4). Démarrage code Alex/Nadia lundi 25/05 en zone verte. Génération clés JWT architecte par Yann avant étape 2 Tandem.*
+
+---
+
+## 2026-05-22 (après-midi) — Alex · P1.1 palette/tokens + P3 bug admin users
+
+**Contexte** : démarrage des 2 chantiers parallèles Alex actés par le Board (cf. `notes-de-suivi/CC_260522_1340_ALEX_P1_1_P3.md`). PR séparées pour permettre rebase sans conflit côté Nadia (Tandem).
+
+### P1.1 — Palette / Tokens DS edifio (branche `feat/refonte-ui-p1-palette-tokens`)
+
+- **2026-05-22 · P1.1 · Alex · Pose des tokens canoniques + alias rétro-compatibles.**
+  Fichiers : `src/app/globals.css` (CSS vars `--brand-red`, `--ink`, `--paper*`, `--line*`, `--status-*`, `--radius-*`, `--shadow-*`), `tailwind.config.ts` (palette, radius, shadows). Les noms canoniques sont `brand-red`/`ink`/`paper` (alignés `design/tokens.json` + maquettes). Les alias `alyos-red`/`alyos-red-dark`/`alyos-red-light` sont conservés et pointent vers les mêmes valeurs — pas de renommage cassant en passe 1 (compromis note Cowork 21/05 §3).
+- **2026-05-22 · P1.1 · Alex · Polices : conservation self-host fontsource (Gate 5).**
+  La consigne du Board mentionnait `next/font/google` pour Inter/Space Grotesk/JetBrains Mono. Décision actée Gate 5 (2026-05-07) impose un self-host strict (RGPD : pas d'IP visiteur vers Google, PWA offline). Les polices restent importées via `@fontsource/*` dans `src/app/layout.tsx` (inchangé). 🟠 Si Sophie veut basculer sur `next/font/google` (qui inline le téléchargement build-time chez Vercel, donc compatible Gate 5 contrairement à un lien `<link>` runtime), un REQUEST CTO est nécessaire.
+- **2026-05-22 · P1.1 · Alex · `<body className="bg-paper font-sans text-ink antialiased">`.**
+  Surface app par défaut alignée DS. Les pages publiques marketing-like (login, forbidden) peuvent surclasser via leurs conteneurs.
+- **Validation** : `tsc --noEmit` propre côté P1.1 (les erreurs visibles viennent des fichiers Nadia non-stagés sur la même working tree). `next build` env-clean (sans `DATABASE_URL`/Supabase) : 17 pages générées, "Compiled successfully", aucune régression.
+
+### P3 — Bug `/sourcing/admin/users` API renvoie HTML (branche `fix/admin-users-api-json-401`)
+
+- **2026-05-22 · P3 · Alex · Diag confirmé par lecture du code.**
+  `src/middleware.ts` ligne 103-105 (`if (!user) return redirectToLogin`) **et** ligne 70-75 (env Supabase manquant) renvoyaient un 307 vers `/login` sur **toutes** les routes, y compris `/api/admin/*`. Le fetch côté UI suit le redirect par défaut, reçoit la page HTML du login, plante à `await resp.json()` avec `Unexpected token <`. Hypothèse 1 du plan Alex confirmée.
+- **2026-05-22 · P3 · Alex · Patch middleware — JSON 401/503/500 sur `isProtectedApiRoute`.**
+  Fichier : `src/middleware.ts`. Helper `jsonUnauthorizedApi(status, error, message)` ajouté. 3 branches patchées : env manquant (503), session absente (401), catch global (500). Les cas déjà JSON (domaine refusé, must_change_password, forbidden_role) restent inchangés.
+- **2026-05-22 · P3 · Alex · Patch UI consommateurs.**
+  Fichiers : `src/app/sourcing/admin/users/InviteUserDialog.tsx` + `RegeneratePasswordButton.tsx`. Gestion `if (resp.status === 401)` → message inline « Session expirée » + `window.location.href = '/login?next=/sourcing/admin/users'`.
+- **2026-05-22 · P3 · Alex · Scaffold E2E pour Camille (qa).**
+  Fichier : `e2e/admin-users-session-expired.spec.ts` (4 cas C1-C4). Camille complétera les cas de bordure (JWT expiré côté Supabase, cookies sb-* malformés, etc.).
+- **Validation** : `tsc --noEmit` propre sur les 3 fichiers P3 (les erreurs résiduelles ne concernent QUE les fichiers de Nadia non-stagés sur la même working tree — c'est son périmètre Tandem).
+
+### Périmètre Tandem **non touché** par Alex (confirmation)
+
+- ❌ `src/db/schema/architects.ts`, `src/db/schema/enums.ts`, `src/db/migrate.ts`, `tests/unit/db/migrate.test.ts` : modifs Nadia déjà présentes dans la working tree, **non stagées par Alex**.
+- ❌ Aucun composant `M-D*`, pas de connecteur Odoo, pas de schéma BDD.
+- ✅ Branches Alex isolées (`feat/refonte-ui-p1-palette-tokens` et `fix/admin-users-api-json-401`) pour permettre à Nadia de rebase sans conflit.
+
+### Suite
+
+- Yann commitera (Conventional Commits : `feat(ui): pose tokens DS edifio (palette + radius + shadows)` et `fix(admin): API routes renvoient JSON 401 au lieu de 302 HTML`).
+- Hugo (reviewer) relira les 2 PR avant validation Board.
+- Camille (qa) reprendra le scaffold `e2e/admin-users-session-expired.spec.ts` pour le finaliser.
+
+---
+
+*Dernière mise à jour : 2026-05-22 (après-midi) par [Alex via Claude Code] — P1.1 tokens + P3 bug admin users, 2 branches préparées, working tree en attente du commit Yann.*

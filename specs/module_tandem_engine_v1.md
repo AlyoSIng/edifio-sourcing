@@ -261,8 +261,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
   await audit('architect_response', { tenderId: decoded.tenderId, architectId: decoded.architectId, status });
 
   // 5. Si accepted → trigger Odoo opportunity creation
+  //    UNE opportunité PAR architecte partant (précision Board 2026-05-21).
+  //    Si plusieurs architectes acceptent le même AO → plusieurs opportunités.
+  //    On passe donc architectId au connecteur partagé (cf. module_solo_engine_v1.md §3.2).
   if (status === 'accepted') {
-    await triggerOdooOpportunity(decoded.tenderId, 'Réponse cotraitance');
+    await createOdooOpportunity(decoded.tenderId, {
+      stage: 'Réponse cotraitance', origin: 'tandem', architectId: decoded.architectId,
+    });
   }
 
   // 6. Si declined → envoi du mail acknowledge D.8 (court courtois)

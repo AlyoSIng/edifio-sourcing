@@ -6,7 +6,8 @@
  * le JSON deja committe -- il ne tape PAS sur l'API.
  *
  * Source : API publique Opendatasoft BOAMP v2.1 (sans cle).
- *   https://data.boamp.fr/api/explore/v2.1/catalog/datasets/boamp/records
+ *   https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records
+ *   (ex-`data.boamp.fr` decommissionne par DILA -- cf. PR #23 / commit d4cefdd)
  *
  * Strategie :
  *   1. Pagine en 3 requetes parallele (offset 0, 100, 200 -- limit 100 chacune)
@@ -37,7 +38,8 @@ import {
 } from "./lib/distribution";
 import { buildMockFixture } from "./lib/fixture-mock";
 
-const BOAMP_BASE_URL = "https://data.boamp.fr/api/explore/v2.1/catalog/datasets/boamp/records";
+const BOAMP_BASE_URL =
+  "https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records";
 
 /** Taille cible par bucket pour le pool de fixture (genereux : 2 orgs x 100). */
 const FIXTURE_TARGETS = {

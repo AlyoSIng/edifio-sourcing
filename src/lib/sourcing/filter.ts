@@ -12,12 +12,20 @@
  *
  * Comportement (aligné spec §3.5 stricte) :
  *  1. Mots-clés POSITIFS — si la liste est non vide, au moins un doit matcher
- *     dans `title` (case-insensitive). Liste vide ⇒ pas de filtre positif.
- *  2. Mots-clés NÉGATIFS — si UN seul matche dans `title`, l'AO est rejeté.
+ *     dans `title`. Matching insensible à la **casse ET aux accents** via
+ *     `normalizeForMatching` (NFD + retrait diacritiques + lowercase).
+ *     Liste vide ⇒ pas de filtre positif.
+ *  2. Mots-clés NÉGATIFS — si UN seul matche dans `title` (même normalisation),
+ *     l'AO est rejeté. La raison remonte le keyword **original** (non normalisé)
+ *     pour traçabilité audit log.
  *  3. CPV — si `cpvCodes` profile non vide, au moins un code AO doit avoir
  *     un de ces préfixes (8 digits = exact, < 8 = préfixe famille CPV).
  *  4. MONTANT — si `amountMin`/`amountMax` posés ET `tender.amount` non null,
  *     respect des bornes. Un AO sans montant connu passe (on n'a pas l'info).
+ *
+ * Note normalisation : voir `src/lib/text/normalize.ts` + `DECISIONS.md`
+ * 2026-05-22 (d) — décision Board « normalisation accents+casse OBLIGATOIRE
+ * des deux côtés (titre AO ↔ mots-clés) ».
  *
  * Choix non triviaux :
  *  - **Scope du matching texte** : la spec §3.5 dit « title OR objet » mais
@@ -41,6 +49,7 @@
  */
 
 import type { SearchProfile } from "@/db/schema/config";
+import { normalizeForMatching } from "@/lib/text/normalize";
 
 import type { NormalizedTender } from "./types";
 
@@ -85,12 +94,16 @@ function parseAmountBound(value: string | null): number | null {
  * @param profile — profil de recherche (Drizzle row, jsonb `keywords` typé)
  */
 export function matchesProfile(tender: NormalizedTender, profile: SearchProfile): MatchResult {
-  const titleLower = tender.title.toLowerCase();
+  // Normalisation accents + casse (NFD + retrait diacritiques + lowercase) —
+  // cf. `src/lib/text/normalize.ts`. On normalise UNE fois le titre, puis chaque
+  // keyword lors du `includes`. La raison de rejet remonte le keyword ORIGINAL
+  // (non normalisé) pour traçabilité audit log.
+  const titleNormalized = normalizeForMatching(tender.title);
 
   // 1. Mots-clés positifs (au moins un match si liste non vide)
   const positives = profile.keywords.positive;
   if (positives.length > 0) {
-    const anyPositive = positives.some((kw) => titleLower.includes(kw.toLowerCase()));
+    const anyPositive = positives.some((kw) => titleNormalized.includes(normalizeForMatching(kw)));
     if (!anyPositive) {
       return { matched: false, reason: "no_positive_keyword" };
     }
@@ -98,7 +111,7 @@ export function matchesProfile(tender: NormalizedTender, profile: SearchProfile)
 
   // 2. Mots-clés négatifs (aucun match)
   const negatives = profile.keywords.negative;
-  const negativeHit = negatives.find((kw) => titleLower.includes(kw.toLowerCase()));
+  const negativeHit = negatives.find((kw) => titleNormalized.includes(normalizeForMatching(kw)));
   if (negativeHit) {
     return { matched: false, reason: `negative_keyword:${negativeHit}` };
   }

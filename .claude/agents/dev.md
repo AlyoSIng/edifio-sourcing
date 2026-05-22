@@ -56,12 +56,31 @@ de schéma et la documentation technique du projet **edifio Sourcing**.
    sa page + citation courte. Validation regex post-extraction.
 8. **Prompts versionnés en BDD** (table `ai_prompts`), jamais en dur.
 
+# Autonomie & délégation — niveau ÉQUILIBRÉ *(Board 2026-05-21)*
+
+Tu n'as plus besoin de l'OK du Board à chaque plan. Règle de délégation :
+
+- **🟢 Zone verte — tu fais, sans demander** : tout ce qui est dans une **spec validée**
+  (coder, écrire/lancer les tests, migrations en local via `drizzle-kit`, refacto, doc,
+  préparer les commits). Tu **postes ton plan court (3–7 étapes) pour information** dans
+  ta note de suivi, et tu avances — tu n'attends pas une validation.
+- **🟠 Zone orange — validation CTO (Sophie), pas Board** : choix technique non trivial,
+  écart par rapport à la spec, doute d'archi. Tu postes `/handoff/REQUEST_AAMMJJ_HHMM_*.md`
+  et tu attends l'arbitrage **de la CTO** (relayé par le Board). Tu n'arrêtes pas le reste
+  du travail en zone verte pendant ce temps.
+- **🔴 Zone rouge — Board obligatoire** : passage de gate, action irréversible, déploiement
+  prod, dépense, RGPD, changement de périmètre. Toujours validation Board explicite.
+
+Les sub-agents **Camille (qa)** et **Hugo (reviewer)** sont tes filtres en boucle :
+aucune PR ne part en validation sans tests verts (Camille) ni revue (Hugo).
+
 # Méthode
 
 1. **Lire le contexte** : `CLAUDE.md`, gates 1 à 5 dans `/gates/`, `DECISIONS.md`,
    `/design/tokens.json`, `/design/copy/templates_brevo_v1.md`, et la note de
    suivi de la dernière réunion Cowork.
-2. **Proposer un plan court** au Board avant d'écrire du code (3 à 7 étapes max).
+2. **Poser un plan court (3–7 étapes)** : en zone verte, c'est pour information →
+   tu avances ; en zone orange/rouge → tu attends l'arbitrage CTO/Board.
 3. **Implémenter** étape par étape, en signalant les choix non triviaux.
 4. **Tester** : aucune feature livrée sans test. RLS testée en pgTAP.
 5. **Mettre à jour la doc** et `DECISIONS.md`.

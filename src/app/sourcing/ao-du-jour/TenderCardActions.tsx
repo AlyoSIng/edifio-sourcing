@@ -112,7 +112,7 @@ export function TenderCardActions({
   return (
     <>
       <div
-        className={`flex flex-wrap gap-2 ${isPending ? "pointer-events-none opacity-50" : ""}`}
+        className={`flex flex-col gap-1.5 sm:items-stretch ${isPending ? "pointer-events-none opacity-50" : ""}`}
         aria-busy={isPending}
       >
         <button
@@ -120,7 +120,7 @@ export function TenderCardActions({
           onClick={() => setShowSoloTandemModal(true)}
           disabled={isPending}
           title="Bascule l'AO en pipeline. Vous choisirez ensuite Solo ou Tandem."
-          className="inline-flex items-center gap-1 rounded-md bg-[#FF0033] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#cc0029] focus:outline-none focus:ring-2 focus:ring-[#FF0033] focus:ring-offset-1 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-brand-red px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x2713;</span>
           Sélectionner
@@ -131,7 +131,7 @@ export function TenderCardActions({
           onClick={handleDefer}
           disabled={isPending}
           title="Reporte l'AO de 24h. Il reviendra dans le digest de demain."
-          className="inline-flex items-center gap-1 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x23F8;</span>
           Différer
@@ -142,7 +142,7 @@ export function TenderCardActions({
           onClick={() => setShowRejectModal(true)}
           disabled={isPending}
           title="Rejette l'AO. Un motif vous sera demandé pour améliorer le scoring."
-          className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-error transition hover:bg-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x2715;</span>
           Rejeter
