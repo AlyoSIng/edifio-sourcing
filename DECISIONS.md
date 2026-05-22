@@ -1029,3 +1029,29 @@ appliquée sur prod après Phase β. Pas de bug de code.
 ---
 
 *Dernière mise à jour : 2026-05-22 par [Yann via Claude Code] — Hotfix prod migration 0004 tracé + smoke prod 307→200 (page login, pas d'ErrorBanner / pas de deferred_until), commits locaux en attente de validation Board avant push.*
+
+---
+
+## 2026-05-22 (soir) — Arbitrage en bloc 9 recos Alex + Nadia (modules UI/admin/Tandem)
+
+**Contexte** : fin de session post-hotfix prod. Alex (dev) a rendu son plan `handoff/PLAN_ALEX_260522_REFONTE_UI.md` (P1 refonte UI + P2 admin profil + P3 bug /admin/users, 6.5-7.5 j) avec 5 questions ouvertes. Nadia (dev_tandem, sub-agent créé ce soir) a rendu `handoff/PLAN_TANDEM_NADIA_260522.md` (~7.5 j, gain 1j vs plan Alex du matin grâce aux 4 décisions du 22/05) + `handoff/REQUEST_260522_NADIA_TANDEM_CTO.md` (4 questions résiduelles, chacune avec reco + plan B).
+
+**Décision Board** : OK explicite en bloc sur les 9 recos perso telles que posées (cf. tableau ci-dessous). Arbitrages réversibles si désaccord détecté en cours d'implémentation.
+
+| # | Sujet | Reco validée |
+|---|---|---|
+| Alex Q1 | Sidebar mobile P1 | Hamburger mobile |
+| Alex Q2 | Profil de recherche V1 | 1 row éditable AlyoS |
+| Alex Q3 | exact_keywords casse | Case-insensitive (cohérent normalisation matcher) |
+| Alex Q4 | market_types | Enum fermé travaux/services/fournitures/moe |
+| Alex Q5 | geo_zones | Codes département FR V1 |
+| Nadia Q1 | Pondération matching | geo 30 / specialty 15 / history 35 / availability 15 / preference 5 + flag MATCHING_WEIGHTS_PROFILE |
+| Nadia Q3 | RGPD art.14 | Variable code {{rgpd_block}} (testable CI) |
+| Nadia Q4 | solicitable | GENERATED ALWAYS AS (email IS NOT NULL) STORED |
+| Nadia Q5 | JWT architecte | Clé RS256 dédiée ARCHITECT_JWT_* |
+
+**Suite** : Alex et Nadia démarrent lundi 25/05 en zone verte sur leurs périmètres respectifs. Yann génère la paire de clés JWT architecte avant l'étape 2 Tandem. Coordination Alex/Nadia : palette tokens en petite PR isolée d'abord (Alex), Nadia rebase ensuite. Sidebar data-driven NAV_ITEMS pour évolution sans conflit.
+
+---
+
+*Dernière mise à jour : 2026-05-22 (soir) par [Yann via Claude Code] — Arbitrage Board en bloc 9 recos perso Alex (5) + Nadia (4). Démarrage code Alex/Nadia lundi 25/05 en zone verte. Génération clés JWT architecte par Yann avant étape 2 Tandem.*
