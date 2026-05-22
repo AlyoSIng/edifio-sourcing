@@ -51,6 +51,13 @@ export const authType = pgEnum("auth_type", ["api_key", "oauth", "login_password
 
 /**
  * partnership_status — relation commerciale architecte.
+ *
+ * **OBSOLÈTE 2026-05-25** (PR `feat/tandem-engine` étape 1) : la colonne
+ * `architects.partnership_status` a été supprimée par la refonte propre
+ * (décision Board 2026-05-22 (a)). L'enum Postgres reste défini pour ne
+ * pas casser l'historique des snapshots/migrations, mais n'est plus
+ * référencé par aucune table. Suppression dure dans une migration
+ * ultérieure (post-MVP).
  */
 export const partnershipStatus = pgEnum("partnership_status", ["actif", "inactif", "prospect"]);
 
@@ -108,15 +115,22 @@ export const aiModel = pgEnum("ai_model", ["sonnet-4-6", "haiku-4-5"]);
 export const brevoRegister = pgEnum("brevo_register", ["tu", "vous", "neutre"]);
 
 /**
- * audit_action — 15 actions sensibles tracées en audit log immutable.
+ * audit_action — 16 actions sensibles tracées en audit log immutable.
  * Cf. `specs/audit_log_v1.md` pour les payloads détaillés par action.
  *
  * NB : `tender_defer` et `tender_reject` ajoutés à la fin du tableau par
- * PR n°5 (2026-05-21). Cet ordre se reflète dans le SQL côté Drizzle
+ * PR n°5 (2026-05-21). `architect_response` ajouté à la fin par PR
+ * `feat/tandem-engine` étape 1 (2026-05-25, décision Board 2026-05-22 (b)
+ * code A16 alloué). Cet ordre se reflète dans le SQL côté Drizzle
  * sous forme de `ALTER TYPE audit_action ADD VALUE 'tender_defer'`
- * puis `ALTER TYPE audit_action ADD VALUE 'tender_reject'` — l'ordre
+ * puis `ALTER TYPE audit_action ADD VALUE 'tender_reject'` puis
+ * `ALTER TYPE audit_action ADD VALUE 'architect_response'` — l'ordre
  * d'ajout est important car `ALTER TYPE ... ADD VALUE` ne peut pas
- * tourner dans une transaction Postgres (cf. migration 0004).
+ * tourner dans une transaction Postgres (cf. migration 0004 et 0005).
+ *
+ * Codes admin architects (`architect_edit`, `architect_import`,
+ * `architect_export`) hors périmètre Tandem — à allouer par Alex (admin)
+ * dans une migration ultérieure.
  */
 export const auditAction = pgEnum("audit_action", [
   "login",
@@ -134,6 +148,7 @@ export const auditAction = pgEnum("audit_action", [
   "access_attempt",
   "tender_defer",
   "tender_reject",
+  "architect_response",
 ]);
 
 /**

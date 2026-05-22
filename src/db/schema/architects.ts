@@ -1,16 +1,47 @@
 /**
  * Tables architects + architect_specialties — annuaire architectes partenaires.
  *
- * Source de vérité : `specs/schema_v1.sql` §3 + Gate 4 directive Board sur
- * la colonne `tutoiement` (vouvoiement par défaut, drapeau par architecte).
+ * Source de vérité :
+ *   - `specs/schema_v1.sql` §3 (modèle initial)
+ *   - Gate 4 directive Board : colonne `tutoiement` (vouvoiement par défaut)
+ *   - `specs/architects_data_and_admin_v1.md` §3-4 (mapping Odoo + RGPD)
+ *   - DECISIONS.md 2026-05-22 (a) : **refonte propre** de la table après audit
+ *     d'impact (Grep : aucun code applicatif ne consomme firstname/lastname/
+ *     title/siret/references/partnership_status — uniquement schema + seed).
+ *   - DECISIONS.md 2026-05-22 (d) : colonne `solicitable` dérivée
+ *     `GENERATED ALWAYS AS (email IS NOT NULL) STORED`.
  *
- * `architect_specialties` est une table de référence (7 spécialités seedées).
+ * Modèle Tandem-ready (refonte 2026-05-25 — PR feat/tandem-engine étape 1) :
+ *   - clé personne morale : `cabinet` (NOT NULL)
+ *   - contact personne physique : `contact_name` (nullable — fallback dirigeant SIRENE)
+ *   - email = clé de solicitabilité (nullable global, mais NOT NULL pour
+ *     que `solicitable=true`)
+ *   - identifiants : `siren` (9 chars — pas `siret` 14, le siret n'est pas
+ *     dans l'export Odoo), `odoo_external_id` UNIQUE (clé de rapprochement
+ *     import / ré-import)
+ *   - matching : `geo_zones`, `specialty_codes` (vocabulaire normalisé §4.4 spec)
+ *   - enrichissement : `headcount`, `company_size`, `company_created_at`
+ *   - drapeaux : `tutoiement` (Gate 4), `preferred` (admin curation),
+ *     `active` (droit d'opposition RGPD), `solicitable` (dérivé)
+ *   - usage : `past_collabs_count` (incrémenté par l'app — signal historique
+ *     du matching V1, cf. PLAN_TANDEM_NADIA_260522.md §H.Q1)
+ *
+ * `architect_specialties` reste table de référence (7 spécialités seedées —
+ * pas touché par la refonte, simplement conservé).
  */
 
 import { sql } from "drizzle-orm";
-import { boolean, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 
-import { partnershipStatus } from "./enums";
 import { organizations } from "./organizations";
 
 export const architectSpecialties = pgTable("architect_specialties", {
@@ -33,47 +64,94 @@ export const architects = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    firstname: text("firstname").notNull(),
-    lastname: text("lastname").notNull(),
-    /** Civilité : M., Mme, Dr, etc. */
-    title: text("title"),
-    email: text("email").notNull(),
+    /** Raison sociale du cabinet (clé personne morale). */
+    cabinet: text("cabinet").notNull(),
+    /**
+     * Nom du contact (personne physique) — `dirigeant_sirene` fallback dans
+     * l'import Odoo. Nullable car la colonne `Contact` Odoo est vide à 99 %.
+     * Côté template Brevo, parse split sur 1er espace = `{{archi_prenom}}` /
+     * reste = `{{archi_nom}}`. Fallback « partenaire » si NULL.
+     */
+    contactName: text("contact_name"),
+    /**
+     * Email professionnel — **clé de solicitabilité**. NULLABLE globalement
+     * car ~50 % de l'export Odoo n'a pas d'email. La colonne dérivée
+     * `solicitable` (GENERATED) gate l'inclusion dans le matching Tandem.
+     */
+    email: text("email"),
     phone: text("phone"),
-    siret: text("siret"),
-    /** Codes de spécialité (FK applicative via architect_specialties.code) */
+    website: text("website"),
+    /** SIREN 9 chars (entreprise). Le SIRET 14 chars n'est pas dans l'export. */
+    siren: text("siren"),
+    zip: text("zip"),
+    city: text("city"),
+    /** Effectif (enrichissement, hors matching V1). */
+    headcount: integer("headcount"),
+    /** Taille entreprise (PME | ETI | GE) — enrichissement, hors matching V1. */
+    companySize: text("company_size"),
+    companyCreatedAt: timestamp("company_created_at", { withTimezone: true }),
+    /** Clé Odoo de rapprochement (import / ré-import upsert). UNIQUE. */
+    odooExternalId: text("odoo_external_id").unique(),
+    /** Codes de spécialité (FK applicative via architect_specialties.code). */
     specialtyCodes: text("specialty_codes")
       .array()
       .notNull()
       .default(sql`'{}'`),
+    /** Départements/zones géo d'intervention (split de `departements_intervention`). */
     geoZones: text("geo_zones")
       .array()
       .notNull()
       .default(sql`'{}'`),
-    references: text("references"),
-    partnershipStatus: partnershipStatus("partnership_status").notNull().default("prospect"),
-    notes: text("notes"),
     /**
      * Drapeau Gate 4 : FALSE = vouvoiement (DEFAULT directive Board),
      * TRUE = tutoiement (collaboration historique). Pilote la sélection
      * du template Brevo TU vs VOUS.
      */
     tutoiement: boolean("tutoiement").notNull().default(false),
+    /** Drapeau admin — architecte « préféré » (mise en avant matching). */
+    preferred: boolean("preferred").notNull().default(false),
+    /**
+     * Droit d'opposition RGPD (art. 21) — FALSE désactive l'architecte
+     * (retiré du matching et des sollicitations futures, sans suppression
+     * dure). Toggle dans l'écran admin + page publique tokenisée
+     * `/archi/oppose/[token]`.
+     */
+    active: boolean("active").notNull().default(true),
+    /**
+     * Drapeau dérivé `solicitable` = TRUE si email NOT NULL — colonne
+     * GENERATED ALWAYS AS STORED (décision Board 2026-05-22 Q4 : isolée
+     * en colonne stockée pour requêtes/index, pas de risque de drift
+     * applicatif vs dérivation côté code).
+     */
+    solicitable: boolean("solicitable").generatedAlwaysAs(sql`(email IS NOT NULL)`),
+    /** Compteur de collaborations passées — incrémenté à l'usage (matching V1). */
+    pastCollabsCount: integer("past_collabs_count").notNull().default(0),
+    notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    /** Unicité email scopée au tenant (un même archi peut être chez 2 orgs) */
+    /** Unicité email scopée au tenant (un même archi peut être chez 2 orgs). */
     orgEmailUq: unique("architects_organization_id_email_key").on(
       table.organizationId,
       table.email,
     ),
     orgIdx: index("idx_architects_org").on(table.organizationId),
-    /** Index partiel pour ne pas indexer les SIRET NULL */
-    siretIdx: index("idx_architects_siret")
-      .on(table.siret)
-      .where(sql`${table.siret} IS NOT NULL`),
-    /** Index GIN sur array spécialités pour matching rapide */
+    /** Index partiel pour ne pas indexer les SIREN NULL. */
+    sirenIdx: index("idx_architects_siren")
+      .on(table.siren)
+      .where(sql`${table.siren} IS NOT NULL`),
+    /** Index GIN sur array spécialités pour matching rapide. */
     specialtiesIdx: index("idx_architects_specialties").using("gin", table.specialtyCodes),
+    /** Index GIN sur array zones géo pour matching rapide. */
+    geoZonesIdx: index("idx_architects_geo_zones").using("gin", table.geoZones),
+    /**
+     * Index partiel sur les architectes sollicitables actifs — chemin chaud
+     * du matching Tandem (filtre `solicitable = TRUE AND active = TRUE`).
+     */
+    solicitableActiveIdx: index("idx_architects_solicitable_active")
+      .on(table.organizationId)
+      .where(sql`${table.solicitable} = TRUE AND ${table.active} = TRUE`),
   }),
 );
 

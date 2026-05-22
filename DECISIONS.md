@@ -1099,3 +1099,55 @@ appliquée sur prod après Phase β. Pas de bug de code.
 ---
 
 *Dernière mise à jour : 2026-05-22 (après-midi) par [Alex via Claude Code] — P1.1 tokens + P3 bug admin users, 2 branches préparées, working tree en attente du commit Yann.*
+
+---
+
+## 2026-05-25 — PR `feat/tandem-engine` étape 1 (Nadia · dev_tandem)
+
+**Périmètre** : refonte schéma Tandem + RLS + seed fictif + audit A16 + spec audit_log. ~1.5 j d'effort. Zone verte (les 4 décisions Board 2026-05-22 ferment tous les choix structurants). Branche cible `feat/tandem-engine` à créer par Yann depuis `feat/sourcing-mvp` au 1er commit.
+
+### Schéma Drizzle modifié
+
+- **`src/db/schema/architects.ts`** — refonte propre (décision Board 22/05 (a)) :
+  drop des colonnes héritées `firstname`, `lastname`, `title`, `siret`, `references`, `partnership_status` (audit Grep préalable : 0 consommateur applicatif, seuls schema + seed touchés). Ajout colonnes Tandem : `cabinet` NOT NULL, `contact_name`, `email` rendu nullable (clé `solicitable`), `phone`, `website`, `siren` (9 chars), `zip`, `city`, `headcount`, `company_size`, `company_created_at`, `odoo_external_id` UNIQUE, `preferred`, `active`, **`solicitable` GENERATED ALWAYS AS (email IS NOT NULL) STORED** (décision Q4), `past_collabs_count`. Index Tandem : `idx_architects_siren` (partiel NOT NULL), `idx_architects_geo_zones` (GIN), `idx_architects_solicitable_active` (partiel chemin chaud matching).
+- **`src/db/schema/selections.ts`** — `architect_responses` : ajout `token_id` (FK SET NULL → `architect_tokens.id`, nullable car responses pré-Tandem ou saisie admin n'en ont pas) + `followup_sent_at` timestamptz (décision (c)). Index partiel chemin chaud cron J+3 : `idx_architect_responses_pending_no_followup`. **NOUVELLE table `architect_opposition_tokens`** (id, architect_id, organization_id, jti UNIQUE, created_at, expires_at, used_at) pour la page publique RGPD `/archi/oppose/[token]` (single-use, durée de vie longue alignée rétention 5 ans).
+- **`src/db/schema/integrations.ts`** — `odoo_opportunities` refonte multi-opp : DROP UNIQUE(tender_id), ADD `architect_id` FK SET NULL, ADD `origin` text avec CHECK `('solo'|'tandem')`, ADD `last_error` text (traçabilité retry), 2 index partiels UNIQUE (`uniq_opp_solo` WHERE architect_id IS NULL + `uniq_opp_tandem` WHERE architect_id IS NOT NULL) garantissant 1 opp Solo par AO + 1 opp par couple (AO, archi) en Tandem.
+- **`src/db/schema/enums.ts`** — ajout `architect_response` en dernière position de `auditAction` (A16 — décision (b)). Annotation `partnershipStatus` comme obsolète (enum Postgres conservé pour ne pas casser snapshots historiques).
+
+### Spec mise à jour
+
+- **`specs/audit_log_v1.md`** — section A16 `architect_response` ajoutée après A15. Payload Zod-ready : `tender_id`, `tender_ref`, `architect_id`, `architect_email`, `response_status` ∈ accepted|declined|info_requested, `via_token`, `token_jti`, `info_request_text`, `responded_at`. Justification : signaux funnel Tandem (taux réponse, délai médian, taux acceptation par registre). Type union TypeScript dans la spec mis à jour. Compteur 15 → 16 actions.
+
+### Seed fictif Tandem
+
+- **`src/db/seed/architects-fixture.ts`** (NEW) — 6 cabinets `@example.test` (RFC 2606 non-routable) avec UUIDs déterministes : 2 TU (Atelier Dupont riche + Studio Martin moyen), 2 VOUS (Cabinet Sud-Ouest moyen + Atelier Garcia vide pour exercer `sparse_data`), 1 inactif RGPD, 1 sans email (exerce `solicitable=FALSE` GENERATED). Upsert idempotent sur `id` avec `ON CONFLICT DO UPDATE`. Gating `NODE_ENV !== 'production'`. Script `pnpm db:seed:architects` ajouté au package.json.
+- **`src/db/seed/index.ts`** — `buildArchitect()` regen pour matcher le nouveau schéma (cabinet/contact_name/siren/odoo_external_id, plus de firstname/lastname/siret). Branchement conditionnel de `seedArchitectsFixture(ORG_A_ID)` après les 100 architects faker. Sanity check global passé de 100 → 106 architects attendus.
+
+### Tests pgTAP
+
+- **`tests/rls/09_tandem_tables.sql`** (NEW) — cross-tenant Tandem : 7 assertions sur `architect_responses`, `architect_tokens`, `architect_opposition_tokens`, `odoo_opportunities` (avec validation multi-opp Solo + Tandem sur le même AO), `match_proposals`.
+- **`tests/rls/10_audit_a16.sql`** (NEW) — A16 dans enum + INSERT autorisé + UPDATE/DELETE rejetés par trigger immutabilité + RLS admin-only. 5 assertions.
+- **Coordination Camille (qa)** : Nadia pose la structure de base ; Camille complète les assertions fines (payload Zod, idempotence response, contraintes index partiels) lors des étapes 4-5 du plan.
+
+### Migration
+
+- **NON GÉNÉRÉE** par Nadia (Bash sandbox interdit `drizzle-kit generate`). 2 drafts SQL posés dans `src/db/migrations/drafts/` pour cadrer le travail Yann :
+  - `0005_tandem_engine.draft.sql` — DDL complet (ALTER TYPE A16, refonte architects, ajouts architect_responses, refonte odoo_opportunities multi-opp, NEW table architect_opposition_tokens)
+  - `0006_tandem_rls.draft.sql` — ENABLE + FORCE + POLICY tenant_isolation sur la NEW table
+- **Action Yann** : `pnpm drizzle-kit generate --name=tandem_engine` + insertion manuelle des éléments non-modélisés par Drizzle (CHECK constraint, colonne GENERATED, ALTER TYPE non-transactionnel), puis `pnpm db:dry-run` complet sur container postgres:15 avant push (cf. memory `feedback_postgres_dry_run_local`).
+
+### Hors-périmètre Nadia (confirmé)
+
+- ❌ Aucune touche : `src/app/globals.css`, `tailwind.config.ts`, `src/components/ui/*` (Alex P1.1), `src/db/schema/search_profiles.ts` (Alex P2), `middleware.ts` (Alex P3), `src/app/sourcing/admin/users/*` (Alex P3).
+- ❌ Pas de matching V1, pas de JWT RS256, pas de connecteur Odoo, pas de Brevo (étapes 2-5 du plan Tandem).
+- ✅ `src/db/schema/enums.ts` — append-only conforme convention ; A16 en dernière position pour respecter l'ordre Postgres `ALTER TYPE ADD VALUE` (cf. commentaire schema). Alex pourra appender ses codes admin architects (`architect_edit`, `architect_import`, `architect_export`) après moi sans conflit.
+
+### Suite
+
+- Yann commit (Conventional : `feat(tandem): refonte schema architects + A16 audit + RLS + seed fictif (etape 1)`) + push après dry-run local OK.
+- Hugo (reviewer) relit avant validation Board (focus : CHECK constraints, GENERATED column, RLS de la NEW table).
+- Étape 2 Tandem débloquée dès création des clés JWT par Yann (`ARCHITECT_JWT_PRIVATE_KEY` / `ARCHITECT_JWT_PUBLIC_KEY` — décision Q5).
+
+---
+
+*Dernière mise à jour : 2026-05-25 (matin) par [Nadia via Claude Code] — Étape 1 Tandem livrée en working tree, attente commit Yann.*

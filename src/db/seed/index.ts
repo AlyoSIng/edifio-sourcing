@@ -65,6 +65,7 @@ import type {
   TenderEventData,
   TenderRawData,
 } from "../types/jsonb";
+import { seedArchitectsFixture } from "./architects-fixture";
 import { AI_PROMPTS_V1_CATALOG } from "./data/ai-prompts";
 import { assertDistribution, recordSizeKb } from "./lib/distribution";
 import { loadBoampFixture } from "./lib/fixture-loader";
@@ -137,16 +138,25 @@ function buildSearchProfile(orgId: string, name: string): typeof searchProfiles.
 }
 
 function buildArchitect(orgId: string, index: number): typeof architects.$inferInsert {
+  // Refonte 2026-05-25 (PR feat/tandem-engine etape 1) : nouveau modele
+  // cabinet / contact_name / siren / odoo_external_id (cf. decision Board
+  // 2026-05-22 (a) + schema architects.ts).
   const firstname = faker.person.firstName();
   const lastname = faker.person.lastName();
   return {
     organizationId: orgId,
-    firstname,
-    lastname,
-    title: faker.helpers.arrayElement(["M.", "Mme", "Dr"]),
+    cabinet: `${faker.company.name()} Architectes`,
+    contactName: `${firstname} ${lastname}`,
     email: `archi-${orgId.slice(0, 8)}-${index}@exemple.test`,
     phone: "01 23 45 67 89",
-    siret: faker.string.numeric(14),
+    website: faker.internet.url(),
+    siren: faker.string.numeric(9),
+    zip: faker.location.zipCode("#####"),
+    city: faker.location.city(),
+    headcount: faker.number.int({ min: 1, max: 80 }),
+    companySize: faker.helpers.arrayElement(["PME", "ETI", "GE"]),
+    companyCreatedAt: faker.date.past({ years: 30 }),
+    odooExternalId: `odoo-${orgId.slice(0, 8)}-${index}`,
     specialtyCodes: faker.helpers.arrayElements(
       SPECIALTIES.map((s) => s.code),
       { min: 1, max: 3 },
@@ -155,10 +165,13 @@ function buildArchitect(orgId: string, index: number): typeof architects.$inferI
       min: 1,
       max: 4,
     }),
-    references: faker.lorem.sentence(),
-    partnershipStatus: faker.helpers.arrayElement(["actif", "inactif", "prospect"]),
     notes: faker.lorem.paragraph(),
     tutoiement: index % 5 === 0, // 20% tutoiement
+    preferred: index % 11 === 0, // ~9% favoris
+    active: true,
+    // NB : `solicitable` est GENERATED ALWAYS AS (email IS NOT NULL) STORED —
+    // pas inserable. Drizzle ignore l'absence (la colonne est generee cote DB).
+    pastCollabsCount: faker.number.int({ min: 0, max: 12 }),
   };
 }
 
@@ -669,6 +682,14 @@ export async function runSeed(): Promise<SeedReport> {
     counts.architects += archis.length;
   }
 
+  // --- 6bis. Fixtures Tandem (6 cabinets deterministes, org ALYOS) --------
+  // Pose les 6 cabinets `@example.test` necessaires aux tests Tandem
+  // (matching V1 + template-picker TU/VOUS + filtre solicitable/active).
+  // Idempotent par UUID stable + ON CONFLICT DO UPDATE -- ne casse pas le
+  // re-run du seed. Strictement dev/CI (NODE_ENV !== 'production' enforce).
+  const tandemFixtureCount = await seedArchitectsFixture(ORG_A_ID);
+  counts.architects += tandemFixtureCount;
+
   // --- 7. Tenders (100 par org, distribution 15/60/25) --------------------
   // Pour la condition 2 CTO : on construit la liste exacte de records BOAMP
   // a injecter et on calcule mediane / distribution apres assemblage.
@@ -844,8 +865,11 @@ export async function runSeed(): Promise<SeedReport> {
   if (counts.tenders !== 200) {
     throw new Error(`[seed] tenders attendu 200, observe ${counts.tenders}`);
   }
-  if (counts.architects !== 100) {
-    throw new Error(`[seed] architects attendu 100, observe ${counts.architects}`);
+  // 100 faker (2 orgs × 50) + 6 fixtures Tandem deterministes (org ALYOS) = 106.
+  if (counts.architects !== 106) {
+    throw new Error(
+      `[seed] architects attendu 106 (100 faker + 6 fixtures Tandem), observe ${counts.architects}`,
+    );
   }
 
   return report;

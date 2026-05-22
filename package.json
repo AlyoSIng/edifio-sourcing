@@ -26,6 +26,7 @@
     "db:migrate:drizzle-only": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed/index.ts",
+    "db:seed:architects": "tsx src/db/seed/architects-fixture.ts",
     "db:seed:prod": "tsx src/db/seed/prod.ts",
     "db:reset": "tsx src/db/seed/reset.ts",
     "db:fetch-boamp": "tsx src/db/seed/fetch-boamp-fixture.ts",

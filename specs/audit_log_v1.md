@@ -35,7 +35,7 @@
 
 ---
 
-## 15 actions × payload détaillé
+## 16 actions × payload détaillé
 
 > **Amendement 2026-05-21 (PR n°5 `feat/tender-actions`)** : ajout de deux actions
 > **A14 `tender_defer`** et **A15 `tender_reject`** séparées, validation Board
@@ -43,6 +43,15 @@
 > split (vs un seul code `tender_decision` polymorphe) : signaux d'apprentissage
 > IA scoring distincts (différé = signal faible, rejet = signal fort), filtrage
 > analytics simple par `action`, et payload schemas Zod dédiés sans `discriminator`.
+>
+> **Amendement 2026-05-25 (PR `feat/tandem-engine` étape 1)** : ajout de
+> **A16 `architect_response`** (validation Board Steve TEISSIER 2026-05-22, décision
+> (b) du batch Tandem 22/05). Compteur passé de 15 → 16 actions. Tracé chaque
+> réponse architecte (accepted/declined/info_requested) reçue via la page
+> tokenisée publique `/archi/[token]`, qu'elle soit déclenchée par clic
+> architecte ou saisie manuelle admin (fallback hors-canal). Payload distinct
+> de A5 `architect_solicit` (envoi) pour faciliter l'analyse du funnel Tandem
+> (taux de réponse, délai médian, taux d'acceptation par registre TU/VOUS).
 
 
 ### A1 — `login`
@@ -237,6 +246,33 @@ apprentissage IA scoring débloqué** (signal négatif explicite + motif libre,
 exploité côté `learning_events.event_type='rejected'` PR ultérieure).
 *Validation Board 2026-05-21 (Steve TEISSIER), code A15 alloué.*
 
+### A16 — `architect_response`
+```json
+{
+  "tender_id": "uuid",
+  "tender_ref": "25-AO-00142",
+  "architect_id": "uuid",
+  "architect_email": "marc.dupont@example.test",
+  "response_status": "accepted",
+  "via_token": true,
+  "token_jti": "uuid-jti-du-jwt",
+  "info_request_text": null,
+  "responded_at": "2026-05-25T10:42:00.000Z"
+}
+```
+`response_status` ∈ `accepted | declined | info_requested`.
+`via_token` est `true` quand la réponse provient de la page tokenisée
+publique `/archi/[token]` (cas standard), `false` quand elle est saisie
+manuellement par un admin côté app (fallback hors-canal, ex. l'architecte
+a répondu par téléphone). `token_jti` est `null` si `via_token = false`.
+`info_request_text` est rempli uniquement si `response_status =
+'info_requested'` (texte libre architecte, max 1000 chars).
+Déclencheur : `POST /api/archi/[token]/respond` (Server Action de la page
+tokenisée) OU action admin sur la fiche AO Tandem. *Validation Board
+2026-05-22 (Steve TEISSIER), code A16 alloué — décision (b) batch Tandem
+22/05.* Signaux analytics : taux de réponse Tandem (delivered → A16) +
+délai médian (sentAt → respondedAt) + taux acceptation par registre.
+
 ---
 
 ## Implémentation côté app — helper TypeScript
@@ -250,7 +286,7 @@ type AuditAction =
   | 'tender_select' | 'architect_solicit' | 'dossier_diffuse'
   | 'ai_run' | 'odoo_opportunity_create' | 'architect_change'
   | 'rgpd_export' | 'token_revoke' | 'data_delete' | 'access_attempt'
-  | 'tender_defer' | 'tender_reject'
+  | 'tender_defer' | 'tender_reject' | 'architect_response'
 
 export async function audit(params: {
   action: AuditAction
