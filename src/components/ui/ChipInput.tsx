@@ -109,16 +109,16 @@ export function ChipInput({
   return (
     <div>
       <div
-        className={`flex flex-wrap items-center gap-2 rounded-md border bg-white px-2 py-2 ${
+        className={`flex flex-wrap items-center gap-2 rounded-sm border bg-white px-2 py-2 transition ${
           displayedErrors.length > 0
-            ? "border-red-300 focus-within:border-red-500"
-            : "border-neutral-300 focus-within:border-neutral-900"
+            ? "border-error focus-within:border-error focus-within:ring-1 focus-within:ring-error"
+            : "border-line-2 focus-within:border-brand-red focus-within:ring-1 focus-within:ring-brand-red"
         }`}
       >
         {values.map((value, index) => (
           <span
             key={`${value}-${index}`}
-            className="inline-flex items-center gap-1 rounded-sm bg-neutral-100 px-2 py-0.5 font-mono text-xs text-neutral-800"
+            className="inline-flex items-center gap-1 rounded-sm border border-line bg-paper-3 px-2 py-0.5 font-mono text-xs text-ink"
           >
             {value}
             <button
@@ -126,7 +126,7 @@ export function ChipInput({
               onClick={() => removeChip(index)}
               disabled={disabled}
               aria-label={`Supprimer ${value}`}
-              className="ml-0.5 rounded-sm px-1 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 disabled:opacity-40"
+              className="ml-0.5 rounded-sm px-1 text-muted transition hover:bg-line hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red disabled:opacity-40"
             >
               ×
             </button>
@@ -146,11 +146,11 @@ export function ChipInput({
           onBlur={commitDraft}
           placeholder={values.length === 0 ? placeholder : ""}
           disabled={disabled}
-          className="min-w-[8rem] flex-1 border-0 bg-transparent px-1 py-0.5 text-sm outline-none placeholder:text-neutral-400 disabled:cursor-not-allowed"
+          className="min-w-[8rem] flex-1 border-0 bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-muted disabled:cursor-not-allowed"
         />
       </div>
       {displayedErrors.length > 0 ? (
-        <ul role="alert" className="mt-1 space-y-0.5 text-xs text-red-700">
+        <ul role="alert" className="mt-1 space-y-0.5 text-xs text-error">
           {displayedErrors.map((msg, i) => (
             <li key={i}>{msg}</li>
           ))}

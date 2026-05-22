@@ -176,15 +176,15 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       : null;
 
   return (
-    <form onSubmit={handleSubmit} aria-busy={isPending} className="space-y-8">
+    <form onSubmit={handleSubmit} aria-busy={isPending} className="space-y-7">
       {/* Toast succès */}
       {successVisible ? (
         <div
           role="status"
           aria-live="polite"
-          className="rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800"
+          className="rounded-sm border-l-4 border-success bg-success-bg px-4 py-3 text-sm text-success"
         >
-          Profil <strong>{profileName}</strong> enregistré avec succès.
+          Profil <strong className="font-semibold">{profileName}</strong> enregistré avec succès.
         </div>
       ) : null}
 
@@ -193,7 +193,7 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
         <div
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-sm border-l-4 border-error bg-error-bg px-4 py-3 text-sm text-error"
         >
           <strong className="mr-1 font-semibold">Action impossible :</strong>
           {globalError}
@@ -201,11 +201,11 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       ) : null}
 
       {/* SECTION 1 — Mots-clés positifs */}
-      <fieldset className="space-y-2">
-        <legend className="font-display text-base font-semibold text-neutral-900">
+      <fieldset className="space-y-2 border-t border-line pt-6 first:border-t-0 first:pt-0">
+        <legend className="font-display text-base font-semibold text-ink">
           Mots-clés positifs
         </legend>
-        <p className="text-xs text-neutral-600">
+        <p className="text-xs text-muted">
           Au moins un doit matcher dans le titre d&apos;un AO (sinon rejeté). Insensible à la casse
           et aux accents.
         </p>
@@ -220,11 +220,11 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       </fieldset>
 
       {/* SECTION 2 — Mots-clés négatifs */}
-      <fieldset className="space-y-2">
-        <legend className="font-display text-base font-semibold text-neutral-900">
+      <fieldset className="space-y-2 border-t border-line pt-6">
+        <legend className="font-display text-base font-semibold text-ink">
           Mots-clés négatifs
         </legend>
-        <p className="text-xs text-neutral-600">
+        <p className="text-xs text-muted">
           Si un seul matche le titre, l&apos;AO est rejeté. Insensible à la casse et aux accents.
         </p>
         <ChipInput
@@ -237,11 +237,9 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       </fieldset>
 
       {/* SECTION 3 — Mots-clés exact */}
-      <fieldset className="space-y-2">
-        <legend className="font-display text-base font-semibold text-neutral-900">
-          Mots-clés exact
-        </legend>
-        <p className="text-xs text-neutral-600">
+      <fieldset className="space-y-2 border-t border-line pt-6">
+        <legend className="font-display text-base font-semibold text-ink">Mots-clés exact</legend>
+        <p className="text-xs text-muted">
           Recherche d&apos;expression exacte dans le titre (bonus de score si match). NB : la
           logique « exact » n&apos;est pas encore câblée côté filtre, à clarifier avec la CTO avant
           V2.
@@ -256,9 +254,9 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       </fieldset>
 
       {/* SECTION 4 — Codes CPV */}
-      <fieldset className="space-y-2">
-        <legend className="font-display text-base font-semibold text-neutral-900">Codes CPV</legend>
-        <p className="text-xs text-neutral-600">
+      <fieldset className="space-y-2 border-t border-line pt-6">
+        <legend className="font-display text-base font-semibold text-ink">Codes CPV</legend>
+        <p className="text-xs text-muted">
           2 à 8 chiffres. 2 digits = famille (ex. <code className="font-mono">45</code> tous travaux
           BTP) ; 8 digits = code exact.
         </p>
@@ -274,11 +272,11 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       </fieldset>
 
       {/* SECTION 5 — Zones géographiques FR */}
-      <fieldset className="space-y-2">
-        <legend className="font-display text-base font-semibold text-neutral-900">
+      <fieldset className="space-y-2 border-t border-line pt-6">
+        <legend className="font-display text-base font-semibold text-ink">
           Zones géographiques (départements FR)
         </legend>
-        <p className="text-xs text-neutral-600">
+        <p className="text-xs text-muted">
           Codes département : 01 à 95 (métropole), 2A / 2B (Corse), 971 à 976 (DROM).
         </p>
         <ChipInput
@@ -293,23 +291,21 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       </fieldset>
 
       {/* SECTION 6 — Types de marché */}
-      <fieldset className="space-y-2">
-        <legend className="font-display text-base font-semibold text-neutral-900">
-          Types de marché
-        </legend>
-        <p className="text-xs text-neutral-600">
+      <fieldset className="space-y-2 border-t border-line pt-6">
+        <legend className="font-display text-base font-semibold text-ink">Types de marché</legend>
+        <p className="text-xs text-muted">
           Sélectionner un ou plusieurs types. Cocher tous = pas de filtre.
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
           {MARKET_TYPES.map((mt) => {
             const checked = marketTypes.includes(mt);
             return (
               <label
                 key={mt}
-                className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${
+                className={`flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-1.5 text-sm transition ${
                   checked
-                    ? "border-neutral-900 bg-neutral-900 text-white"
-                    : "border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-50"
+                    ? "border-brand-red bg-brand-red text-white"
+                    : "border-line-2 bg-white text-ink hover:bg-paper-2"
                 } ${isPending ? "pointer-events-none opacity-60" : ""}`}
               >
                 <input
@@ -329,7 +325,7 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
           })}
         </div>
         {fieldErrors["market_types"] ? (
-          <ul role="alert" className="text-xs text-red-700">
+          <ul role="alert" className="text-xs text-error">
             {fieldErrors["market_types"].map((msg, i) => (
               <li key={i}>{msg}</li>
             ))}
@@ -338,17 +334,17 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       </fieldset>
 
       {/* SECTION 7 & 8 — Montants */}
-      <fieldset className="space-y-2">
-        <legend className="font-display text-base font-semibold text-neutral-900">
+      <fieldset className="space-y-2 border-t border-line pt-6">
+        <legend className="font-display text-base font-semibold text-ink">
           Plage de montants (EUR)
         </legend>
-        <p className="text-xs text-neutral-600">
+        <p className="text-xs text-muted">
           Bornes optionnelles. Si renseignées, le montant min doit être inférieur ou égal au montant
           max.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className="font-mono text-xs uppercase tracking-wider text-neutral-500">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted">
               Montant min
             </span>
             <input
@@ -360,10 +356,10 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
               min={0}
               step="0.01"
               placeholder="—"
-              className="mt-1 block w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+              className="mt-1 block w-full rounded-sm border border-line-2 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
             />
             {fieldErrors["amount_min"] ? (
-              <ul role="alert" className="mt-1 text-xs text-red-700">
+              <ul role="alert" className="mt-1 text-xs text-error">
                 {fieldErrors["amount_min"].map((msg, i) => (
                   <li key={i}>{msg}</li>
                 ))}
@@ -371,7 +367,7 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
             ) : null}
           </label>
           <label className="block">
-            <span className="font-mono text-xs uppercase tracking-wider text-neutral-500">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-muted">
               Montant max
             </span>
             <input
@@ -383,10 +379,10 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
               min={0}
               step="0.01"
               placeholder="—"
-              className="mt-1 block w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+              className="mt-1 block w-full rounded-sm border border-line-2 bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
             />
             {fieldErrors["amount_max"] ? (
-              <ul role="alert" className="mt-1 text-xs text-red-700">
+              <ul role="alert" className="mt-1 text-xs text-error">
                 {fieldErrors["amount_max"].map((msg, i) => (
                   <li key={i}>{msg}</li>
                 ))}
@@ -397,11 +393,11 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
       </fieldset>
 
       {/* Actions */}
-      <div className="flex items-center gap-3 border-t border-neutral-200 pt-6">
+      <div className="flex items-center gap-3 border-t border-line pt-6">
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 disabled:opacity-60"
+          className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:bg-line-2 disabled:opacity-70"
         >
           {isPending ? "Enregistrement…" : "Enregistrer"}
         </button>
@@ -409,7 +405,7 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
           type="button"
           onClick={handleReset}
           disabled={isPending}
-          className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-60"
+          className="rounded-sm border border-line-2 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 disabled:opacity-60"
         >
           Annuler les modifications
         </button>
