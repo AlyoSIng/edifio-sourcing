@@ -73,7 +73,7 @@ test.describe("P3 — Session expirée sur /api/admin/* renvoie JSON 401 (pas HT
     context,
   }) => {
     // 1. Connexion admin valide (helper E2E gated).
-    await signInWith(page, "admin@alyosingenierie.fr");
+    await signInWith(page, "e2e-test+admin-c3@alyosingenierie.fr");
     await page.goto("/sourcing/admin/users");
     await expect(page).toHaveURL(/\/sourcing\/admin\/users/);
 
