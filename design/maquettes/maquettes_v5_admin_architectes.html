@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>edifio Sourcing — Maquette M16 (Admin architectes)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --alyos-red: #FF0033; --alyos-red-dark: #CC0029;
+    --ink: #0F1A2E; --ink-2: #1F2937;
+    --paper: #FAF9F6; --paper-2: #F3F1EC; --paper-3: #E8E5DD;
+    --line: #E2DFD6; --line-2: #CFCBC0; --muted: #6B7280; --white: #FFFFFF;
+    --success: #15803D; --success-bg: #DCFCE7;
+    --warn: #B45309; --warn-bg: #FEF3C7;
+    --error: #B91C1C; --error-bg: #FEE2E2;
+    --info: #1E40AF; --info-bg: #DBEAFE;
+    --pill-bg: #FFE5EA; --pill-color: #C8002A;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-body); background: var(--paper-2); color: var(--ink); }
+  .page-wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
+  .page-header h1 { font-family: var(--font-display); font-size: 32px; margin: 0 0 8px; letter-spacing: -1px; }
+  .page-header .meta { color: var(--muted); font-size: 14px; }
+  .legend { background: var(--white); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; margin: 18px 0 28px; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+  .mockup { background: var(--white); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 32px; overflow: hidden; box-shadow: 0 2px 12px rgba(15,26,46,0.04); }
+  .mockup-label { background: var(--ink); color: var(--white); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 10px 16px; }
+  .mockup-frame { padding: 20px; background: var(--paper); }
+  .edifio-pin { width: 28px; height: 28px; border-radius: 50%; background: var(--alyos-red); display: grid; place-items: center; box-shadow: 0 4px 16px rgba(255,0,51,0.25); }
+  .edifio-pin svg { width: 14px; height: 17px; }
+  .edifio-word { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -1px; }
+  .edifio-logo { display: inline-flex; align-items: center; gap: 8px; }
+
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 12px; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--alyos-red); color: var(--white); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+  .btn-danger-ghost { background: transparent; color: var(--error); border: 1px solid var(--line-2); }
+  .btn-sm { padding: 6px 10px; font-size: 11px; }
+  .chip { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+  .chip-success { background: var(--success-bg); color: var(--success); }
+  .chip-warn { background: var(--warn-bg); color: var(--warn); }
+  .chip-error { background: var(--error-bg); color: var(--error); }
+  .chip-neutral { background: var(--paper-3); color: var(--muted); }
+  .chip-red { background: rgba(255,0,51,0.1); color: var(--alyos-red); }
+  .chip-spec { background: var(--paper-2); color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; font-family: var(--font-body); text-transform: none; font-size: 10.5px; padding: 2px 9px; letter-spacing: 0; }
+
+  .app-layout { display: grid; grid-template-columns: 220px 1fr; min-height: 660px; background: var(--paper); position: relative; }
+  .sidebar { background: var(--ink); color: var(--white); padding: 20px 16px; }
+  .sidebar-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
+  .sidebar-logo .edifio-word { color: var(--white); font-size: 20px; }
+  .sidebar-logo .edifio-sub { color: rgba(255,255,255,0.45); font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 1px; }
+  .sidebar-section { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.4); margin: 20px 0 8px; }
+  .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; color: rgba(255,255,255,0.75); font-size: 13px; border-radius: 6px; cursor: pointer; margin-bottom: 2px; }
+  .sidebar-link.active { background: var(--alyos-red); color: var(--white); }
+  .sidebar-link .icon { font-size: 14px; opacity: 0.9; }
+  .main-content { padding: 24px 28px; overflow: auto; }
+  .page-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.5px; }
+  .page-subtitle { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+  .head-row { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+  .head-actions { display: flex; gap: 8px; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+  .search-input { padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 6px; font-family: var(--font-body); font-size: 12px; width: 260px; background: var(--white); }
+  .select { padding: 7px 10px; border: 1px solid var(--line-2); border-radius: 6px; font-family: var(--font-body); font-size: 12px; background: var(--white); color: var(--ink); }
+  .filter-toggle { display: inline-flex; background: var(--white); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .filter-toggle button { background: transparent; border: none; padding: 7px 11px; font-size: 11.5px; font-weight: 500; color: var(--muted); cursor: pointer; border-right: 1px solid var(--line); }
+  .filter-toggle button:last-child { border-right: none; }
+  .filter-toggle button.active { background: var(--ink); color: var(--white); }
+
+  .data-table { width: 100%; border-collapse: collapse; background: var(--white); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .data-table th { background: var(--paper-2); padding: 9px 12px; text-align: left; font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .data-table td { padding: 10px 12px; font-size: 12.5px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--paper-2); }
+  .cab { font-weight: 600; }
+  .sub { color: var(--muted); font-size: 11px; }
+  .mono { font-family: var(--font-mono); font-size: 11px; }
+  .row-actions { display: flex; gap: 4px; }
+  .row-inactive td { opacity: .5; }
+
+  .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: var(--muted); }
+
+  /* Modal fiche */
+  .modal-backdrop { background: rgba(15,26,46,0.45); border-radius: 10px; padding: 28px; display: grid; place-items: center; }
+  .modal { background: var(--white); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,0.18); width: 100%; max-width: 600px; overflow: hidden; }
+  .modal-head { padding: 16px 22px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .modal-head h3 { font-family: var(--font-display); font-size: 17px; margin: 0; font-weight: 600; }
+  .modal-head .x { color: var(--muted); cursor: pointer; font-size: 18px; }
+  .modal-body { padding: 20px 22px; max-height: 460px; overflow:auto; }
+  .modal-foot { padding: 14px 22px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; background: var(--paper); align-items:center; }
+  .field { margin-bottom: 14px; }
+  .field label { display:block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+  .field input, .field select { width:100%; font-family: var(--font-body); font-size: 13px; padding: 8px 11px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--white); }
+  .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ms { display:flex; flex-wrap:wrap; gap:5px; padding:8px; border:1px solid var(--line-2); border-radius:6px; background:var(--white); }
+  .ms .chip-spec { cursor:pointer; }
+  .ms .chip-spec.on { background: rgba(255,0,51,0.1); color: var(--alyos-red); border-color: var(--alyos-red); }
+  .toggle-switch { display: inline-flex; background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+  .toggle-switch button { background: transparent; border: none; padding: 5px 12px; font-family: var(--font-body); font-weight: 500; font-size: 11px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+  .toggle-switch button.active { background: var(--ink); color: var(--white); }
+  .rgpd-note { font-size: 11px; color: var(--muted); background: var(--info-bg); color: var(--info); border-radius: 6px; padding: 8px 10px; line-height:1.45; }
+  .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <header class="page-header">
+    <div class="edifio-logo">
+      <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+      <span class="edifio-word">edifio</span>
+      <span style="color: var(--muted); font-size: 13px; margin-left: 6px;">Sourcing — Maquette M16</span>
+    </div>
+    <div class="meta" style="margin-top: 12px;">2026-05-21 · Théo Renard · écran admin architectes (charte edifio)</div>
+  </header>
+
+  <div class="legend">
+    <b>M16 — Administration de la base architectes</b> (<code>/sourcing/admin/architects</code>, réservé admin AlyoS).
+    Liste filtrable des ~3805 cabinets, fiche éditable, import/export pour compléter la base au fil de l'eau.
+    La désactivation d'un architecte = mise en œuvre du droit d'opposition RGPD.
+  </div>
+
+  <!-- M16-A — LISTE -->
+  <section class="mockup">
+    <div class="mockup-label">M16-A — Liste, recherche & filtres</div>
+    <div class="mockup-frame">
+      <div class="app-layout">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <span class="edifio-pin"><svg viewBox="0 0 20 24" fill="none"><path d="M 10 0 C 16 0 20 4 20 10 C 20 17 10 24 10 24 C 10 24 0 17 0 10 C 0 4 4 0 10 0 Z" fill="white"/><circle cx="10" cy="10" r="4" fill="#FF0033"/></svg></span>
+            <div><div class="edifio-word">edifio</div><div class="edifio-sub">Sourcing</div></div>
+          </div>
+          <div class="sidebar-section">Sourcing</div>
+          <div class="sidebar-link"><span class="icon">📥</span> AO du jour</div>
+          <div class="sidebar-link"><span class="icon">⭐</span> Sélectionnés</div>
+          <div class="sidebar-link"><span class="icon">🤝</span> Cotraitance</div>
+          <div class="sidebar-section">Admin</div>
+          <div class="sidebar-link active"><span class="icon">🏛️</span> Architectes</div>
+          <div class="sidebar-link"><span class="icon">👥</span> Utilisateurs</div>
+        </aside>
+        <div class="main-content">
+          <div class="head-row">
+            <div>
+              <h1 class="page-title">Base architectes</h1>
+              <p class="page-subtitle">3 805 cabinets · 1 902 sollicitables (avec email) · 1 903 à compléter</p>
+            </div>
+            <div class="head-actions">
+              <button class="btn btn-ghost btn-sm">⬇ Exporter (Excel)</button>
+              <button class="btn btn-ghost btn-sm">⬆ Importer</button>
+              <button class="btn btn-primary btn-sm">+ Nouvel architecte</button>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <input class="search-input" placeholder="Rechercher (cabinet, email, ville, SIREN)…">
+            <select class="select"><option>Département : tous</option><option>38 — Isère</option><option>69 — Rhône</option><option>75 — Paris</option></select>
+            <select class="select"><option>Spécialité : toutes</option><option>tertiaire</option><option>équipement public</option><option>santé</option><option>scolaire</option></select>
+            <span class="filter-toggle"><button class="active">Sollicitables</button><button>Tous</button></span>
+            <span class="filter-toggle"><button class="active">Actifs</button><button>Tous</button></span>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr><th>Cabinet</th><th>Contact</th><th>Email</th><th>Zone</th><th>Spécialités</th><th>Match</th><th>Statut</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cab">Atelier Marc Caron <span class="chip chip-red" style="margin-left:2px;">PRÉFÉRÉ</span></td>
+                <td>M. Caron<div class="sub">TU</div></td>
+                <td class="mono">marc.caron@…</td>
+                <td>38, 69</td>
+                <td><span class="chip-spec">tertiaire</span> <span class="chip-spec">équipement public</span></td>
+                <td class="mono">88</td>
+                <td><span class="chip chip-success">SOLLICITABLE</span></td>
+                <td class="row-actions"><button class="btn btn-ghost btn-sm">✎</button></td>
+              </tr>
+              <tr>
+                <td class="cab">Sophie Lemaire Architecture</td>
+                <td>S. Lemaire<div class="sub">VOUS</div></td>
+                <td class="mono">contact@…</td>
+                <td>38, 73</td>
+                <td><span class="chip-spec">équipement public</span> <span class="chip-spec">santé</span></td>
+                <td class="mono">64</td>
+                <td><span class="chip chip-success">SOLLICITABLE</span></td>
+                <td class="row-actions"><button class="btn btn-ghost btn-sm">✎</button></td>
+              </tr>
+              <tr>
+                <td class="cab">Cabinet Durand-Berthier</td>
+                <td><span class="sub">— dirigeant SIRENE</span></td>
+                <td><span class="chip chip-warn">PAS D'EMAIL</span></td>
+                <td>69</td>
+                <td><span class="chip-spec">logements collectifs</span></td>
+                <td class="mono">—</td>
+                <td><span class="chip chip-neutral">À COMPLÉTER</span></td>
+                <td class="row-actions"><button class="btn btn-ghost btn-sm">✎</button></td>
+              </tr>
+              <tr class="row-inactive">
+                <td class="cab">Atelier Vernet (retiré)</td>
+                <td>J. Vernet</td>
+                <td class="mono">j.vernet@…</td>
+                <td>26</td>
+                <td><span class="chip-spec">patrimoine</span></td>
+                <td class="mono">—</td>
+                <td><span class="chip chip-error">DÉSACTIVÉ</span></td>
+                <td class="row-actions"><button class="btn btn-ghost btn-sm">↺</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pager"><span>1–4 sur 3 805</span><span>‹ 1 2 3 … 191 ›</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- M16-B — FICHE ÉDITABLE -->
+  <section class="mockup">
+    <div class="mockup-label">M16-B — Fiche éditable (amender les données)</div>
+    <div class="mockup-frame">
+      <div class="modal-backdrop">
+        <div class="modal">
+          <div class="modal-head"><h3>Atelier Marc Caron</h3><span class="x">✕</span></div>
+          <div class="modal-body">
+            <div class="grid-2">
+              <div class="field"><label>Cabinet</label><input value="Atelier Marc Caron"></div>
+              <div class="field"><label>Contact</label><input value="Marc Caron"></div>
+            </div>
+            <div class="grid-2">
+              <div class="field"><label>Email</label><input value="marc.caron@atelier-caron.fr"></div>
+              <div class="field"><label>Téléphone</label><input value="06 12 34 56 78"></div>
+            </div>
+            <div class="grid-2">
+              <div class="field"><label>Ville</label><input value="Grenoble"></div>
+              <div class="field"><label>Départements d'intervention</label><input value="38, 69"></div>
+            </div>
+            <div class="field">
+              <label>Spécialités (vocabulaire contrôlé)</label>
+              <div class="ms">
+                <span class="chip-spec on">tertiaire</span>
+                <span class="chip-spec on">équipement public</span>
+                <span class="chip-spec">santé</span>
+                <span class="chip-spec">scolaire</span>
+                <span class="chip-spec">patrimoine</span>
+                <span class="chip-spec">logements collectifs</span>
+                <span class="chip-spec">+ ajouter</span>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label>Registre du mail de sollicitation</label>
+                <div class="toggle-switch"><button class="active">Tu</button><button>Vous</button></div>
+              </div>
+              <div class="field">
+                <label>Architecte préféré</label>
+                <div class="toggle-switch"><button class="active">Oui</button><button>Non</button></div>
+              </div>
+            </div>
+            <div class="rgpd-note">ℹ️ Désactiver cet architecte (toggle ci-dessous) le retire du matching et de toute sollicitation future — c'est la mise en œuvre de son droit d'opposition RGPD. Suppression définitive sur demande écrite uniquement.</div>
+            <div class="field" style="margin-top:14px;">
+              <label>Statut</label>
+              <div class="toggle-switch"><button class="active">Actif</button><button>Désactivé</button></div>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-danger-ghost btn-sm">Désactiver</button>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-ghost">Annuler</button>
+              <button class="btn btn-primary">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- M16-C — IMPORT / EXPORT -->
+  <section class="mockup">
+    <div class="mockup-label">M16-C — Import / Export (round-trip Excel)</div>
+    <div class="mockup-frame">
+      <div class="modal-backdrop">
+        <div class="modal" style="max-width:520px;">
+          <div class="modal-head"><h3>Importer des architectes</h3><span class="x">✕</span></div>
+          <div class="modal-body">
+            <p style="font-size:13px; color:var(--ink-2); margin-top:0;">Dépose un fichier Excel/CSV. Les fiches sont <b>mises à jour ou créées</b> par rapprochement sur l'identifiant Odoo puis le SIREN — aucun doublon.</p>
+            <div style="border:2px dashed var(--line-2); border-radius:10px; padding:28px; text-align:center; color:var(--muted); background:var(--paper);">
+              <div style="font-size:30px; opacity:.4;">⬆</div>
+              <div style="font-size:13px; margin-top:6px;">Glisser un fichier ici, ou <span style="color:var(--alyos-red); font-weight:600;">parcourir</span></div>
+              <div style="font-size:11px; margin-top:4px;">.xlsx ou .csv — colonnes attendues : cabinet, email, départements, spécialités…</div>
+            </div>
+            <div class="rgpd-note" style="margin-top:14px;">Astuce round-trip : <b>Exporter</b> la base → compléter dans Excel (emails, spécialités manquants) → <b>Ré-importer</b>. Les identifiants en colonne garantissent le bon rapprochement.</div>
+          </div>
+          <div class="modal-foot" style="justify-content:flex-end;">
+            <button class="btn btn-ghost">Annuler</button>
+            <button class="btn btn-primary">Lancer l'import</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">edifio Sourcing — Maquette M16 · admin architectes · © AlyoS Ingénierie 2026 — Outil interne</div>
+</div>
+</body>
+</html>
