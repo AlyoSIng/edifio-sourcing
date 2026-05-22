@@ -58,14 +58,14 @@ INSERT INTO memberships (organization_id, user_id, role) VALUES
 -- Donnees OrgA
 INSERT INTO search_profiles (id, organization_id, name) VALUES
   ('aaaa1111-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'profil OrgA');
-INSERT INTO architects (id, organization_id, firstname, lastname, email) VALUES
-  ('aaaa2222-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'Alice', 'Archi', 'alice.archi@orga.test');
+INSERT INTO architects (id, organization_id, cabinet, contact_name, email) VALUES
+  ('aaaa2222-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'Cabinet Alice', 'Alice Archi', 'alice.archi@orga.test');
 
 -- Donnees OrgB
 INSERT INTO search_profiles (id, organization_id, name) VALUES
   ('bbbb1111-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'profil OrgB');
-INSERT INTO architects (id, organization_id, firstname, lastname, email) VALUES
-  ('bbbb2222-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Bob', 'Archi', 'bob.archi@orgb.test');
+INSERT INTO architects (id, organization_id, cabinet, contact_name, email) VALUES
+  ('bbbb2222-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Cabinet Bob', 'Bob Archi', 'bob.archi@orgb.test');
 
 -- Plateforme de reference (non multi-tenant) requise par tenders.platform_id.
 -- platforms.code est un enum (boamp|place|francmarches|mp_info) et le seed

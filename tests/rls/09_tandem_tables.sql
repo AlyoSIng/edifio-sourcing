@@ -65,7 +65,7 @@ INSERT INTO tenders (id, organization_id, external_ref, platform_id, title, buye
    'TANDEM-A-001', (SELECT id FROM platforms WHERE code = 'boamp'), 'AO Tandem OrgA', 'Mairie A'),
   ('bb993333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b',
    'TANDEM-B-001', (SELECT id FROM platforms WHERE code = 'boamp'), 'AO Tandem OrgB', 'Mairie B')
-ON CONFLICT (organization_id, external_ref) DO NOTHING;
+ON CONFLICT (organization_id, external_ref, platform_id) DO NOTHING;
 
 -- Architects OrgA + OrgB (nouveau modele : cabinet/contact_name/email)
 INSERT INTO architects (id, organization_id, cabinet, contact_name, email) VALUES

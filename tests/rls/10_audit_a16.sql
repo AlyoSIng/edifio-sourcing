@@ -83,7 +83,7 @@ SELECT throws_ok(
   $$UPDATE audit_logs SET data = '{"hacked": true}'::jsonb
     WHERE action = 'architect_response'
       AND organization_id = '00000000-0000-0000-0000-00000000000a'$$,
-  'audit_logs is append-only -- UPDATE refuse (immutabilite RGPD/audit)',
+  'audit_logs is immutable: UPDATE and DELETE are forbidden',
   'UPDATE A16 rejete par trigger reject_audit_mutation'
 );
 
@@ -92,7 +92,7 @@ SELECT throws_ok(
   $$DELETE FROM audit_logs
     WHERE action = 'architect_response'
       AND organization_id = '00000000-0000-0000-0000-00000000000a'$$,
-  'audit_logs is append-only -- DELETE refuse (immutabilite RGPD/audit)',
+  'audit_logs is immutable: UPDATE and DELETE are forbidden',
   'DELETE A16 rejete par trigger reject_audit_mutation'
 );
 

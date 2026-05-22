@@ -45,8 +45,8 @@ SELECT set_config(
   true
 );
 SELECT lives_ok(
-  $$INSERT INTO architects (organization_id, firstname, lastname, email)
-    VALUES ('00000000-0000-0000-0000-00000000000a', 'A1', 'Admin', 'a1@test')$$,
+  $$INSERT INTO architects (organization_id, cabinet, contact_name, email)
+    VALUES ('00000000-0000-0000-0000-00000000000a', 'Cabinet A1', 'A1 Admin', 'a1@test')$$,
   'admin doit pouvoir INSERT architects'
 );
 
@@ -57,8 +57,8 @@ SELECT set_config(
   true
 );
 SELECT lives_ok(
-  $$INSERT INTO architects (organization_id, firstname, lastname, email)
-    VALUES ('00000000-0000-0000-0000-00000000000a', 'A2', 'User', 'a2@test')$$,
+  $$INSERT INTO architects (organization_id, cabinet, contact_name, email)
+    VALUES ('00000000-0000-0000-0000-00000000000a', 'Cabinet A2', 'A2 User', 'a2@test')$$,
   'user doit pouvoir INSERT architects'
 );
 
@@ -69,8 +69,8 @@ SELECT set_config(
   true
 );
 SELECT throws_ok(
-  $$INSERT INTO architects (organization_id, firstname, lastname, email)
-    VALUES ('00000000-0000-0000-0000-00000000000a', 'A3', 'Viewer', 'a3@test')$$,
+  $$INSERT INTO architects (organization_id, cabinet, contact_name, email)
+    VALUES ('00000000-0000-0000-0000-00000000000a', 'Cabinet A3', 'A3 Viewer', 'a3@test')$$,
   '42501',
   NULL,
   'viewer NE DOIT PAS pouvoir INSERT architects (RLS violation 42501)'
@@ -83,8 +83,8 @@ SELECT set_config(
   true
 );
 SELECT throws_ok(
-  $$INSERT INTO architects (organization_id, firstname, lastname, email)
-    VALUES ('00000000-0000-0000-0000-00000000000b', 'A4', 'CrossTenant', 'a4@test')$$,
+  $$INSERT INTO architects (organization_id, cabinet, contact_name, email)
+    VALUES ('00000000-0000-0000-0000-00000000000b', 'Cabinet A4', 'A4 CrossTenant', 'a4@test')$$,
   '42501',
   NULL,
   'admin OrgA NE DOIT PAS pouvoir INSERT pour OrgB (cross-tenant 42501)'
