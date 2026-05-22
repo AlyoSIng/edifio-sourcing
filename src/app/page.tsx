@@ -1,59 +1,73 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 
-import { EdifioLogo } from "@/components/EdifioLogo";
 import { HashErrorHandler } from "@/components/HashErrorHandler";
+import { LandingFooter } from "@/components/landing/LandingFooter";
+import { LandingHeader } from "@/components/landing/LandingHeader";
+import { LandingHero } from "@/components/landing/LandingHero";
+import { LandingMarqueBox } from "@/components/landing/LandingMarqueBox";
+import { LandingSpotlight } from "@/components/landing/LandingSpotlight";
+import { LandingSuiteSection } from "@/components/landing/LandingSuiteSection";
 
 /**
- * Home publique — affichée à tous, y compris visiteurs anonymes.
- * Si l'utilisateur est connecté avec un email `@alyosingenierie.fr`,
- * le lien « Accéder à edifio Sourcing » pointe vers `/sourcing/ao-du-jour`
- * (protégé par le middleware).
+ * Landing publique edifio Sourcing — refonte M15 (Board 2026-05-22 soir).
  *
- * Inclut `HashErrorHandler` : intercepte le cas où Supabase Auth fait
- * fallback sur le Site URL (la home) avec un fragment d'erreur
- * (#error=…&error_code=otp_expired&…) — typiquement après qu'un scanner
- * email d'entreprise ait pré-cliqué le lien recovery. Cf. ADR-011.
+ * Source design : `design/maquettes/maquettes_v3_landing.html` (M15 v1.0, Théo, 14/05).
+ * Patterns marketing edifio.fr : cf. ADR-012 (`specs/adr_012_alignment_edifio_fr_visual.md`).
+ *
+ * Composition :
+ *   1. `LandingHeader` — header nav + CTA « Se connecter »
+ *   2. `LandingHero` — pill eyebrow + H1 split-color + lead + 2 CTAs
+ *   3. `LandingMarqueBox` — section « Que recouvre la marque ? »
+ *   4. `LandingSuiteSection` — 4 cards produits edifio (Suivi/Sourcing/AO/ACT)
+ *   5. `LandingSpotlight` — section ink avec stats
+ *   6. `LandingFooter` — footer 4 colonnes
+ *
+ * Le `HashErrorHandler` (mount-only, sans rendu visible) intercepte le cas Supabase
+ * Auth fallback sur Site URL avec fragment d'erreur (typiquement scanner email
+ * d'entreprise qui pré-consomme un token recovery — cf. ADR-011).
+ *
+ * Image OG (`/og-image-placeholder.png`) à fournir par Théo (Cowork B3) — le lien
+ * pointe vers un placeholder qui n'existe pas encore dans `/public`, sera enrichi
+ * dans une PR séparée.
  */
+
+export const metadata: Metadata = {
+  title: "edifio Sourcing — AO publics, du sourcing au pli",
+  description:
+    "Outil interne AlyoS Ingénierie. Sourcing automatique de marchés publics BTP, copilote IA pour répondre en Solo ou en cotraitance Tandem.",
+  openGraph: {
+    title: "edifio Sourcing",
+    description: "AO publics, du sourcing au pli",
+    type: "website",
+    locale: "fr_FR",
+    images: [
+      {
+        url: "/og-image-placeholder.png",
+        width: 1200,
+        height: 630,
+        alt: "edifio Sourcing",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "edifio Sourcing",
+    description: "AO publics, du sourcing au pli",
+  },
+};
+
 export default function Home() {
-  const year = new Date().getFullYear();
   return (
-    <main className="flex min-h-screen flex-col">
+    <>
       <HashErrorHandler />
-      <header className="border-b border-neutral-200 px-8 py-6">
-        <EdifioLogo />
-      </header>
-
-      <section className="flex flex-1 flex-col items-center justify-center gap-8 px-8 py-16">
-        <h1 className="max-w-2xl text-center font-display text-4xl font-bold tracking-tight">
-          De l&apos;avis publié à l&apos;opportunité gagnée, sans rien tenir à la main.
-        </h1>
-        <p className="max-w-xl text-center text-neutral-600">
-          Outil interne <strong>AlyoS Ingénierie</strong> pour le sourcing automatique de marchés
-          publics BTP. Accès restreint aux emails{" "}
-          <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-sm">
-            @alyosingenierie.fr
-          </code>
-          .
-        </p>
-        <div className="flex gap-3">
-          <Link
-            href="/sourcing/ao-du-jour"
-            className="rounded-md bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
-          >
-            Accéder à edifio Sourcing →
-          </Link>
-          <Link
-            href="/about"
-            className="rounded-md border border-neutral-300 px-5 py-2.5 text-sm font-medium text-neutral-700 transition hover:border-neutral-400"
-          >
-            À propos
-          </Link>
-        </div>
-      </section>
-
-      <footer className="border-t border-neutral-200 px-8 py-6 text-center font-mono text-xs text-neutral-500">
-        © AlyoS Ingénierie {year} — Outil interne
-      </footer>
-    </main>
+      <LandingHeader />
+      <main className="bg-paper">
+        <LandingHero />
+        <LandingMarqueBox />
+        <LandingSuiteSection />
+        <LandingSpotlight />
+      </main>
+      <LandingFooter />
+    </>
   );
 }

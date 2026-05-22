@@ -21,8 +21,12 @@ export const metadata = {
  *
  * Cas non valide :
  *   - pas de session → message + lien forgot-password.
+ *
+ * Habillage DS edifio (cf. M13 `design/maquettes/maquettes_v2_password_auth.html`)
+ * aligné avec `/login` et `/forgot-password`.
  */
 export default async function ResetPasswordPage() {
+  const year = new Date().getFullYear();
   let hasSession = false;
 
   try {
@@ -44,19 +48,19 @@ export default async function ResetPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-12">
-      <div className="w-full max-w-md rounded-lg border border-neutral-200 bg-white p-8 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-paper-2 px-4 py-12">
+      <div className="w-full max-w-md rounded-lg border border-line bg-white p-8 shadow-card">
         <div className="mb-6 flex justify-center">
           <EdifioLogo />
         </div>
 
-        <h1 className="mb-2 text-center font-display text-2xl font-bold tracking-tight">
+        <h1 className="mb-2 text-center font-display text-2xl font-bold tracking-tight text-ink">
           Définir mon mot de passe
         </h1>
 
         {hasSession ? (
           <>
-            <p className="mb-6 text-center text-sm text-neutral-600">
+            <p className="mb-6 text-center text-sm text-ink-2">
               Choisis un mot de passe durable et conserve-le en lieu sûr.
             </p>
             <ResetPasswordForm />
@@ -65,8 +69,8 @@ export default async function ResetPasswordPage() {
           <InvalidStateBlock />
         )}
 
-        <p className="mt-6 text-center text-xs text-neutral-500">
-          <span className="font-mono text-[10px]">© AlyoS Ingénierie 2026 — Outil interne</span>
+        <p className="mt-6 text-center text-xs text-muted">
+          <span className="font-mono text-[10px]">© AlyoS Ingénierie {year} — Outil interne</span>
         </p>
       </div>
     </main>
@@ -78,18 +82,21 @@ function InvalidStateBlock() {
     <div className="flex flex-col items-center gap-4 text-center">
       <p
         role="alert"
-        className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        className="rounded-sm border border-warn bg-warn-bg px-3 py-2 text-sm text-warn"
       >
         Session expirée. Recommence depuis « Mot de passe oublié » pour recevoir un nouveau mot de
         passe par email.
       </p>
       <Link
         href="/forgot-password"
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-800"
+        className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
       >
         Mot de passe oublié
       </Link>
-      <Link href="/login" className="text-xs text-neutral-600 underline-offset-4 hover:underline">
+      <Link
+        href="/login"
+        className="text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
+      >
         ← Retour à la connexion
       </Link>
     </div>
