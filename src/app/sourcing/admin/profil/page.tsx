@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { EdifioLogo } from "@/components/EdifioLogo";
 import { db } from "@/db/client";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
@@ -24,21 +23,18 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Page admin — édition du profil de recherche AlyoS (P2 Gate 6).
+ * Page admin — édition du profil de recherche AlyoS (P2 Gate 6, refonte UI v1).
  *
- * Source de vérité :
+ * Source de vérité fonctionnelle :
  *  - `handoff/PLAN_ALEX_260522_REFONTE_UI.md` §P2
  *  - 5 recos Q1-Q5 Board 22/05 (cf. `DECISIONS.md`)
- *  - Pattern Server Component aligné `src/app/sourcing/admin/users/page.tsx`
- *    (auth-check + EdifioLogo + footer mono)
+ * Source de vérité visuelle :
+ *  - `design/maquettes/maquettes_v5_admin_architectes.html` ligne 218-275
+ *    (M16-B fiche éditable — pattern sections + champs).
  *
- * Garde : middleware bloque déjà les non-admin (cf. `src/middleware.ts`).
- * Re-check côté Server Component pour la défense en profondeur (si le
- * middleware était désactivé par erreur, cette page ne doit RIEN exposer).
- *
- * Résilience runtime : pattern try/catch absorbé aligné sur
- * `/sourcing/ao-du-jour/page.tsx` (hotfix PR #22, Board 2026-05-21) — un
- * Supabase blip 30s ne doit pas casser brutalement la page admin.
+ * Garde : middleware bloque déjà les non-admin — re-check côté Server Component
+ * (défense en profondeur). Résilience runtime : try/catch absorbé aligné sur
+ * `/sourcing/ao-du-jour/page.tsx` (hotfix PR #22, Board 2026-05-21).
  */
 export default async function AdminProfilPage() {
   // 1. Auth check (le middleware aurait déjà redirigé sinon)
@@ -63,16 +59,13 @@ export default async function AdminProfilPage() {
     fetchError = err instanceof Error ? err.message : String(err);
   }
 
-  const year = new Date().getFullYear();
-
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 sm:px-8 sm:py-10">
-      <header className="mb-8">
-        <EdifioLogo />
-        <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-neutral-900">
+    <div className="mx-auto max-w-3xl">
+      <header className="mb-6">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
           Profil de recherche
         </h1>
-        <p className="text-sm text-neutral-600">
+        <p className="mt-1 text-sm text-muted">
           Édite les critères qui pilotent la sélection « AO du jour » d&apos;AlyoS.
         </p>
       </header>
@@ -80,7 +73,7 @@ export default async function AdminProfilPage() {
       {fetchError ? (
         <div
           role="alert"
-          className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-md border border-l-4 border-line border-l-error bg-error-bg px-4 py-3 text-sm text-error"
         >
           <strong className="mr-1 font-semibold">Erreur de chargement :</strong>
           {fetchError}
@@ -88,7 +81,7 @@ export default async function AdminProfilPage() {
       ) : !activeProfile ? (
         <div
           role="alert"
-          className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          className="rounded-md border border-l-4 border-line border-l-warn bg-warn-bg px-4 py-3 text-sm text-warn"
         >
           Aucun profil de recherche actif trouvé pour AlyoS. Contacte un administrateur ou exécute{" "}
           <code className="font-mono">pnpm db:seed:prod</code>.
@@ -99,11 +92,7 @@ export default async function AdminProfilPage() {
           initialValues={toFormInitialValues(activeProfile)}
         />
       )}
-
-      <p className="mt-12 text-center font-mono text-[10px] text-neutral-500">
-        © AlyoS Ingénierie {year} — Outil interne
-      </p>
-    </main>
+    </div>
   );
 }
 

@@ -1,0 +1,132 @@
+/**
+ * Configuration data-driven de la sidebar `AppShell`.
+ *
+ * Source de vérité : maquettes Cowork (`design/maquettes/maquettes_v4_sourcing_modules.html`
+ * lignes 191-210 + `maquettes_v5_admin_architectes.html` lignes 130-142).
+ *
+ * Format :
+ *   - `NavSection[]` regroupé par bandeau (« Sourcing », « Pilotage », « Admin »)
+ *   - Chaque `NavItem` porte un `href`, un `label` court, un `icon` (emoji V1,
+ *     SVG plus tard) et optionnellement `matchPrefix` pour détecter l'item actif
+ *     même quand la route est imbriquée (ex. `/sourcing/admin/users/[id]`).
+ *   - `adminOnly: true` masque l'item pour les rôles non-admin (rendu côté
+ *     Server Component dans `Sidebar`).
+ *
+ * **Coordination Nadia (Tandem)** : ce fichier est le point d'extension prévu
+ * pour les liens Tandem (« Cotraitance », « Architectes », « Notifications »…).
+ * Ajouter une entrée dans le tableau ne nécessite AUCUNE modification du
+ * composant `Sidebar`. Garder les sections existantes telles quelles.
+ *
+ * **Pourquoi pas de routing programmatique avec `usePathname` ?** L'AppShell
+ * est un Server Component — détecter l'item actif côté serveur évite un flash
+ * client-side et garantit un rendu SSR identique au final (a11y propre, pas
+ * de layout shift). La détection se fait via `matchPrefix` côté Server.
+ */
+
+export interface NavItem {
+  /** Path absolu vers lequel pointer (ex. `/sourcing/ao-du-jour`). */
+  href: string;
+  /** Libellé visible (FR, naming strict). */
+  label: string;
+  /** Icône (emoji MVP, SVG futur — laisser une string). */
+  icon: string;
+  /** Optionnel : badge numérique ou texte court (ex. compteur). */
+  badge?: number | string;
+  /**
+   * Optionnel : préfixe utilisé pour détecter l'item actif. Si absent, on
+   * fait un strict equals avec `href`. Utile pour les routes imbriquées
+   * comme `/sourcing/admin/users/[id]/security`.
+   */
+  matchPrefix?: string;
+  /** Si vrai, l'item n'est rendu que pour les utilisateurs `role === "admin"`. */
+  adminOnly?: boolean;
+  /**
+   * Optionnel : item désactivé visuellement (placeholder MVP). Utile pour
+   * pré-câbler les liens Tandem en attendant l'implémentation Nadia.
+   */
+  comingSoon?: boolean;
+}
+
+export interface NavSection {
+  /** Titre du bandeau (small caps mono, cf. maquette). */
+  title: string;
+  items: NavItem[];
+}
+
+/**
+ * Configuration figée au MVP. Toute évolution doit rester data-driven ici —
+ * pas de logique conditionnelle dans `Sidebar`.
+ */
+export const NAV_ITEMS: NavSection[] = [
+  {
+    title: "Sourcing",
+    items: [
+      {
+        href: "/sourcing/ao-du-jour",
+        label: "AO du jour",
+        icon: "📥",
+        matchPrefix: "/sourcing/ao-du-jour",
+      },
+      // V2 : liens vers Sélectionnés / Différés / Tous les AO. Pré-câblés en
+      // `comingSoon` pour montrer la structure cible côté UX, désactivés en MVP.
+      {
+        href: "/sourcing/selectionnes",
+        label: "Sélectionnés",
+        icon: "⭐",
+        comingSoon: true,
+      },
+      {
+        href: "/sourcing/differes",
+        label: "Différés",
+        icon: "🕓",
+        comingSoon: true,
+      },
+    ],
+  },
+  {
+    title: "Pilotage",
+    items: [
+      // Slot prévu pour Nadia (module Tandem). Laissé en `comingSoon` tant que
+      // la PR Tandem n'a pas livré la page `/sourcing/cotraitance`.
+      {
+        href: "/sourcing/cotraitance",
+        label: "Cotraitance",
+        icon: "🤝",
+        comingSoon: true,
+      },
+    ],
+  },
+  {
+    title: "Configuration",
+    items: [
+      {
+        href: "/sourcing/admin/profil",
+        label: "Profil de recherche",
+        icon: "⚙️",
+        matchPrefix: "/sourcing/admin/profil",
+        adminOnly: true,
+      },
+    ],
+  },
+  {
+    title: "Admin",
+    items: [
+      {
+        href: "/sourcing/admin/users",
+        label: "Utilisateurs",
+        icon: "👥",
+        matchPrefix: "/sourcing/admin/users",
+        adminOnly: true,
+      },
+    ],
+  },
+];
+
+/**
+ * Détermine si un item est l'item actif pour un pathname donné. Utilisé côté
+ * Server Component `Sidebar` — pure function testable.
+ */
+export function isItemActive(item: NavItem, pathname: string): boolean {
+  if (item.matchPrefix) return pathname.startsWith(item.matchPrefix);
+  return pathname === item.href;
+}

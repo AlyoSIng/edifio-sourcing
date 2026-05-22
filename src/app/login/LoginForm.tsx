@@ -12,8 +12,9 @@ import { useCountdown } from "./useCountdown";
 /**
  * Formulaire de connexion — email + password (pivot Board 2026-05-11).
  *
- * Ajustement Board Q4/A 2026-05-12 — affichage d'un countdown rate-limit
- * quand Supabase Auth répond 429 (« Trop de tentatives. Réessaye dans X »).
+ * Habillage DS edifio v1 — champs bordure `--line-2`, bouton primaire
+ * `bg-brand-red`, erreurs en `--error-bg` / `--error`, countdown rate-limit
+ * en mono.
  *
  * Trois états visuels :
  *   - idle : formulaire vide / saisie en cours
@@ -21,8 +22,7 @@ import { useCountdown } from "./useCountdown";
  *   - error rate-limited : message + countdown mm:ss + submit disabled
  *
  * Le composant ne valide pas le domaine côté client — toute la garde est
- * centralisée dans la Server Action. Validation HTML5 basique (`required`,
- * `type="email"`) pour l'UX uniquement.
+ * centralisée dans la Server Action.
  */
 export function LoginForm({ next }: { next?: string }) {
   const [state, formAction] = useFormState<LoginState, FormData>(
@@ -43,7 +43,7 @@ export function LoginForm({ next }: { next?: string }) {
       {next ? <input type="hidden" name="next" value={next} /> : null}
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="email" className="text-sm font-medium text-neutral-700">
+        <label htmlFor="email" className="text-sm font-medium text-ink">
           Email AlyoS
         </label>
         <input
@@ -53,12 +53,12 @@ export function LoginForm({ next }: { next?: string }) {
           required
           autoComplete="email"
           placeholder="prenom.nom@alyosingenierie.fr"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder-neutral-400 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+          className="rounded-sm border border-line-2 bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="text-sm font-medium text-neutral-700">
+        <label htmlFor="password" className="text-sm font-medium text-ink">
           Mot de passe
         </label>
         <input
@@ -67,7 +67,7 @@ export function LoginForm({ next }: { next?: string }) {
           type="password"
           required
           autoComplete="current-password"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder-neutral-400 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+          className="rounded-sm border border-line-2 bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
         />
       </div>
 
@@ -75,7 +75,7 @@ export function LoginForm({ next }: { next?: string }) {
         <div
           role="alert"
           data-testid="auth-error"
-          className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-sm border-l-4 border-error bg-error-bg px-3 py-2 text-sm text-error"
         >
           <p>{state.message}</p>
           {isRateLimited ? (
@@ -89,9 +89,9 @@ export function LoginForm({ next }: { next?: string }) {
 
       <SubmitButton disabled={isRateLimited} />
 
-      <p className="text-center text-xs text-neutral-600">
+      <p className="text-center text-xs text-muted">
         <Link href="/forgot-password" className="underline-offset-4 hover:underline">
-          Mot de passe oublié ?
+          Mot de passe oublié&nbsp;?
         </Link>
       </p>
     </form>
@@ -105,7 +105,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
     <button
       type="submit"
       disabled={isDisabled}
-      className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-400"
+      className="rounded-sm bg-brand-red px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
     >
       {pending ? "Connexion…" : disabled ? "Patiente…" : "Se connecter"}
     </button>
