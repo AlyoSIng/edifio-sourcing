@@ -60,6 +60,10 @@ export const AUDIT_ACTIONS = [
   "access_attempt",
   "tender_defer",
   "tender_reject",
+  // A16 — `architect_response` (Tandem étape 1, décision Board 2026-05-22 (b)).
+  // Émis par POST /api/archi/[token]/respond (étape 4) — l'acteur est
+  // l'architecte via JWT, pas un user AlyoS authentifié. Schéma strict ci-dessous.
+  "architect_response",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -201,10 +205,30 @@ const tenderSelectSchema = z.object({
 });
 
 /**
- * A5 — `architect_solicit` (placeholder)
- * TODO: implémenter à la PR sollicitation architectes (workflow Tandem).
+ * A5 — `architect_solicit` (STRICT — implémenté Tandem étape 3, 2026-05-24).
+ *
+ * Déclenchée par la Server Action `sendArchitectSolicitation` quand un user
+ * AlyoS envoie un mail Brevo de sollicitation à un architecte pour un AO en
+ * mode Tandem. C'est la 1re des deux actions audit du workflow Tandem
+ * (la 2e étant A16 `architect_response` quand l'archi répond).
+ *
+ * Contraintes :
+ *  - `tender_id`, `architect_id` : UUID shape (cf. `UUID_SHAPE`)
+ *  - `template_name` : string non vide (ex. `architect_solicitation_TU`)
+ *  - `register` : enum strict `tu | vous`
+ *  - `brevo_message_id` : optionnel — peut être absent si l'envoi a échoué
+ *    (la Server Action insère quand même la trace BDD pour retry futur)
+ *  - `token_jti` : optionnel — `jti` du JWT architecte généré pour cette
+ *    sollicitation (présent en succès, absent en échec pré-token)
  */
-const architectSolicitSchema = placeholder;
+const architectSolicitSchema = z.object({
+  tender_id: z.string().regex(UUID_SHAPE, { message: "tender_id doit être un UUID" }),
+  architect_id: z.string().regex(UUID_SHAPE, { message: "architect_id doit être un UUID" }),
+  template_name: z.string().min(1, { message: "template_name ne peut pas être vide" }),
+  register: z.enum(["tu", "vous"]),
+  brevo_message_id: z.string().optional(),
+  token_jti: z.string().optional(),
+});
 
 /**
  * A6 — `dossier_diffuse` (placeholder)
@@ -314,6 +338,32 @@ const tenderRejectSchema = z.object({
     .nullable(),
 });
 
+/**
+ * A16 — `architect_response` (STRICT — Tandem étape 1+3, code alloué Board
+ * 2026-05-22 (b)).
+ *
+ * Déclenchée par POST /api/archi/[token]/respond — l'architecte répond à
+ * une sollicitation via la page tokenisée publique. L'acteur n'est PAS un
+ * user AlyoS authentifié : c'est l'architecte via JWT (cf. JSDoc enum
+ * `auditAction` dans `src/db/schema/enums.ts`). Les champs `actor_*` du
+ * helper `audit()` resteront NULL pour cette action (gérés côté helper).
+ *
+ * Contraintes :
+ *  - `tender_id`, `architect_id` : UUID shape
+ *  - `status` : enum strict `accepted | declined | info_requested`
+ *    (jamais `pending` — pending est l'état initial, pas une réponse)
+ *  - `token_jti` : string non vide (claim `jti` du JWT — traçabilité)
+ *  - `has_info_request_text` : booléen (présence de texte libre, sans le
+ *    contenu — RGPD-friendly, on évite de dupliquer le texte dans l'audit)
+ */
+const architectResponseSchema = z.object({
+  tender_id: z.string().regex(UUID_SHAPE, { message: "tender_id doit être un UUID" }),
+  architect_id: z.string().regex(UUID_SHAPE, { message: "architect_id doit être un UUID" }),
+  status: z.enum(["accepted", "declined", "info_requested"]),
+  token_jti: z.string().min(1, { message: "token_jti ne peut pas être vide" }),
+  has_info_request_text: z.boolean(),
+});
+
 // ============================================================================
 // 3. Map action → schéma Zod
 // ============================================================================
@@ -342,6 +392,7 @@ export const AUDIT_SCHEMAS = {
   access_attempt: accessAttemptSchema,
   tender_defer: tenderDeferSchema,
   tender_reject: tenderRejectSchema,
+  architect_response: architectResponseSchema,
 } as const satisfies Record<AuditAction, z.ZodTypeAny>;
 
 // ============================================================================
@@ -366,4 +417,10 @@ export type AuditLogDataFor<A extends AuditAction> = z.infer<(typeof AUDIT_SCHEM
  * Le call-site `audit({ action: 'tender_select', data: ... })` n'a PAS besoin
  * d'importer le schéma : la validation est interne au helper.
  */
-export { tenderDeferSchema, tenderRejectSchema, tenderSelectSchema };
+export {
+  architectResponseSchema,
+  architectSolicitSchema,
+  tenderDeferSchema,
+  tenderRejectSchema,
+  tenderSelectSchema,
+};
