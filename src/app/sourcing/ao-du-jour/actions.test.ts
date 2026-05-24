@@ -410,6 +410,49 @@ describe("deferTenderAction", () => {
     );
   });
 
+  /**
+   * Shortcuts UI « Reporter » (Addendum spec 2026-05-24 §Exigence 1) :
+   *  +1 jour → 24h, +3 jours → 72h, +7 jours → 168h.
+   *
+   * On boucle sur les 3 mappings UI → server pour verrouiller :
+   *   (a) la propagation correcte du `hoursOffset` dans l'audit payload,
+   *   (b) la cohérence event.data.extra.hours_offset (tender_events).
+   *
+   * Toute régression du contrat (ex. cap silencieux à 24h, off-by-one) fera
+   * péter ce test. Le `deferred_until` calculé côté Postgres n'est pas
+   * testable ici (mock) — on vérifie juste que la valeur est posée non-nulle.
+   */
+  it.each([
+    { label: "+1 jour", hours: 24 },
+    { label: "+3 jours", hours: 72 },
+    { label: "+7 jours", hours: 168 },
+  ])("shortcut $label ($hours h) propage hoursOffset correct", async ({ hours }) => {
+    const { db, capture } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
+    const auditFn = makeAuditSpy();
+
+    const result = await deferTenderAction(VALID_TENDER_ID, hours, {
+      db,
+      authClient: fakeAuthClient(alyosUser()),
+      auditFn,
+    });
+
+    expect(result).toEqual({ ok: true });
+
+    // (a) audit log A14 : hours_offset correct
+    expect(auditFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "tender_defer",
+        data: expect.objectContaining({ hours_offset: hours }),
+      }),
+    );
+
+    // (b) tender_events.data.extra.hours_offset correct
+    const insertedEvent = capture.inserts[0]?.values as {
+      data?: { extra?: { hours_offset?: number } };
+    };
+    expect(insertedEvent.data?.extra?.hours_offset).toBe(hours);
+  });
+
   it("retourne invalid_input si hoursOffset négatif", async () => {
     const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
     const result = await deferTenderAction(VALID_TENDER_ID, -1, {
