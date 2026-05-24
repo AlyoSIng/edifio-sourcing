@@ -15,6 +15,8 @@ import { describe, expect, it } from "vitest";
 import {
   AUDIT_ACTIONS,
   AUDIT_SCHEMAS,
+  architectResponseSchema,
+  architectSolicitSchema,
   tenderDeferSchema,
   tenderRejectSchema,
   tenderSelectSchema,
@@ -129,11 +131,12 @@ describe("tenderSelectSchema (A4 strict)", () => {
 
 // `membership_change` retiré : implémenté STRICT par la PR auth-password-pivot
 // (2026-05-20). `search_profile_change` retiré : implémenté STRICT par P2
-// Gate 6 (2026-05-22). Couverts par leur propre describe block plus bas.
-// Reste 10 placeholders.
+// Gate 6 (2026-05-22). `architect_solicit` retiré : implémenté STRICT par
+// Tandem étape 3 (2026-05-24, Nadia). `architect_response` jamais dans cette
+// liste : ajouté directement en STRICT (Tandem étape 1 + 3, A16). Couverts
+// par leur propre describe block plus bas. Reste 9 placeholders.
 const PLACEHOLDER_ACTIONS = [
   "login",
-  "architect_solicit",
   "dossier_diffuse",
   "ai_run",
   "odoo_opportunity_create",
@@ -294,7 +297,91 @@ describe("searchProfileChangeSchema (A3 strict — P2 Gate 6)", () => {
   });
 });
 
-describe("placeholders (10 actions non-strictes)", () => {
+// ----------------------------------------------------------------------------
+// A5 — architect_solicit STRICT (Tandem étape 3, 2026-05-24)
+// ----------------------------------------------------------------------------
+
+describe("architectSolicitSchema (A5 strict)", () => {
+  const validBase = {
+    tender_id: "11111111-1111-1111-1111-111111111111",
+    architect_id: "22222222-2222-2222-2222-222222222222",
+    template_name: "architect_solicitation_TU",
+    register: "tu" as const,
+    brevo_message_id: "<msg-abc@brevo>",
+    token_jti: "token-jti-xyz",
+  };
+
+  it("valide un payload complet (TU)", () => {
+    expect(architectSolicitSchema.safeParse(validBase).success).toBe(true);
+  });
+
+  it("valide un payload VOUS sans brevo_message_id (envoi échoué)", () => {
+    const { brevo_message_id: _drop, ...partial } = validBase;
+    void _drop;
+    expect(architectSolicitSchema.safeParse({ ...partial, register: "vous" }).success).toBe(true);
+  });
+
+  it("rejette tender_id non-UUID", () => {
+    expect(architectSolicitSchema.safeParse({ ...validBase, tender_id: "no" }).success).toBe(false);
+  });
+
+  it("rejette register hors enum", () => {
+    expect(architectSolicitSchema.safeParse({ ...validBase, register: "neutre" }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejette template_name vide", () => {
+    expect(architectSolicitSchema.safeParse({ ...validBase, template_name: "" }).success).toBe(
+      false,
+    );
+  });
+});
+
+// ----------------------------------------------------------------------------
+// A16 — architect_response STRICT (Tandem étape 1 + 3, 2026-05-24)
+// ----------------------------------------------------------------------------
+
+describe("architectResponseSchema (A16 strict)", () => {
+  const validBase = {
+    tender_id: "11111111-1111-1111-1111-111111111111",
+    architect_id: "22222222-2222-2222-2222-222222222222",
+    status: "accepted" as const,
+    token_jti: "token-jti-xyz",
+    has_info_request_text: false,
+  };
+
+  it("valide un payload accepted", () => {
+    expect(architectResponseSchema.safeParse(validBase).success).toBe(true);
+  });
+
+  it("valide les 3 status (accepted/declined/info_requested)", () => {
+    for (const s of ["accepted", "declined", "info_requested"] as const) {
+      expect(architectResponseSchema.safeParse({ ...validBase, status: s }).success).toBe(true);
+    }
+  });
+
+  it("rejette status='pending' (jamais une réponse)", () => {
+    expect(architectResponseSchema.safeParse({ ...validBase, status: "pending" }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejette token_jti vide", () => {
+    expect(architectResponseSchema.safeParse({ ...validBase, token_jti: "" }).success).toBe(false);
+  });
+
+  it("rejette has_info_request_text non-booléen", () => {
+    expect(
+      architectResponseSchema.safeParse({
+        ...validBase,
+        has_info_request_text: "yes" as never,
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("placeholders (9 actions non-strictes)", () => {
   // Test smoke : chaque placeholder accepte un objet vide ET un objet arbitraire
   // via `passthrough()`. Garantit qu'on peut déjà coder `audit({action: 'login',
   // data: {...}})` côté call-site sans attendre l'implémentation stricte.
@@ -321,8 +408,8 @@ describe("placeholders (10 actions non-strictes)", () => {
 // ----------------------------------------------------------------------------
 
 describe("AUDIT_ACTIONS + AUDIT_SCHEMAS — couverture", () => {
-  it("AUDIT_ACTIONS contient exactement 15 actions (spec post-PR n°5)", () => {
-    expect(AUDIT_ACTIONS).toHaveLength(15);
+  it("AUDIT_ACTIONS contient exactement 16 actions (spec post-Tandem étape 1, A16)", () => {
+    expect(AUDIT_ACTIONS).toHaveLength(16);
   });
 
   it("chaque action dans AUDIT_ACTIONS a un schéma dans AUDIT_SCHEMAS", () => {
@@ -331,15 +418,16 @@ describe("AUDIT_ACTIONS + AUDIT_SCHEMAS — couverture", () => {
     }
   });
 
-  it("AUDIT_SCHEMAS n'a pas de clef en plus que les 15 actions", () => {
+  it("AUDIT_SCHEMAS n'a pas de clef en plus que les 16 actions", () => {
     const schemaKeys = Object.keys(AUDIT_SCHEMAS).sort();
     const expectedKeys = [...AUDIT_ACTIONS].sort();
     expect(schemaKeys).toEqual(expectedKeys);
   });
 
-  it("AUDIT_ACTIONS contient bien tender_defer (A14) et tender_reject (A15)", () => {
+  it("AUDIT_ACTIONS contient tender_defer (A14), tender_reject (A15), architect_response (A16)", () => {
     expect(AUDIT_ACTIONS).toContain("tender_defer");
     expect(AUDIT_ACTIONS).toContain("tender_reject");
+    expect(AUDIT_ACTIONS).toContain("architect_response");
   });
 });
 

@@ -45,11 +45,28 @@ export const ADMIN_API_PREFIX = "/api/admin" as const;
 export const RESET_PASSWORD_PATH = "/reset-password" as const;
 
 /**
+ * Préfixes publics du module Tandem (sous-étape 4) — page tokenisée
+ * architecte + webhook Brevo. Ces routes contournent la garde domaine
+ * `@alyosingenierie.fr` car elles sont conçues pour des acteurs externes ;
+ * chaque handler porte sa propre vérification cryptographique (JWT
+ * architecte / JWT opposition / HMAC Brevo). Cf.
+ * `specs/module_tandem_engine_v1.md` §3.4-3.6.
+ */
+export const PUBLIC_ARCHITECT_PREFIX = "/archi/" as const;
+export const PUBLIC_ARCHITECT_API_PREFIX = "/api/archi/" as const;
+export const PUBLIC_BREVO_WEBHOOK_PATH = "/api/webhooks/brevo" as const;
+
+/**
  * Retourne `true` si le pathname est une route publique (servie sans
- * vérification de session).
+ * vérification de session). Couvre les routes exactes de `PUBLIC_ROUTES`
+ * ET les préfixes du module Tandem (auth cryptographique côté handler).
  */
 export function isPublicRoute(pathname: string): boolean {
-  return (PUBLIC_ROUTES as readonly string[]).includes(pathname);
+  if ((PUBLIC_ROUTES as readonly string[]).includes(pathname)) return true;
+  if (pathname.startsWith(PUBLIC_ARCHITECT_PREFIX)) return true;
+  if (pathname.startsWith(PUBLIC_ARCHITECT_API_PREFIX)) return true;
+  if (pathname === PUBLIC_BREVO_WEBHOOK_PATH) return true;
+  return false;
 }
 
 /**
