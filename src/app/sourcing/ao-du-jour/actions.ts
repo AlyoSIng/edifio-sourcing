@@ -94,6 +94,34 @@ interface ActionDeps {
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /**
+ * Whitelist stricte des `hoursOffset` autorisés par `deferTenderAction`.
+ *
+ * Source de vérité Board (2026-05-24, Addendum spec §Exigence 1) : la
+ * décision « +1 / +3 / +7 j stricte » → seules ces 3 valeurs sont acceptées
+ * côté server action. Le client UI déclare les mêmes valeurs dans
+ * `TenderCardActions.tsx::DEFER_SHORTCUTS` ; on re-valide ici en
+ * défense-en-profondeur (un utilisateur authentifié pourrait, via DevTools,
+ * appeler `deferTenderAction(uuid, 87600)` et différer un AO de 10 ans →
+ * bypass du filtre liste).
+ *
+ * Si la spec V1.x ouvre un "date picker custom", remplacer cette whitelist
+ * par un bornage `0 < hoursOffset <= 720` (30 jours max).
+ *
+ * Cf. revue Hugo PR #39 → MEDIUM-1
+ * (`notes-de-suivi/CC_260524_1657_HUGO_PR39_REVIEW.md`).
+ */
+const ALLOWED_HOURS_OFFSETS = [24, 72, 168] as const;
+type AllowedHoursOffset = (typeof ALLOWED_HOURS_OFFSETS)[number];
+
+function isAllowedHoursOffset(value: unknown): value is AllowedHoursOffset {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    (ALLOWED_HOURS_OFFSETS as readonly number[]).includes(value)
+  );
+}
+
+/**
  * Étape commune : auth + domaine. Retourne le profil utilisateur OU un
  * `ActionResult` d'échec à propager tel quel.
  */
@@ -258,13 +286,18 @@ export async function selectTenderAction(
 // ============================================================================
 
 /**
- * Différe un AO de `hoursOffset` heures (V1 par défaut 24h depuis l'UI).
- * Le statut tender reste `sourced`. `getTendersOfTheDay` filtrera
- * `(deferred_until IS NULL OR deferred_until < now())` pour exclure l'AO
- * de la vue jusqu'à expiration.
+ * Différe un AO de `hoursOffset` heures (V1 : 24 / 72 / 168 — décision Board
+ * 2026-05-24 « +1 / +3 / +7 j stricte »). Le statut tender reste `sourced`.
+ * `getTendersOfTheDay` filtrera `(deferred_until IS NULL OR deferred_until <
+ * now())` pour exclure l'AO de la vue jusqu'à expiration.
  *
- * Cas d'usage particulier : appliquer un nouveau différé sur un tender
- * déjà différé est autorisé (on étend la durée).
+ * Whitelist stricte côté serveur (cf. `ALLOWED_HOURS_OFFSETS`) : toute valeur
+ * hors `{24, 72, 168}` retourne `invalid_input` sans aucune mutation BDD ni
+ * insertion d'audit log. Défense-en-profondeur contre un client malicieux
+ * qui forgeait `hoursOffset = 87600` (10 ans) pour bypass du filtre liste.
+ *
+ * Cas d'usage particulier : appliquer un nouveau différé (24 / 72 / 168 h)
+ * sur un tender déjà différé est autorisé (on étend la durée).
  */
 export async function deferTenderAction(
   tenderId: string,
@@ -282,7 +315,10 @@ export async function deferTenderAction(
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
-  if (!Number.isInteger(hoursOffset) || hoursOffset <= 0) {
+  // Whitelist stricte `{24, 72, 168}` — décision Board 2026-05-24 (+1/+3/+7 j),
+  // revue Hugo MEDIUM-1. Toute valeur hors set (NaN, Infinity, 48, 720,
+  // négatif, string, null, undefined, …) → invalid_input.
+  if (!isAllowedHoursOffset(hoursOffset)) {
     return { ok: false, error: "invalid_input" };
   }
 

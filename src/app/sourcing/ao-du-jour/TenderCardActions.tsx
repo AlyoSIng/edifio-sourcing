@@ -59,7 +59,10 @@ const ERROR_MESSAGES: Record<string, string> = {
 /**
  * Shortcuts du popover « Reporter ». Le mapping label → heures est ici la
  * source de vérité côté UI ; côté server action `deferTenderAction` ré-valide
- * `hoursOffset > 0 entier` — toute valeur cohérente passe.
+ * via whitelist stricte `{24, 72, 168}` (décision Board 2026-05-24, revue
+ * Hugo MEDIUM-1) — toute valeur hors set renvoie `invalid_input`. Si on
+ * ajoute un shortcut ici, il faut l'ajouter en miroir dans
+ * `ALLOWED_HOURS_OFFSETS` (`src/app/sourcing/ao-du-jour/actions.ts`).
  */
 const DEFER_SHORTCUTS: ReadonlyArray<{ label: string; hours: number }> = [
   { label: "+1 jour", hours: 24 },
