@@ -1,9 +1,15 @@
 "use client";
 
 /**
- * Modale « Rejeter cet AO » — Arbitrage Board C (2026-05-21) : motif
+ * Modale « Écarter cet AO » — Arbitrage Board C (2026-05-21) : motif
  * optionnel (textarea max 280 chars). Pas dans la maquette officielle Gate 3,
  * design tokens-based aligné sur SoloTandemModal.
+ *
+ * Wording verbatim (Addendum spec 2026-05-24 §Exigence 1) :
+ *  - Titre eyebrow : « Écarter AO »
+ *  - Titre h2     : « Pourquoi écarter cet AO ? »
+ *  - Bouton CTA   : « Écarter »
+ *  - Identifiant technique côté server action `rejectTenderAction` inchangé.
  *
  * ARIA :
  *  - `role="dialog"` + `aria-modal="true"`
@@ -15,7 +21,7 @@
  *  - Compteur live `{n}/280` sous la textarea
  *  - Compteur devient rouge à partir de 250 caractères (alerte visuelle
  *    avant la borne)
- *  - Bouton « Rejeter » toujours actif (motif optionnel)
+ *  - Bouton « Écarter » toujours actif (motif optionnel)
  *  - Le texte saisi est transmis tel quel (chaîne vide → null géré au call-site)
  */
 
@@ -73,13 +79,13 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
         {/* Header */}
         <div className="mb-4">
           <div className="font-mono text-[11px] uppercase tracking-wider text-[#FF0033]">
-            Rejet AO
+            Écarter AO
           </div>
           <h2
             id={titleId}
             className="mt-1 font-display text-[20px] font-bold leading-snug text-neutral-900"
           >
-            Pourquoi rejeter cet AO ?
+            Pourquoi écarter cet AO ?
           </h2>
           <p className="mt-1 text-sm text-neutral-500">{tenderTitle}</p>
         </div>
@@ -93,7 +99,7 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
             maxLength={MAX_LENGTH}
             rows={4}
             placeholder="Optionnel — quelques mots aident l'IA à affiner le scoring (max 280 caractères)"
-            aria-label="Motif de rejet (optionnel, 280 caractères max)"
+            aria-label="Motif (optionnel, 280 caractères max)"
             className="w-full resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-[#FF0033] focus:outline-none focus:ring-1 focus:ring-[#FF0033]"
           />
           <p className={`mt-1 text-right font-mono text-[11px] ${counterColor}`} aria-live="polite">
@@ -115,7 +121,7 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
             onClick={handleConfirm}
             className="rounded-md border border-red-300 bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1"
           >
-            Rejeter
+            Écarter
           </button>
         </div>
       </div>
