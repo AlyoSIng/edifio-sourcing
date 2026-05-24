@@ -2,7 +2,7 @@
 
 /**
  * Sous-composant Client `TenderCardActions` — 3 boutons sur la carte AO :
- * Sélectionner / Différer / Rejeter.
+ * Sélectionner / Reporter / Écarter.
  *
  * Pattern :
  *  - `useTransition` pour suivre l'état pending pendant l'appel server action
@@ -14,11 +14,19 @@
  *  - Pour la simplicité V1, on dispatch un CustomEvent global capté par la
  *    page parent qui se charge d'afficher le toast. Pas de lib toast externe.
  *
- * Copy verbatim :
- *  - Boutons : « Sélectionner » (primary), « Différer » (ghost), « Rejeter »
- *    (danger ghost) — cf. `design/copy/onboarding_and_push_v1.md` l.68-70 et
- *    `guide_utilisateur_1page.html` l.137-145.
- *  - Tooltips alignés sur le même fichier (attribut `title`).
+ * Copy verbatim (Addendum spec 2026-05-24 §Exigence 1) :
+ *  - « Sélectionner » (primary), « Reporter » (ghost, popover shortcuts),
+ *    « Écarter » (danger ghost, ouvre modale motif optionnel).
+ *  - Identifiants techniques inchangés côté server action
+ *    (`deferTenderAction`, `rejectTenderAction`) — wording UI seul.
+ *
+ * UX « Reporter » (Addendum spec 2026-05-24) :
+ *  - Clic sur le bouton « Reporter » ouvre un popover avec 3 shortcuts :
+ *    +1 jour (24h), +3 jours (72h), +7 jours (168h).
+ *  - Le popover se ferme : clic outside, Escape, clic sur un shortcut.
+ *  - Pas de date picker custom en V1 (KISS) — extensible Phase 2 si besoin.
+ *  - Implémenté en composant inline (state local + listener outside-click)
+ *    plutôt qu'un @radix-ui/react-popover pour ne pas ajouter de dépendance.
  *
  * V1 limites :
  *  - Pas de drag-and-drop
@@ -29,8 +37,10 @@
  *    la liste après mutation.
  */
 
-import { useState, useTransition } from "react";
+
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+
 
 import { deferTenderAction, rejectTenderAction, selectTenderAction } from "./actions";
 import { RejectReasonModal } from "./RejectReasonModal";
@@ -48,6 +58,20 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_state: "Cet AO a déjà été traité.",
   internal_error: "Erreur technique. Réessaye dans quelques instants.",
 };
+
+/**
+ * Shortcuts du popover « Reporter ». Le mapping label → heures est ici la
+ * source de vérité côté UI ; côté server action `deferTenderAction` ré-valide
+ * via whitelist stricte `{24, 72, 168}` (décision Board 2026-05-24, revue
+ * Hugo MEDIUM-1) — toute valeur hors set renvoie `invalid_input`. Si on
+ * ajoute un shortcut ici, il faut l'ajouter en miroir dans
+ * `ALLOWED_HOURS_OFFSETS` (`src/app/sourcing/ao-du-jour/actions.ts`).
+ */
+const DEFER_SHORTCUTS: ReadonlyArray<{ label: string; hours: number }> = [
+  { label: "+1 jour", hours: 24 },
+  { label: "+3 jours", hours: 72 },
+  { label: "+7 jours", hours: 168 },
+];
 
 /**
  * Émet un CustomEvent capté par la page parent (cf. `page.tsx`).
@@ -86,6 +110,31 @@ export function TenderCardActions({
   const [isPending, startTransition] = useTransition();
   const [showSoloTandemModal, setShowSoloTandemModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDeferPopover, setShowDeferPopover] = useState(false);
+
+  // Ref sur le wrapper popover pour détection click-outside.
+  const deferContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Fermeture popover : Escape + click-outside.
+  useEffect(() => {
+    if (!showDeferPopover) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowDeferPopover(false);
+    };
+    const onClick = (e: MouseEvent) => {
+      const node = deferContainerRef.current;
+      if (node && e.target instanceof Node && !node.contains(e.target)) {
+        setShowDeferPopover(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onClick);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onClick);
+    };
+  }, [showDeferPopover]);
 
   function handleSelect(mode: "solo" | "tandem"): void {
     setShowSoloTandemModal(false);
@@ -104,13 +153,16 @@ export function TenderCardActions({
     });
   }
 
-  function handleDefer(): void {
-    startTransition(async () => {
-      // V1 : 24h fixe (Arbitrage Board B 2026-05-21, extensible Phase 2).
-      const result = await deferTenderAction(tenderId, 24);
-      if (!result.ok) emitError(result.error);
-    });
-  }
+  const handleDefer = useCallback(
+    (hours: number) => {
+      setShowDeferPopover(false);
+      startTransition(async () => {
+        const result = await deferTenderAction(tenderId, hours);
+        if (!result.ok) emitError(result.error);
+      });
+    },
+    [tenderId],
+  );
 
   function handleReject(reason: string | null): void {
     setShowRejectModal(false);
@@ -137,26 +189,52 @@ export function TenderCardActions({
           Sélectionner
         </button>
 
-        <button
-          type="button"
-          onClick={handleDefer}
-          disabled={isPending}
-          title="Reporte l'AO de 24h. Il reviendra dans le digest de demain."
-          className="inline-flex items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 focus-visible:ring-offset-1 disabled:opacity-50"
-        >
-          <span aria-hidden>&#x23F8;</span>
-          Différer
-        </button>
+        {/* « Reporter » : bouton + popover shortcuts (+1j / +3j / +7j) */}
+        <div className="relative" ref={deferContainerRef}>
+          <button
+            type="button"
+            onClick={() => setShowDeferPopover((v) => !v)}
+            disabled={isPending}
+            aria-haspopup="menu"
+            aria-expanded={showDeferPopover}
+            title="Reporte l'AO. Il reviendra dans le digest après le délai choisi."
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 focus-visible:ring-offset-1 disabled:opacity-50"
+          >
+            <span aria-hidden>&#x23F8;</span>
+            Reporter
+          </button>
+
+          {showDeferPopover ? (
+            <div
+              role="menu"
+              aria-label="Choisir la durée de report"
+              className="absolute right-0 top-full z-20 mt-1 flex w-36 flex-col gap-0.5 rounded-md border border-line-2 bg-white p-1 shadow-card"
+            >
+              {DEFER_SHORTCUTS.map((shortcut) => (
+                <button
+                  key={shortcut.hours}
+                  type="button"
+                  role="menuitem"
+                  data-defer-hours={shortcut.hours}
+                  onClick={() => handleDefer(shortcut.hours)}
+                  className="rounded-sm px-2 py-1 text-left text-[11px] font-medium text-ink transition hover:bg-paper-2 focus:bg-paper-2 focus:outline-none"
+                >
+                  {shortcut.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
         <button
           type="button"
           onClick={() => setShowRejectModal(true)}
           disabled={isPending}
-          title="Rejette l'AO. Un motif vous sera demandé pour améliorer le scoring."
+          title="Écarte l'AO. Un motif vous sera demandé pour améliorer le scoring."
           className="inline-flex items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-error transition hover:bg-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x2715;</span>
-          Rejeter
+          Écarter
         </button>
       </div>
 

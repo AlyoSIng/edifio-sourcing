@@ -4,16 +4,21 @@ import { signInWith } from "./helpers/auth";
 import { deleteUserIfExists } from "./helpers/password";
 
 /**
- * Tests E2E — actions métier sur la `TenderCard` (PR n°5).
+ * Tests E2E — actions métier sur la `TenderCard` (PR n°5 + Addendum 2026-05-24).
  *
  * Couvre :
  *  1. **Sélectionner Solo** : clic « Sélectionner » → modale Solo/Tandem
  *     ouverte → clic « Solo » → clic « Confirmer » → modale fermée +
  *     card disparait de la liste.
- *  2. **Différer** : clic « Différer » → pas de modale (V1 direct 24h) →
- *     card disparait.
- *  3. **Rejeter avec motif** : clic « Rejeter » → modale ouverte →
- *     remplir textarea → clic « Rejeter » → modale fermée + card disparait.
+ *  2. **Reporter (popover shortcuts)** : clic « Reporter » → popover ouvert
+ *     avec 3 shortcuts (+1j / +3j / +7j) → clic « +3 jours » → popover fermé
+ *     + card disparait du digest.
+ *  3. **Écarter avec motif** : clic « Écarter » → modale ouverte →
+ *     remplir textarea → clic « Écarter » → modale fermée + card disparait.
+ *
+ * Wording verbatim spec Addendum 2026-05-24 §Exigence 1 :
+ *   « Sélectionner » / « Reporter » / « Écarter » (jamais « Différer » / « Rejeter »
+ *   côté UI ; les identifiants techniques server-side restent inchangés).
  *
  * ----------------------------------------------------------------------------
  * Skip-policy (cf. brief PR n°5 §5.1)
@@ -94,19 +99,35 @@ test.describe("Actions métier sur TenderCard — PR n°5", () => {
     expect(newCount).toBeLessThanOrEqual(initialCount);
   });
 
-  test("Différer — pas de modale, card disparait directement (V1 24h)", async ({ page }) => {
+  test("Reporter — popover ouvre 3 shortcuts, clic +3j ferme et fait disparaitre", async ({
+    page,
+  }) => {
     const firstCard = page.locator("article").first();
     const initialCount = await page.locator("article").count();
 
-    await firstCard.getByRole("button", { name: /Différer/i }).click();
+    // 1. Clic « Reporter » ouvre le popover (menu role + aria-expanded)
+    const reporterBtn = firstCard.getByRole("button", { name: /^Reporter$/i });
+    await reporterBtn.click();
+    await expect(reporterBtn).toHaveAttribute("aria-expanded", "true");
+
+    // 2. Popover contient les 3 shortcuts
+    const popover = page.getByRole("menu", { name: /Choisir la durée de report/i });
+    await expect(popover).toBeVisible();
+    await expect(popover.getByRole("menuitem", { name: /^\+1 jour$/ })).toBeVisible();
+    await expect(popover.getByRole("menuitem", { name: /^\+3 jours$/ })).toBeVisible();
+    await expect(popover.getByRole("menuitem", { name: /^\+7 jours$/ })).toBeVisible();
+
+    // 3. Clic « +3 jours » ferme le popover (server action defer 72h)
+    await popover.getByRole("menuitem", { name: /^\+3 jours$/ }).click();
+    await expect(popover).not.toBeVisible();
 
     // Pas de modale Solo/Tandem ouverte
     await expect(
       page.getByRole("heading", { level: 2, name: /Comment réponds-tu à cet AO/i }),
     ).not.toBeVisible();
-    // Pas de modale Reject ouverte
+    // Pas de modale Écarter ouverte
     await expect(
-      page.getByRole("heading", { level: 2, name: /Pourquoi rejeter cet AO/i }),
+      page.getByRole("heading", { level: 2, name: /Pourquoi écarter cet AO/i }),
     ).not.toBeVisible();
 
     // Pas d'erreur visible
@@ -116,29 +137,29 @@ test.describe("Actions métier sur TenderCard — PR n°5", () => {
     expect(newCount).toBeLessThanOrEqual(initialCount);
   });
 
-  test("Rejeter avec motif — modale ouverte + textarea + confirme", async ({ page }) => {
+  test("Écarter avec motif — modale ouverte + textarea + confirme", async ({ page }) => {
     const firstCard = page.locator("article").first();
     const initialCount = await page.locator("article").count();
 
-    await firstCard.getByRole("button", { name: /Rejeter/i }).click();
+    await firstCard.getByRole("button", { name: /^Écarter$/i }).click();
 
-    // Modale Reject ouverte
+    // Modale Écarter ouverte
     await expect(
-      page.getByRole("heading", { level: 2, name: /Pourquoi rejeter cet AO/i }),
+      page.getByRole("heading", { level: 2, name: /Pourquoi écarter cet AO/i }),
     ).toBeVisible();
 
     // Saisir un motif court
-    await page.getByRole("textbox", { name: /Motif de rejet/i }).fill("Hors zone géo");
+    await page.getByRole("textbox", { name: /Motif/i }).fill("Hors zone géo");
 
-    // Clic sur « Rejeter » (footer)
+    // Clic sur « Écarter » (footer)
     await page
       .getByRole("dialog")
-      .getByRole("button", { name: /^Rejeter$/i })
+      .getByRole("button", { name: /^Écarter$/i })
       .click();
 
     // Modale fermée
     await expect(
-      page.getByRole("heading", { level: 2, name: /Pourquoi rejeter cet AO/i }),
+      page.getByRole("heading", { level: 2, name: /Pourquoi écarter cet AO/i }),
     ).not.toBeVisible();
 
     // Pas d'erreur
@@ -146,5 +167,38 @@ test.describe("Actions métier sur TenderCard — PR n°5", () => {
 
     const newCount = await page.locator("article").count();
     expect(newCount).toBeLessThanOrEqual(initialCount);
+  });
+
+  /**
+   * Verrou wording verbatim (Addendum spec 2026-05-24 §Exigence 1) :
+   * la card NE DOIT PLUS exposer les libellés legacy « Différer » / « Rejeter ».
+   * Test rapide qui pète si quelqu'un fait machine arrière sur le wording.
+   */
+  test("Wording verbatim — les libellés legacy « Différer » / « Rejeter » ont disparu", async ({
+    page,
+  }) => {
+    const firstCard = page.locator("article").first();
+
+    // Présence des nouveaux libellés
+    const reporterBtn = firstCard.getByRole("button", { name: /^Reporter$/i });
+    const ecarterBtn = firstCard.getByRole("button", { name: /^Écarter$/i });
+    await expect(reporterBtn).toBeVisible();
+    await expect(ecarterBtn).toBeVisible();
+
+    // Absence des anciens
+    await expect(firstCard.getByRole("button", { name: /^Différer$/i })).toHaveCount(0);
+    await expect(firstCard.getByRole("button", { name: /^Rejeter$/i })).toHaveCount(0);
+
+    // Verrou supplémentaire (LOW-3, revue Hugo PR #39) : le tooltip natif
+    // `title=` ne doit pas régresser vers la formulation legacy. On garantit
+    // la présence de la formulation cible verbatim.
+    await expect(reporterBtn).toHaveAttribute(
+      "title",
+      /Reporte l'AO\. Il reviendra dans le digest après le délai choisi\./,
+    );
+    await expect(ecarterBtn).toHaveAttribute(
+      "title",
+      /Écarte l'AO\. Un motif vous sera demandé pour améliorer le scoring\./,
+    );
   });
 });
