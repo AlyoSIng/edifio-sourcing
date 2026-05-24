@@ -180,11 +180,25 @@ test.describe("Actions métier sur TenderCard — PR n°5", () => {
     const firstCard = page.locator("article").first();
 
     // Présence des nouveaux libellés
-    await expect(firstCard.getByRole("button", { name: /^Reporter$/i })).toBeVisible();
-    await expect(firstCard.getByRole("button", { name: /^Écarter$/i })).toBeVisible();
+    const reporterBtn = firstCard.getByRole("button", { name: /^Reporter$/i });
+    const ecarterBtn = firstCard.getByRole("button", { name: /^Écarter$/i });
+    await expect(reporterBtn).toBeVisible();
+    await expect(ecarterBtn).toBeVisible();
 
     // Absence des anciens
     await expect(firstCard.getByRole("button", { name: /^Différer$/i })).toHaveCount(0);
     await expect(firstCard.getByRole("button", { name: /^Rejeter$/i })).toHaveCount(0);
+
+    // Verrou supplémentaire (LOW-3, revue Hugo PR #39) : le tooltip natif
+    // `title=` ne doit pas régresser vers la formulation legacy. On garantit
+    // la présence de la formulation cible verbatim.
+    await expect(reporterBtn).toHaveAttribute(
+      "title",
+      /Reporte l'AO\. Il reviendra dans le digest après le délai choisi\./,
+    );
+    await expect(ecarterBtn).toHaveAttribute(
+      "title",
+      /Écarte l'AO\. Un motif vous sera demandé pour améliorer le scoring\./,
+    );
   });
 });
