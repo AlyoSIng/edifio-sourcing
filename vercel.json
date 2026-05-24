@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/sourcing-run",
       "schedule": "30 4 * * 1-5"
+    },
+    {
+      "path": "/api/cron/tandem-followup",
+      "schedule": "0 7 * * *"
     }
   ]
 }

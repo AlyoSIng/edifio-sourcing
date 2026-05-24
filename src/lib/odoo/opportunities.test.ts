@@ -26,7 +26,7 @@ describe("createOdooOpportunity — validation inputs", () => {
   // db non utilisé sur ces tests : on échoue avant l'INSERT BDD via la
   // validation des invariants. Le mock est juste un objet vide cast.
   const fakeDbAny = {} as never;
-  const noopClient: OdooClient = { executeKw: async () => 0 };
+  const noopClient: OdooClient = { executeKw: async <T>() => 0 as T };
 
   it("missing_architect_id si origin=tandem sans architectId", async () => {
     const result = await createOdooOpportunity(

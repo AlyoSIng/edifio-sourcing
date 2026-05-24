@@ -30,6 +30,7 @@
  */
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { deferTenderAction, rejectTenderAction, selectTenderAction } from "./actions";
 import { RejectReasonModal } from "./RejectReasonModal";
@@ -81,6 +82,7 @@ export function TenderCardActions({
   tenderAmount,
   tenderDeadline,
 }: TenderCardActionsProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showSoloTandemModal, setShowSoloTandemModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -89,7 +91,16 @@ export function TenderCardActions({
     setShowSoloTandemModal(false);
     startTransition(async () => {
       const result = await selectTenderAction(tenderId, mode);
-      if (!result.ok) emitError(result.error);
+      if (!result.ok) {
+        emitError(result.error);
+        return;
+      }
+      // Sous-étape 5 Tandem : après bascule en `selected_tandem`, on
+      // redirige vers la page short-list. Solo reste sur la page AO du
+      // jour (révalidation du cache via la Server Action).
+      if (mode === "tandem") {
+        router.push(`/sourcing/ao/${tenderId}/tandem`);
+      }
     });
   }
 
