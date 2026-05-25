@@ -94,6 +94,14 @@ export const NAV_ITEMS: NavSection[] = [
         icon: "🤝",
         comingSoon: true,
       },
+      // Annuaire architectes — visible tous rôles (lecture) ; édition filtrée
+      // côté page via `isAdmin(profile)`. Migration Lot B (2026-05-25).
+      {
+        href: "/sourcing/architectes",
+        label: "Architectes",
+        icon: "🏛️",
+        matchPrefix: "/sourcing/architectes",
+      },
     ],
   },
   {

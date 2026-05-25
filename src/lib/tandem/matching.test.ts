@@ -54,6 +54,8 @@ function makeArchitect(overrides: Partial<Architect> = {}): Architect {
     notes: null,
     createdAt: new Date("2026-05-01T00:00:00Z"),
     updatedAt: new Date("2026-05-01T00:00:00Z"),
+    rgpdOpposition: false,
+    rgpdOppositionDate: null,
     ...overrides,
   };
 }
