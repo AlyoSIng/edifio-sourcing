@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isItemActive, NAV_ITEMS, type NavItem } from "./nav-items";
 
@@ -15,13 +15,25 @@ import { isItemActive, NAV_ITEMS, type NavItem } from "./nav-items";
  * Source design : maquettes Cowork v4/v5 (sidebar desktop fond `--ink`,
  * réutilisée telle quelle en drawer mobile pour cohérence visuelle).
  *
- * **A11y** :
+ * **A11y (hardening review Hugo PR #42 — 2026-05-25)** :
  *   - `role="dialog"` + `aria-modal="true"` quand ouvert
+ *   - Quand fermé, le drawer reçoit `inert` via DOM ref (React 18 ne supporte
+ *     pas la prop typée — on pose `setAttribute('inert','')` dans un effect).
+ *     `inert` rend le sous-arbre **non-focusable et invisible aux AT**, ce qui
+ *     règle proprement le bug « liens tabbables hors viewport » sans recourir
+ *     à `aria-hidden` (qui n'enlève pas la tabbabilité). On garde le drawer
+ *     dans le DOM pour préserver l'animation `transition-transform` slide-out.
+ *   - Focus-trap maison : `Tab` au dernier focusable wrap au premier ;
+ *     `Shift+Tab` au premier wrap au dernier. ~30 lignes, pas de lib externe.
  *   - Touche `Escape` ferme le drawer
+ *   - Focus restitué sur le bouton qui a ouvert (mémorisation `activeElement`
+ *     à l'ouverture, restauration à la fermeture)
+ *   - Fermeture automatique au changement de route (`usePathname` watcher)
  *   - Click sur backdrop ou sur un lien ferme le drawer
  *   - Scroll body bloqué (`overflow: hidden`) tant que le drawer est ouvert
- *   - Focus auto sur le 1er lien à l'ouverture (focus management minimal —
- *     pas de focus-trap complet, suffisant pour le périmètre MVP)
+ *   - Reset au resize ≥ 768 px : si la viewport passe en desktop alors que
+ *     le drawer est ouvert, on `close()` (le cleanup useEffect restaure
+ *     l'overflow body)
  *   - Bouton hamburger porte `aria-expanded` et `aria-controls`
  *
  * **Data-driven** : réutilise `NAV_ITEMS` + `isItemActive` de la sidebar desktop.
@@ -39,15 +51,36 @@ interface SidebarMobileDrawerProps {
   role: "admin" | "user" | "viewer";
 }
 
+/** Sélecteur des éléments focusables — pour focus-trap maison. */
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
 export function SidebarMobileDrawer({ role }: SidebarMobileDrawerProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname() ?? "/sourcing/ao-du-jour";
   const isAdmin = role === "admin";
-  const firstLinkRef = useRef<HTMLAnchorElement | null>(null);
 
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const hamburgerRef = useRef<HTMLButtonElement | null>(null);
+  const firstLinkRef = useRef<HTMLAnchorElement | null>(null);
+  /** Élément qui avait le focus avant ouverture — utilisé pour le restituer. */
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+  /** Marker pour ignorer le 1er render dans l'effect close-on-route-change. */
+  const isFirstRender = useRef(true);
+
+  const close = useCallback(() => setOpen(false), []);
+
+  // ---------------------------------------------------------------------------
   // Lock body scroll tant que le drawer est ouvert. On rétablit la valeur
   // précédente au cleanup pour ne pas écraser un autre composant qui aurait
-  // déjà touché overflow (peu probable au MVP, mais propre).
+  // déjà touché overflow.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
@@ -57,34 +90,132 @@ export function SidebarMobileDrawer({ role }: SidebarMobileDrawerProps) {
     };
   }, [open]);
 
-  // Escape ferme le drawer. Listener attaché au document tant que le drawer
-  // est ouvert pour éviter le coût quand fermé.
+  // ---------------------------------------------------------------------------
+  // Pose / retire `inert` sur le drawer en fonction de `open`. React 18 ne
+  // reconnaît pas la prop `inert` typée → on passe par le DOM. Quand fermé,
+  // l'attribut est posé → sous-arbre non-focusable + invisible aux AT. Quand
+  // ouvert, on le retire pour que les liens redeviennent tabbables.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const node = drawerRef.current;
+    if (!node) return;
+    if (open) {
+      node.removeAttribute("inert");
+    } else {
+      node.setAttribute("inert", "");
+    }
+  }, [open]);
+
+  // ---------------------------------------------------------------------------
+  // Mémorise l'élément focus à l'ouverture, le restitue à la fermeture.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (open) {
+      previouslyFocused.current = document.activeElement as HTMLElement | null;
+    } else if (previouslyFocused.current) {
+      // Restitution : on cible le bouton hamburger en priorité (cas standard
+      // où l'utilisateur a fermé via Escape / backdrop / lien). Si pour une
+      // raison X l'élément précédent existe encore, on le focus.
+      const target = hamburgerRef.current ?? previouslyFocused.current;
+      // setTimeout 0 pour laisser React poser le DOM avant de focus
+      // (sinon l'élément peut ne pas être encore mounted).
+      setTimeout(() => target?.focus?.(), 0);
+      previouslyFocused.current = null;
+    }
+  }, [open]);
+
+  // ---------------------------------------------------------------------------
+  // Escape ferme + focus-trap (Tab / Shift+Tab wrap). Listener au document
+  // attaché tant que le drawer est ouvert pour éviter le coût quand fermé.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const node = drawerRef.current;
+      if (!node) return;
+      const focusables = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        (el) => !el.hasAttribute("disabled") && el.offsetParent !== null,
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement as HTMLElement | null;
+
+      if (e.shiftKey) {
+        // Shift+Tab depuis le premier → wrap au dernier
+        if (active === first || !node.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        // Tab depuis le dernier → wrap au premier
+        if (active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+  }, [open, close]);
 
-  // Focus sur le 1er lien à l'ouverture — courtoisie a11y minimale (pas un
-  // focus-trap complet).
+  // ---------------------------------------------------------------------------
+  // Focus sur le 1er lien à l'ouverture. Léger délai pour laisser le drawer
+  // terminer son slide-in avant de déplacer le focus.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!open) return;
-    // Léger délai pour laisser le drawer terminer son slide-in avant de
-    // déplacer le focus (sinon le scroll programmatique du navigateur peut
-    // glitcher l'animation sur certains devices).
     const t = setTimeout(() => firstLinkRef.current?.focus(), 50);
     return () => clearTimeout(t);
   }, [open]);
 
-  const close = () => setOpen(false);
+  // ---------------------------------------------------------------------------
+  // Fermeture automatique au changement de route. Skip le 1er render pour ne
+  // pas tenter de fermer un drawer qui n'a jamais été ouvert.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (open) close();
+    // close() est stable (useCallback) et open est volontairement omis : on
+    // ne veut déclencher l'auto-close qu'au changement de pathname.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // ---------------------------------------------------------------------------
+  // Reset au resize ≥ 768 px (R2 Camille). Si le drawer est ouvert et que la
+  // viewport passe en desktop, on `close()` — le cleanup de l'effect body
+  // overflow restaure la valeur précédente.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mql = window.matchMedia("(min-width: 768px)");
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) close();
+    };
+    // Compat navigateurs : Safari < 14 utilise `addListener`
+    if (mql.addEventListener) {
+      mql.addEventListener("change", onChange);
+      return () => mql.removeEventListener("change", onChange);
+    }
+    mql.addListener(onChange);
+    return () => mql.removeListener(onChange);
+  }, [close]);
 
   return (
     <>
       {/* Bouton hamburger — visible uniquement < md */}
       <button
+        ref={hamburgerRef}
         type="button"
         onClick={() => setOpen(true)}
         className="grid h-9 w-9 place-items-center rounded-sm text-ink outline-none transition hover:bg-paper-2 focus-visible:ring-2 focus-visible:ring-brand-red md:hidden"
@@ -113,17 +244,23 @@ export function SidebarMobileDrawer({ role }: SidebarMobileDrawerProps) {
           le DOM uniquement quand ouvert, sinon `pointer-events` capturerait
           les clics du contenu sous-jacent. */}
       {open ? (
-        <div className="bg-ink/60 fixed inset-0 z-40 md:hidden" onClick={close} aria-hidden />
+        <div
+          className="bg-ink/60 fixed inset-0 z-40 md:hidden"
+          onClick={close}
+          aria-hidden
+          data-testid="sidebar-mobile-backdrop"
+        />
       ) : null}
 
       {/* Drawer principal — toujours dans le DOM pour animer la sortie. La
-          translation est purement CSS (`transition-transform`). */}
+          translation est purement CSS (`transition-transform`). Quand fermé,
+          l'attribut `inert` est posé via effect → sous-arbre non-focusable. */}
       <aside
+        ref={drawerRef}
         id="mobile-nav-drawer"
         role="dialog"
         aria-modal={open ? "true" : undefined}
         aria-label="Menu de navigation"
-        aria-hidden={open ? undefined : true}
         className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col bg-ink text-white shadow-modal transition-transform duration-200 ease-out md:hidden ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
