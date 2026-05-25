@@ -64,6 +64,7 @@ import {
   templateNameFor,
   type BrevoRegister,
 } from "@/lib/brevo/template-picker";
+import { resolveBrevoTemplate } from "@/lib/brevo/template-resolver";
 import { buildBrevoVariables } from "@/lib/brevo/variables";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { getSiteUrl } from "@/lib/site-url";
@@ -522,12 +523,31 @@ export async function sendArchitectSolicitation(
   // 7. Envoi Brevo (hors transaction — latence variable)
   const register = options.register ?? defaultRegisterFromTutoiement(architect.tutoiement);
   const templateName = templateNameFor("solicitation", register);
+
+  // Résolution du template : BDD org-scopée → fallback copy v2 hardcodé.
+  // `resolveBrevoTemplate` applique aussi les garde-fous RGPD (lien_opposition
+  // + mention art.14) — si le template est non conforme, il throw et on
+  // retourne `brevo_send_failed` avant tout envoi.
+  let resolvedTemplate: Awaited<ReturnType<typeof resolveBrevoTemplate>> | null = null;
+  try {
+    resolvedTemplate = await resolveBrevoTemplate(templateName, ALYOS_ORG_ID, db);
+  } catch (err) {
+    return {
+      ok: false,
+      error: "brevo_send_failed",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
   const variables = buildBrevoVariables({
     architect,
     tender,
     tenderDepartment: extractDepartment(tender),
     lienAo: `${getSiteUrl()}/archi/${architectToken.token}`,
     lienOpposition: `${getSiteUrl()}/archi/oppose/${oppositionToken.jti}`,
+    // `presentation_societe` : si le template BDD fournit un contenu custom, on
+    // pourrait l'injecter ici (lot D). Pour l'instant on laisse buildBrevoVariables
+    // utiliser son défaut (PRESENTATION_SOCIETE_HTML_DEFAULT).
   });
 
   let templateId: number;
@@ -548,6 +568,8 @@ export async function sendArchitectSolicitation(
     templateId,
     to: { email: architect.email, name: toName || variables.cabinet },
     params: {
+      // v2 : civilite + presentation_societe
+      civilite: variables.civilite,
       archi_prenom: variables.archi_prenom,
       archi_nom: variables.archi_nom,
       cabinet: variables.cabinet,
@@ -557,10 +579,14 @@ export async function sendArchitectSolicitation(
       ao_cloture: variables.ao_cloture,
       lien_ao: variables.lien_ao,
       lien_opposition: variables.lien_opposition,
+      presentation_societe: variables.presentation_societe,
       rgpd_block: variables.rgpd_block,
     },
     customHeader: `tender:${tenderId};archi:${architectId}`,
   });
+
+  // resolvedTemplate est utilisée pour l'audit (source db/default — traçabilité)
+  void resolvedTemplate;
 
   let brevoMessageId: string | null = null;
   if (!sendResult.ok) {

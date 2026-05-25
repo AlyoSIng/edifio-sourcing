@@ -334,6 +334,10 @@ function buildSolicitMockDb(tutoiement: boolean): DrizzleClient {
         then: (cb: (v: unknown[]) => unknown) => Promise.resolve(cb([])),
       })),
     })),
+    // resolveBrevoTemplate appelle db.execute (SQL brut) pour chercher un template
+    // custom en BDD. Le mock retourne rows vide → fallback sur le template par défaut,
+    // ce qui permet à pickBrevoTemplateId de sélectionner le bon templateId TU/VOUS.
+    execute: vi.fn(async () => ({ rows: [] })),
     transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) => {
       // tx interne : simule les opérations dans la transaction
       const tx = {

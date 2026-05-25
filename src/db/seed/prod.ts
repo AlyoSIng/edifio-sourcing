@@ -78,6 +78,8 @@ import {
 } from "../schema";
 import type { SearchProfileKeywords } from "../types/jsonb";
 import { AI_PROMPTS_V1_CATALOG } from "./data/ai-prompts";
+import { DEFAULT_TEMPLATES, TEMPLATE_META, type TemplateKey } from "@/lib/email/template-resolver";
+import { messageTemplates, organizationProfiles } from "@/db/schema/messaging";
 
 // ============================================================================
 // SECTION 1 -- Constantes (alignees `src/db/seed/index.ts` pour coherence
@@ -201,6 +203,8 @@ export interface SeedProdReportCounts {
   architect_specialties: number;
   ai_prompts: number;
   search_profiles: number;
+  message_templates: number;
+  organization_profiles: number;
 }
 
 export interface SeedProdReport {
@@ -244,6 +248,8 @@ export async function runSeedProd(
     architect_specialties: 0,
     ai_prompts: 0,
     search_profiles: 0,
+    message_templates: 0,
+    organization_profiles: 0,
   };
 
   // --- 1. Organization AlyoS ----------------------------------------------
@@ -342,7 +348,58 @@ export async function runSeedProd(
     );
   }
 
-  // --- 6. Rapport ---------------------------------------------------------
+  // --- 6. Templates d'e-mail (11 templates par defaut) -------------------
+  // Idempotent via onConflictDoNothing (contrainte UNIQUE org_id + key).
+  // Le seed pose les valeurs par defaut; le Board peut les editer via
+  // l'interface /sourcing/admin/modeles-email sans re-seeder.
+  const templateKeys = Object.keys(DEFAULT_TEMPLATES) as TemplateKey[];
+  const templateRows = templateKeys.map((key) => ({
+    organizationId: ORG_A_ID,
+    key,
+    channel: TEMPLATE_META[key].channel,
+    subject: DEFAULT_TEMPLATES[key].subject,
+    body: DEFAULT_TEMPLATES[key].body,
+    version: 1,
+  }));
+  await db.insert(messageTemplates).values(templateRows).onConflictDoNothing();
+  counts.message_templates = templateKeys.length;
+  // eslint-disable-next-line no-console
+  console.log(
+    `[db:seed:prod] [OK] message_templates : ${templateKeys.length} lignes (11 templates par defaut)`,
+  );
+
+  // --- 7. Profil organisation AlyoS (1 ligne) ----------------------------
+  // Seed MVP : bloc 4 puces AlyoS (eco construction/MOE ; accessibilite ;
+  // BIM/ACCA ; 2 agences Normandie & PACA) — validé Board spec D.
+  const ALYOS_PRESENTATION_BLOCK =
+    "AlyoS Ingenierie est un bureau d'etudes specialise en maitrise d'oeuvre BTP, " +
+    "intervenant en construction neuve et rehabilitation.\n\n" +
+    "- Eco-construction et maitrise d'oeuvre : conception durable, materiaux biosources, " +
+    "performance energetique.\n" +
+    "- Accessibilite et reglementaire : mise en conformite Ad'AP, AMO PPMS, missions " +
+    "PEMD/amiante, economie circulaire et reemploi.\n" +
+    "- BIM et outils numeriques : pilotage maquette ACCA, coordination interoperabilite.\n" +
+    "- Deux agences : Normandie (Rouen) et PACA (Aix-en-Provence).";
+
+  await db
+    .insert(organizationProfiles)
+    .values({
+      organizationId: ORG_A_ID,
+      presentationBlock: ALYOS_PRESENTATION_BLOCK,
+      commercialName: "AlyoS Ingenierie",
+      emailSignature: "L'equipe AlyoS Ingenierie",
+      agencyDetails:
+        "Agence Normandie : 2 rue des Artisans, 76000 Rouen\n" +
+        "Agence PACA : 15 avenue du Mistral, 13100 Aix-en-Provence",
+      phone: "",
+      contactEmail: "",
+    })
+    .onConflictDoNothing();
+  counts.organization_profiles = 1;
+  // eslint-disable-next-line no-console
+  console.log("[db:seed:prod] [OK] organization_profiles : 1 ligne (AlyoS Ingenierie)");
+
+  // --- 8. Rapport ---------------------------------------------------------
   const report: SeedProdReport = {
     seeded_at: new Date().toISOString(),
     context,

@@ -4,13 +4,20 @@
  * Couvre :
  *  - splitContactName : "Marie Dupont" / "Jean Pierre Marie" / "Solo" / NULL / ""
  *  - formatClotureFr : Date → "28 mai 2026" / null → "à confirmer"
- *  - buildBrevoVariables : intégration — produit toutes les vars attendues
+ *  - deriveCivilite : mapping title Odoo → "Madame" / "Monsieur" / fallback
+ *  - buildBrevoVariables : intégration — produit toutes les vars attendues (v2)
  *  - rgpd_block intégré dans le résultat
+ *  - civilite + presentation_societe présents (v2)
  */
 
 import { describe, expect, it } from "vitest";
 
-import { buildBrevoVariables, formatClotureFr, splitContactName } from "./variables";
+import {
+  buildBrevoVariables,
+  deriveCivilite,
+  formatClotureFr,
+  splitContactName,
+} from "./variables";
 
 describe("splitContactName", () => {
   it("split sur 1er espace : 'Marie Dupont'", () => {
@@ -55,9 +62,42 @@ describe("formatClotureFr", () => {
   });
 });
 
-describe("buildBrevoVariables — intégration", () => {
+describe("deriveCivilite", () => {
+  it("'M.' → 'Monsieur'", () => {
+    expect(deriveCivilite("M.")).toBe("Monsieur");
+  });
+  it("'M' → 'Monsieur'", () => {
+    expect(deriveCivilite("M")).toBe("Monsieur");
+  });
+  it("'Monsieur' → 'Monsieur'", () => {
+    expect(deriveCivilite("Monsieur")).toBe("Monsieur");
+  });
+  it("'monsieur' (minuscules) → 'Monsieur' (insensible casse)", () => {
+    expect(deriveCivilite("monsieur")).toBe("Monsieur");
+  });
+  it("'Mme' → 'Madame'", () => {
+    expect(deriveCivilite("Mme")).toBe("Madame");
+  });
+  it("'Mme.' → 'Madame'", () => {
+    expect(deriveCivilite("Mme.")).toBe("Madame");
+  });
+  it("'Madame' → 'Madame'", () => {
+    expect(deriveCivilite("Madame")).toBe("Madame");
+  });
+  it("null → fallback 'Madame, Monsieur,'", () => {
+    expect(deriveCivilite(null)).toBe("Madame, Monsieur,");
+  });
+  it("string vide → fallback 'Madame, Monsieur,'", () => {
+    expect(deriveCivilite("")).toBe("Madame, Monsieur,");
+  });
+  it("valeur inconnue 'Dr.' → fallback 'Madame, Monsieur,'", () => {
+    expect(deriveCivilite("Dr.")).toBe("Madame, Monsieur,");
+  });
+});
+
+describe("buildBrevoVariables — intégration (v2)", () => {
   const baseInput = {
-    architect: { cabinet: "Atelier Dupont", contactName: "Marie Dupont" },
+    architect: { cabinet: "Atelier Dupont", contactName: "Marie Dupont", title: "Mme" },
     tender: {
       title: "Rénovation école Jean Moulin",
       buyer: "Mairie de Lyon",
@@ -68,8 +108,9 @@ describe("buildBrevoVariables — intégration", () => {
     lienOpposition: "https://sourcing.alyosingenierie.fr/archi/oppose/xyz.uvw.rst",
   };
 
-  it("produit toutes les variables attendues", () => {
+  it("produit toutes les variables attendues (y compris civilite v2)", () => {
     const v = buildBrevoVariables(baseInput);
+    expect(v.civilite).toBe("Madame");
     expect(v.archi_prenom).toBe("Marie");
     expect(v.archi_nom).toBe("Dupont");
     expect(v.cabinet).toBe("Atelier Dupont");
@@ -80,6 +121,29 @@ describe("buildBrevoVariables — intégration", () => {
     expect(v.ao_cloture).toContain("2026");
     expect(v.lien_ao).toBe(baseInput.lienAo);
     expect(v.lien_opposition).toBe(baseInput.lienOpposition);
+  });
+
+  it("civilite fallback 'Madame, Monsieur,' si title absent", () => {
+    const v = buildBrevoVariables({
+      ...baseInput,
+      architect: { ...baseInput.architect, title: null },
+    });
+    expect(v.civilite).toBe("Madame, Monsieur,");
+  });
+
+  it("presentation_societe contient le contenu par défaut AlyoS (4 puces)", () => {
+    const v = buildBrevoVariables(baseInput);
+    expect(v.presentation_societe).toContain("AlyoS Ingénierie");
+    expect(v.presentation_societe).toContain("BIM");
+    expect(v.presentation_societe).toContain("économie circulaire");
+  });
+
+  it("presentation_societe override si fourni en input", () => {
+    const v = buildBrevoVariables({
+      ...baseInput,
+      presentationSociete: "<p>Override custom</p>",
+    });
+    expect(v.presentation_societe).toBe("<p>Override custom</p>");
   });
 
   it("rgpd_block contient cabinet + lien opposition + mention art.14", () => {
