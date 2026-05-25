@@ -88,13 +88,12 @@ export const NAV_ITEMS: NavSection[] = [
   {
     title: "Pilotage",
     items: [
-      // Slot prévu pour Nadia (module Tandem). Laissé en `comingSoon` tant que
-      // la PR Tandem n'a pas livré la page `/sourcing/cotraitance`.
+      // Pipeline cotraitance — livré par PR feat/tandem-engine (Nadia, 2026-05-25).
       {
         href: "/sourcing/cotraitance",
         label: "Cotraitance",
         icon: "handshake",
-        comingSoon: true,
+        matchPrefix: "/sourcing/cotraitance",
       },
       // Annuaire architectes — visible tous rôles (lecture) ; édition filtrée
       // côté page via `isAdmin(profile)`. Migration Lot B (2026-05-25).
