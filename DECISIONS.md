@@ -1199,3 +1199,14 @@ appliquée sur prod après Phase β. Pas de bug de code.
   *Motif : idempotent via `onConflictDoNothing`. Permet au Board d'éditer depuis l'UI sans attendre un re-seed.*
 
 *Dernière mise à jour : 2026-05-25 par [Alex via Claude Code] — Lots C+D implémentés (migration 0007 + lib + pages admin + seed).*
+
+---
+
+## 2026-05-25 — Alex (dev) + Steve (ops)
+**Action** : Application manuelle migrations 0007 et 0008 via Supabase SQL Editor (contournement esbuild ARM64).
+**Contexte** : `drizzle-kit migrate` échoue sur la machine Windows ARM64 de Steve car `pnpm-workspace.yaml` a `allowBuilds: esbuild: false` (décision CTO 2026-05-18) + le lockfile pince `@esbuild/win32-x64`. La machine Steve est ARM64, le binaire natif est incompatible.
+**Solution** : Migrations appliquées manuellement dans Supabase SQL Editor + enregistrement dans `drizzle.__drizzle_migrations` (hash SHA256 + folderMillis).
+**Workflow prod établi** : Pour toute future migration, générer via `drizzle-kit generate` en CI, appliquer via SQL Editor + INSERT journal. L'option `allowBuilds: esbuild: false` reste en place (décision CTO).
+**Corrections apportées** :
+- Migration 0007 (`0007_abnormal_ares`) : enum audit_action + colonnes rgpd_opposition — fix "Annuaire indisponible"
+- Migration 0008 (`0008_chief_the_order`) : tables message_templates + organization_profiles — fix "société ne se sauvegarde pas"
