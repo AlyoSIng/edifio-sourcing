@@ -1,0 +1,42 @@
+{
+  "name": "edifio Sourcing",
+  "short_name": "edifio",
+  "description": "AO publics, du sourcing au pli. Outil interne AlyoS Ingénierie.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "/sourcing",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#FF0033",
+  "background_color": "#FAF9F6",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "AO du jour",
+      "short_name": "AO du jour",
+      "description": "Voir le digest sourcing du jour",
+      "url": "/sourcing/ao-du-jour"
+    },
+    {
+      "name": "Pipeline",
+      "short_name": "Pipeline",
+      "description": "Tableau Kanban du pipeline AO",
+      "url": "/sourcing/pipeline"
+    }
+  ]
+}

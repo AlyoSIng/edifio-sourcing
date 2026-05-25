@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Icon } from "@/components/icons/AppIcons";
 import { isItemActive, NAV_ITEMS, type NavItem } from "./nav-items";
 
 /**
@@ -102,9 +103,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
         aria-disabled
         title="Bientôt disponible"
       >
-        <span className="text-sm opacity-90" aria-hidden>
-          {item.icon}
-        </span>
+        <Icon name={item.icon} size={20} aria-hidden />
         <span className="flex-1 truncate">{item.label}</span>
         <span className="font-mono text-[8px] uppercase tracking-wider text-white/30">soon</span>
       </span>
@@ -119,9 +118,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
 
   return (
     <Link href={item.href} className={`${baseClasses} ${stateClasses}`}>
-      <span className="text-sm opacity-90" aria-hidden>
-        {item.icon}
-      </span>
+      <Icon name={item.icon} size={20} aria-hidden />
       <span className="flex-1 truncate">{item.label}</span>
       {item.badge !== undefined ? (
         <span

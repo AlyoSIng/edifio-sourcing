@@ -26,6 +26,23 @@ export const metadata: Metadata = {
   description: "Outil interne AlyoS Ingénierie — sourcing automatique de marchés publics BTP",
   // Robots : on bloque l'indexation tant qu'on est en preview AlyoS interne.
   robots: { index: false, follow: false },
+  // ── PWA / favicon ────────────────────────────────────────────────────────
+  // apple-touch-icon.png (180×180) est généré par scripts/generate-pwa-icons.mjs
+  // (prérequis : pnpm add -D sharp puis node scripts/generate-pwa-icons.mjs).
+  // Tant qu'il n'est pas généré, Safari iOS affiche un screenshot de la page.
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/manifest.webmanifest",
+  // themeColor colore la barre d'adresse Chrome / Safari en mode standalone.
+  // Valeur identique à theme_color dans manifest.webmanifest et design/tokens.json.
+  themeColor: "#FF0033",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "edifio Sourcing",
+  },
 };
 
 export default function RootLayout({

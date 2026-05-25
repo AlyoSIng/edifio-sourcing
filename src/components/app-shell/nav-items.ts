@@ -6,8 +6,8 @@
  *
  * Format :
  *   - `NavSection[]` regroupé par bandeau (« Sourcing », « Pilotage », « Admin »)
- *   - Chaque `NavItem` porte un `href`, un `label` court, un `icon` (emoji V1,
- *     SVG plus tard) et optionnellement `matchPrefix` pour détecter l'item actif
+ *   - Chaque `NavItem` porte un `href`, un `label` court, un `icon` (nom d'icône
+ *     SVG AppIcons) et optionnellement `matchPrefix` pour détecter l'item actif
  *     même quand la route est imbriquée (ex. `/sourcing/admin/users/[id]`).
  *   - `adminOnly: true` masque l'item pour les rôles non-admin (rendu côté
  *     Server Component dans `Sidebar`).
@@ -23,13 +23,15 @@
  * de layout shift). La détection se fait via `matchPrefix` côté Server.
  */
 
+import type { IconName } from "@/components/icons/AppIcons";
+
 export interface NavItem {
   /** Path absolu vers lequel pointer (ex. `/sourcing/ao-du-jour`). */
   href: string;
   /** Libellé visible (FR, naming strict). */
   label: string;
-  /** Icône (emoji MVP, SVG futur — laisser une string). */
-  icon: string;
+  /** Nom d'icône SVG AppIcons (cf. `src/components/icons/AppIcons.tsx`). */
+  icon: IconName;
   /** Optionnel : badge numérique ou texte court (ex. compteur). */
   badge?: number | string;
   /**
@@ -64,7 +66,7 @@ export const NAV_ITEMS: NavSection[] = [
       {
         href: "/sourcing/ao-du-jour",
         label: "AO du jour",
-        icon: "📥",
+        icon: "ao",
         matchPrefix: "/sourcing/ao-du-jour",
       },
       // V2 : liens vers Sélectionnés / Différés / Tous les AO. Pré-câblés en
@@ -72,13 +74,13 @@ export const NAV_ITEMS: NavSection[] = [
       {
         href: "/sourcing/selectionnes",
         label: "Sélectionnés",
-        icon: "⭐",
+        icon: "bookmark",
         comingSoon: true,
       },
       {
         href: "/sourcing/differes",
         label: "Différés",
-        icon: "🕓",
+        icon: "clock",
         comingSoon: true,
       },
     ],
@@ -91,7 +93,7 @@ export const NAV_ITEMS: NavSection[] = [
       {
         href: "/sourcing/cotraitance",
         label: "Cotraitance",
-        icon: "🤝",
+        icon: "handshake",
         comingSoon: true,
       },
       // Annuaire architectes — visible tous rôles (lecture) ; édition filtrée
@@ -99,7 +101,7 @@ export const NAV_ITEMS: NavSection[] = [
       {
         href: "/sourcing/architectes",
         label: "Architectes",
-        icon: "🏛️",
+        icon: "building",
         matchPrefix: "/sourcing/architectes",
       },
     ],
@@ -110,8 +112,22 @@ export const NAV_ITEMS: NavSection[] = [
       {
         href: "/sourcing/admin/profil",
         label: "Profil de recherche",
-        icon: "⚙️",
+        icon: "sliders",
         matchPrefix: "/sourcing/admin/profil",
+        adminOnly: true,
+      },
+      {
+        href: "/sourcing/admin/modeles-email",
+        label: "Modèles d'e-mail",
+        icon: "mail",
+        matchPrefix: "/sourcing/admin/modeles-email",
+        adminOnly: true,
+      },
+      {
+        href: "/sourcing/admin/societe",
+        label: "Présentation société",
+        icon: "briefcase",
+        matchPrefix: "/sourcing/admin/societe",
         adminOnly: true,
       },
     ],
@@ -122,7 +138,7 @@ export const NAV_ITEMS: NavSection[] = [
       {
         href: "/sourcing/admin/users",
         label: "Utilisateurs",
-        icon: "👥",
+        icon: "users",
         matchPrefix: "/sourcing/admin/users",
         adminOnly: true,
       },
