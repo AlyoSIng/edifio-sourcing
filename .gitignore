@@ -63,11 +63,8 @@ Thumbs.db
 # --- Claude Code local (settings.json projet committé, .local non) ---
 .claude/settings.local.json
 
-# --- Dumps backups prod (JAMAIS commit — cf. scripts/bug-cabinet/README.md) ---
-backups/*.dump
-backups/*.sql
-backups/*.tar
-backups/*.gz
+# --- Dossier backups/ (sauvegardes locales, JAMAIS commit) ---
+backups/
 
 # --- Dossier tmp/ — analyses jetables, rapports d'import, parsing XLSX local ---
 # Recommandation Nadia 2026-05-25 (CC_260525_0326) : tout ce qui est dans tmp/
