@@ -1151,3 +1151,32 @@ appliquée sur prod après Phase β. Pas de bug de code.
 ---
 
 *Dernière mise à jour : 2026-05-25 (matin) par [Nadia via Claude Code] — Étape 1 Tandem livrée en working tree, attente commit Yann.*
+
+---
+
+## 2026-05-25 — Actions prod nuit 24→25/05 (rattrapage documentaire)
+
+> Trois exécutions prod ont eu lieu sans note de clôture ni entrée DECISIONS.md.
+> Rattrapage acté par le Board (cf. `handoff/REQUEST_260525_CLOTURE_NUIT_DEBLOCAGE_LOT56_57.md`).
+> Notes détaillées dans `notes-de-suivi/CC_260525_0800_CLOTURE_CABINET_APPLY.md`,
+> `CC_260525_0800_CLOTURE_IMPORT_ARCHITECTS.md`,
+> `CC_260525_0800_CLOTURE_TANDEM_MODULE.md`.
+
+### A.1 — Apply DDL migrations 0004-0006 prod + alignement journal __drizzle_migrations
+
+- **2026-05-25 · PROD · Steve (opérateur) + Alex (diagnostic) + Nadia (analyse Tandem) · Apply DDL ciblé migrations 0004-0006 via éditeur SQL Supabase + INSERT manuel des hashes dans `drizzle.__drizzle_migrations`.**
+  *Motif : drift prod — journal `__drizzle_migrations` ne contenait que 4 entrées (migrations 0000-0003). Les migrations 0004, 0005, 0006 n'avaient jamais été enregistrées dans le journal Drizzle, privant la table `architects` de la colonne `cabinet` (et de toute la refonte schéma Tandem 2026-05-22). Conséquence : erreur `column architects.cabinet does not exist` → module Sourcing inaccessible. L'apply DDL direct + INSERT manuel des hashes était l'option la moins risquée (pas de drizzle-kit migrate sur un journal partiellement incohérent). Réversibilité : irreversible côté DDL (ADD COLUMN / DROP COLUMN appliqués) mais idempotent si rejoué après un DELETE du journal — un rollback nécessiterait pg_restore du backup. Journal final : 7 lignes (IDs 1,2,3,4,8,9,10 — non-contigus suite à un incident double INSERT corrigé par DELETE, fonctionnellement correct). Smoke test post-apply : OK. Snapshot Supabase : non pris (reporté post-MVP).*
+
+### A.2 — Import réel architectes prod (3440 cabinets)
+
+- **2026-05-25 · PROD · Steve (opérateur) + Nadia (script + analyse) · Import de 3440 architectes réels en prod via script CLI `scripts/architects-import-260525.ts`.**
+  *Motif : table `architects` vide en prod après apply migrations. Module Tandem (matching, sollicitation) nécessite des architectes en base. Source : `Contact_complete.xlsx` (3805 lignes, export Odoo CRM + enrichissement SIRENE, gitignored). Dry-run effectué d'abord : 3805 lignes parsées, 365 doublons `(organization_id, email)` éliminés par dedup, 0 erreur. Import prod : 3440 insérés, 0 mis à jour, 0 erreur. Upsert `ON CONFLICT (odoo_external_id) DO NOTHING` — idempotent. PII : fichier source jamais committé, rapport JSON dans `tmp/` (gitignored). Réversibilité : `TRUNCATE architects` suffit à annuler (données uniquement, pas de DDL). Un re-import serait sans effet (idempotent). Organisation cible : AlyoS Ingénierie (`11111111-1111-1111-1111-111111111111`).*
+
+### A.3 — Etat PRs et module Tandem étape 2 soldé
+
+- **2026-05-25 · GIT · Steve (merge) + Alex (fixes a11y) + Nadia (Tandem étape 2) · PRs #42 et #43 mergées ; PR #44 ouverte (fixes a11y sidebar, en attente review Hugo) ; fichiers core Tandem étape 2 en working tree non-committés.**
+  *Motif : la nuit avait pour objectif de solder les commits Tandem étape 2 et les correctifs a11y sidebar (PR #42 Hugo review changes). PR #43 (lint-staged hook) mergée 07:04 UTC pour débloquer le flow de commit. PR #44 ouvre les fixes P1.1-P1.4 + R2 Camille + levée des 5 test.fixme E2E sidebar. Module Tandem : fichiers core en working tree, attente commit Yann. E2E Tandem : tests existants passants ; 6 scénarios backlog annotés `test.skip` en attente Gate 7 (confirmé). Réversibilité : PR #44 peut être fermée sans conséquence sur main (branche isolée). Fichiers Tandem non-committés peuvent être stagés/non-stagés sans impact prod.*
+
+---
+
+*Dernière mise à jour : 2026-05-25 (08h00) par [Nadia via Claude Code] — Rattrapage documentaire nuit 24→25/05 : 3 notes de clôture + 3 entrées DECISIONS.md.*
