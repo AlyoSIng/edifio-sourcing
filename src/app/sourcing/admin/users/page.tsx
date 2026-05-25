@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
+import type { User } from "@supabase/supabase-js";
+
 import { isAdmin, toUserProfile, type UserMetadata, type UserProfile } from "@/lib/auth/types";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -12,6 +14,9 @@ import { RegeneratePasswordButton } from "./RegeneratePasswordButton";
 // `mfa_enabled?: boolean` est déjà présent dans `UserMetadata` (cf.
 // `src/lib/auth/types.ts`) mais NON câblé côté UI ni côté API en MVP.
 // Activation prévue Phase 2 via `supabase.auth.mfa.enroll({ factorType: "totp" })`.
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export const metadata = {
   title: "Administration — Utilisateurs — edifio Sourcing",
@@ -44,10 +49,22 @@ export default async function AdminUsersPage() {
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
-  const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.auth.admin.listUsers({ perPage: 100, page: 1 });
+  let usersData: { users: User[] } | null = null;
+  let loadError: string | null = null;
 
-  if (error) {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin.auth.admin.listUsers({ perPage: 100, page: 1 });
+    if (error) {
+      loadError = error.message;
+    } else {
+      usersData = data;
+    }
+  } catch (err) {
+    loadError = err instanceof Error ? err.message : String(err);
+  }
+
+  if (loadError) {
     return (
       <div className="mx-auto max-w-5xl">
         <div
@@ -55,13 +72,13 @@ export default async function AdminUsersPage() {
           className="rounded-md border border-l-4 border-line border-l-error bg-error-bg px-4 py-3 text-sm text-error"
         >
           <strong className="mr-1 font-semibold">Erreur de chargement :</strong>
-          {error.message}
+          {loadError}
         </div>
       </div>
     );
   }
 
-  const users = (data?.users ?? []).map((u) => toUserProfile(u));
+  const users = (usersData?.users ?? []).map((u) => toUserProfile(u));
   const sollicitableCount = users.filter((u) => !u.mustChangePassword).length;
   const provisionalCount = users.length - sollicitableCount;
 
