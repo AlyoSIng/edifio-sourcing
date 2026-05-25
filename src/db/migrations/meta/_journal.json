@@ -57,6 +57,13 @@
       "when": 1779702070179,
       "tag": "0007_abnormal_ares",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779705354892,
+      "tag": "0008_chief_the_order",
+      "breakpoints": true
     }
   ]
 }

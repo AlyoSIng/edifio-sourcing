@@ -2,14 +2,17 @@
  * Construction des variables Brevo `params` pour les templates architecte.
  *
  * Source de vérité :
- *  - `design/copy/email_sollicitation_architecte_v1.md` (variables listées)
+ *  - `design/copy/email_sollicitation_architecte_v2.md` (variables v2 — remplace v1)
  *  - `specs/module_tandem_engine_v1.md` §3.3
  *  - Décision Q3 Board 2026-05-24 (Option A) : `{{rgpd_block}}` en variable
  *    de code (injecté ici, pas dans le template Brevo).
+ *  - Board 2026-05-25 (Lot #56) : ajout `civilite` (fallback obligatoire
+ *    « Madame, Monsieur, ») + `presentation_societe` (placeholder lot D).
  *
- * Variables couvertes :
- *   archi_prenom, archi_nom, cabinet, ao_objet, ao_acheteur, ao_departement,
- *   ao_cloture (date FR), lien_ao, lien_opposition, rgpd_block (HTML)
+ * Variables couvertes (v2) :
+ *   civilite, archi_prenom, archi_nom, cabinet, ao_objet, ao_acheteur,
+ *   ao_departement, ao_cloture (date FR), lien_ao, lien_opposition,
+ *   presentation_societe (placeholder), rgpd_block (HTML)
  *
  * Parsing du contact :
  *  - `architects.contactName` (peut être NULL — ~50 % de l'export Odoo).
@@ -18,18 +21,37 @@
  *  - Si `contactName` NULL → `archi_prenom = "partenaire"`, `archi_nom = ""`.
  *    Cohérent avec le ton TU/VOUS : « Salut partenaire » / « Bonjour partenaire ».
  *
+ * Civilité :
+ *  - Dérivée de `architects.title` si disponible et mappable ("M." / "Mme" /
+ *    "M" / "Monsieur" → "Monsieur" ; "Mme" / "Madame" → "Madame").
+ *  - Fallback obligatoire (copy v2 §A, note dépendance données) :
+ *    "Madame, Monsieur," si title absent ou non mappable.
+ *  - Uniquement utilisée dans la variante VOUS (formelle). Ignorée en TU.
+ *
  * Formattage date cloture :
  *  - Format FR : `28 mai 2026` (jour + mois littéral + année).
  *  - Locale `fr-FR` via `Intl.DateTimeFormat`.
  *  - Si `deadline` NULL → `ao_cloture = "à confirmer"`.
+ *
+ * presentation_societe :
+ *  - Placeholder pour le lot D (éditable par société via `message_templates`).
+ *  - Contenu par défaut : bloc AlyoS 4 puces copy v2 §A.
+ *  - En texte brut HTML (paragraphe + liste UL). Non échappé — c'est du HTML
+ *    de confiance (origine code, pas données utilisateur).
  */
 
 import type { Architect } from "@/db/schema/architects";
 import type { Tender } from "@/db/schema/tenders";
 
 import { buildRgpdBlockHtml, buildRgpdBlockText } from "./rgpd-block";
+import { PRESENTATION_SOCIETE_HTML_DEFAULT } from "./templates-copy";
 
 export interface BrevoArchitectVariables {
+  /**
+   * Civilité : "Madame" | "Monsieur" | "Madame, Monsieur," (fallback).
+   * Utilisée dans la variante VOUS (formelle) pour l'appel.
+   */
+  civilite: string;
   archi_prenom: string;
   archi_nom: string;
   cabinet: string;
@@ -39,6 +61,12 @@ export interface BrevoArchitectVariables {
   ao_cloture: string;
   lien_ao: string;
   lien_opposition: string;
+  /**
+   * Bloc présentation AlyoS Ingénierie (4 puces — copy v2 §A/B).
+   * Contenu par défaut seedé ici ; remplaçable par `message_templates` BDD
+   * (lot D, via `resolveBrevoTemplate`).
+   */
+  presentation_societe: string;
   rgpd_block: string;
   /** Version texte du bloc RGPD pour la part text/plain (Brevo gère les 2). */
   rgpd_block_text: string;
@@ -46,7 +74,10 @@ export interface BrevoArchitectVariables {
 
 /** Inputs nécessaires à la construction — caller responsable de les charger. */
 export interface BuildVariablesInput {
-  architect: Pick<Architect, "cabinet" | "contactName">;
+  architect: Pick<Architect, "cabinet" | "contactName"> & {
+    /** `title` optionnel (champ Odoo "Civilité" — valeurs libres). */
+    title?: string | null;
+  };
   tender: Pick<Tender, "title" | "buyer" | "deadline">;
   /** Département extrait par le matcher (cf. matching.ts `extractDepartment`). */
   tenderDepartment: string | null;
@@ -54,6 +85,11 @@ export interface BuildVariablesInput {
   lienAo: string;
   /** URL absolue de la page d'opposition (`/archi/oppose/[token]`). */
   lienOpposition: string;
+  /**
+   * Override de `presentation_societe` (lot D — éditable BDD).
+   * Si absent, on utilise `PRESENTATION_SOCIETE_HTML_DEFAULT`.
+   */
+  presentationSociete?: string;
 }
 
 /**
@@ -78,6 +114,24 @@ export function splitContactName(contactName: string | null | undefined): {
 }
 
 /**
+ * Dérive la civilité depuis le champ `title` Odoo (valeurs libres — pas
+ * d'enum Postgres).
+ *
+ * Mapping :
+ *   "M." | "M" | "Monsieur" → "Monsieur"
+ *   "Mme" | "Mme." | "Madame" → "Madame"
+ *   tout autre | null → "Madame, Monsieur," (fallback obligatoire copy v2)
+ *
+ * La comparaison est insensible à la casse et aux espaces superflus.
+ */
+export function deriveCivilite(title: string | null | undefined): string {
+  const t = (title ?? "").trim().toLowerCase();
+  if (t === "m." || t === "m" || t === "monsieur") return "Monsieur";
+  if (t === "mme" || t === "mme." || t === "madame") return "Madame";
+  return "Madame, Monsieur,";
+}
+
+/**
  * Formate la date de clôture en FR : `28 mai 2026` (lowercase mois).
  * Fallback : `à confirmer` si NULL.
  *
@@ -97,7 +151,8 @@ export function formatClotureFr(deadline: Date | null | undefined): string {
 
 /**
  * Construit toutes les variables Brevo nécessaires aux templates architecte.
- * Inclut le bloc RGPD pré-interpolé (Option A — Q3 Board).
+ * Inclut le bloc RGPD pré-interpolé (Option A — Q3 Board) et les nouvelles
+ * variables v2 : `civilite` + `presentation_societe`.
  *
  * @throws `Error` si `lienOpposition` invalide (propagé depuis `buildRgpdBlock*`).
  */
@@ -116,6 +171,7 @@ export function buildBrevoVariables(input: BuildVariablesInput): BrevoArchitectV
   });
 
   return {
+    civilite: deriveCivilite(input.architect.title),
     archi_prenom: prenom,
     archi_nom: nom,
     cabinet,
@@ -125,6 +181,7 @@ export function buildBrevoVariables(input: BuildVariablesInput): BrevoArchitectV
     ao_cloture: formatClotureFr(input.tender.deadline),
     lien_ao: input.lienAo,
     lien_opposition: input.lienOpposition,
+    presentation_societe: input.presentationSociete ?? PRESENTATION_SOCIETE_HTML_DEFAULT,
     rgpd_block,
     rgpd_block_text,
   };

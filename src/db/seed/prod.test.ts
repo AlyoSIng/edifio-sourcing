@@ -313,15 +313,17 @@ describe("runSeedProd -- aucune des 8 tables interdites n'est touchee", () => {
       [],
     );
 
-    // Le type SeedProdReportCounts ne contient que 5 clefs. Cette assertion
-    // verrouille la shape -- si quelqu'un ajoute "users: 1" dans le rapport,
-    // ce test (et le typecheck) signaleront le risque.
+    // Le type SeedProdReportCounts verrouille la shape -- si quelqu'un ajoute
+    // une nouvelle catégorie, ce test (et le typecheck) signaleront le risque.
+    // Mis à jour 2026-05-25 : +message_templates +organization_profiles (Lots C+D).
     const expectedKeys = [
       "organizations",
       "platforms",
       "architect_specialties",
       "ai_prompts",
       "search_profiles",
+      "message_templates",
+      "organization_profiles",
     ];
     expect(Object.keys(report.counts).sort()).toEqual(expectedKeys.sort());
   });

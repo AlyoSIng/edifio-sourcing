@@ -28,3 +28,4 @@ export * from "./library";
 export * from "./ai";
 export * from "./integrations";
 export * from "./audit";
+export * from "./messaging";
