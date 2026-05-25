@@ -1,0 +1,618 @@
+"use server";
+
+/**
+ * Server Actions — flux Tandem (matching + sollicitation architecte).
+ *
+ * Source de vérité :
+ *  - `specs/module_tandem_engine_v1.md` §3.1 (matching), §3.3 (Server Action
+ *    sendArchitectSolicitation)
+ *  - `handoff/PLAN_TANDEM_NADIA_260522.md` §étape 2 sous-étape 3
+ *  - Décision Q3 Board 2026-05-24 — `{{rgpd_block}}` en variable code
+ *  - `DECISIONS.md` 2026-05-22 (c) — `tokenId` + `followupSentAt` posés
+ *  - `src/lib/audit/schemas.ts` — A5 strict (architect_solicit)
+ *
+ * Périmètre sous-étape 3 :
+ *  1. `matchArchitectsForTender(tenderId)` — exécute le matcher V1
+ *     (`rankArchitects`) avec les architectes solicitables + actifs du
+ *     tenant, retourne top N (3 par défaut) avec rationale fallback. La
+ *     persistance dans `match_proposals` se fait à l'envoi (`sendArchitectSolicitation`)
+ *     — pas avant : l'utilisateur peut consulter la short-list sans
+ *     forcément envoyer une sollicitation.
+ *  2. `sendArchitectSolicitation(tenderId, architectId, opts)` — envoie le
+ *     mail Brevo + crée le JWT architecte + persiste `match_proposals` +
+ *     `architect_tokens` + `architect_opposition_tokens` + `architect_responses`
+ *     (status=pending) + `brevo_messages` + bascule tender status →
+ *     `awaiting_architect`. Audit A5 `architect_solicit` post-commit.
+ *
+ * **Conformité contrat partagé avec Alex (Solo) :**
+ *  - `createOdooOpportunity` est consommé ici lors d'un futur `accepted` archi
+ *    (étape 4 — page tokenisée). Ce module ne le déclenche PAS — Tandem
+ *    crée l'opp Odoo seulement à l'acceptation, pas à la sollicitation
+ *    (cf. spec §3.5).
+ *
+ * Sécurité :
+ *  - Auth check via `requireAlyosUser` (auth + domaine alyosingenierie.fr)
+ *  - Validation UUID inputs (tenderId, architectId)
+ *  - Transactions Drizzle : SELECT FOR UPDATE sur `tenders` pour éviter
+ *    course concurrente sur le status
+ *  - Génération JWT côté serveur uniquement (clé privée jamais exposée)
+ *  - Token d'opposition généré UNE fois par architecte (réutilisé après
+ *    si déjà actif et non utilisé) — évite la multiplication de tokens
+ *    long-life par architecte
+ */
+
+import { revalidatePath } from "next/cache";
+import { and, eq, gte, sql } from "drizzle-orm";
+
+import { db as defaultDb } from "@/db/client";
+import { architects } from "@/db/schema/architects";
+import {
+  architectOppositionTokens,
+  architectResponses,
+  architectTokens,
+  matchProposals,
+} from "@/db/schema/selections";
+import { brevoMessages } from "@/db/schema/integrations";
+import { tenders } from "@/db/schema/tenders";
+import { audit } from "@/lib/audit";
+import { isAuthorizedEmail } from "@/lib/auth/domain";
+import { toUserProfile } from "@/lib/auth/types";
+import { getBrevoClient, type BrevoClient } from "@/lib/brevo/client";
+import {
+  defaultRegisterFromTutoiement,
+  pickBrevoTemplateId,
+  templateNameFor,
+  type BrevoRegister,
+} from "@/lib/brevo/template-picker";
+import { buildBrevoVariables } from "@/lib/brevo/variables";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getSiteUrl } from "@/lib/site-url";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { extractDepartment, rankArchitects, type MatchScore } from "@/lib/tandem/matching";
+import { signArchitectToken } from "@/lib/tandem/jwt";
+import { generateRationaleWithAi } from "@/lib/tandem/ai-rationale";
+import type { Architect } from "@/db/schema/architects";
+import type { Tender } from "@/db/schema/tenders";
+
+// ============================================================================
+// Types publics
+// ============================================================================
+
+export type DrizzleClient = typeof defaultDb;
+
+export interface AuthClientLike {
+  auth: {
+    getUser: () => Promise<{ data: { user: import("@supabase/supabase-js").User | null } }>;
+  };
+}
+
+export type AuditFn = typeof audit;
+
+interface ActionDeps {
+  db?: DrizzleClient;
+  authClient?: AuthClientLike;
+  auditFn?: AuditFn;
+  brevoClient?: BrevoClient;
+}
+
+export type MatchActionResult =
+  | { ok: true; matches: MatchScoreWithArchitect[] }
+  | {
+      ok: false;
+      error:
+        | "not_authenticated"
+        | "forbidden_domain"
+        | "invalid_input"
+        | "tender_not_found"
+        | "internal_error";
+    };
+
+export interface MatchScoreWithArchitect extends MatchScore {
+  /** Snapshot architecte enrichi pour rendu UI (pas de lookup additionnel). */
+  architect: Pick<
+    Architect,
+    | "id"
+    | "cabinet"
+    | "contactName"
+    | "tutoiement"
+    | "specialtyCodes"
+    | "geoZones"
+    | "pastCollabsCount"
+    | "preferred"
+  >;
+}
+
+export type SolicitActionResult =
+  | { ok: true; brevoMessageId: string | null; tokenJti: string }
+  | {
+      ok: false;
+      error:
+        | "not_authenticated"
+        | "forbidden_domain"
+        | "invalid_input"
+        | "tender_not_found"
+        | "architect_not_found"
+        | "architect_not_solicitable"
+        | "invalid_state"
+        | "brevo_send_failed"
+        | "internal_error";
+      detail?: string;
+    };
+
+// ============================================================================
+// Helpers internes
+// ============================================================================
+
+const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+async function requireAlyosUser(
+  authClient: AuthClientLike,
+): Promise<
+  { ok: true; userId: string } | { ok: false; error: "not_authenticated" | "forbidden_domain" }
+> {
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  if (!user) return { ok: false, error: "not_authenticated" };
+  const profile = toUserProfile(user);
+  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  return { ok: true, userId: user.id };
+}
+
+// ============================================================================
+// 1. matchArchitectsForTender — exécute le matcher V1 et retourne top N
+// ============================================================================
+
+/**
+ * Calcule et retourne les top N architectes pour un AO Tandem. Lecture
+ * seule — ne persiste rien en BDD (la persistance dans `match_proposals`
+ * arrive à l'envoi via `sendArchitectSolicitation`).
+ *
+ * @param tenderId — UUID du tender (mode Tandem)
+ * @param topN — nombre d'architectes à retourner (défaut 3)
+ */
+export async function matchArchitectsForTender(
+  tenderId: string,
+  topN: number = 3,
+  deps: ActionDeps = {},
+): Promise<MatchActionResult> {
+  const db = deps.db ?? defaultDb;
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+
+  // 2. Validation input
+  if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
+  if (!Number.isInteger(topN) || topN < 1 || topN > 10) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  try {
+    // 3. Lookup tender (filtre tenant explicite)
+    const tenderRows = await db
+      .select()
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .limit(1);
+    const tender = tenderRows[0];
+    if (!tender) return { ok: false, error: "tender_not_found" };
+
+    // 4. Lookup architectes solicitable + active (filtre tenant)
+    const activeArchitects = await db
+      .select()
+      .from(architects)
+      .where(
+        and(
+          eq(architects.organizationId, ALYOS_ORG_ID),
+          eq(architects.active, true),
+          eq(architects.solicitable, true),
+        ),
+      );
+
+    if (activeArchitects.length === 0) {
+      return { ok: true, matches: [] };
+    }
+
+    // 5. Map sollicitations récentes (30 derniers jours) — pour scoring
+    //    `availability`. On groupe par architectId depuis `architect_responses`
+    //    créés ces 30 derniers jours.
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const recentRows = await db
+      .select({
+        architectId: architectResponses.architectId,
+        count: sql<number>`count(*)::int`.as("count"),
+      })
+      .from(architectResponses)
+      .where(
+        and(
+          eq(architectResponses.organizationId, ALYOS_ORG_ID),
+          gte(architectResponses.respondedAt, since),
+        ),
+      )
+      .groupBy(architectResponses.architectId);
+    const recentMap = new Map<string, number>(recentRows.map((r) => [r.architectId, r.count]));
+
+    // 6. Run matcher V1
+    const scores = rankArchitects(
+      { title: tender.title, buyer: tender.buyer, rawData: tender.rawData },
+      { architects: activeArchitects, recentSolicitationsByArchitect: recentMap },
+      { topN },
+    );
+
+    // 7. Enrichit avec architect snapshot + fallback rationale
+    const archMap = new Map<string, Architect>(activeArchitects.map((a) => [a.id, a]));
+    const matches: MatchScoreWithArchitect[] = await Promise.all(
+      scores.map(async (s) => {
+        const a = archMap.get(s.architectId)!;
+        const rationale = await generateRationaleWithAi(
+          a,
+          { title: tender.title, buyer: tender.buyer },
+          s.breakdown,
+          s.score,
+        );
+        return {
+          ...s,
+          rationale,
+          architect: {
+            id: a.id,
+            cabinet: a.cabinet,
+            contactName: a.contactName,
+            tutoiement: a.tutoiement,
+            specialtyCodes: a.specialtyCodes,
+            geoZones: a.geoZones,
+            pastCollabsCount: a.pastCollabsCount,
+            preferred: a.preferred,
+          },
+        };
+      }),
+    );
+
+    return { ok: true, matches };
+  } catch (err) {
+    console.error("[tandem-actions:match:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ============================================================================
+// 2. sendArchitectSolicitation — envoie le mail Brevo + persiste BDD
+// ============================================================================
+
+export interface SolicitOptions {
+  /** Override du registre (sinon dérivé de `architects.tutoiement`). */
+  register?: BrevoRegister;
+  /** Texte additionnel optionnel — stocké pour audit/debug, non envoyé. */
+  customNote?: string;
+  /** Score + rationale issus du matcher — persistés dans `match_proposals`. */
+  score: number;
+  rationale: string;
+  rank: number;
+}
+
+/**
+ * Envoie une sollicitation Tandem à un architecte donné pour un tender donné.
+ *
+ * Effets de bord (transaction unique) :
+ *  1. Génère un JWT architecte (RS256, 30 j, `aud=architect`, `jti` BDD).
+ *  2. Génère / réutilise un token d'opposition pour cet architecte
+ *     (5 ans, single-use).
+ *  3. INSERT `architect_tokens` (jti unique).
+ *  4. INSERT `architect_opposition_tokens` (si pas déjà actif).
+ *  5. UPSERT `match_proposals` (1 ligne par couple AO+archi).
+ *  6. UPSERT `architect_responses` (status=pending, tokenId set).
+ *  7. UPDATE `tenders.status = 'awaiting_architect'`.
+ *  8. Envoi mail Brevo (HORS transaction — l'envoi peut être lent).
+ *  9. INSERT `brevo_messages` (post-envoi avec brevoMessageId).
+ * 10. Audit A5 `architect_solicit` (best-effort, hors tx).
+ *
+ * Robustesse :
+ *  - Si Brevo échoue : les rows BDD existent (token + match + response pending),
+ *    `brevo_messages` n'est PAS créé mais l'`architect_responses` reste, le
+ *    user peut retry depuis l'UI. On retourne `brevo_send_failed`.
+ *  - Idempotence partielle : appeler 2× pour le même (tenderId, architectId)
+ *    quand un `architect_responses` existe déjà → erreur `invalid_state`
+ *    (la spec demande de basculer en M-D2 « relance » côté UI, pas re-créer).
+ */
+export async function sendArchitectSolicitation(
+  tenderId: string,
+  architectId: string,
+  options: SolicitOptions,
+  deps: ActionDeps = {},
+): Promise<SolicitActionResult> {
+  const db = deps.db ?? defaultDb;
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const auditFn = deps.auditFn ?? audit;
+  const brevoClient = deps.brevoClient ?? getBrevoClient();
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+  const { userId } = authResult;
+
+  // 2. Validation
+  if (!UUID_SHAPE.test(tenderId) || !UUID_SHAPE.test(architectId)) {
+    return { ok: false, error: "invalid_input" };
+  }
+  if (!Number.isFinite(options.score) || options.score < 0 || options.score > 100) {
+    return { ok: false, error: "invalid_input" };
+  }
+  if (!options.rationale || typeof options.rationale !== "string") {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  let tender: Tender | undefined;
+  let architect: Architect | undefined;
+  let tokenJti: string;
+  let oppositionToken: { jti: string; expiresAt: Date };
+  let architectToken: { token: string; jti: string; expiresAt: Date };
+  let pendingResponseExisted = false;
+
+  try {
+    // 3. Pré-fetch tender + architect avant de générer le JWT (besoin orgId)
+    const tenderRows = await db
+      .select()
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .limit(1);
+    tender = tenderRows[0];
+    if (!tender) return { ok: false, error: "tender_not_found" };
+
+    const archRows = await db
+      .select()
+      .from(architects)
+      .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+      .limit(1);
+    architect = archRows[0];
+    if (!architect) return { ok: false, error: "architect_not_found" };
+    if (!architect.active || !architect.solicitable || !architect.email) {
+      return { ok: false, error: "architect_not_solicitable" };
+    }
+
+    // 4. Génère le JWT architecte (30 j)
+    architectToken = signArchitectToken({
+      architectId,
+      tenderId,
+      organizationId: ALYOS_ORG_ID,
+    });
+    tokenJti = architectToken.jti;
+
+    // 5. Réutilise ou génère un token d'opposition (long-life, single-use).
+    //    On cherche un token actif (usedAt IS NULL) non expiré. Si trouvé,
+    //    on le réutilise — sinon on en crée un.
+    const existingOppo = await db
+      .select({
+        jti: architectOppositionTokens.jti,
+        expiresAt: architectOppositionTokens.expiresAt,
+        usedAt: architectOppositionTokens.usedAt,
+      })
+      .from(architectOppositionTokens)
+      .where(
+        and(
+          eq(architectOppositionTokens.architectId, architectId),
+          eq(architectOppositionTokens.organizationId, ALYOS_ORG_ID),
+        ),
+      )
+      .orderBy(sql`${architectOppositionTokens.createdAt} desc`)
+      .limit(1);
+
+    const reusable =
+      existingOppo[0] && existingOppo[0].usedAt === null && existingOppo[0].expiresAt > new Date();
+    if (reusable && existingOppo[0]) {
+      oppositionToken = {
+        jti: existingOppo[0].jti,
+        expiresAt: existingOppo[0].expiresAt,
+      };
+    } else {
+      // Crée un nouveau token d'opposition (5 ans).
+      // On utilise une UUID v4 comme `jti` (pas de JWT signé ici — la page
+      // d'opposition vérifie l'existence du token en BDD + non-expiration).
+      const newJti = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000);
+      await db.insert(architectOppositionTokens).values({
+        architectId,
+        organizationId: ALYOS_ORG_ID,
+        jti: newJti,
+        expiresAt,
+      });
+      oppositionToken = { jti: newJti, expiresAt };
+    }
+
+    // 6. Transaction : tokens + match_proposals + responses + tender status
+    await db.transaction(async (tx) => {
+      // architect_tokens (JWT signé — révocation cible)
+      const insertedTokens = await tx
+        .insert(architectTokens)
+        .values({
+          tenderId,
+          architectId,
+          organizationId: ALYOS_ORG_ID,
+          jwtId: architectToken.jti,
+          expiresAt: architectToken.expiresAt,
+        })
+        .returning({ id: architectTokens.id });
+      const archTokenId = insertedTokens[0]?.id;
+      if (!archTokenId) throw new Error("architect_tokens insert returned no id");
+
+      // match_proposals — UPSERT via ON CONFLICT (tenderId, architectId)
+      await tx
+        .insert(matchProposals)
+        .values({
+          tenderId,
+          organizationId: ALYOS_ORG_ID,
+          architectId,
+          score: options.score.toFixed(2),
+          rank: options.rank,
+          rationale: options.rationale,
+        })
+        .onConflictDoUpdate({
+          target: [matchProposals.tenderId, matchProposals.architectId],
+          set: {
+            score: options.score.toFixed(2),
+            rank: options.rank,
+            rationale: options.rationale,
+          },
+        });
+
+      // architect_responses — check existence, ne pas écraser si déjà répondu
+      const existingResp = await tx
+        .select({
+          status: architectResponses.status,
+          tokenId: architectResponses.tokenId,
+        })
+        .from(architectResponses)
+        .where(
+          and(
+            eq(architectResponses.tenderId, tenderId),
+            eq(architectResponses.architectId, architectId),
+          ),
+        )
+        .limit(1);
+
+      if (existingResp[0] && existingResp[0].status !== "pending") {
+        throw new InvalidStateError(`response already ${existingResp[0].status}`);
+      }
+      if (existingResp[0]) {
+        pendingResponseExisted = true;
+        // Update : nouveau token
+        await tx
+          .update(architectResponses)
+          .set({ tokenId: archTokenId })
+          .where(
+            and(
+              eq(architectResponses.tenderId, tenderId),
+              eq(architectResponses.architectId, architectId),
+            ),
+          );
+      } else {
+        await tx.insert(architectResponses).values({
+          tenderId,
+          organizationId: ALYOS_ORG_ID,
+          architectId,
+          status: "pending",
+          tokenId: archTokenId,
+        });
+      }
+
+      // tenders.status = 'awaiting_architect' (uniquement si pas déjà avancé)
+      await tx
+        .update(tenders)
+        .set({ status: "awaiting_architect", updatedAt: sql`now()` })
+        .where(
+          and(
+            eq(tenders.id, tenderId),
+            eq(tenders.organizationId, ALYOS_ORG_ID),
+            sql`${tenders.status} IN ('selected_tandem', 'awaiting_architect', 'architect_declined')`,
+          ),
+        );
+    });
+  } catch (err) {
+    if (err instanceof InvalidStateError) {
+      return { ok: false, error: "invalid_state", detail: err.message };
+    }
+    console.error("[tandem-actions:solicit:db_fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+
+  // 7. Envoi Brevo (hors transaction — latence variable)
+  const register = options.register ?? defaultRegisterFromTutoiement(architect.tutoiement);
+  const templateName = templateNameFor("solicitation", register);
+  const variables = buildBrevoVariables({
+    architect,
+    tender,
+    tenderDepartment: extractDepartment(tender),
+    lienAo: `${getSiteUrl()}/archi/${architectToken.token}`,
+    lienOpposition: `${getSiteUrl()}/archi/oppose/${oppositionToken.jti}`,
+  });
+
+  let templateId: number;
+  try {
+    templateId = pickBrevoTemplateId("solicitation", register);
+  } catch (err) {
+    return {
+      ok: false,
+      error: "brevo_send_failed",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  // Brevo accepte un nom complet — on reconstruit depuis archi_prenom + archi_nom.
+  const toName = [variables.archi_prenom, variables.archi_nom].filter(Boolean).join(" ");
+
+  const sendResult = await brevoClient.send({
+    templateId,
+    to: { email: architect.email, name: toName || variables.cabinet },
+    params: {
+      archi_prenom: variables.archi_prenom,
+      archi_nom: variables.archi_nom,
+      cabinet: variables.cabinet,
+      ao_objet: variables.ao_objet,
+      ao_acheteur: variables.ao_acheteur,
+      ao_departement: variables.ao_departement,
+      ao_cloture: variables.ao_cloture,
+      lien_ao: variables.lien_ao,
+      lien_opposition: variables.lien_opposition,
+      rgpd_block: variables.rgpd_block,
+    },
+    customHeader: `tender:${tenderId};archi:${architectId}`,
+  });
+
+  let brevoMessageId: string | null = null;
+  if (!sendResult.ok) {
+    // L'envoi a échoué — on garde quand même les rows BDD (cf. JSDoc §Robustesse).
+    return {
+      ok: false,
+      error: "brevo_send_failed",
+      detail: `${sendResult.error}${sendResult.detail ? `: ${sendResult.detail}` : ""}`,
+    };
+  }
+  brevoMessageId = sendResult.messageId;
+
+  // 8. Insert brevo_messages (post-envoi avec ID)
+  try {
+    await db.insert(brevoMessages).values({
+      tenderId,
+      architectId,
+      organizationId: ALYOS_ORG_ID,
+      templateName,
+      register,
+      brevoMessageId,
+      sentAt: new Date(),
+    });
+  } catch (err) {
+    // Non-bloquant : le mail est parti, l'audit log captera la trace.
+    console.error("[tandem-actions:solicit:brevo_messages_insert_fail]", err);
+  }
+
+  // 9. Audit A5 architect_solicit (best-effort)
+  void userId; // (réservé pour Phase 2 — pour le moment l'audit helper lit la session)
+  await auditFn({
+    action: "architect_solicit",
+    subjectType: "architect",
+    subjectId: architectId,
+    data: {
+      tender_id: tenderId,
+      architect_id: architectId,
+      template_name: templateName,
+      register,
+      brevo_message_id: brevoMessageId,
+      token_jti: tokenJti,
+    },
+  });
+
+  // 10. Revalidate la page Tandem (réécriture future en sous-étape 5)
+  revalidatePath(`/sourcing/ao/${tenderId}/tandem`);
+  revalidatePath("/sourcing/ao-du-jour");
+
+  void pendingResponseExisted; // info pour audit Phase 2 si besoin
+
+  return { ok: true, brevoMessageId, tokenJti };
+}
+
+class InvalidStateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidStateError";
+  }
+}

@@ -20,10 +20,26 @@
  * pour assertions ciblées. Le pattern est aligné sur `insert.test.ts`.
  */
 
+import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import type { DrizzleClient, TenderOfTheDay } from "./queries";
 import { getActiveSearchProfileName, getTendersOfTheDay } from "./queries";
+
+/**
+ * Helper test : sérialise une expression Drizzle (typiquement le contenu de
+ * `.where(...)`) en SQL texte via `PgDialect`. Permet de verrouiller la
+ * structure du WHERE sans dépendre d'une vraie connexion BDD.
+ *
+ * Usage : `sqlOf(capture.whereExpr)` → renvoie quelque chose comme
+ *   `"organization_id" = $1 and "status" = $2 and (...)`.
+ */
+function sqlOf(expr: unknown): string {
+  const dialect = new PgDialect();
+  // `sqlToQuery` attend un objet `SQL` ; les helpers `and`/`or` retournent
+  // bien un `SQL` côté Drizzle 0.39. Cast minimal pour passer le typage test.
+  return dialect.sqlToQuery(expr as Parameters<PgDialect["sqlToQuery"]>[0]).sql;
+}
 
 // ----------------------------------------------------------------------------
 // Fixtures
@@ -208,6 +224,42 @@ describe("getTendersOfTheDay", () => {
     // Garde-fou contre un futur refactor qui oublierait ces colonnes.
     expect(result[0]?.externalRef).toBe("BOAMP-AO-001");
     expect(result[0]?.platformCode).toBe("boamp");
+  });
+
+  /**
+   * Verrou structural sur les 4 conditions du WHERE — Addendum spec 2026-05-24
+   * §Exigence 1 (filtre AO du jour conforme).
+   *
+   * Le WHERE doit AND-er :
+   *  1. `organization_id = $`                         (multi-tenant)
+   *  2. `status = 'sourced'`                          (uniquement AO actifs)
+   *  3. `deadline IS NULL OR deadline > now()`        (deadline future ou TBD)
+   *  4. `deferred_until IS NULL OR deferred_until < now()` (différé expiré ou pas)
+   *
+   * On sérialise l'expression Drizzle en SQL texte via `PgDialect.sqlToQuery`
+   * et on assert sur la présence des fragments distinctifs. Toute disparition
+   * silencieuse d'une condition (ex. quelqu'un retire le filtre `deferred_until`
+   * lors d'un refacto) pète ce test.
+   */
+  it("WHERE applique bien les 4 conditions org / status / deadline / deferred_until", async () => {
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([]);
+
+    await getTendersOfTheDay(ORG_ALYOS, db);
+
+    expect(capture.whereExpr).toBeDefined();
+    const sql = sqlOf(capture.whereExpr);
+
+    // (1) Multi-tenant : organization_id
+    expect(sql).toMatch(/"organization_id"\s*=/);
+    // (2) Status = sourced (la valeur est passée en paramètre $N, on cherche
+    // juste la colonne)
+    expect(sql).toMatch(/"status"\s*=/);
+    // (3) Deadline : IS NULL OR > now()
+    expect(sql).toMatch(/"deadline"\s+is\s+null/i);
+    expect(sql).toMatch(/"deadline"\s*>\s*now\(\)/i);
+    // (4) Deferred until : IS NULL OR < now() — exigence PR n°5
+    expect(sql).toMatch(/"deferred_until"\s+is\s+null/i);
+    expect(sql).toMatch(/"deferred_until"\s*<\s*now\(\)/i);
   });
 
   /**

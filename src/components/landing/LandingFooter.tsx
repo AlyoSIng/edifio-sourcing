@@ -22,8 +22,8 @@ export function LandingFooter() {
         <div className="mb-10 grid grid-cols-1 gap-12 md:grid-cols-[2fr_1fr_1fr_1fr]">
           {/* Col 1 — Logo + description */}
           <div>
-            <div className="mb-3 [&_.text-neutral-500]:text-white/70">
-              <EdifioLogo />
+            <div className="mb-3">
+              <EdifioLogo onDarkBg />
             </div>
             <p className="text-[13.5px] leading-[1.6] text-white/70">
               Outil interne AlyoS Ingénierie — sourcing automatique d&apos;appels d&apos;offres

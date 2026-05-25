@@ -9,6 +9,9 @@ import {
   isPublicRoute,
   PROTECTED_API_PREFIX,
   PROTECTED_PREFIX,
+  PUBLIC_ARCHITECT_API_PREFIX,
+  PUBLIC_ARCHITECT_PREFIX,
+  PUBLIC_BREVO_WEBHOOK_PATH,
   PUBLIC_ROUTES,
 } from "./routes";
 
@@ -46,6 +49,18 @@ describe("constantes", () => {
   it("ADMIN_API_PREFIX vaut /api/admin", () => {
     expect(ADMIN_API_PREFIX).toBe("/api/admin");
   });
+
+  it("PUBLIC_ARCHITECT_PREFIX vaut /archi/ (module Tandem)", () => {
+    expect(PUBLIC_ARCHITECT_PREFIX).toBe("/archi/");
+  });
+
+  it("PUBLIC_ARCHITECT_API_PREFIX vaut /api/archi/ (module Tandem)", () => {
+    expect(PUBLIC_ARCHITECT_API_PREFIX).toBe("/api/archi/");
+  });
+
+  it("PUBLIC_BREVO_WEBHOOK_PATH vaut /api/webhooks/brevo (module Tandem)", () => {
+    expect(PUBLIC_BREVO_WEBHOOK_PATH).toBe("/api/webhooks/brevo");
+  });
 });
 
 describe("isPublicRoute", () => {
@@ -62,6 +77,15 @@ describe("isPublicRoute", () => {
   });
 
   it.each([
+    "/archi/abc.def.ghi",
+    "/archi/opposition/abc.def.ghi",
+    "/api/archi/abc/respond",
+    "/api/webhooks/brevo",
+  ])("%s est publique (module Tandem — auth crypto côté handler)", (pathname) => {
+    expect(isPublicRoute(pathname)).toBe(true);
+  });
+
+  it.each([
     "/sourcing",
     "/sourcing/ao-du-jour",
     "/api/protected/tenders/select",
@@ -70,6 +94,11 @@ describe("isPublicRoute", () => {
     "/login/extra",
     "/reset-passwordd",
     "/forgot-password/extra",
+    // Variantes proches qui NE doivent PAS passer (anti-bypass) :
+    "/archi", // pas de slash final
+    "/api/archi", // pas de slash final
+    "/api/webhooks/brevoo", // typo
+    "/api/webhooks/brevo/extra", // pas exact-match
   ])("%s n'est pas publique (match strict, pas de préfixe)", (pathname) => {
     expect(isPublicRoute(pathname)).toBe(false);
   });

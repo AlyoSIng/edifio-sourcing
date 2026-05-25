@@ -410,34 +410,97 @@ describe("deferTenderAction", () => {
     );
   });
 
-  it("retourne invalid_input si hoursOffset négatif", async () => {
-    const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
-    const result = await deferTenderAction(VALID_TENDER_ID, -1, {
+  /**
+   * Shortcuts UI « Reporter » (Addendum spec 2026-05-24 §Exigence 1) :
+   *  +1 jour → 24h, +3 jours → 72h, +7 jours → 168h.
+   *
+   * On boucle sur les 3 mappings UI → server pour verrouiller :
+   *   (a) la propagation correcte du `hoursOffset` dans l'audit payload,
+   *   (b) la cohérence event.data.extra.hours_offset (tender_events).
+   *
+   * Toute régression du contrat (ex. cap silencieux à 24h, off-by-one) fera
+   * péter ce test. Le `deferred_until` calculé côté Postgres n'est pas
+   * testable ici (mock) — on vérifie juste que la valeur est posée non-nulle.
+   */
+  it.each([
+    { label: "+1 jour", hours: 24 },
+    { label: "+3 jours", hours: 72 },
+    { label: "+7 jours", hours: 168 },
+  ])("shortcut $label ($hours h) propage hoursOffset correct", async ({ hours }) => {
+    const { db, capture } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
+    const auditFn = makeAuditSpy();
+
+    const result = await deferTenderAction(VALID_TENDER_ID, hours, {
       db,
       authClient: fakeAuthClient(alyosUser()),
-      auditFn: makeAuditSpy(),
+      auditFn,
     });
-    expect(result).toEqual({ ok: false, error: "invalid_input" });
+
+    expect(result).toEqual({ ok: true });
+
+    // (a) audit log A14 : hours_offset correct
+    expect(auditFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "tender_defer",
+        data: expect.objectContaining({ hours_offset: hours }),
+      }),
+    );
+
+    // (b) tender_events.data.extra.hours_offset correct
+    const insertedEvent = capture.inserts[0]?.values as {
+      data?: { extra?: { hours_offset?: number } };
+    };
+    expect(insertedEvent.data?.extra?.hours_offset).toBe(hours);
   });
 
-  it("retourne invalid_input si hoursOffset zéro", async () => {
-    const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
-    const result = await deferTenderAction(VALID_TENDER_ID, 0, {
-      db,
-      authClient: fakeAuthClient(alyosUser()),
-      auditFn: makeAuditSpy(),
-    });
-    expect(result).toEqual({ ok: false, error: "invalid_input" });
-  });
+  /**
+   * Whitelist stricte `{24, 72, 168}` (décision Board 2026-05-24 « +1/+3/+7 j
+   * stricte », revue Hugo MEDIUM-1).
+   *
+   * On boucle sur toutes les valeurs hors-whitelist plausibles (entier hors
+   * set, négatif, zéro, non-entier, NaN, Infinity, string, null, undefined)
+   * et on vérifie :
+   *   (a) retour `{ ok: false, error: "invalid_input" }`
+   *   (b) AUCUNE mutation BDD (UPDATE / INSERT)
+   *   (c) AUCUN audit log inséré (`auditFn` non appelé)
+   *
+   * → Garde-fou contre régression silencieuse : si quelqu'un assouplit la
+   *   validation côté server, ce test pète immédiatement.
+   */
+  it.each([
+    { label: "entier hors set (48)", value: 48 },
+    { label: "entier hors set (720)", value: 720 },
+    { label: "entier hors set (87600 = 10 ans)", value: 87600 },
+    { label: "entier hors set (Number.MAX_SAFE_INTEGER)", value: Number.MAX_SAFE_INTEGER },
+    { label: "négatif (-24)", value: -24 },
+    { label: "zéro (0)", value: 0 },
+    { label: "non-entier (24.5)", value: 24.5 },
+    { label: "NaN", value: Number.NaN },
+    { label: "+Infinity", value: Number.POSITIVE_INFINITY },
+    { label: "-Infinity", value: Number.NEGATIVE_INFINITY },
+    { label: 'string ("24")', value: "24" as unknown as number },
+    { label: "null", value: null as unknown as number },
+    { label: "undefined", value: undefined as unknown as number },
+    { label: "objet", value: {} as unknown as number },
+  ])("rejette hoursOffset hors whitelist : $label", async ({ value }) => {
+    const { db, capture } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
+    const auditFn = makeAuditSpy();
 
-  it("retourne invalid_input si hoursOffset non-entier", async () => {
-    const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
-    const result = await deferTenderAction(VALID_TENDER_ID, 24.5, {
+    const result = await deferTenderAction(VALID_TENDER_ID, value, {
       db,
       authClient: fakeAuthClient(alyosUser()),
-      auditFn: makeAuditSpy(),
+      auditFn,
     });
+
+    // (a) erreur métier correcte
     expect(result).toEqual({ ok: false, error: "invalid_input" });
+
+    // (b) aucune mutation BDD (transaction non démarrée)
+    expect(capture.updates).toHaveLength(0);
+    expect(capture.inserts).toHaveLength(0);
+
+    // (c) aucun audit log (le helper audit n'est appelé qu'après commit)
+    expect(auditFn).not.toHaveBeenCalled();
   });
 
   it("retourne invalid_state si tender déjà sélectionné", async () => {
