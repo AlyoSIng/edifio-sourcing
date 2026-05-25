@@ -129,6 +129,10 @@ export const architects = pgTable(
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Opposition RGPD art. 21 — posée par l'admin, tracée avec date */
+    rgpdOpposition: boolean("rgpd_opposition").notNull().default(false),
+    /** Date de l'opposition RGPD — NULL si pas d'opposition */
+    rgpdOppositionDate: timestamp("rgpd_opposition_date", { withTimezone: true }),
   },
   (table) => ({
     /** Unicité email scopée au tenant (un même archi peut être chez 2 orgs). */

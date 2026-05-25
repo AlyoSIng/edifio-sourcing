@@ -32,7 +32,7 @@ import { z } from "zod";
 // ============================================================================
 
 /**
- * Liste fermée des 15 actions sensibles tracées en audit log.
+ * Liste fermée des 19 actions sensibles tracées en audit log.
  *
  * IMPORTANT : tout ajout ici nécessite :
  *  - bump du payload spec `audit_log_v1.md`
@@ -64,6 +64,13 @@ export const AUDIT_ACTIONS = [
   // Émis par POST /api/archi/[token]/respond (étape 4) — l'acteur est
   // l'architecte via JWT, pas un user AlyoS authentifié. Schéma strict ci-dessous.
   "architect_response",
+  // A17-A19 — codes admin architectes (migration Lot B, 2026-05-25, décision CTO Sophie).
+  // `architect_edit`   : modification d'une fiche architecte par un admin.
+  // `architect_import` : import CSV en masse par un admin.
+  // `architect_export` : export CSV par un admin (tracé RGPD art. 20).
+  "architect_edit",
+  "architect_import",
+  "architect_export",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -339,6 +346,36 @@ const tenderRejectSchema = z.object({
 });
 
 /**
+ * A17 — `architect_edit` (placeholder)
+ *
+ * Déclenchée quand un admin modifie une fiche architecte (save du formulaire
+ * d'édition). Périmètre : champs de la table `architects`.
+ *
+ * TODO: implémenter en strict à la PR CRUD architectes.
+ */
+const architectEditSchema = placeholder;
+
+/**
+ * A18 — `architect_import` (placeholder)
+ *
+ * Déclenchée par un import CSV en masse (bouton « Importer » admin).
+ * Payload attendu : `{ file_name, row_count, upserted_count, error_count }`.
+ *
+ * TODO: implémenter en strict à la PR import bulk architectes.
+ */
+const architectImportSchema = placeholder;
+
+/**
+ * A19 — `architect_export` (placeholder)
+ *
+ * Déclenchée par un export CSV (bouton « Exporter » admin). Tracé RGPD art. 20.
+ * Payload attendu : `{ row_count, filters }`.
+ *
+ * TODO: implémenter en strict à la PR export architectes.
+ */
+const architectExportSchema = placeholder;
+
+/**
  * A16 — `architect_response` (STRICT — Tandem étape 1+3, code alloué Board
  * 2026-05-22 (b)).
  *
@@ -393,6 +430,9 @@ export const AUDIT_SCHEMAS = {
   tender_defer: tenderDeferSchema,
   tender_reject: tenderRejectSchema,
   architect_response: architectResponseSchema,
+  architect_edit: architectEditSchema,
+  architect_import: architectImportSchema,
+  architect_export: architectExportSchema,
 } as const satisfies Record<AuditAction, z.ZodTypeAny>;
 
 // ============================================================================

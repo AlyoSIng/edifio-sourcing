@@ -63,6 +63,18 @@ Thumbs.db
 # --- Claude Code local (settings.json projet committé, .local non) ---
 .claude/settings.local.json
 
+# --- Dumps backups prod (JAMAIS commit — cf. scripts/bug-cabinet/README.md) ---
+backups/*.dump
+backups/*.sql
+backups/*.tar
+backups/*.gz
+
+# --- Dossier tmp/ — analyses jetables, rapports d'import, parsing XLSX local ---
+# Recommandation Nadia 2026-05-25 (CC_260525_0326) : tout ce qui est dans tmp/
+# est strictement local, jamais commit (analyses PII Contact_complete.xlsx,
+# rapports d'import architectes, dezip XLSX, etc.).
+tmp/
+
 # --- Seed fixtures et rapport distribution (decision Board etape 5) ---
 # Aucun ignore : `src/db/seed/fixtures/boamp-real.json` et
 # `src/db/seed/distribution-report.json` SONT committes (condition 2 CTO ADR-013).
