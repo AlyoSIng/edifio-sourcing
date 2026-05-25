@@ -8,7 +8,7 @@ import { Topbar } from "./Topbar";
  * AppShell — chrome global des pages authentifiées `/sourcing/*`.
  *
  * Structure :
- *   - Sidebar (220 px desktop, cachée mobile MVP) — fond `--ink`
+ *   - Sidebar (220 px desktop, drawer hamburger mobile) — fond `--ink`
  *   - Conteneur droit en colonne : Topbar + main (children) + Footer
  *
  * Source design : `design/maquettes/maquettes_v4_sourcing_modules.html`
@@ -18,10 +18,10 @@ import { Topbar } from "./Topbar";
  * à la `Sidebar` (Client Component, `usePathname`) — voir JSDoc Sidebar pour
  * le rationale.
  *
- * **Mobile MVP** : la sidebar est masquée sur les viewports < `md`. Le menu
- * hamburger viendra dans une PR ultérieure (cf. notes Cowork Q1 sidebar
- * mobile). Le contenu reste accessible en pleine largeur. La nav admin est
- * accessible via `/sourcing/admin/*` directement (URL).
+ * **Mobile (< md)** : la sidebar inline est masquée (`hidden md:flex`). La
+ * navigation est servie via `SidebarMobileDrawer` (drawer slide-from-left
+ * déclenché par bouton hamburger), rendu depuis la Topbar. Cf. Q1 Board
+ * 2026-05-22.
  *
  * **Pas d'AppShell** sur :
  *   - `/` `/about` `/login` `/forbidden` `/forgot-password` `/reset-password`
