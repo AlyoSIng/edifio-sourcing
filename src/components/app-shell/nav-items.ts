@@ -109,6 +109,13 @@ export const NAV_ITEMS: NavSection[] = [
     title: "Configuration",
     items: [
       {
+        href: "/sourcing/admin/bibliotheque",
+        label: "Bibliothèque",
+        icon: "folder-open",
+        matchPrefix: "/sourcing/admin/bibliotheque",
+        adminOnly: true,
+      },
+      {
         href: "/sourcing/admin/profil",
         label: "Profil de recherche",
         icon: "sliders",
