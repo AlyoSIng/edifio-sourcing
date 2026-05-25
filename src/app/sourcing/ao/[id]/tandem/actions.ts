@@ -281,7 +281,11 @@ export async function matchArchitectsForTender(
 // ============================================================================
 
 export interface SolicitOptions {
-  /** Override du registre (sinon dérivé de `architects.tutoiement`). */
+  /**
+   * Registre TU/VOUS. Priorité : override explicite > architects.tutoiement > DEFAULT false (vouvoiement).
+   * La page tokenisée architecte (lot C) ne doit PAS passer de register en override —
+   * le registre est fixé lors de l'envoi initial, pas de la réponse.
+   */
   register?: BrevoRegister;
   /** Texte additionnel optionnel — stocké pour audit/debug, non envoyé. */
   customNote?: string;
