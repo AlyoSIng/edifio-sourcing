@@ -1,2 +1,1 @@
-prettier --check . --log-level warn
-next lint
+pnpm exec lint-staged
