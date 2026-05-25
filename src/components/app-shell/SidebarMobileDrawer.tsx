@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Icon } from "@/components/icons/AppIcons";
 import { isItemActive, NAV_ITEMS, type NavItem } from "./nav-items";
 
 /**
@@ -376,9 +377,7 @@ function DrawerLink({
         aria-disabled
         title="Bientôt disponible"
       >
-        <span className="text-sm opacity-90" aria-hidden>
-          {item.icon}
-        </span>
+        <Icon name={item.icon} size={20} aria-hidden />
         <span className="flex-1 truncate">{item.label}</span>
         <span className="font-mono text-[8px] uppercase tracking-wider text-white/30">soon</span>
       </span>
@@ -393,9 +392,7 @@ function DrawerLink({
 
   return (
     <Link href={item.href} onClick={onNavigate} className={`${baseClasses} ${stateClasses}`}>
-      <span className="text-sm opacity-90" aria-hidden>
-        {item.icon}
-      </span>
+      <Icon name={item.icon} size={20} aria-hidden />
       <span className="flex-1 truncate">{item.label}</span>
       {item.badge !== undefined ? (
         <span
