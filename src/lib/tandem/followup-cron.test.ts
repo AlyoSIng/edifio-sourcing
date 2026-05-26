@@ -88,11 +88,20 @@ function makeMockDb(opts: {
           }),
         };
       }
-      // Appels secondaires (par item). On alterne tokenRows / oppoRows :
-      // dans le code, l'ordre est tokenRows EN PREMIER, puis oppoRows.
-      // Pour simplifier le mock : selectCallCount pair = tokenRows,
-      // impair = oppoRows. On renvoie toujours le même shape.
-      const isToken = selectCallCount % 2 === 0;
+      // 2e select = organization_profiles (chargé une fois avant la boucle
+      // pour presentationSociete). Retourne [] → fallback hardcoded.
+      if (selectCallCount === 2) {
+        return {
+          from: () => ({
+            where: () => ({
+              limit: async () => [],
+            }),
+          }),
+        };
+      }
+      // Appels par item (≥ 3). Ordre : tokenRows (impair) puis oppoRows (pair).
+      // 3=tokenRows, 4=oppoRows, 5=tokenRows, 6=oppoRows, …
+      const isToken = selectCallCount % 2 === 1; // impair = token
       const value = isToken
         ? [{ jwtId: opts.tokenJti ?? "jti-test" }]
         : [{ jti: opts.oppoJti ?? null }].filter((r) => r.jti !== null);
