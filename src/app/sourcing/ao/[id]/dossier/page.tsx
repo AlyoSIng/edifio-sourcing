@@ -1,0 +1,160 @@
+/**
+ * Page dossier IA — `/sourcing/ao/[id]/dossier`.
+ *
+ * Server Component **protégé** (middleware `@alyosingenierie.fr` + path
+ * `/sourcing/*`). Accessible dès que `tender.status === 'architect_accepted'`.
+ *
+ * Source de vérité :
+ *   - Spec PR-B module dossier IA (brief Board 2026-05-25)
+ *   - Parcours utilisateur G2 §3 « Préparation dossier IA — Sandrine desktop »
+ *
+ * Contraintes techniques :
+ *   - `runtime = "nodejs"` : requis pour pdf-parse (CommonJS natif) et
+ *     Anthropic SDK dans les Server Actions (pas d'Edge runtime ici).
+ *   - `maxDuration = 60` : timeout Vercel Pro pour couvrir l'analyse IA (~30-60 s).
+ *   - `dynamic = "force-dynamic"` : page non mise en cache (état dossier mutable).
+ *
+ * Résilience runtime (memory `feedback_nextjs_runtime_page_resilience`) :
+ *   try/catch absorbé autour de `loadDossierPageData` → `<ErrorBanner>`.
+ */
+
+import { redirect } from "next/navigation";
+
+import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
+import { toUserProfile } from "@/lib/auth/types";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isAuthorizedEmail } from "@/lib/auth/domain";
+
+import { DossierClient } from "./DossierClient";
+import { loadDossierPageData } from "./page-data";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+/** 60 s — timeout Vercel Pro pour couvrir l'analyse Claude Sonnet 4.6 */
+export const maxDuration = 60;
+
+export const metadata = {
+  title: "Dossier de candidature · edifio Sourcing",
+};
+
+interface PageProps {
+  params: { id: string };
+}
+
+const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/** Format court de date français (ex. 15/07/2026) */
+function formatDate(date: Date | null): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+export default async function DossierPage({ params }: PageProps) {
+  // Auth check défensif (le middleware a normalement déjà filtré)
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/dossier`);
+  const profile = toUserProfile(user);
+  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+
+  // Validation UUID
+  if (!UUID_SHAPE.test(params.id)) {
+    return (
+      <main className="mx-auto max-w-5xl px-6 py-8">
+        <ErrorBanner message="Identifiant d'AO invalide." />
+      </main>
+    );
+  }
+
+  // Chargement des données — résilience runtime
+  let loadResult: Awaited<ReturnType<typeof loadDossierPageData>> | null = null;
+  let fetchError: string | null = null;
+  try {
+    loadResult = await loadDossierPageData(params.id);
+  } catch (err) {
+    console.error("[dossier-page:unhandled]", err);
+    fetchError = err instanceof Error ? err.message : String(err);
+  }
+
+  if (fetchError || !loadResult) {
+    return (
+      <main className="mx-auto max-w-5xl px-6 py-8">
+        <ErrorBanner message={fetchError ?? "Erreur inconnue"} />
+      </main>
+    );
+  }
+
+  if (!loadResult.ok) {
+    if (loadResult.error === "tender_not_found") {
+      return (
+        <main className="mx-auto max-w-5xl px-6 py-8">
+          <ErrorBanner message="Cet AO n'existe plus ou est inaccessible." />
+        </main>
+      );
+    }
+    return (
+      <main className="mx-auto max-w-5xl px-6 py-8">
+        <ErrorBanner message="Erreur de chargement du dossier." />
+      </main>
+    );
+  }
+
+  const { data } = loadResult;
+
+  // Restriction : dossier uniquement disponible pour les AOs acceptés en Tandem
+  if (data.tender.status !== "architect_accepted") {
+    return (
+      <main className="mx-auto max-w-5xl px-6 py-8">
+        <ErrorBanner message="Ce dossier n'est accessible que pour les AOs acceptés par un architecte." />
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-5xl px-6 py-8">
+      {/* En-tête AO */}
+      <header className="mb-6">
+        <nav className="mb-3 flex items-center gap-2 text-xs text-muted" aria-label="Fil d'Ariane">
+          <a
+            href="/sourcing/cotraitance"
+            className="hover:text-ink hover:underline focus:outline-none"
+          >
+            Cotraitance
+          </a>
+          <span aria-hidden>/</span>
+          <a
+            href={`/sourcing/ao/${params.id}/tandem`}
+            className="hover:text-ink hover:underline focus:outline-none"
+          >
+            Short-list
+          </a>
+          <span aria-hidden>/</span>
+          <span className="text-ink">Dossier</span>
+        </nav>
+
+        <span className="pill-eyebrow">Dossier de candidature — Tandem</span>
+        <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
+          {data.tender.title}
+        </h1>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-2">
+          <span>{data.tender.buyer}</span>
+          {data.tender.deadline && (
+            <span>
+              Deadline : <strong className="text-ink">{formatDate(data.tender.deadline)}</strong>
+            </span>
+          )}
+        </div>
+      </header>
+
+      <DossierClient data={data} />
+    </main>
+  );
+}

@@ -1210,3 +1210,20 @@ appliquée sur prod après Phase β. Pas de bug de code.
 **Corrections apportées** :
 - Migration 0007 (`0007_abnormal_ares`) : enum audit_action + colonnes rgpd_opposition — fix "Annuaire indisponible"
 - Migration 0008 (`0008_chief_the_order`) : tables message_templates + organization_profiles — fix "société ne se sauvegarde pas"
+
+---
+
+## 2026-05-25 — Gate 6 — PR-B module dossier IA
+
+- **2026-05-25 · G6 · DEV Alex · Implémentation PR-B — téléchargement DCE + analyse RC Sonnet 4.6.**
+  *Fichiers créés : `src/db/seeds/001_ai_prompts.sql` (seed prompt P1),
+  `src/lib/ai/schemas.ts` (Zod rcAnalysisSchema avec contrainte provenance Gate 5 §7),
+  `src/lib/ai/analyze-rc.ts` (appel Anthropic + validation Zod + trace ai_runs),
+  `src/app/sourcing/ao/[id]/dossier/page-data.ts` (loader),
+  `src/app/sourcing/ao/[id]/dossier/actions.ts` (3 Server Actions Node.js),
+  `src/app/sourcing/ao/[id]/dossier/DossierClient.tsx` (UI 3 sections),
+  `src/app/sourcing/ao/[id]/dossier/page.tsx` (Server Component, maxDuration=60).*
+  *Modification : `CotraitancePipelineClient.tsx` — bouton « Préparer le dossier → » conditionnel sur `architect_accepted`.*
+  *Déclarations temporaires : `src/types/external-modules.d.ts` — stubs @anthropic-ai/sdk + pdf-parse (à supprimer après `pnpm add`).*
+  *Typecheck + lint : 0 erreur.*
+  *Packages à installer par Yann : `pnpm add @anthropic-ai/sdk pdf-parse @types/pdf-parse`.*
