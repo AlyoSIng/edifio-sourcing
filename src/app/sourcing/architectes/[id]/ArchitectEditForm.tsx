@@ -9,12 +9,16 @@
  * Périmètre MVP :
  *  - Édition des champs principaux : `cabinet`, `contactName`, `email`,
  *    `phone`, `website`, `siren`, `zip`, `city`, `notes`, `tutoiement`,
- *    `preferred`, `specialtyCodes`, `geoZones`.
+ *    `preferred`, `concoursOnly`.
+ *  - Édition des spécialités via checkboxes (liste ARCHITECT_SPECIALTY_CODES).
+ *  - Édition des zones géo en CSV text (départements séparés par virgule).
+ *  - Édition budget min / max (€ HT, optionnels).
  *  - Toggle RGPD opposition (section dédiée, distinct des champs ordinaires).
  *  - Validation client-side minimaliste (cabinet non vide).
  *  - Soumission via Server Action `upsertArchitect` + `setRgpdOpposition`.
  *  - Feedback optimiste : état `pending` sur les boutons pendant la mutation.
- *  - `router.refresh()` après save pour rafraîchir l'en-tête SSR.
+ *  - `router.refresh()` après sauvegarde réussie pour rafraîchir le Server
+ *    Component parent (PR #64 — supersède PR #61 spécialités/zones géo CSV).
  *
  * Champs hors formulaire (calculés / gérés autrement) :
  *  - `solicitable` : dérivé automatiquement (GENERATED ALWAYS AS).
@@ -24,9 +28,11 @@
  */
 
 import { useTransition, useState } from "react";
+
 import { useRouter } from "next/navigation";
 
 import type { Architect } from "@/db/schema/architects";
+import { ARCHITECT_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
 
 import { upsertArchitect, setRgpdOpposition } from "../actions";
 
@@ -44,7 +50,7 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
   const [rgpdError, setRgpdError] = useState<string | null>(null);
   const [rgpdSuccess, setRgpdSuccess] = useState(false);
 
-  // Champs du formulaire
+  // Champs du formulaire — données principales
   const [cabinet, setCabinet] = useState(architect.cabinet);
   const [contactName, setContactName] = useState(architect.contactName ?? "");
   const [email, setEmail] = useState(architect.email ?? "");
@@ -54,10 +60,23 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
   const [zip, setZip] = useState(architect.zip ?? "");
   const [city, setCity] = useState(architect.city ?? "");
   const [notes, setNotes] = useState(architect.notes ?? "");
+
+  // Drapeaux booléens
   const [tutoiement, setTutoiement] = useState(architect.tutoiement);
   const [preferred, setPreferred] = useState(architect.preferred);
-  const [specialtyCodes, setSpecialtyCodes] = useState(architect.specialtyCodes.join(", "));
-  const [geoZones, setGeoZones] = useState(architect.geoZones.join(", "));
+  const [concoursOnly, setConcoursOnly] = useState(architect.concoursOnly ?? false);
+
+  // Spécialités — Set pour gestion checkboxes
+  const [selectedSpecialties, setSelectedSpecialties] = useState<Set<string>>(
+    new Set(architect.specialtyCodes ?? []),
+  );
+
+  // Zones géo — CSV text (départements séparés par virgule)
+  const [geoZonesText, setGeoZonesText] = useState((architect.geoZones ?? []).join(", "));
+
+  // Budget min / max (€ HT) — string pour input[type=number]
+  const [budgetMin, setBudgetMin] = useState(architect.budgetMin?.toString() ?? "");
+  const [budgetMax, setBudgetMax] = useState(architect.budgetMax?.toString() ?? "");
 
   // -------------------------------------------------------------------------
   // Soumission formulaire principal
@@ -71,6 +90,15 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
       setEditError("La raison sociale (cabinet) est obligatoire.");
       return;
     }
+
+    // Conversion des champs dérivés
+    const specialtyCodesValue = Array.from(selectedSpecialties);
+    const geoZonesValue = geoZonesText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const budgetMinValue = budgetMin ? parseInt(budgetMin, 10) : null;
+    const budgetMaxValue = budgetMax ? parseInt(budgetMax, 10) : null;
 
     startEditTransition(async () => {
       const result = await upsertArchitect(
@@ -86,18 +114,15 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
           notes: notes.trim() || null,
           tutoiement,
           preferred,
+          concoursOnly,
+          specialtyCodes: specialtyCodesValue,
+          geoZones: geoZonesValue,
+          budgetMin: budgetMinValue,
+          budgetMax: budgetMaxValue,
           // Champs conservés tels quels (non modifiables ici)
           active: architect.active,
           rgpdOpposition: architect.rgpdOpposition,
           rgpdOppositionDate: architect.rgpdOppositionDate,
-          specialtyCodes: specialtyCodes
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-          geoZones: geoZones
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
           headcount: architect.headcount,
           companySize: architect.companySize,
           companyCreatedAt: architect.companyCreatedAt,
@@ -109,6 +134,7 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
 
       if (result.ok) {
         setEditSuccess(true);
+        // Rafraîchit le Server Component parent pour afficher les nouvelles valeurs
         router.refresh();
       } else {
         const messages: Record<string, string> = {
@@ -277,40 +303,6 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
             </div>
           </div>
 
-          {/* Spécialités + Zones géo */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="specialtyCodes" className="block text-xs font-medium text-ink">
-                Spécialités{" "}
-                <span className="font-normal text-muted">(codes séparés par virgule)</span>
-              </label>
-              <input
-                id="specialtyCodes"
-                type="text"
-                value={specialtyCodes}
-                onChange={(e) => setSpecialtyCodes(e.target.value)}
-                placeholder="ex : archi_maison, archi_sport"
-                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label htmlFor="geoZones" className="block text-xs font-medium text-ink">
-                Zones géo{" "}
-                <span className="font-normal text-muted">
-                  (numéros département séparés par virgule)
-                </span>
-              </label>
-              <input
-                id="geoZones"
-                type="text"
-                value={geoZones}
-                onChange={(e) => setGeoZones(e.target.value)}
-                placeholder="ex : 69, 01, 38"
-                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
-              />
-            </div>
-          </div>
-
           {/* Notes */}
           <div>
             <label htmlFor="notes" className="block text-xs font-medium text-ink">
@@ -323,6 +315,82 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
               rows={3}
               className="focus:ring-brand-red/40 mt-1 w-full resize-y rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
             />
+          </div>
+
+          {/* Spécialités — checkboxes */}
+          <div>
+            <span className="mb-2 block text-xs font-medium text-ink">Spécialités</span>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {ARCHITECT_SPECIALTY_CODES.map(({ code, label }) => (
+                <label
+                  key={code}
+                  className="flex cursor-pointer items-center gap-2 text-sm text-ink-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedSpecialties.has(code)}
+                    onChange={(e) => {
+                      const next = new Set(selectedSpecialties);
+                      if (e.target.checked) next.add(code);
+                      else next.delete(code);
+                      setSelectedSpecialties(next);
+                    }}
+                    className="h-4 w-4 rounded border-line accent-brand-red"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Zones géo — CSV text */}
+          <div>
+            <label htmlFor="geo-zones" className="block text-xs font-medium text-ink">
+              Zones géo{" "}
+              <span className="text-xs font-normal text-muted">(n° départements, virgule)</span>
+            </label>
+            <input
+              id="geo-zones"
+              type="text"
+              value={geoZonesText}
+              onChange={(e) => setGeoZonesText(e.target.value)}
+              placeholder="ex : 75, 92, 93, 94"
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
+          </div>
+
+          {/* Budget min / max */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="budget-min" className="block text-xs font-medium text-ink">
+                Budget min (€ HT) <span className="text-xs font-normal text-muted">optionnel</span>
+              </label>
+              <input
+                id="budget-min"
+                type="number"
+                min={0}
+                step={10000}
+                value={budgetMin}
+                onChange={(e) => setBudgetMin(e.target.value)}
+                placeholder="ex : 100000"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label htmlFor="budget-max" className="block text-xs font-medium text-ink">
+                Budget max (€ HT) <span className="text-xs font-normal text-muted">optionnel</span>
+              </label>
+              <input
+                id="budget-max"
+                type="number"
+                min={0}
+                step={10000}
+                value={budgetMax}
+                onChange={(e) => setBudgetMax(e.target.value)}
+                placeholder="ex : 2000000"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
           </div>
 
           {/* Drapeaux */}
@@ -344,6 +412,15 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
                 className="accent-brand-red"
               />
               Architecte préféré (mise en avant matching)
+            </label>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={concoursOnly}
+                onChange={(e) => setConcoursOnly(e.target.checked)}
+                className="accent-brand-red"
+              />
+              Concours uniquement (pas de candidature)
             </label>
           </div>
 

@@ -127,6 +127,21 @@ export const architects = pgTable(
     /** Compteur de collaborations passées — incrémenté à l'usage (matching V1). */
     pastCollabsCount: integer("past_collabs_count").notNull().default(0),
     notes: text("notes"),
+    /**
+     * Budget minimum d'opération (€ HT). Optionnel — aide au matching.
+     * NULL = pas de contrainte basse.
+     */
+    budgetMin: integer("budget_min"),
+    /**
+     * Budget maximum d'opération (€ HT). Optionnel — aide au matching.
+     * NULL = pas de contrainte haute.
+     */
+    budgetMax: integer("budget_max"),
+    /**
+     * Si TRUE, l'architecte répond uniquement aux concours (pas aux candidatures).
+     * Pris en compte dans le matching pour filtrer les types de procédure.
+     */
+    concoursOnly: boolean("concours_only").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     /** Opposition RGPD art. 21 — posée par l'admin, tracée avec date */
