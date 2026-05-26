@@ -53,18 +53,37 @@ const BUCKET_NAME = "company_library";
  * Liste blanche des valeurs `kind` autorisées — doit rester synchronisée avec
  * `LIBRARY_KINDS` dans `LibraryClient.tsx`.
  * Valider côté serveur empêche toute injection de chemin dans Storage.
+ *
+ * Catégories actives (liste officielle 2026-05-26) :
+ *   dc1, dc2, dc4, pouvoir_mandataire, kbis, urssaf, attestation_fiscale,
+ *   assurance_rc, rib, presentation_entreprise, moyens_humains, references,
+ *   memoire_rse, autre
+ *
+ * Catégories legacy (backward-compat — ne plus uploader, docs existants conservés) :
+ *   bilan, dc2_vierge, dc4_vierge
  */
 const VALID_KINDS = new Set([
+  // Catégories actives
+  "dc1",
+  "dc2",
+  "dc4",
+  "pouvoir_mandataire",
   "kbis",
   "urssaf",
   "attestation_fiscale",
   "assurance_rc",
-  "bilan",
   "rib",
+  "presentation_entreprise",
+  "moyens_humains",
   "references",
+  "memoire_rse",
+  "autre",
+  // Catégories legacy — supprimées de l'UI d'upload mais conservées ici pour
+  // que les documents existants en BDD restent valides (pas d'erreur "invalid_kind"
+  // si un ancien doc est re-soumis ou si la suppression passe par cette validation).
+  "bilan",
   "dc2_vierge",
   "dc4_vierge",
-  "autre",
 ]);
 
 // ---------------------------------------------------------------------------
