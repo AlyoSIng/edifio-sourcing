@@ -68,6 +68,77 @@ export interface AnalyzeRcActionResult {
 }
 
 // ---------------------------------------------------------------------------
+// Sécurité SSRF : validation URL avant fetch externe
+// ---------------------------------------------------------------------------
+
+/**
+ * Retourne `true` si le hostname correspond à une plage IP privée / réservée
+ * (loopback, RFC 1918, link-local, CGNAT, IPv6 ULA…).
+ * Protège contre les attaques SSRF (Server-Side Request Forgery).
+ */
+function isPrivateOrReservedHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+
+  // Noms d'hôtes réservés
+  if (
+    h === "localhost" ||
+    h === "metadata.google.internal" ||
+    h === "instance-data" ||
+    h === "169.254.169.254" // AWS / GCP metadata
+  ) {
+    return true;
+  }
+
+  // IPv4 privé + réservé
+  const ipv4Patterns = [
+    /^127\./, // loopback
+    /^10\./, // RFC 1918 class A
+    /^172\.(1[6-9]|2\d|3[01])\./, // RFC 1918 class B (172.16–172.31)
+    /^192\.168\./, // RFC 1918 class C
+    /^169\.254\./, // link-local / AWS metadata
+    /^0\./, // "this" network
+    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // CGNAT (100.64–100.127)
+    /^198\.(18|19)\./, // benchmarking
+    /^240\./, // reserved
+  ];
+
+  if (ipv4Patterns.some((re) => re.test(h))) return true;
+
+  // IPv6 loopback + ULA
+  if (
+    h === "::1" ||
+    /^fe80:/i.test(h) ||
+    /^fc[0-9a-f]{2}:/i.test(h) ||
+    /^fd[0-9a-f]{2}:/i.test(h)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Valide qu'une URL est autorisée pour un fetch externe :
+ *  - Protocole HTTPS uniquement (pas HTTP, pas file:// etc.)
+ *  - Hostname hors plages privées/réservées (anti-SSRF)
+ *
+ * Retourne `null` si l'URL est valide, ou un code d'erreur lisible.
+ */
+function validateExternalUrl(rawUrl: string): "invalid_dce_url" | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return "invalid_dce_url";
+  }
+
+  if (parsed.protocol !== "https:") return "invalid_dce_url";
+  if (isPrivateOrReservedHostname(parsed.hostname)) return "invalid_dce_url";
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Helper : auth check
 // ---------------------------------------------------------------------------
 
@@ -113,6 +184,13 @@ export async function downloadDceFromUrl(tenderId: string): Promise<DceActionRes
 
     if (!tender) return { ok: false, error: "tender_not_found" };
     if (!tender.dceUrl) return { ok: false, error: "no_dce_url" };
+
+    // Validation SSRF : HTTPS uniquement + hostname hors plages privées/réservées
+    const urlError = validateExternalUrl(tender.dceUrl);
+    if (urlError) {
+      console.warn("[dossier:download-dce:ssrf-block]", tender.dceUrl);
+      return { ok: false, error: urlError };
+    }
 
     // Fetch avec timeout 30 s
     let response: Response;

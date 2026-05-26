@@ -390,6 +390,8 @@ function uploadErrorLabel(code: string | undefined): string {
       return "Veuillez sélectionner un fichier.";
     case "missing_kind":
       return "Catégorie manquante — rechargez la page.";
+    case "invalid_kind":
+      return "Catégorie invalide — rechargez la page.";
     case "file_too_large":
       return "Fichier trop volumineux (max 50 Mo).";
     case "invalid_mime_type":
@@ -411,6 +413,8 @@ function deleteErrorLabel(code: string | undefined): string {
       return "Session expirée — reconnectez-vous.";
     case "forbidden_role":
       return "Accès refusé — rôle admin requis.";
+    case "document_not_found":
+      return "Document introuvable — rechargez la page.";
     case "storage_delete_failed":
       return "Erreur lors de la suppression du fichier — réessayez.";
     case "db_delete_failed":

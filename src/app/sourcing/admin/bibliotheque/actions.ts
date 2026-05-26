@@ -18,7 +18,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { presentationLibrary } from "@/db/schema/library";
@@ -48,6 +48,24 @@ const ALLOWED_MIME_TYPES = new Set([
 
 /** Nom du bucket Supabase Storage (déjà créé, privé, RLS activée). */
 const BUCKET_NAME = "company_library";
+
+/**
+ * Liste blanche des valeurs `kind` autorisées — doit rester synchronisée avec
+ * `LIBRARY_KINDS` dans `LibraryClient.tsx`.
+ * Valider côté serveur empêche toute injection de chemin dans Storage.
+ */
+const VALID_KINDS = new Set([
+  "kbis",
+  "urssaf",
+  "attestation_fiscale",
+  "assurance_rc",
+  "bilan",
+  "rib",
+  "references",
+  "dc2_vierge",
+  "dc4_vierge",
+  "autre",
+]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -103,6 +121,11 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
   }
   if (typeof kind !== "string" || kind.trim() === "") {
     return { ok: false, error: "missing_kind" };
+  }
+
+  // Validation kind contre la liste blanche (évite l'injection de chemin dans Storage)
+  if (!VALID_KINDS.has(kind.trim())) {
+    return { ok: false, error: "invalid_kind" };
   }
 
   // Validation taille
@@ -179,13 +202,21 @@ export interface DeleteLibraryDocResult {
 /**
  * Supprime un document de la bibliothèque (Storage + BDD).
  *
+ * Sécurité : le `storagePath` passé par le client est IGNORÉ — on re-lit le
+ * chemin depuis la BDD (filtre `organizationId = ALYOS_ORG_ID`) pour empêcher
+ * toute suppression cross-tenant.
+ *
  * @param id          — UUID du document dans `presentation_library`
- * @param storagePath — chemin complet dans le bucket (ex. `{orgId}/kbis/…`)
+ * @param _storagePath — ignoré (conservé dans la signature pour compatibilité client)
  */
 export async function deleteLibraryDoc(
   id: string,
-  storagePath: string,
+  _storagePath: string,
 ): Promise<DeleteLibraryDocResult> {
+  // Paramètre ignoré volontairement : le storagePath client n'est jamais utilisé
+  // (re-lecture BDD filtre tenant). Déclaré pour compatibilité signature appelant.
+  void _storagePath;
+
   // 1. Auth check
   const supabase = createSupabaseServerClient();
   const {
@@ -197,21 +228,32 @@ export async function deleteLibraryDoc(
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
-  // 2. Validation basique des paramètres
+  // 2. Validation basique du paramètre id
   if (!id || typeof id !== "string") return { ok: false, error: "invalid_id" };
-  if (!storagePath || typeof storagePath !== "string") {
-    return { ok: false, error: "invalid_storage_path" };
-  }
 
-  // 3. Suppression du fichier dans Storage
-  const { error: storageError } = await supabase.storage.from(BUCKET_NAME).remove([storagePath]);
+  // 3. Re-lecture du storagePath depuis la BDD avec filtre tenant
+  //    On n'utilise jamais le chemin fourni par le client (risque cross-tenant).
+  const [doc] = await db
+    .select({ storagePath: presentationLibrary.storagePath })
+    .from(presentationLibrary)
+    .where(
+      and(eq(presentationLibrary.id, id), eq(presentationLibrary.organizationId, ALYOS_ORG_ID)),
+    )
+    .limit(1);
+
+  if (!doc) return { ok: false, error: "document_not_found" };
+
+  // 4. Suppression du fichier dans Storage (chemin certifié depuis la BDD)
+  const { error: storageError } = await supabase.storage
+    .from(BUCKET_NAME)
+    .remove([doc.storagePath]);
 
   if (storageError) {
     console.error("[bibliotheque:delete:storage:fail]", storageError);
     return { ok: false, error: "storage_delete_failed" };
   }
 
-  // 4. Suppression de la ligne BDD
+  // 5. Suppression de la ligne BDD
   try {
     await db.delete(presentationLibrary).where(eq(presentationLibrary.id, id));
   } catch (err) {
