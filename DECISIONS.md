@@ -1,5 +1,23 @@
 # DECISIONS.md — Sourcing-Edifio
 
+---
+
+## 2026-05-26 — feat/architect-headcount — Effectif cabinets + scoring staffSize (Alex)
+
+- **2026-05-26 · G6 · Alex (dev) · feat/architect-headcount — exposition champ effectif + scoring staffSize + composition shortlist.**
+  *Colonne `headcount` déjà en BDD (migration 0005) mais non éditable dans l'UI ni utilisée dans le matching. Pas de nouvelle migration.*
+  *Fichiers modifiés :*
+  *- `src/lib/tandem/matching.ts` : `MatchBreakdown.staffSize` ajouté (bonus +8 pts headcount ≥10, +3 pts headcount 3-9, 0 sinon). `totalScore` mis à jour. `rankArchitects` : composition best-effort 3×(≥10) + reste×(3-9) + fallback score pur.*
+  *- `src/app/sourcing/architectes/[id]/ArchitectEditForm.tsx` : champ "Effectif" (entier, optionnel) ajouté entre Budget max et Drapeaux. Passage de `architect.headcount` en pass-through remplacé par saisie utilisateur.*
+  *- `src/lib/tandem/matching.test.ts` + `ai-rationale.test.ts` : 6 cas staffSize + 2 cas composition rankArchitects, `staffSize: 0` ajouté à toutes les fixtures MatchBreakdown.*
+  *Décision technique : bonus staffSize absolu (hors enveloppe 100 pts) — cohérent avec le bonus géo. Composition best-effort : si pas assez de cabinets ≥10, on complète par le meilleur score toutes tailles.*
+
+- **2026-05-26 · G6 · Steve (Board) · Déploiement prod — migrations 0015 + 0016 appliquées, buckets `cotraitant-docs` + `be-docs` créés, `vercel --prod` lancé depuis session Steve.**
+
+- **2026-05-26 · G6 · Alex (dev) · Nav sidebar — item "Cotraitants" retiré de main (commit ffad7a4). Accessible uniquement depuis la fiche Tandem `/sourcing/ao/[id]/tandem/cotraitant`.**
+
+---
+
 > Log des décisions structurantes du projet. Une ligne = une décision actée et opposable.
 > Convention : `YYYY-MM-DD · Gate · Décideur(s) · Décision · Motif`
 > Validation Board notée `[BOARD-OK YYYY-MM-DD]`.
