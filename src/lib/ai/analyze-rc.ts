@@ -45,6 +45,16 @@ export type AnalyzeRcResult =
       runId: string;
       costUsd: number;
       latencyMs: number;
+      /** Nom du prompt utilisé (ex. 'rc_analysis_full') — pour audit log A7. */
+      promptName: string;
+      /** Version du prompt (snapshot) — pour audit log A7. */
+      promptVersion: number;
+      /** Identifiant modèle enum BDD (ex. 'sonnet-4-6') — pour audit log A7. */
+      model: string;
+      /** Tokens d'entrée consommés — pour audit log A7. */
+      tokensIn: number;
+      /** Tokens de sortie consommés — pour audit log A7. */
+      tokensOut: number;
     }
   | {
       ok: false;
@@ -182,6 +192,11 @@ export async function analyzeRc(tenderId: string, rcText: string): Promise<Analy
       runId,
       costUsd,
       latencyMs,
+      promptName: prompt.name,
+      promptVersion: prompt.version,
+      model: prompt.model,
+      tokensIn: response.usage.input_tokens,
+      tokensOut: response.usage.output_tokens,
     };
   } catch (err) {
     console.error("[analyze-rc:unhandled]", err);
