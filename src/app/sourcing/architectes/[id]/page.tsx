@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
+import { architectResponses } from "@/db/schema/selections";
+import { tenders } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -51,6 +53,61 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
 
   // Architecte introuvable (id inconnu ou hors tenant) → 404
   if (!fetchError && !architect) notFound();
+
+  // Statistiques de sollicitation — fetch optionnel (pas de crash si absent)
+  type ArchitectStat = {
+    totalSolicitations: number;
+    acceptedCount: number;
+    declinedCount: number;
+    pendingCount: number;
+    recentResponses: Array<{
+      tenderId: string;
+      tenderTitle: string;
+      tenderExternalRef: string | null;
+      status: string;
+      respondedAt: Date | null;
+    }>;
+  };
+
+  let stats: ArchitectStat | null = null;
+  if (architect) {
+    try {
+      const rows = await db
+        .select({
+          status: architectResponses.status,
+          respondedAt: architectResponses.respondedAt,
+          tenderId: architectResponses.tenderId,
+          tenderTitle: tenders.title,
+          tenderExternalRef: tenders.externalRef,
+        })
+        .from(architectResponses)
+        .innerJoin(tenders, eq(architectResponses.tenderId, tenders.id))
+        .where(
+          and(
+            eq(architectResponses.architectId, architect.id),
+            eq(architectResponses.organizationId, ALYOS_ORG_ID),
+          ),
+        )
+        .orderBy(desc(tenders.deadline));
+
+      stats = {
+        totalSolicitations: rows.length,
+        acceptedCount: rows.filter((r) => r.status === "accepted").length,
+        declinedCount: rows.filter((r) => r.status === "declined").length,
+        pendingCount: rows.filter((r) => r.status === "pending").length,
+        recentResponses: rows.map((r) => ({
+          tenderId: r.tenderId,
+          tenderTitle: r.tenderTitle,
+          tenderExternalRef: r.tenderExternalRef,
+          status: r.status,
+          respondedAt: r.respondedAt,
+        })),
+      };
+    } catch (err) {
+      console.error("[architecte-fiche:stats-failed]", err);
+      // stats reste null — section masquée, pas de crash
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -188,6 +245,62 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
             </section>
           ) : null}
 
+          {/* Statistiques de sollicitation */}
+          {stats !== null && stats.totalSolicitations > 0 ? (
+            <section aria-labelledby="stats-heading" className="mb-6">
+              <h2
+                id="stats-heading"
+                className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted"
+              >
+                Sollicitations
+              </h2>
+              {/* KPIs */}
+              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { label: "Envoyées", value: stats.totalSolicitations },
+                  { label: "Acceptées", value: stats.acceptedCount },
+                  { label: "Refusées", value: stats.declinedCount },
+                  { label: "En attente", value: stats.pendingCount },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    className="rounded-md border border-line bg-paper px-3 py-2 text-center"
+                  >
+                    <div className="font-display text-2xl font-bold text-ink">{value}</div>
+                    <div className="mt-0.5 text-[11px] text-muted">{label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Liste des AOs */}
+              <ul className="divide-y divide-line text-sm">
+                {stats.recentResponses.map((r) => (
+                  <li key={r.tenderId} className="flex items-center justify-between gap-2 py-2">
+                    <a
+                      href={`/sourcing/ao/${r.tenderId}/dossier`}
+                      className="truncate text-ink hover:underline"
+                    >
+                      {r.tenderExternalRef ? (
+                        <span className="mr-1.5 text-muted">{r.tenderExternalRef}</span>
+                      ) : null}
+                      {r.tenderTitle}
+                    </a>
+                    <ResponseStatusBadge status={r.status} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : stats !== null ? (
+            <section aria-labelledby="stats-heading" className="mb-6">
+              <h2
+                id="stats-heading"
+                className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted"
+              >
+                Sollicitations
+              </h2>
+              <p className="text-sm text-muted">Aucune sollicitation envoyée à cet architecte.</p>
+            </section>
+          ) : null}
+
           {/* Formulaire d'édition (admin uniquement) */}
           {adminUser ? (
             <section aria-labelledby="edit-heading" className="border-t border-line pt-6">
@@ -270,5 +383,27 @@ function InfoField({
         )}
       </dd>
     </div>
+  );
+}
+
+// ============================================================================
+// Composant badge statut réponse architecte
+// ============================================================================
+
+function ResponseStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    pending: { label: "En attente", className: "bg-amber-50 text-amber-700" },
+    accepted: { label: "Acceptée", className: "bg-green-50 text-green-700" },
+    declined: { label: "Refusée", className: "bg-red-50 text-red-700" },
+    info: { label: "Info demandée", className: "bg-blue-50 text-blue-700" },
+  };
+  const { label, className } = map[status] ?? {
+    label: status,
+    className: "bg-gray-100 text-gray-600",
+  };
+  return (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>
+      {label}
+    </span>
   );
 }
