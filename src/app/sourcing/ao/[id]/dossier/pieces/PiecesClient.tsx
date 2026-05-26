@@ -9,15 +9,18 @@
  *      ✓ Disponible | ⚠ Partiel | ✕ Manquant
  *   3. Pour les pièces disponibles : lien vers le doc bibliothèque
  *   4. Pour les pièces manquantes : suggestion de catégorie + lien bibliothèque
- *   5. Bouton "Compiler le dossier" (aria-disabled — PR-E)
+ *   5. Bouton "Compiler le dossier" — actif (PR-E)
  *
- * Composant client pur (pas d'appel serveur ici — données passées en props).
+ * Composant client pur (appel Server Action compileDossierAction).
  *
- * Source de vérité : brief Board PR-D 2026-05-25.
+ * Source de vérité : brief Board PR-D/PR-E 2026-05-26.
  */
+
+import { useState, useTransition } from "react";
 
 import type { PieceMatch } from "@/lib/dossier/pieces-match";
 import type { ExistingCerfa } from "../cerfa/actions";
+import { compileDossierAction } from "./actions";
 
 // ---------------------------------------------------------------------------
 // Types props
@@ -127,6 +130,30 @@ function CerfaStatusCard({
 // Composant principal
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Labels d'erreur compilation
+// ---------------------------------------------------------------------------
+
+function compileErrorLabel(code: string | undefined): string {
+  switch (code) {
+    case "not_authenticated":
+      return "Session expirée — reconnectez-vous.";
+    case "no_cerfa":
+      return "DC1 et DC2 doivent être validés avant de compiler le dossier.";
+    case "zip_empty":
+      return "Aucun document disponible — ajoutez des pièces à la bibliothèque d'abord.";
+    case "storage_upload_failed":
+    case "signed_url_failed":
+      return "Erreur de stockage — réessayez.";
+    default:
+      return "Erreur inattendue lors de la compilation — réessayez.";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Composant principal
+// ---------------------------------------------------------------------------
+
 export function PiecesClient({
   tenderId,
   existingDc1,
@@ -139,6 +166,26 @@ export function PiecesClient({
 
   // Alerte si DC1 ou DC2 manquants
   const cerfsIncomplete = !existingDc1 || !existingDc2;
+
+  // État compilation ZIP
+  const [isCompiling, startCompile] = useTransition();
+  const [compileError, setCompileError] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [zipFileCount, setZipFileCount] = useState<number | null>(null);
+
+  function handleCompile() {
+    setCompileError(null);
+    setDownloadUrl(null);
+    startCompile(async () => {
+      const result = await compileDossierAction(tenderId);
+      if (result.ok && result.downloadUrl) {
+        setDownloadUrl(result.downloadUrl);
+        setZipFileCount(result.fileCount ?? null);
+      } else {
+        setCompileError(compileErrorLabel(result.error));
+      }
+    });
+  }
 
   return (
     <div className="space-y-8">
@@ -269,25 +316,63 @@ export function PiecesClient({
         )}
       </section>
 
-      {/* Bouton Compiler le dossier (PR-E — disabled) */}
-      <div className="flex justify-end pt-2">
-        <div className="relative">
-          <button
-            type="button"
-            aria-disabled="true"
-            disabled
-            title="Disponible prochainement — étape PR-E"
-            className="inline-flex cursor-not-allowed items-center rounded-md bg-paper-2 px-4 py-2 text-sm font-medium text-muted"
-          >
-            Compiler le dossier
-            <span aria-hidden className="ml-1">
-              &rarr;
-            </span>
-          </button>
-          <span className="absolute -right-1 -top-1 rounded bg-ink px-1 py-0.5 font-mono text-[9px] text-white">
-            bientôt
-          </span>
-        </div>
+      {/* Compilation ZIP */}
+      <div className="border-t border-line pt-6">
+        {/* Résultat : lien de téléchargement */}
+        {downloadUrl ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-emerald-700">
+              ✓ Dossier compilé —{" "}
+              {zipFileCount !== null && (
+                <span className="font-normal">
+                  {zipFileCount} fichier{zipFileCount > 1 ? "s" : ""}
+                </span>
+              )}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={downloadUrl}
+                download
+                className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+              >
+                Télécharger le dossier (ZIP)
+                <span aria-hidden>↓</span>
+              </a>
+              <button
+                type="button"
+                onClick={handleCompile}
+                disabled={isCompiling || cerfsIncomplete}
+                className="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
+              >
+                Recompiler
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-end gap-2">
+            {compileError && (
+              <p role="alert" className="text-sm text-error">
+                {compileError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleCompile}
+              disabled={isCompiling || cerfsIncomplete}
+              className="hover:bg-brand-red/90 inline-flex items-center gap-2 rounded-md bg-brand-red px-4 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+              title={cerfsIncomplete ? "Validez DC1 et DC2 avant de compiler" : undefined}
+            >
+              {isCompiling ? (
+                "Compilation en cours…"
+              ) : (
+                <>
+                  Compiler le dossier
+                  <span aria-hidden>&rarr;</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
