@@ -17,6 +17,7 @@ import type { Architect } from "@/db/schema/architects";
 import type { Tender } from "@/db/schema/tenders";
 
 import {
+  NEIGHBORING_DEPARTMENTS,
   WEIGHTS_BY_PROFILE,
   adjacentDepartment,
   extractDepartment,
@@ -155,6 +156,23 @@ describe("adjacentDepartment", () => {
   it("faux pour départements non limitrophes 75 / 13", () => {
     expect(adjacentDepartment("75", "13")).toBe(false);
   });
+
+  it("utilise NEIGHBORING_DEPARTMENTS complet — 69 ↔ 42 (Rhône / Loire)", () => {
+    expect(adjacentDepartment("69", "42")).toBe(true);
+    expect(adjacentDepartment("42", "69")).toBe(true);
+  });
+
+  it("34 ↔ 30 (Hérault / Gard)", () => {
+    expect(adjacentDepartment("34", "30")).toBe(true);
+  });
+
+  it("01 ↔ 74 (Ain / Haute-Savoie)", () => {
+    expect(adjacentDepartment("01", "74")).toBe(true);
+  });
+
+  it("NEIGHBORING_DEPARTMENTS — DOM (971) sans voisin (tableau vide)", () => {
+    expect(NEIGHBORING_DEPARTMENTS["971"]).toEqual([]);
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -183,7 +201,7 @@ describe("scoreArchitect — profil sparse_data", () => {
     expect(b.specialty).toBe(7);
   });
 
-  it("géo exact → 100% (30), géo limitrophe → 50% (15)", () => {
+  it("géo exact → min(35, geo_weight=30) = 30, limitrophe → min(15, 30) = 15, aucun → 0", () => {
     const exact = makeArchitect({ geoZones: ["75"] });
     const adjacent = makeArchitect({ geoZones: ["92"] });
     const noMatch = makeArchitect({ geoZones: ["13"] });
@@ -213,6 +231,99 @@ describe("scoreArchitect — profil sparse_data", () => {
         .preference,
     ).toBe(5);
     expect(scoreArchitect(makeArchitect(), tender, 0, weights, inferred, dept).preference).toBe(0);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Bonus géo +35/+15 — absolus capés au poids                                */
+/* -------------------------------------------------------------------------- */
+
+describe("scoreArchitect — bonus géo absolu (NEIGHBORING_DEPARTMENTS complet)", () => {
+  // AO en Seine-Maritime (76) — buyer contient cp 76000
+  const tenderNormandie = makeTender({
+    title: "Construction d'un équipement public",
+    buyer: "Mairie de Rouen, 76000 Rouen",
+  });
+  const inferred76 = inferCategoriesFromTender(tenderNormandie);
+  const dept76 = extractDepartment(tenderNormandie); // "76"
+
+  it("match exact département → geo = min(35, poids) = 30 (sparse_data)", () => {
+    const archi = makeArchitect({ geoZones: ["76"] });
+    const b = scoreArchitect(
+      archi,
+      tenderNormandie,
+      0,
+      WEIGHTS_BY_PROFILE.sparse_data,
+      inferred76,
+      dept76,
+    );
+    expect(b.geo).toBe(30); // min(35, 30) = 30
+  });
+
+  it("département limitrophe → geo = min(15, poids) = 15 (sparse_data)", () => {
+    // 27 (Eure) est limitrophe de 76 dans NEIGHBORING_DEPARTMENTS
+    const archi = makeArchitect({ geoZones: ["27"] });
+    const b = scoreArchitect(
+      archi,
+      tenderNormandie,
+      0,
+      WEIGHTS_BY_PROFILE.sparse_data,
+      inferred76,
+      dept76,
+    );
+    expect(b.geo).toBe(15); // min(15, 30) = 15
+  });
+
+  it("aucune zone correspondante → geo = 0", () => {
+    const archi = makeArchitect({ geoZones: ["13"] });
+    const b = scoreArchitect(
+      archi,
+      tenderNormandie,
+      0,
+      WEIGHTS_BY_PROFILE.sparse_data,
+      inferred76,
+      dept76,
+    );
+    expect(b.geo).toBe(0);
+  });
+
+  it("profil mature : match exact → min(35, geo_weight=20) = 20", () => {
+    const archi = makeArchitect({ geoZones: ["76"] });
+    const b = scoreArchitect(
+      archi,
+      tenderNormandie,
+      0,
+      WEIGHTS_BY_PROFILE.mature,
+      inferred76,
+      dept76,
+    );
+    expect(b.geo).toBe(20); // min(35, 20) = 20
+  });
+
+  it("profil mature : limitrophe → min(15, geo_weight=20) = 15", () => {
+    const archi = makeArchitect({ geoZones: ["27"] });
+    const b = scoreArchitect(
+      archi,
+      tenderNormandie,
+      0,
+      WEIGHTS_BY_PROFILE.mature,
+      inferred76,
+      dept76,
+    );
+    expect(b.geo).toBe(15); // min(15, 20) = 15
+  });
+
+  it("geoZones vide → geo = 0 même si tenderDept connu", () => {
+    const archi = makeArchitect({ geoZones: [] });
+    const b = scoreArchitect(
+      archi,
+      tenderNormandie,
+      0,
+      WEIGHTS_BY_PROFILE.sparse_data,
+      inferred76,
+      dept76,
+    );
+    expect(b.geo).toBe(0);
   });
 });
 

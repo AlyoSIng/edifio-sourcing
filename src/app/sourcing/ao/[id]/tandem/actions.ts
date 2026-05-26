@@ -172,11 +172,11 @@ async function requireAlyosUser(
  * `persistMatchProposals` après réception des résultats).
  *
  * @param tenderId — UUID du tender (mode Tandem)
- * @param topN — nombre d'architectes à retourner (défaut 50)
+ * @param topN — nombre d'architectes à retourner (défaut 10)
  */
 export async function matchArchitectsForTender(
   tenderId: string,
-  topN: number = 50,
+  topN: number = 10,
   deps: ActionDeps = {},
 ): Promise<MatchActionResult> {
   const db = deps.db ?? defaultDb;
