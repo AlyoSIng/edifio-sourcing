@@ -127,6 +127,13 @@
       "when": 1748995620000,
       "tag": "0017_architect_annual_revenue",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1748995680000,
+      "tag": "0018_rls_cotraitants_be",
+      "breakpoints": true
     }
   ]
 }

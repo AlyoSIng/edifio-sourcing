@@ -2,6 +2,14 @@
 
 ---
 
+## 2026-05-26 — RLS cotraitants/BE + Haiku rationale Tandem (Alex)
+
+- **2026-05-26 · G6 · Alex (dev) · Migration 0018 — RLS ENABLE + FORCE + 3 policies (tenant_isolation PERMISSIVE, admin_write RESTRICTIVE, admin_update RESTRICTIVE) sur `cotraitants`, `tender_cotraitants`, `cotraitant_documents`, `be_documents`. Trigger `touch_cotraitants` ajouté sur `cotraitants`. Appliqué en prod (Supabase MCP). Hash inséré dans `drizzle.__drizzle_migrations`.**
+
+- **2026-05-26 · G6 · Alex (dev) · Haiku rationale wiring — `src/lib/ai/haiku-rationale-client.ts` créé : implémente `AiRationaleClient` via Anthropic Haiku 4.5 (model `claude-haiku-4-5`, timeout 8s, max_tokens 120, fallback null sur erreur). Branché dans `matchArchitectsForTender` : si `ANTHROPIC_API_KEY` présente → `createHaikuRationaleClient()` passé à `generateRationaleWithAi`, sinon fallback déterministe. Aucune erreur propagée, short-list affichée même si API down.**
+
+---
+
 ## 2026-05-26 — feat/architect-headcount — Effectif cabinets + scoring staffSize (Alex)
 
 - **2026-05-26 · G6 · Alex (dev) · feat/architect-headcount — exposition champ effectif + scoring staffSize + composition shortlist.**

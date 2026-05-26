@@ -73,6 +73,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { extractDepartment, rankArchitects, type MatchScore } from "@/lib/tandem/matching";
 import { signArchitectToken } from "@/lib/tandem/jwt";
 import { generateRationaleWithAi } from "@/lib/tandem/ai-rationale";
+import { createHaikuRationaleClient } from "@/lib/ai/haiku-rationale-client";
 import type { Architect } from "@/db/schema/architects";
 import type { Tender } from "@/db/schema/tenders";
 
@@ -274,6 +275,7 @@ export async function matchArchitectsForTender(
           { title: tender.title, buyer: tender.buyer },
           s.breakdown,
           boostedScore,
+          process.env.ANTHROPIC_API_KEY ? createHaikuRationaleClient() : undefined,
         );
         return {
           ...s,
