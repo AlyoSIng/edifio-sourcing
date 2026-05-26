@@ -9,21 +9,22 @@
  * Périmètre MVP :
  *  - Édition des champs principaux : `cabinet`, `contactName`, `email`,
  *    `phone`, `website`, `siren`, `zip`, `city`, `notes`, `tutoiement`,
- *    `preferred`.
+ *    `preferred`, `specialtyCodes`, `geoZones`.
  *  - Toggle RGPD opposition (section dédiée, distinct des champs ordinaires).
  *  - Validation client-side minimaliste (cabinet non vide).
  *  - Soumission via Server Action `upsertArchitect` + `setRgpdOpposition`.
  *  - Feedback optimiste : état `pending` sur les boutons pendant la mutation.
+ *  - `router.refresh()` après save pour rafraîchir l'en-tête SSR.
  *
  * Champs hors formulaire (calculés / gérés autrement) :
  *  - `solicitable` : dérivé automatiquement (GENERATED ALWAYS AS).
- *  - `specialtyCodes`, `geoZones` : édition prévue Phase 2 (multi-select).
  *  - `headcount`, `companySize`, `companyCreatedAt` : enrichissement externe.
  *  - `odooExternalId` : géré par import Odoo uniquement.
  *  - `pastCollabsCount` : incrémenté automatiquement par l'app.
  */
 
 import { useTransition, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import type { Architect } from "@/db/schema/architects";
 
@@ -35,6 +36,7 @@ interface ArchitectEditFormProps {
 }
 
 export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
+  const router = useRouter();
   const [editPending, startEditTransition] = useTransition();
   const [rgpdPending, startRgpdTransition] = useTransition();
   const [editError, setEditError] = useState<string | null>(null);
@@ -54,6 +56,8 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
   const [notes, setNotes] = useState(architect.notes ?? "");
   const [tutoiement, setTutoiement] = useState(architect.tutoiement);
   const [preferred, setPreferred] = useState(architect.preferred);
+  const [specialtyCodes, setSpecialtyCodes] = useState(architect.specialtyCodes.join(", "));
+  const [geoZones, setGeoZones] = useState(architect.geoZones.join(", "));
 
   // -------------------------------------------------------------------------
   // Soumission formulaire principal
@@ -86,8 +90,14 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
           active: architect.active,
           rgpdOpposition: architect.rgpdOpposition,
           rgpdOppositionDate: architect.rgpdOppositionDate,
-          specialtyCodes: architect.specialtyCodes,
-          geoZones: architect.geoZones,
+          specialtyCodes: specialtyCodes
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          geoZones: geoZones
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
           headcount: architect.headcount,
           companySize: architect.companySize,
           companyCreatedAt: architect.companyCreatedAt,
@@ -99,6 +109,7 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
 
       if (result.ok) {
         setEditSuccess(true);
+        router.refresh();
       } else {
         const messages: Record<string, string> = {
           not_authenticated: "Session expirée. Rechargez la page.",
@@ -261,6 +272,40 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          {/* Spécialités + Zones géo */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="specialtyCodes" className="block text-xs font-medium text-ink">
+                Spécialités{" "}
+                <span className="font-normal text-muted">(codes séparés par virgule)</span>
+              </label>
+              <input
+                id="specialtyCodes"
+                type="text"
+                value={specialtyCodes}
+                onChange={(e) => setSpecialtyCodes(e.target.value)}
+                placeholder="ex : archi_maison, archi_sport"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label htmlFor="geoZones" className="block text-xs font-medium text-ink">
+                Zones géo{" "}
+                <span className="font-normal text-muted">
+                  (numéros département séparés par virgule)
+                </span>
+              </label>
+              <input
+                id="geoZones"
+                type="text"
+                value={geoZones}
+                onChange={(e) => setGeoZones(e.target.value)}
+                placeholder="ex : 69, 01, 38"
                 className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
               />
             </div>
