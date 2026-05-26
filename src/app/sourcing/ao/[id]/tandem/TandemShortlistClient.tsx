@@ -90,7 +90,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     setLoading(true);
     setLoadError(null);
     void (async () => {
-      const result = await matchArchitectsForTender(tenderId, 50);
+      const result = await matchArchitectsForTender(tenderId, 10);
       if (cancelled) return;
       if (!result.ok) {
         setLoadError(mapErrorToFr(result.error));
@@ -493,7 +493,6 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
           Associez un cotraitant à cet AO et gérez les pièces échangées.
         </p>
       </div>
-
 
       {/* Modale de prévisualisation individuelle */}
       {previewFor ? (
