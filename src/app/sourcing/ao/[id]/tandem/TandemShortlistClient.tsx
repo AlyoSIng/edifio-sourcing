@@ -481,6 +481,20 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         )}
       </div>
 
+      {/* Lien vers la page de partage de pièces aux cotraitants */}
+      <div className="mt-6 border-t border-line pt-4">
+        <a
+          href={`/sourcing/ao/${tenderId}/tandem/partage`}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-red hover:underline"
+        >
+          &#8599; Partager les pièces avec un cotraitant
+        </a>
+        <p className="mt-0.5 text-xs text-muted">
+          Générez un lien sécurisé pour que votre cotraitant télécharge, signe et redépose les
+          pièces.
+        </p>
+      </div>
+
       {/* Modale de prévisualisation individuelle */}
       {previewFor ? (
         <BrevoPreviewModal
