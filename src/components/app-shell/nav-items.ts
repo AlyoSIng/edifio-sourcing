@@ -69,19 +69,23 @@ export const NAV_ITEMS: NavSection[] = [
         icon: "ao",
         matchPrefix: "/sourcing/ao-du-jour",
       },
-      // V2 : liens vers Sélectionnés / Différés / Tous les AO. Pré-câblés en
-      // `comingSoon` pour montrer la structure cible côté UX, désactivés en MVP.
       {
         href: "/sourcing/selectionnes",
         label: "Sélectionnés",
         icon: "bookmark",
-        comingSoon: true,
+        matchPrefix: "/sourcing/selectionnes",
       },
       {
         href: "/sourcing/differes",
         label: "Différés",
         icon: "clock",
-        comingSoon: true,
+        matchPrefix: "/sourcing/differes",
+      },
+      {
+        href: "/sourcing/reponse-solo",
+        label: "Réponse solo",
+        icon: "file-text",
+        matchPrefix: "/sourcing/reponse-solo",
       },
     ],
   },
