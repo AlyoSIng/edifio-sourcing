@@ -35,6 +35,7 @@ import type { db as defaultDb } from "@/db/client";
 import { architects } from "@/db/schema/architects";
 import { architectResponses, architectTokens } from "@/db/schema/selections";
 import { brevoMessages } from "@/db/schema/integrations";
+import { organizationProfiles } from "@/db/schema/messaging";
 import { tenders } from "@/db/schema/tenders";
 import type { BrevoClient } from "@/lib/brevo/client";
 import {
@@ -43,6 +44,7 @@ import {
   templateNameFor,
 } from "@/lib/brevo/template-picker";
 import { buildBrevoVariables } from "@/lib/brevo/variables";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { extractDepartment } from "@/lib/tandem/matching";
 import { getSiteUrl } from "@/lib/site-url";
 
@@ -147,6 +149,20 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
     return age >= FOLLOWUP_THRESHOLD_MS;
   });
 
+  // Chargement une fois pour toute la boucle
+  let orgPresentationSociete: string | undefined;
+  try {
+    const orgRows = await db
+      .select({ presentationBlock: organizationProfiles.presentationBlock })
+      .from(organizationProfiles)
+      .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+      .limit(1);
+    const block = orgRows[0]?.presentationBlock;
+    if (block) orgPresentationSociete = block;
+  } catch {
+    // Fallback silencieux
+  }
+
   const sentArchitectIds: string[] = [];
   const failures: FollowupRunResult["failures"] = [];
 
@@ -239,6 +255,8 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
         // doit ouvrir l'ancien mail). En V2, re-sign + nouveau jwt.
         lienAo: `${getSiteUrl()}/archi/`,
         lienOpposition,
+        register,
+        presentationSociete: orgPresentationSociete,
       });
       void tokenRows; // pour silence linter
     } catch (err) {
@@ -255,6 +273,7 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
       templateId,
       to: { email: item.architect.email, name: toName || variables.cabinet },
       params: {
+        greeting: variables.greeting,
         archi_prenom: variables.archi_prenom,
         archi_nom: variables.archi_nom,
         cabinet: variables.cabinet,
@@ -264,6 +283,7 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
         ao_cloture: variables.ao_cloture,
         lien_ao: variables.lien_ao,
         lien_opposition: variables.lien_opposition,
+        presentation_societe: variables.presentation_societe,
         rgpd_block: variables.rgpd_block,
       },
       customHeader: `tender:${item.tenderId};archi:${item.architectId};kind:followup`,

@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBrevoVariables,
+  buildGreeting,
   deriveCivilite,
   formatClotureFr,
   splitContactName,
@@ -92,6 +93,29 @@ describe("deriveCivilite", () => {
   });
   it("valeur inconnue 'Dr.' → fallback 'Madame, Monsieur,'", () => {
     expect(deriveCivilite("Dr.")).toBe("Madame, Monsieur,");
+  });
+});
+
+describe("buildGreeting", () => {
+  it("TU → 'Bonjour {{prenom}},'", () => {
+    expect(buildGreeting("tu", "Madame", "Marie", "Dupont")).toBe("Bonjour Marie,");
+  });
+  it("TU + prenom fallback → 'Bonjour partenaire,'", () => {
+    expect(buildGreeting("tu", "Madame, Monsieur,", "partenaire", "")).toBe("Bonjour partenaire,");
+  });
+  it("VOUS + Madame + nom → 'Bonjour Madame Dupont,'", () => {
+    expect(buildGreeting("vous", "Madame", "Marie", "Dupont")).toBe("Bonjour Madame Dupont,");
+  });
+  it("VOUS + Monsieur + nom → 'Bonjour Monsieur Dupont,'", () => {
+    expect(buildGreeting("vous", "Monsieur", "Jean", "Martin")).toBe("Bonjour Monsieur Martin,");
+  });
+  it("VOUS + Madame + nom vide → 'Bonjour Madame,'", () => {
+    expect(buildGreeting("vous", "Madame", "partenaire", "")).toBe("Bonjour Madame,");
+  });
+  it("VOUS + fallback civilite → 'Bonjour Madame, Monsieur,'", () => {
+    expect(buildGreeting("vous", "Madame, Monsieur,", "Marie", "Dupont")).toBe(
+      "Bonjour Madame, Monsieur,",
+    );
   });
 });
 
@@ -181,5 +205,26 @@ describe("buildBrevoVariables — intégration (v2)", () => {
       tender: { ...baseInput.tender, deadline: null },
     });
     expect(v.ao_cloture).toBe("à confirmer");
+  });
+
+  it("greeting VOUS connu → 'Bonjour Madame Dupont,'", () => {
+    const v = buildBrevoVariables({ ...baseInput, register: "vous" });
+    expect(v.greeting).toBe("Bonjour Madame Dupont,");
+  });
+  it("greeting TU → 'Bonjour Marie,'", () => {
+    const v = buildBrevoVariables({ ...baseInput, register: "tu" });
+    expect(v.greeting).toBe("Bonjour Marie,");
+  });
+  it("greeting VOUS sans register explicite → défaut VOUS", () => {
+    const v = buildBrevoVariables(baseInput); // pas de register
+    expect(v.greeting).toBe("Bonjour Madame Dupont,"); // title='Mme' → Madame; nom='Dupont'
+  });
+  it("greeting VOUS + civilité fallback → 'Bonjour Madame, Monsieur,'", () => {
+    const v = buildBrevoVariables({
+      ...baseInput,
+      register: "vous",
+      architect: { ...baseInput.architect, title: null },
+    });
+    expect(v.greeting).toBe("Bonjour Madame, Monsieur,");
   });
 });

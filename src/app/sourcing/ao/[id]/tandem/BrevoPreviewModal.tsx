@@ -36,7 +36,7 @@
 
 import { useEffect, useId, useState } from "react";
 
-import { formatClotureFr, splitContactName } from "@/lib/brevo/variables";
+import { buildGreeting, formatClotureFr, splitContactName } from "@/lib/brevo/variables";
 import type { BrevoRegister } from "@/lib/brevo/template-picker";
 
 interface ArchitectLike {
@@ -86,11 +86,13 @@ export function BrevoPreviewModal({ architect, tender, onCancel, onConfirm }: Pr
     onConfirm(register, customNote.trim() || undefined);
   }
 
-  const { prenom } = splitContactName(architect.contactName);
+  const { prenom, nom } = splitContactName(architect.contactName);
   const isTu = register === "tu";
 
-  // Salutation aligné copy validé. Si pas de prénom, fallback générique.
-  const salut = isTu ? `Salut ${prenom} !` : `Bonjour ${prenom},`;
+  // Salutation alignée copy validé (greeting v3).
+  // Pour le VOUS en preview : pas de title/civilité disponible dans la short-list
+  // → fallback "Madame, Monsieur,". Le mail réel calculé côté server aura la civilité correcte.
+  const salut = buildGreeting(register, "Madame, Monsieur,", prenom, nom);
   const cloture = formatClotureFr(tender.deadline);
 
   return (

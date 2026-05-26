@@ -9,10 +9,10 @@
  *  - Board 2026-05-25 (Lot #56) : ajout `civilite` (fallback obligatoire
  *    « Madame, Monsieur, ») + `presentation_societe` (placeholder lot D).
  *
- * Variables couvertes (v2) :
- *   civilite, archi_prenom, archi_nom, cabinet, ao_objet, ao_acheteur,
- *   ao_departement, ao_cloture (date FR), lien_ao, lien_opposition,
- *   presentation_societe (placeholder), rgpd_block (HTML)
+ * Variables couvertes (v2+) :
+ *   greeting (salutation complète TU/VOUS), civilite, archi_prenom, archi_nom,
+ *   cabinet, ao_objet, ao_acheteur, ao_departement, ao_cloture (date FR),
+ *   lien_ao, lien_opposition, presentation_societe, rgpd_block (HTML)
  *
  * Parsing du contact :
  *  - `architects.contactName` (peut être NULL — ~50 % de l'export Odoo).
@@ -47,6 +47,13 @@ import { buildRgpdBlockHtml, buildRgpdBlockText } from "./rgpd-block";
 import { PRESENTATION_SOCIETE_HTML_DEFAULT } from "./templates-copy";
 
 export interface BrevoArchitectVariables {
+  /**
+   * Salutation complète, prête à insérer dans le template :
+   *   - TU   : "Bonjour Marie,"
+   *   - VOUS : "Bonjour Madame Dupont," / "Bonjour Monsieur Dupont,"
+   *            ou "Bonjour Madame, Monsieur," si civilité inconnue
+   */
+  greeting: string;
   /**
    * Civilité : "Madame" | "Monsieur" | "Madame, Monsieur," (fallback).
    * Utilisée dans la variante VOUS (formelle) pour l'appel.
@@ -90,6 +97,11 @@ export interface BuildVariablesInput {
    * Si absent, on utilise `PRESENTATION_SOCIETE_HTML_DEFAULT`.
    */
   presentationSociete?: string;
+  /**
+   * Registre TU/VOUS — utilisé pour calculer la salutation.
+   * Si absent, fallback VOUS (vouvoiement par défaut).
+   */
+  register?: "tu" | "vous";
 }
 
 /**
@@ -150,6 +162,37 @@ export function formatClotureFr(deadline: Date | null | undefined): string {
 }
 
 /**
+ * Calcule la salutation d'ouverture du mail.
+ *
+ * Règles :
+ *  - TU   : "Bonjour {{prenom}},"
+ *  - VOUS + civilité connue (Madame|Monsieur) : "Bonjour {{civilite}} {{nom}},"
+ *    (si nom vide → "Bonjour {{civilite}},")
+ *  - VOUS + civilité fallback ("Madame, Monsieur,") : "Bonjour Madame, Monsieur,"
+ *
+ * @param register  — "tu" ou "vous"
+ * @param civilite  — résultat de deriveCivilite()
+ * @param prenom    — résultat de splitContactName().prenom
+ * @param nom       — résultat de splitContactName().nom
+ */
+export function buildGreeting(
+  register: "tu" | "vous",
+  civilite: string,
+  prenom: string,
+  nom: string,
+): string {
+  if (register === "tu") {
+    return `Bonjour ${prenom},`;
+  }
+  const knownCivility = civilite === "Madame" || civilite === "Monsieur";
+  if (knownCivility) {
+    const namePart = nom.trim();
+    return namePart ? `Bonjour ${civilite} ${namePart},` : `Bonjour ${civilite},`;
+  }
+  return "Bonjour Madame, Monsieur,";
+}
+
+/**
  * Construit toutes les variables Brevo nécessaires aux templates architecte.
  * Inclut le bloc RGPD pré-interpolé (Option A — Q3 Board) et les nouvelles
  * variables v2 : `civilite` + `presentation_societe`.
@@ -170,8 +213,13 @@ export function buildBrevoVariables(input: BuildVariablesInput): BrevoArchitectV
     lienOpposition: input.lienOpposition,
   });
 
+  const civilite_value = deriveCivilite(input.architect.title);
+  const register = input.register ?? "vous";
+  const greeting = buildGreeting(register, civilite_value, prenom, nom);
+
   return {
-    civilite: deriveCivilite(input.architect.title),
+    greeting,
+    civilite: civilite_value,
     archi_prenom: prenom,
     archi_nom: nom,
     cabinet,
