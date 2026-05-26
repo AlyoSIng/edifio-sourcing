@@ -1,4 +1,4 @@
-- Mise a jour headcount + annual_revenue des architectes depuis export Odoo
+-- Mise a jour headcount + annual_revenue des architectes depuis export Odoo
 -- Genere le 2026-05-26 depuis Contact_complete.xlsx (3805 lignes)
 -- A appliquer dans Supabase SQL Editor (prod)
 -- Matching : email > siren > cabinet (nom exact)
