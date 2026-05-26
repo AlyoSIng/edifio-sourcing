@@ -52,8 +52,7 @@ interface PageProps {
   params: { id: string };
 }
 
-const UUID_SHAPE =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /** Format court de date français (ex. 15/07/2026) */
 function formatDate(date: Date | null): string {
@@ -131,7 +130,9 @@ export default async function DossierPage({ params }: PageProps) {
   }
 
   const isSolo = data.tender.status === "selected_solo";
-  const eyebrow = isSolo ? "Dossier de candidature — Solo" : "Dossier de candidature — Tandem";
+  const eyebrow = isSolo
+    ? "Dossier de candidature — Mandataire"
+    : "Dossier de candidature — Co-traitant";
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
@@ -144,7 +145,7 @@ export default async function DossierPage({ params }: PageProps) {
                 href="/sourcing/reponse-solo"
                 className="hover:text-ink hover:underline focus:outline-none"
               >
-                Réponse solo
+                Mandataire
               </Link>
               <span aria-hidden>/</span>
               <span className="text-ink">Dossier</span>
@@ -178,8 +179,7 @@ export default async function DossierPage({ params }: PageProps) {
           <span>{data.tender.buyer}</span>
           {data.tender.deadline && (
             <span>
-              Deadline :{" "}
-              <strong className="text-ink">{formatDate(data.tender.deadline)}</strong>
+              Deadline : <strong className="text-ink">{formatDate(data.tender.deadline)}</strong>
             </span>
           )}
         </div>

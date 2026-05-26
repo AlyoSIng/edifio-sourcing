@@ -11,7 +11,7 @@ import { getTendersSolo } from "@/lib/sourcing/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata = {
-  title: "Réponse solo — edifio Sourcing",
+  title: "Mandataire — edifio Sourcing",
 };
 
 /**
@@ -51,17 +51,17 @@ export default async function ReponseSoloPage() {
       <header className="mb-6">
         <span className="pill-eyebrow">Dossiers en cours</span>
         <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
-          Réponse solo
+          Mandataire
         </h1>
         <p className="mt-1 text-sm text-muted">
           {fetchError ? (
             "Erreur de chargement — voir détail ci-dessous."
           ) : totalCount === 0 ? (
-            "Aucun AO en réponse solo pour le moment."
+            "Aucun AO en mode Mandataire pour le moment."
           ) : (
             <>
-              {totalCount} dossier{totalCount > 1 ? "s" : ""} solo en cours — triés par date de
-              clôture.
+              {totalCount} dossier{totalCount > 1 ? "s" : ""} mandataire en cours — triés par date
+              de clôture.
             </>
           )}
         </p>
@@ -105,7 +105,7 @@ function EmptyStateReponseSolo() {
       <div className="mb-3 text-4xl opacity-40" aria-hidden>
         📄
       </div>
-      <h2 className="font-display text-lg font-semibold text-ink">Aucun AO en réponse solo</h2>
+      <h2 className="font-display text-lg font-semibold text-ink">Aucun AO en mode Mandataire</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted">
         Sélectionnez un AO en solo depuis{" "}
         <Link href="/sourcing/ao-du-jour" className="text-brand-red underline underline-offset-2">
