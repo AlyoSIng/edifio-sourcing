@@ -41,6 +41,7 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "drizzle-orm": "0.39.3",
+    "fflate": "^0.8.3",
     "next": "14.2.35",
     "pdf-parse": "^1.1.1",
     "postgres": "3.4.9",
