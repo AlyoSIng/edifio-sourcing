@@ -1343,3 +1343,33 @@ appliquée sur prod après Phase β. Pas de bug de code.
   *Déclarations temporaires : `src/types/external-modules.d.ts` — stubs @anthropic-ai/sdk + pdf-parse (à supprimer après `pnpm add`).*
   *Typecheck + lint : 0 erreur.*
   *Packages à installer par Yann : `pnpm add @anthropic-ai/sdk pdf-parse @types/pdf-parse`.*
+
+---
+
+## 2026-05-26 — Sprint Gate 6 journée complète (suite)
+
+### ADR-027 — Scoring CA éligibilité (PR #73)
+- **Agent** : Alex (dev) + Nadia (dev_tandem)
+- **Décision** : filtre d'éligibilité CA — un architecte est exclu de la shortlist si `annual_revenue < 40 % * tender.amount`. Fallback BOAMP amount : `montant_estime ?? valeur_estimee ?? valeur_globale ?? montant_global ?? montant_minimum`.
+- **Motif** : éviter de proposer des petites structures sur des marchés trop grands pour elles.
+
+### ADR-028 — Colonne `annual_revenue` + import CSV architectes (PR #73)
+- **Agent** : Alex (dev)
+- **Décision** : ajout colonne `integer annual_revenue` sur `architects` (migration 0017). Import CSV étendu (colonnes headcount + annual_revenue). Script bulk UPDATE prod depuis export Odoo Contact_complete.xlsx (2 168 statements).
+- **Motif** : alimenter le filtre CA éligibilité avec les données réelles.
+
+### ADR-029 — Moulinette enrichissement Pappers API (PR #74)
+- **Agent** : Alex (dev)
+- **Décision** : intégration API Pappers v2 pour enrichissement automatique des fiches architectes (SIREN, CA, effectifs). Stratégie double : lookup SIREN direct + recherche par nom cabinet avec filtre NAF 711x. Logique `?? newValue` stricte (données manuelles jamais écrasées). Clé `PAPPERS_API_KEY` dans les variables Vercel.
+- **Motif** : compléter les 1 313 fiches sans effectif et enrichir le CA depuis les sources officielles INSEE/BODACC.
+
+### ADR-030 — Journal Drizzle prod aligné (migrations 0000-0017)
+- **Agent** : Alex (dev) + Yann (ps_operator)
+- **Décision** : création de `drizzle.__drizzle_migrations` (schéma `drizzle`, table avec contrainte UNIQUE sur hash) et insertion des 18 hashes SHA-256 des fichiers de migration. Toutes les migrations avaient été appliquées manuellement ; le journal était absent.
+- **Motif** : permettre les futurs `migrate()` runtime sans re-application des migrations déjà en place.
+
+### Déploiement prod — 2026-05-26 fin de journée
+- **Agent** : Yann (ps_operator) / Steve (Board/Ops)
+- **PRs mergées** : #69 (bibliothèque cotraitants), #70 (shortlist top 10 + scoring géo), #71 (BE documents), #72 (effectif cabinets), #73 (CA éligibilité + import CSV), #74 (moulinette Pappers)
+- **Migrations prod** : 0015 (cotraitants), 0016 (be_documents), 0017 (annual_revenue) — toutes appliquées
+- **Données** : 2 127 architectes avec headcount, 682 avec annual_revenue (depuis export Odoo 3 805 lignes)
