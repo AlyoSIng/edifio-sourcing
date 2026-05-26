@@ -182,13 +182,68 @@ export function normalizeUrl(value: string | null | undefined): string | null {
 // ============================================================================
 
 /**
+ * Normalise un RawTender issu d'un scraper Playwright (place, francmarches, mp_info).
+ * Le record contient déjà les champs extraits par le scraper avec des noms normalisés.
+ */
+function normalizeScraped(raw: RawTender): NormalizedTender {
+  const r = raw.rawData.record;
+  const title = trimAndCapitalize((r["title"] as string | undefined) ?? "");
+  const buyer = trimAndCapitalize((r["buyer"] as string | undefined) ?? "");
+
+  // CPV : tableau de codes ou string comma-separated
+  const cpvRaw = r["cpv"];
+  let cpvCodes: string[] = [];
+  if (Array.isArray(cpvRaw)) {
+    cpvCodes = parseCpvCodes(
+      (cpvRaw[0] as string | undefined) ?? null,
+      (cpvRaw.slice(1) as string[]) ?? null,
+    );
+  } else if (typeof cpvRaw === "string") {
+    cpvCodes = parseCpvCodes(cpvRaw, null);
+  }
+
+  const amount = typeof r["amount"] === "number" ? r["amount"] : parseAmount(r["amount"]);
+  const deadline = parseDate((r["deadline"] as string | undefined) ?? null);
+  const questionsDeadline = parseDate((r["questionsDeadline"] as string | undefined) ?? null);
+  const dceUrl = normalizeUrl((r["dceUrl"] as string | undefined) ?? null);
+  const sourceUrl = (r["sourceUrl"] as string | undefined) ?? null;
+
+  return {
+    externalRef: raw.externalRef,
+    platformCode: raw.platformCode,
+    title,
+    buyer,
+    cpvCodes,
+    amount,
+    deadline,
+    questionsDeadline,
+    visitDate: null,
+    dceUrl,
+    sourceUrl,
+    rawData: raw.rawData,
+  };
+}
+
+/**
  * Convertit un `RawTender` (post-connecteur) en `NormalizedTender` (prêt à
  * être inséré en BDD via `insertTender` — étape 4).
+ *
+ * Dispatch sur `raw.platformCode` :
+ *  - `place` | `francmarches` | `mp_info` → `normalizeScraped` (champs directs)
+ *  - `boamp` → logique Opendatasoft (champs BOAMP spécifiques)
  *
  * @param raw — issue du connecteur (étape 2)
  * @returns la forme finale `NormalizedTender`
  */
 export function normalize(raw: RawTender): NormalizedTender {
+  if (
+    raw.platformCode === "place" ||
+    raw.platformCode === "francmarches" ||
+    raw.platformCode === "mp_info"
+  ) {
+    return normalizeScraped(raw);
+  }
+
   // `raw.rawData.record` est `Record<string, unknown>` côté contrat — on
   // narrowe en `BoampApiRecord` pour exploiter le typage Opendatasoft.
   // Aucun cast `any` : `as unknown as BoampApiRecord` est l'idiome standard

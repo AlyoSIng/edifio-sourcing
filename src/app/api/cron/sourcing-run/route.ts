@@ -33,9 +33,13 @@
  * **Hors scope PR #3** (à venir dans PRs ultérieures) :
  *  - Filtrage par `cron_time` du profil (V1 : tous les profils actifs au
  *    même cron Vercel 04:30 UTC)
- *  - Connecteurs PLACE / Francmarchés / MP.info via Fly.io
  *  - Scoring IA Haiku complémentaire
  *  - Push notifications Realtime
+ *
+ * **Ajout PR scraping PLACE/Francmarchés :**
+ *  4. Déclenche les jobs scraping PLACE + Francmarchés en fire-and-forget
+ *     via `triggerScrapeJob` → worker Fly.io POST les résultats vers
+ *     `POST /api/webhooks/scraper-done` (même secret `SCRAPER_TRIGGER_SECRET`).
  */
 
 import { eq } from "drizzle-orm";
@@ -45,7 +49,12 @@ import { db } from "@/db/client";
 import { searchProfiles } from "@/db/schema/config";
 
 import { createBoampConnector } from "@/lib/sourcing/connectors/boamp";
+import {
+  ScraperUnavailableError,
+  triggerScrapeJob,
+} from "@/lib/sourcing/connectors/scraping-client";
 import { runSourcingForProfiles } from "@/lib/sourcing/orchestrator";
+import { getSiteUrl } from "@/lib/site-url";
 
 /** Durée max raisonnable pour le pipeline complet (toutes les org, tous profils). */
 export const maxDuration = 60;
@@ -101,7 +110,43 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
     // 3. Pipeline pour tous les profils
     const batch = await runSourcingForProfiles(profiles, { connector, db });
 
-    // 4. Trace structurée des métriques (Vercel logs / Datadog)
+    // 4. Déclencher scraping PLACE + Francmarchés (async — résultats via webhook)
+    const scraperTriggered: Array<{ platform: string; runId?: string; error?: string }> = [];
+    const webhookUrl = `${getSiteUrl()}/api/webhooks/scraper-done`;
+
+    for (const profile of profiles) {
+      const profileFilters = {
+        keywords: profile.keywords?.positive ?? [],
+        geoZones: profile.geoZones ?? [],
+      };
+      const lastRunAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      for (const platform of ["francmarches", "place"] as const) {
+        try {
+          const ack = await triggerScrapeJob({
+            platform,
+            profileFilters,
+            lastRunAt,
+            profileId: profile.id,
+            orgId: profile.organizationId,
+            webhookUrl,
+          });
+          scraperTriggered.push({ platform, runId: ack.runId });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (!(err instanceof ScraperUnavailableError)) {
+            console.error("[cron:sourcing-run] scraper error", { platform, message });
+          } else {
+            console.log("[cron:sourcing-run] scraper unavailable (skip)", { platform, message });
+          }
+          scraperTriggered.push({ platform, error: message });
+        }
+      }
+    }
+
+    console.log("[cron:sourcing-run] scrapers triggered", scraperTriggered);
+
+    // 5. Trace structurée des métriques (Vercel logs / Datadog)
     console.log("[cron:sourcing-run] done", {
       total_profiles: batch.totalProfiles,
       profiles_ok: batch.results.length,
@@ -111,7 +156,7 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
       duration_ms: batch.durationMs,
     });
 
-    return NextResponse.json({ ok: true, ...batch });
+    return NextResponse.json({ ok: true, ...batch, scraperTriggered });
   } catch (err) {
     console.error("[cron:sourcing-run] unhandled", {
       message: err instanceof Error ? err.message : String(err),

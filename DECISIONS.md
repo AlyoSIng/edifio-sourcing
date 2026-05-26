@@ -2,6 +2,21 @@
 
 ---
 
+## 2026-05-26 — Worker Playwright v1.0.0 — scrapers PLACE + Francmarchés (Alex)
+
+- **2026-05-26 · G6 · Alex (dev) · feat/cotraitant-sharing — Worker Playwright v1.0.0 : scrapers PLACE et Francmarchés câblés dans le Fly.io worker.**
+  *Fichiers créés/modifiés :*
+  *- `infra/playwright/src/scrapers/types.ts` (nouveau) : types partagés `ScrapingPlatform`, `ScrapeRequest`, `ScrapedTenderRecord`, `ScrapeJobResult`.*
+  *- `infra/playwright/src/scrapers/francmarches.ts` (nouveau) : scraper non-authentifié Francmarchés — navigation liste + pagination (MAX_PAGES=20) + extraction fiche détail + timeout global 90s + jitter 100-300ms.*
+  *- `infra/playwright/src/scrapers/place.ts` (nouveau) : scraper authentifié PLACE — login → recherche + filtre date → pagination (MAX_PAGES=30) + extraction fiche détail + logout propre + timeout global 120s. Throw `Error("PLACE credentials required")` si credentials absents.*
+  *- `infra/playwright/src/worker.ts` (réécriture) : VERSION 1.0.0 — handler `POST /v1/scrape` : validation (platform|profileId|orgId|webhookUrl|lastRunAt), 202 immédiat, scraping async via `process.nextTick`, postWebhook vers URL Vercel. Browser Playwright partagé (`getBrowser()`), fermé au SIGTERM. Healthz expose état browser. Realtime Supabase et graceful shutdown conservés.*
+  *Décision technique : browser Playwright partagé entre jobs (réutilisation si connecté) — cold start uniquement au premier job ou après déconnexion. Jitter + user-agent réaliste sur les deux scrapers pour limiter le rate-limiting.*
+
+- **2026-05-26 · G6 · Alex (dev) · feat/scrapers-place-francmarches — Côté App Next.js : `scraping-client.ts` (client HTTP fire-and-forget vers Fly.io), `src/app/api/webhooks/scraper-done/route.ts` (pipeline normalize→dedup→filter→score→insert sur résultats scraper), `normalize.ts` étendu (branche place/francmarches/mp_info via `normalizeScraped`), cron `sourcing-run` mis à jour (déclenche Francmarchés + PLACE après BOAMP, ScraperUnavailableError non-bloquante), `site-url.ts`, `.env.example` (SCRAPER_BASE_URL + SCRAPER_TRIGGER_SECRET).**
+  *Décision technique : SCRAPER_TRIGGER_SECRET unique partagé déclencheur ↔ webhook (symétrique, HTTPS). `ScraperUnavailableError` non-bloquante : si le worker Fly.io est absent, le pipeline BOAMP tourne normalement.*
+
+---
+
 ## 2026-05-26 — RLS cotraitants/BE + Haiku rationale Tandem (Alex)
 
 - **2026-05-26 · G6 · Alex (dev) · Migration 0018 — RLS ENABLE + FORCE + 3 policies (tenant_isolation PERMISSIVE, admin_write RESTRICTIVE, admin_update RESTRICTIVE) sur `cotraitants`, `tender_cotraitants`, `cotraitant_documents`, `be_documents`. Trigger `touch_cotraitants` ajouté sur `cotraitants`. Appliqué en prod (Supabase MCP). Hash inséré dans `drizzle.__drizzle_migrations`.**
