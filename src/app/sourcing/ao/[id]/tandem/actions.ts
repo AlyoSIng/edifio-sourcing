@@ -256,7 +256,7 @@ export async function matchArchitectsForTender(
 
     // 7. Run matcher V1
     const scores = rankArchitects(
-      { title: tender.title, buyer: tender.buyer, rawData: tender.rawData },
+      { title: tender.title, buyer: tender.buyer, rawData: tender.rawData, amount: tender.amount },
       { architects: activeArchitects, recentSolicitationsByArchitect: recentMap },
       { topN },
     );

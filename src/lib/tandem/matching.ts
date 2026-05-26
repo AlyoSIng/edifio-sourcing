@@ -478,7 +478,7 @@ export interface RankArchitectsOptions {
  * @param options — topN + profile
  */
 export function rankArchitects(
-  tender: Pick<Tender, "title" | "buyer" | "rawData">,
+  tender: Pick<Tender, "title" | "buyer" | "rawData" | "amount">,
   inputs: MatchingInputs,
   options: RankArchitectsOptions = {},
 ): MatchScore[] {
@@ -488,7 +488,15 @@ export function rankArchitects(
   const inferredCodes = inferCategoriesFromTender(tender);
   const tenderDept = extractDepartment(tender);
 
-  const scored: MatchScore[] = inputs.architects.map((a) => {
+  // Filtre éligibilité CA : exclure si annual_revenue < 40 % du montant marché.
+  // Si l'un des deux est NULL/inconnu → inclure par défaut (bénéfice du doute).
+  const tenderAmount = tender.amount ? parseFloat(String(tender.amount)) : null;
+  const eligibleArchitects = inputs.architects.filter((a) => {
+    if (!tenderAmount || !a.annualRevenue) return true;
+    return a.annualRevenue >= tenderAmount * 0.4;
+  });
+
+  const scored: MatchScore[] = eligibleArchitects.map((a) => {
     const recentSolic = inputs.recentSolicitationsByArchitect.get(a.id) ?? 0;
     const breakdown = scoreArchitect(a, tender, recentSolic, weights, inferredCodes, tenderDept);
     return {
@@ -503,7 +511,7 @@ export function rankArchitects(
 
   // Composition souhaitée : ~3 cabinets headcount ≥ 10, reste headcount 3-9.
   // Best-effort : si pas assez d'une catégorie, on complète avec le meilleur score.
-  const headcountById = new Map(inputs.architects.map((a) => [a.id, a.headcount ?? 0]));
+  const headcountById = new Map(eligibleArchitects.map((a) => [a.id, a.headcount ?? 0]));
 
   const bigFirms = scored.filter((s) => headcountById.get(s.architectId)! >= 10);
   const midFirms = scored.filter((s) => {

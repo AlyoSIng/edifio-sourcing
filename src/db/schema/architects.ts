@@ -87,6 +87,12 @@ export const architects = pgTable(
     city: text("city"),
     /** Effectif (enrichissement, hors matching V1). */
     headcount: integer("headcount"),
+    /**
+     * Chiffre d'affaires annuel moyen du cabinet (€ HT).
+     * Utilisé dans le filtre d'éligibilité Tandem (règle : CA ≥ 40 % du montant marché).
+     * NULL = inconnu → architecte inclus par défaut.
+     */
+    annualRevenue: integer("annual_revenue"),
     /** Taille entreprise (PME | ETI | GE) — enrichissement, hors matching V1. */
     companySize: text("company_size"),
     companyCreatedAt: timestamp("company_created_at", { withTimezone: true }),
