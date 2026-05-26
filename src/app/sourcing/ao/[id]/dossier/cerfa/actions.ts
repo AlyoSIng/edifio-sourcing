@@ -20,6 +20,7 @@ export const runtime = "nodejs";
 
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 
 import { db } from "@/db/client";
 import { responseFiles } from "@/db/schema/library";
@@ -37,6 +38,42 @@ import type { CerfaField } from "@/lib/dossier/cerfa-prefill";
 const BUCKET = "response_files";
 
 // ---------------------------------------------------------------------------
+// Validation UUID (B-1) + Zod schema fields (B-2)
+// ---------------------------------------------------------------------------
+
+/** Regex UUID v4. Utilisée en défense profonde dans les Server Actions. */
+const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/** Valeurs autorisées pour `cerfaKind`. */
+const VALID_CERFA_KINDS = new Set(["DC1", "DC2"]);
+
+/** Taille maximale du JSON sérialisé avant upload Storage (512 Ko). */
+const MAX_JSON_SIZE_BYTES = 512 * 1024;
+
+/**
+ * Schéma Zod pour un champ CERFA reçu du client.
+ *
+ * Surface réseau : la Server Action reçoit les `fields` directement du client
+ * (Next.js ne valide pas les arguments à l'exécution). Ce schéma garantit :
+ *  - `field_id` : format slug alphanumérique sécurisé (pas d'injection chemin)
+ *  - `value` : bornée à 500 chars
+ *  - `source` : enum strict (pas de valeur fantaisiste persistée)
+ *  - Tableau max 50 éléments (anti-DoS mémoire / Storage)
+ */
+const cerfaFieldSchema = z.object({
+  field_id: z
+    .string()
+    .regex(/^[a-z0-9_]+$/, "field_id doit être alphanumérique snake_case")
+    .max(64),
+  field_label: z.string().max(200),
+  value: z.string().max(500),
+  source: z.enum(["company_data", "tender_data", "a_completer"]),
+  required: z.boolean(),
+});
+
+const cerfaFieldsSchema = z.array(cerfaFieldSchema).max(50, "Trop de champs CERFA (max 50)");
+
+// ---------------------------------------------------------------------------
 // Types retour
 // ---------------------------------------------------------------------------
 
@@ -45,6 +82,7 @@ export interface ValidateCerfaResult {
   error?:
     | "not_authenticated"
     | "tender_not_found"
+    | "invalid_input"
     | "missing_required_fields"
     | "storage_upload_failed"
     | "db_insert_failed"
@@ -96,6 +134,23 @@ export async function validateCerfa(
     const auth = await getAuthenticatedUser();
     if (!auth) return { ok: false, error: "not_authenticated" };
 
+    // B-1 : Validation UUID + cerfaKind contre liste blanche
+    // (les Server Actions sont une surface réseau — le type TS ne suffit pas)
+    if (!UUID_SHAPE.test(tenderId)) {
+      return { ok: false, error: "tender_not_found" };
+    }
+    if (!VALID_CERFA_KINDS.has(cerfaKind)) {
+      return { ok: false, error: "invalid_input" };
+    }
+
+    // B-2 : Validation Zod des champs reçus du client
+    const fieldsResult = cerfaFieldsSchema.safeParse(fields);
+    if (!fieldsResult.success) {
+      console.warn("[cerfa:validate:fields:invalid]", fieldsResult.error.flatten());
+      return { ok: false, error: "invalid_input" };
+    }
+    const validatedFields = fieldsResult.data;
+
     // 2. Vérification ownership du tender
     const [tender] = await db
       .select({ id: tenders.id })
@@ -105,8 +160,8 @@ export async function validateCerfa(
 
     if (!tender) return { ok: false, error: "tender_not_found" };
 
-    // 3. Validation des champs requis non remplis
-    const missing = fields
+    // 3. Validation des champs requis non remplis (sur le tableau validé Zod)
+    const missing = validatedFields
       .filter((f) => f.required && f.source === "a_completer" && f.value.trim() === "")
       .map((f) => f.field_id);
 
@@ -114,14 +169,20 @@ export async function validateCerfa(
       return { ok: false, error: "missing_required_fields", missing };
     }
 
-    // 4. Sérialisation JSON
+    // 4. Sérialisation JSON (avec les champs validés côté serveur)
     const payload = {
       cerfa_kind: cerfaKind,
-      fields,
+      fields: validatedFields,
       validated_at: new Date().toISOString(),
     };
     const json = JSON.stringify(payload);
     const jsonBuffer = Buffer.from(json, "utf-8");
+
+    // B-2 : Limite de taille globale du payload (anti-DoS Storage)
+    if (jsonBuffer.byteLength > MAX_JSON_SIZE_BYTES) {
+      console.warn("[cerfa:validate:payload:too-large]", jsonBuffer.byteLength);
+      return { ok: false, error: "invalid_input" };
+    }
 
     // 5. Upload Supabase Storage
     const filename = `${cerfaKind.toLowerCase()}_${Date.now()}.json`;
@@ -153,8 +214,11 @@ export async function validateCerfa(
       });
     } catch (err) {
       console.error("[cerfa:validate:db:fail]", err);
-      // Nettoyage Storage best-effort en cas d'échec BDD
-      await auth.supabase.storage.from(BUCKET).remove([storagePath]);
+      // Nettoyage Storage best-effort en cas d'échec BDD (W-4 : on logue le résultat)
+      const { error: removeErr } = await auth.supabase.storage.from(BUCKET).remove([storagePath]);
+      if (removeErr) {
+        console.error("[cerfa:validate:storage:cleanup:fail]", removeErr);
+      }
       return { ok: false, error: "db_insert_failed" };
     }
 
@@ -188,6 +252,12 @@ export async function loadExistingCerfa(tenderId: string): Promise<{
   dc1: ExistingCerfa | null;
   dc2: ExistingCerfa | null;
 }> {
+  // B-1 : validation UUID défensive (loadExistingCerfa est exportée — peut être
+  // appelée depuis d'autres contextes que le Server Component CerfaPage)
+  if (!UUID_SHAPE.test(tenderId)) {
+    return { dc1: null, dc2: null };
+  }
+
   const rows = await db
     .select({
       id: responseFiles.id,

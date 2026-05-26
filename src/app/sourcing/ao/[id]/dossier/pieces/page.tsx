@@ -29,7 +29,7 @@ import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
-import type { RcAnalysis } from "@/lib/ai/schemas";
+import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { PiecesClient } from "./PiecesClient";
 import { loadExistingCerfa } from "../cerfa/actions";
 
@@ -99,12 +99,19 @@ export default async function PiecesPage({ params }: PageProps) {
       .orderBy(desc(tenderEvents.occurredAt))
       .limit(1);
 
-    // Extraction de l'analyse RC
-    let rcAnalysis: RcAnalysis | null = null;
+    // Extraction de l'analyse RC — parsée avec Zod pour détecter les évolutions
+    // de schéma entre le moment du run IA et l'affichage (W-2 Hugo)
+    let rcAnalysis = null;
     if (rcAnalyzedEvent?.data) {
       const extra = (rcAnalyzedEvent.data as { extra?: { rc_analysis?: unknown } }).extra;
       if (extra?.rc_analysis) {
-        rcAnalysis = extra.rc_analysis as RcAnalysis;
+        const parsed = rcAnalysisSchema.safeParse(extra.rc_analysis);
+        if (parsed.success) {
+          rcAnalysis = parsed.data;
+        } else {
+          console.warn("[pieces-page:rc-analysis:schema-mismatch]", parsed.error.flatten());
+          // rcAnalysis reste null → l'UI affiche le message "Aucune analyse RC disponible"
+        }
       }
     }
 
@@ -197,7 +204,7 @@ export default async function PiecesPage({ params }: PageProps) {
     console.error("[pieces-page:unhandled]", err);
     return (
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <ErrorBanner message={err instanceof Error ? err.message : "Erreur de chargement."} />
+        <ErrorBanner message="Erreur de chargement — réessayez ou contactez l'administrateur." />
       </main>
     );
   }

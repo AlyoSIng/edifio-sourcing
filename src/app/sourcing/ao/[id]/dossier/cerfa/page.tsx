@@ -224,7 +224,7 @@ export default async function CerfaPage({ params }: PageProps) {
     console.error("[cerfa-page:unhandled]", err);
     return (
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <ErrorBanner message={err instanceof Error ? err.message : "Erreur de chargement."} />
+        <ErrorBanner message="Erreur de chargement — réessayez ou contactez l'administrateur." />
       </main>
     );
   }
