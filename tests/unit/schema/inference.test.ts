@@ -174,7 +174,8 @@ describe("schema Drizzle v1 — inférence de types", () => {
 
   it("selections : mode enum selection_mode", () => {
     type Row = typeof selections.$inferSelect;
-    expectTypeOf<Row["mode"]>().toEqualTypeOf<"solo" | "tandem">();
+    // Migration 0012 a ajouté 'conception_realisation' à l'enum selection_mode.
+    expectTypeOf<Row["mode"]>().toEqualTypeOf<"solo" | "tandem" | "conception_realisation">();
     expectTypeOf<Row["cancelledAt"]>().toEqualTypeOf<Date | null>();
   });
 

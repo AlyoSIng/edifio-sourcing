@@ -329,6 +329,10 @@ export async function getTendersDeferred(
       platformCode: platforms.code,
       externalRef: tenders.externalRef,
       deferredUntil: tenders.deferredUntil,
+      sourceUrl: tenders.sourceUrl,
+      dceUrl: tenders.dceUrl,
+      rawData: tenders.rawData,
+      excludedAt: tenders.excludedAt,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
