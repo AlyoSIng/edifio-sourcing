@@ -78,6 +78,9 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
   const [budgetMin, setBudgetMin] = useState(architect.budgetMin?.toString() ?? "");
   const [budgetMax, setBudgetMax] = useState(architect.budgetMax?.toString() ?? "");
 
+  // Effectif — saisie manuelle (enrichissement)
+  const [headcount, setHeadcount] = useState(architect.headcount?.toString() ?? "");
+
   // -------------------------------------------------------------------------
   // Soumission formulaire principal
   // -------------------------------------------------------------------------
@@ -123,7 +126,7 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
           active: architect.active,
           rgpdOpposition: architect.rgpdOpposition,
           rgpdOppositionDate: architect.rgpdOppositionDate,
-          headcount: architect.headcount,
+          headcount: headcount ? parseInt(headcount, 10) : null,
           companySize: architect.companySize,
           companyCreatedAt: architect.companyCreatedAt,
           odooExternalId: architect.odooExternalId,
@@ -391,6 +394,25 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
                 className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
               />
             </div>
+          </div>
+
+          {/* Effectif */}
+          <div className="max-w-[200px]">
+            <label htmlFor="headcount" className="block text-xs font-medium text-ink">
+              Effectif{" "}
+              <span className="text-xs font-normal text-muted">(personnes, optionnel)</span>
+            </label>
+            <input
+              id="headcount"
+              type="number"
+              min={1}
+              max={9999}
+              step={1}
+              value={headcount}
+              onChange={(e) => setHeadcount(e.target.value)}
+              placeholder="ex : 5"
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
           </div>
 
           {/* Drapeaux */}
