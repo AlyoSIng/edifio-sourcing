@@ -109,12 +109,13 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
       setPage(0);
       setLoading(false);
       // Persistance fire-and-forget — on ne bloque pas l'UI
+      // rank = position dans le tableau trié par score desc (1-indexed)
       void persistMatchProposals(
         tenderId,
-        result.matches.map((m) => ({
+        result.matches.map((m, idx) => ({
           architectId: m.architectId,
           score: m.score,
-          rank: m.rank,
+          rank: idx + 1,
           rationale: m.rationale,
         })),
       );
