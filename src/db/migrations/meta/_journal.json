@@ -85,6 +85,20 @@
       "when": 1748995200000,
       "tag": "0011_be_companies",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1748995260000,
+      "tag": "0012_selectionmode_cr",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1748995320000,
+      "tag": "0013_tender_excluded",
+      "breakpoints": true
     }
   ]
 }

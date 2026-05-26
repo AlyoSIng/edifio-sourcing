@@ -107,13 +107,12 @@ export const NAV_ITEMS: NavSection[] = [
         icon: "file-text",
         matchPrefix: "/sourcing/reponse-solo",
       },
-      // Conception/Réalisation — placeholder Phase 2.
+      // Conception/Réalisation — page stub activée PR feat/modal-mandataire-cr.
       {
         href: "/sourcing/conception-realisation",
         label: "Conception/Réalisation",
         icon: "layers",
         matchPrefix: "/sourcing/conception-realisation",
-        comingSoon: true,
       },
     ],
   },

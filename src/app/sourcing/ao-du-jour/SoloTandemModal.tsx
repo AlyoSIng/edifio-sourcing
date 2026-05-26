@@ -11,14 +11,14 @@
  *  - Escape ferme la modale (onCancel)
  *  - click outside (backdrop) ferme la modale (onCancel)
  *
- * V1 — pas de scoring architecte automatique : le tag `Recommandé · score MOE
- * 0.91` reste *présentationnel uniquement* (cf. brief PR n°5 §3.2). Le tag
- * est marqué via comment HTML pour le futur dev (Phase 2 scoring réel).
+ * V1 — badge `Recommandé · Score MOE` affiché dynamiquement si `tenderScore >= 70`
+ * (prop `tenderScore: number | null` reçue de `TenderCardActions`). Score issu
+ * de `tenders.score` (0-100, cf. spec sourcing engine §scoring).
  */
 
 import { useCallback, useEffect, useId, useState } from "react";
 
-type Mode = "solo" | "tandem";
+type Mode = "solo" | "tandem" | "conception_realisation";
 
 export interface SoloTandemModalProps {
   tenderTitle: string;
@@ -26,6 +26,8 @@ export interface SoloTandemModalProps {
   tenderAmount: string;
   /** Pré-formaté (ex. « 28 mai »). */
   tenderDeadline: string;
+  /** Score de pertinence 0-100 issu de `tenders.score`. Badge affiché uniquement si >= 70. */
+  tenderScore: number | null;
   onConfirm: (mode: Mode) => void;
   onCancel: () => void;
 }
@@ -34,6 +36,7 @@ export function SoloTandemModal({
   tenderTitle,
   tenderAmount,
   tenderDeadline,
+  tenderScore,
   onConfirm,
   onCancel,
 }: SoloTandemModalProps) {
@@ -68,7 +71,7 @@ export function SoloTandemModal({
       onClick={onBackdropClick}
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F1A2E]/45 p-6"
     >
-      <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+      <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
         {/* Header */}
         <div className="mb-5">
           <div className="font-mono text-[11px] uppercase tracking-wider text-[#FF0033]">
@@ -85,12 +88,12 @@ export function SoloTandemModal({
           </p>
         </div>
 
-        {/* Grid 2 colonnes Solo / Tandem */}
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* Grid 3 cartes : Mandataire / Cotraitance / Conception-Réalisation */}
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <ModeCard
             mode="solo"
             icon="🧍"
-            name="Solo"
+            name="Mandataire"
             description="Tu réponds en propre, en mandataire seul. L'AO bascule en pipeline et l'opportunité est créée dans Odoo."
             selected={selectedMode === "solo"}
             onSelect={() => setSelectedMode("solo")}
@@ -99,11 +102,23 @@ export function SoloTandemModal({
           <ModeCard
             mode="tandem"
             icon="🤝"
-            name="Tandem"
+            name="Cotraitance"
             description="Tu mobilises un architecte cotraitant. edifio Sourcing te propose 3 architectes scorés et envoie la sollicitation."
             selected={selectedMode === "tandem"}
             onSelect={() => setSelectedMode("tandem")}
-            recommendedTag="Recommandé · score MOE 0.91"
+            recommendedTag={
+              tenderScore !== null && tenderScore >= 70
+                ? `Recommandé · Score MOE ${tenderScore}/100`
+                : undefined
+            }
+          />
+          <ModeCard
+            mode="conception_realisation"
+            icon="🏗️"
+            name="Conception/Réalisation"
+            description="Tu réponds en groupement conception-réalisation. AlyoS assure la maîtrise d'œuvre et coordonne un partenaire réalisateur."
+            selected={selectedMode === "conception_realisation"}
+            onSelect={() => setSelectedMode("conception_realisation")}
           />
         </div>
 
@@ -141,10 +156,7 @@ interface ModeCardProps {
   description: string;
   selected: boolean;
   onSelect: () => void;
-  /**
-   * TODO V2 score réel : le tag « Recommandé · score MOE 0.91 » est
-   * présentationnel en V1 — pas de calcul backend. Cf. brief PR n°5 §3.2.
-   */
+  /** Badge affiché sous la description (ex. « Recommandé · Score MOE 82/100 »). */
   recommendedTag?: string;
   autoFocus?: boolean;
 }

@@ -7,15 +7,15 @@ import { TenderCardActions } from "./TenderCardActions";
  * Carte AO « du jour » — habillage charte edifio (M-A lignes 236-302).
  *
  * Server Component pour le rendu + sous-composant Client `<TenderCardActions />`
- * pour les 3 boutons Sélectionner / Différer / Rejeter (PR n°5).
+ * pour les boutons Sélectionner / Différer / Rejeter / Exclure (PR n°5 + n°6).
  *
  * Pattern visuel :
  *   - Grid 3 colonnes : [score ring 64px] [main] [actions 132px+]
  *   - Score ring SVG inline avec dasharray dynamique (cf. helper plus bas)
  *   - Couleur du ring dérivée du score (≥75 brand-red, 50-74 warn, <50 line-2)
- *   - Score breakdown (4 barres CPV / Géo / Montant / Délai) — V2 quand les
- *     sous-scores seront exposés. V1 affiche uniquement la barre globale via
- *     le ring.
+ *   - Brief AO (3-4 lignes) extrait de rawData BOAMP (record.description / objet)
+ *   - Département extrait de rawData, fallback regex code postal dans buyer
+ *   - Liens « Consulter l'avis » + « Accéder au DCE / RC » si disponibles
  *
  * Aucune touche aux données : signature `TenderCard({ tender })` inchangée.
  */
@@ -26,6 +26,12 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
   const deadlineLabel = formatDeadline(tender.deadline);
   const daysToDeadline = daysUntil(tender.deadline);
   const deadlineTone = deadlineToneFromDays(daysToDeadline);
+
+  // Brief AO extrait du rawData BOAMP (description / objet / libelle)
+  const brief = extractBrief(tender.rawData);
+
+  // Département / code postal extrait du rawData, fallback sur buyer
+  const dept = extractDeptFromTender(tender.rawData, tender.buyer);
 
   return (
     <article className="grid grid-cols-1 gap-4 rounded-md border border-line bg-white p-4 transition hover:shadow-card sm:grid-cols-[64px_1fr_auto] sm:items-start">
@@ -40,6 +46,7 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
           <span>{tender.buyer}</span>
           <span className="font-mono">CPV {mainCpv}</span>
           <span className="font-mono">Réf. {tender.externalRef}</span>
+          {dept ? <span className="font-mono">Dépt. {dept}</span> : null}
           <span
             className="rounded-xs bg-paper-2 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-2"
             aria-label="Plateforme source"
@@ -47,9 +54,39 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
             {platformLabel}
           </span>
         </div>
+
+        {/* Brief AO — extrait de rawData (BOAMP: record.description / record.objet) */}
+        {brief ? <p className="mt-2 line-clamp-3 text-xs text-ink-2">{brief}</p> : null}
+
         <p className="mt-2 text-xs text-ink-2">
           Estimation <span className="font-medium">{formatAmount(tender.amount)}</span>
         </p>
+
+        {/* Liens vers l'avis source et le DCE si disponibles */}
+        {(tender.sourceUrl ?? tender.dceUrl) ? (
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+            {tender.sourceUrl ? (
+              <a
+                href={tender.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-red underline-offset-2 hover:underline"
+              >
+                Consulter l&apos;avis ↗
+              </a>
+            ) : null}
+            {tender.dceUrl ? (
+              <a
+                href={tender.dceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-red underline-offset-2 hover:underline"
+              >
+                Accéder au DCE / RC ↗
+              </a>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-col items-stretch gap-1.5 sm:min-w-[140px]">
@@ -66,6 +103,8 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
           tenderTitle={tender.title}
           tenderAmount={formatAmount(tender.amount)}
           tenderDeadline={deadlineLabel}
+          tenderScore={scoreNum}
+          isExcluded={!!tender.excludedAt}
         />
       </div>
     </article>
@@ -146,4 +185,52 @@ function deadlineToneFromDays(days: number | null): string {
   if (days <= 7) return "text-warn";
   if (days <= 14) return "text-ink-2";
   return "text-muted";
+}
+
+/**
+ * Extrait un brief court (≤ 320 chars) depuis le rawData BOAMP.
+ *
+ * Priorité de champs : description > objet > libelle.
+ * Tronque à 317 chars + « … » si le texte est trop long.
+ * Retourne `null` si aucun champ exploitable.
+ */
+function extractBrief(rawData: TenderOfTheDay["rawData"]): string | null {
+  if (!rawData?.record) return null;
+  const rec = rawData.record as Record<string, unknown>;
+  const text =
+    (typeof rec.description === "string" ? rec.description : null) ??
+    (typeof rec.objet === "string" ? rec.objet : null) ??
+    (typeof rec.libelle === "string" ? rec.libelle : null);
+  if (!text) return null;
+  return text.length > 320 ? text.slice(0, 317) + "…" : text;
+}
+
+/**
+ * Extrait le département (2 caractères) depuis le rawData ou le champ buyer.
+ *
+ * Stratégie :
+ *   1. Priorité rawData BOAMP : champ `record.departement` s'il est une string
+ *      non vide (ex. "75", "2A", "974").
+ *   2. Fallback : regex code postal 5 chiffres dans le champ `buyer`
+ *      (ex. "Mairie de Paris, 75001 Paris" → "75").
+ *      Cas Corse : CP "20xxx" → "2A" si xxx < 200, "2B" sinon.
+ *
+ * Retourne `null` si aucune info départementale trouvable.
+ */
+function extractDeptFromTender(rawData: TenderOfTheDay["rawData"], buyer: string): string | null {
+  // 1. Priorité rawData BOAMP
+  if (rawData?.record) {
+    const rec = rawData.record as Record<string, unknown>;
+    if (typeof rec.departement === "string" && rec.departement) return rec.departement;
+  }
+  // 2. Fallback : code postal dans buyer
+  const match = buyer.match(/\b([0-9]{5})\b/);
+  if (!match) return null;
+  const cp = match[1]!;
+  // Cas Corse (CP commençant par "20")
+  if (cp.startsWith("20")) {
+    const sub = parseInt(cp.slice(2), 10);
+    return sub < 200 ? "2A" : "2B";
+  }
+  return cp.slice(0, 2);
 }

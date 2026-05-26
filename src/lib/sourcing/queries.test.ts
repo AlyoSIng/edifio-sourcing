@@ -58,6 +58,10 @@ const tenderRow1: TenderOfTheDay = {
   platformCode: "boamp",
   externalRef: "BOAMP-AO-001",
   deferredUntil: null,
+  sourceUrl: null,
+  dceUrl: null,
+  rawData: null,
+  excludedAt: null,
 };
 
 const tenderRow2: TenderOfTheDay = {
@@ -71,6 +75,10 @@ const tenderRow2: TenderOfTheDay = {
   platformCode: "place",
   externalRef: "PLACE-AO-002",
   deferredUntil: null,
+  sourceUrl: null,
+  dceUrl: null,
+  rawData: null,
+  excludedAt: null,
 };
 
 const tenderRow3: TenderOfTheDay = {
@@ -84,6 +92,10 @@ const tenderRow3: TenderOfTheDay = {
   platformCode: "francmarches",
   externalRef: "FM-AO-003",
   deferredUntil: null,
+  sourceUrl: null,
+  dceUrl: null,
+  rawData: null,
+  excludedAt: null,
 };
 
 /**
@@ -104,6 +116,10 @@ const tenderRow4PreviouslyDeferred: TenderOfTheDay = {
   externalRef: "BOAMP-AO-004",
   // Différé expiré (1 heure dans le passé) — visible dans le digest
   deferredUntil: new Date(Date.now() - 60 * 60 * 1000),
+  sourceUrl: null,
+  dceUrl: null,
+  rawData: null,
+  excludedAt: null,
 };
 
 // ----------------------------------------------------------------------------

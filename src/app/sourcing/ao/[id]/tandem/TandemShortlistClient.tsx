@@ -9,7 +9,7 @@
  *  - `handoff/PLAN_TANDEM_NADIA_260522.md` §sous-étape 5
  *
  * Comportement V2 (Tandem V2) :
- *  - Short-list jusqu'à 10 architectes (plus de limite à 3).
+ *  - Short-list jusqu'à 100 architectes, paginés par 10 côté UI.
  *  - Checkboxes par architecte + barre d'action groupée "Envoyer les sollicitations sélectionnées".
  *  - Ajout manuel d'un architecte via recherche inline (debounce 300ms).
  *  - Relevance learning : le matcher V1 booste les architectes ayant historiquement accepté.
@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 
 import {
   matchArchitectsForTender,
+  persistMatchProposals,
   searchArchitectsForShortlist,
   sendArchitectSolicitation,
   sendBulkArchitectSolicitation,
@@ -35,6 +36,8 @@ import { BrevoPreviewModal } from "./BrevoPreviewModal";
 import type { TandemShortlistData } from "./page-data";
 import type { BrevoRegister } from "@/lib/brevo/template-picker";
 import type { ArchitectResponse } from "@/db/schema/selections";
+
+const PAGE_SIZE = 10;
 
 interface Props {
   tenderId: string;
@@ -61,6 +64,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
   const [rows, setRows] = useState<ArchitectRow[]>(() => buildRowsFromInitial(initialData));
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   // --- Sélection pour envoi groupé ---
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -86,7 +90,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     setLoading(true);
     setLoadError(null);
     void (async () => {
-      const result = await matchArchitectsForTender(tenderId, 10);
+      const result = await matchArchitectsForTender(tenderId, 50);
       if (cancelled) return;
       if (!result.ok) {
         setLoadError(mapErrorToFr(result.error));
@@ -102,7 +106,19 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         responseStatus: null,
       }));
       setRows(newRows);
+      setPage(0);
       setLoading(false);
+      // Persistance fire-and-forget — on ne bloque pas l'UI
+      // rank = position dans le tableau trié par score desc (1-indexed)
+      void persistMatchProposals(
+        tenderId,
+        result.matches.map((m, idx) => ({
+          architectId: m.architectId,
+          score: m.score,
+          rank: idx + 1,
+          rationale: m.rationale,
+        })),
+      );
     })();
     return () => {
       cancelled = true;
@@ -303,6 +319,10 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     );
   }
 
+  // Pagination
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
+  const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   // Nombre de cochés éligibles à l'envoi (pas déjà sollicités)
   const eligibleCheckedCount = rows.filter(
     (r) => checked.has(r.architectId) && r.responseStatus === null,
@@ -352,8 +372,11 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
       )}
 
       {/* Liste des architectes */}
-      <ol className="flex flex-col gap-4" aria-label="Liste des architectes proposés">
-        {rows.map((row) => (
+      <ol
+        className="flex flex-col gap-4"
+        aria-label={`Liste des architectes proposés (${rows.length})`}
+      >
+        {pageRows.map((row) => (
           <li key={row.architectId}>
             <ArchitectCard
               row={row}
@@ -364,6 +387,31 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
           </li>
         ))}
       </ol>
+
+      {/* Pagination */}
+      {totalPages > 1 ? (
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="rounded-sm border border-line-2 px-3 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-40"
+          >
+            &larr; Précédent
+          </button>
+          <span className="text-xs text-muted">
+            Page {page + 1} / {totalPages} &middot; {rows.length} architectes
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page === totalPages - 1}
+            className="rounded-sm border border-line-2 px-3 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-40"
+          >
+            Suivant &rarr;
+          </button>
+        </div>
+      ) : null}
 
       {/* Section ajout manuel */}
       <div className="mt-6">
