@@ -7,6 +7,7 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/sup
 
 import { InviteUserDialog } from "./InviteUserDialog";
 import { RegeneratePasswordButton } from "./RegeneratePasswordButton";
+import { ToggleRoleButton } from "./ToggleRoleButton";
 
 // TODO Phase 2 MFA TOTP — Board Q3/A 2026-05-12.
 // Réserver la place du toggle « Activer la double authentification » dans
@@ -82,6 +83,10 @@ export default async function AdminUsersPage() {
   const sollicitableCount = users.filter((u) => !u.mustChangePassword).length;
   const provisionalCount = users.length - sollicitableCount;
 
+  // `profile.id` est l'UUID de l'acteur connecté — transmis aux lignes pour
+  // bloquer l'auto-rétrogradation côté UI (le guard serveur reste la protection réelle).
+  const currentUserId = profile.id;
+
   return (
     <div className="mx-auto max-w-5xl">
       {/* En-tête de page — pattern M16 ligne 144-154 */}
@@ -120,7 +125,7 @@ export default async function AdminUsersPage() {
                 </td>
               </tr>
             ) : (
-              users.map((u) => <UserRow key={u.id} user={u} />)
+              users.map((u) => <UserRow key={u.id} user={u} currentUserId={currentUserId} />)
             )}
           </tbody>
         </table>
@@ -140,7 +145,7 @@ function Th({ children }: { children: React.ReactNode }) {
   );
 }
 
-function UserRow({ user }: { user: UserProfile }) {
+function UserRow({ user, currentUserId }: { user: UserProfile; currentUserId: string }) {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
 
   const isExpired =
@@ -161,6 +166,27 @@ function UserRow({ user }: { user: UserProfile }) {
     : "bg-success-bg text-success";
 
   const roleLabel = roleToFr(user.role);
+
+  // Logique d'affichage de la colonne Actions :
+  //   - Provisoire (mustChangePassword) → RegeneratePasswordButton uniquement
+  //   - Actif non-viewer                → ToggleRoleButton
+  //   - Actif viewer                    → tiret (pas de modification de rôle viewer en MVP)
+  const renderActions = () => {
+    if (user.mustChangePassword) {
+      return <RegeneratePasswordButton userId={user.id} email={user.email} />;
+    }
+    if (user.role === "admin" || user.role === "user") {
+      return (
+        <ToggleRoleButton
+          targetUserId={user.id}
+          currentRole={user.role}
+          isSelf={user.id === currentUserId}
+        />
+      );
+    }
+    // Viewer — pas de bouton en MVP
+    return <span className="text-muted">—</span>;
+  };
 
   return (
     <tr className="hover:bg-paper-2">
@@ -183,13 +209,7 @@ function UserRow({ user }: { user: UserProfile }) {
           ? new Date(user.provisionalPasswordExpiresAt).toLocaleDateString("fr-FR")
           : "—"}
       </td>
-      <td className="px-3 py-2.5 text-xs">
-        {user.mustChangePassword ? (
-          <RegeneratePasswordButton userId={user.id} email={user.email} />
-        ) : (
-          <span className="text-muted">—</span>
-        )}
-      </td>
+      <td className="px-3 py-2.5 text-xs">{renderActions()}</td>
     </tr>
   );
 }
