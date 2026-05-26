@@ -83,7 +83,7 @@ export const NAV_ITEMS: NavSection[] = [
       },
       {
         href: "/sourcing/reponse-solo",
-        label: "Réponse solo",
+        label: "Mandataire",
         icon: "file-text",
         matchPrefix: "/sourcing/reponse-solo",
       },

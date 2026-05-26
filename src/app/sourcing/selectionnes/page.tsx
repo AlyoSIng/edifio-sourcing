@@ -66,8 +66,8 @@ export default async function SelectionnesPage() {
             "Aucun AO sélectionné pour le moment."
           ) : (
             <>
-              {totalCount} AO sélectionné{totalCount > 1 ? "s" : ""} — {soloCount} Solo,{" "}
-              {tandemCount} Tandem. Triés par date de clôture.
+              {totalCount} AO sélectionné{totalCount > 1 ? "s" : ""} — {soloCount} Mandataire,{" "}
+              {tandemCount} Co-traitant. Triés par date de clôture.
             </>
           )}
         </p>
@@ -77,8 +77,8 @@ export default async function SelectionnesPage() {
       {!fetchError ? (
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <KpiCard label="Total sélectionnés" value={totalCount} accent />
-          <KpiCard label="En Solo" value={soloCount} />
-          <KpiCard label="En Tandem" value={tandemCount} />
+          <KpiCard label="Mandataire" value={soloCount} />
+          <KpiCard label="Co-traitant" value={tandemCount} />
         </div>
       ) : null}
 
@@ -110,7 +110,7 @@ export default async function SelectionnesPage() {
                         href={`/sourcing/ao/${tender.id}/tandem`}
                         className="inline-flex items-center justify-center gap-1 rounded-sm border border-line-2 bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
                       >
-                        Voir Tandem →
+                        Voir Co-traitant →
                       </Link>
                     )}
                   </>
@@ -162,7 +162,7 @@ function StatusBadge({ status }: { status: "selected_solo" | "selected_tandem" }
         isSolo ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
       }`}
     >
-      {isSolo ? "Solo" : "Tandem"}
+      {isSolo ? "Mandataire" : "Co-traitant"}
     </span>
   );
 }
