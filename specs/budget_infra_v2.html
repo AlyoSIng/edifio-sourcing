@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>edifio Sourcing — Étude de marché infrastructure v2.0</title>
+    <style>
+      /* ── Reset & base ── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        font-size: 15px;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        background: #f4f5f7;
+        color: #1d3557;
+        line-height: 1.6;
+      }
+
+      /* ── Layout ── */
+      .page {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 4rem;
+      }
+
+      /* ── Brand header ── */
+      .brand-header {
+        background: #1d3557;
+        color: #fff;
+        padding: 2rem 2.5rem;
+        border-radius: 10px 10px 0 0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .brand-header .logo-line {
+        font-size: 0.75rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #a8c0d6;
+        margin-bottom: 0.35rem;
+      }
+      .brand-header h1 {
+        font-size: 1.55rem;
+        font-weight: 700;
+        color: #fff;
+        line-height: 1.25;
+      }
+      .brand-header h1 span {
+        color: #e63946;
+      }
+      .brand-header .meta {
+        font-size: 0.8rem;
+        color: #a8c0d6;
+        line-height: 1.9;
+        text-align: right;
+      }
+      .brand-header .meta strong {
+        color: #fff;
+      }
+
+      /* ── Sections ── */
+      .section {
+        background: #fff;
+        border: 1px solid #dde3ec;
+        border-top: none;
+        padding: 2rem 2.5rem;
+      }
+      .section:last-of-type {
+        border-radius: 0 0 10px 10px;
+      }
+      .section + .section {
+        border-top: 1px solid #dde3ec;
+      }
+
+      h2 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #1d3557;
+        margin-bottom: 1.2rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e63946;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      h2 .icon {
+        font-size: 1.1rem;
+      }
+
+      h3 {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #1d3557;
+        margin: 1.4rem 0 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      p {
+        margin-bottom: 0.75rem;
+        color: #3d5068;
+        font-size: 0.88rem;
+      }
+      p:last-child {
+        margin-bottom: 0;
+      }
+
+      /* ── Executive summary box ── */
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+      .kpi-card {
+        background: #f4f5f7;
+        border: 1px solid #dde3ec;
+        border-radius: 8px;
+        padding: 1rem 1.2rem;
+        text-align: center;
+      }
+      .kpi-card .kpi-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #7a90a8;
+        margin-bottom: 0.3rem;
+      }
+      .kpi-card .kpi-value {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #1d3557;
+        line-height: 1.1;
+      }
+      .kpi-card .kpi-sub {
+        font-size: 0.72rem;
+        color: #7a90a8;
+        margin-top: 0.2rem;
+      }
+      .kpi-card.highlight {
+        background: #fff5f5;
+        border-color: #e63946;
+      }
+      .kpi-card.highlight .kpi-value {
+        color: #e63946;
+      }
+      .kpi-card.green {
+        background: #f0faf3;
+        border-color: #2d9c57;
+      }
+      .kpi-card.green .kpi-value {
+        color: #2d9c57;
+      }
+      .kpi-card.orange {
+        background: #fffbf0;
+        border-color: #e09800;
+      }
+      .kpi-card.orange .kpi-value {
+        color: #c67d00;
+      }
+
+      /* ── Tables ── */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.83rem;
+        margin: 0.8rem 0 1.2rem;
+      }
+      thead tr {
+        background: #1d3557;
+        color: #fff;
+      }
+      thead th {
+        padding: 0.65rem 0.85rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+      }
+      tbody tr:nth-child(even) {
+        background: #f8f9fb;
+      }
+      tbody tr:hover {
+        background: #eef2f7;
+      }
+      td {
+        padding: 0.6rem 0.85rem;
+        border-bottom: 1px solid #eef2f7;
+        color: #3d5068;
+        vertical-align: top;
+      }
+      td:first-child {
+        color: #1d3557;
+        font-weight: 500;
+      }
+      .total-row td {
+        background: #1d3557 !important;
+        color: #fff !important;
+        font-weight: 700;
+        border-bottom: none;
+      }
+      .subtotal-row td {
+        background: #e8edf3 !important;
+        font-weight: 600;
+        color: #1d3557 !important;
+      }
+
+      /* ── Badges & tags ── */
+      .badge {
+        display: inline-block;
+        padding: 0.15rem 0.55rem;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+      }
+      .badge-red {
+        background: #ffe8ea;
+        color: #c62828;
+      }
+      .badge-green {
+        background: #e6f4ea;
+        color: #2d7a2f;
+      }
+      .badge-orange {
+        background: #fff3e0;
+        color: #bf6000;
+      }
+      .badge-blue {
+        background: #e3eeff;
+        color: #1565c0;
+      }
+      .badge-purple {
+        background: #f3e5ff;
+        color: #7b1fa2;
+      }
+      .badge-gray {
+        background: #eceff1;
+        color: #546e7a;
+      }
+      .badge-new {
+        background: #e63946;
+        color: #fff;
+      }
+
+      /* ── Alert boxes ── */
+      .alert-box {
+        border-left: 4px solid;
+        border-radius: 0 6px 6px 0;
+        padding: 0.75rem 1rem;
+        margin: 0.7rem 0;
+        font-size: 0.84rem;
+      }
+      .alert-box.red {
+        border-color: #e63946;
+        background: #fff5f5;
+      }
+      .alert-box.orange {
+        border-color: #e09800;
+        background: #fffbf0;
+      }
+      .alert-box.green {
+        border-color: #2d9c57;
+        background: #f0faf3;
+      }
+      .alert-box.blue {
+        border-color: #457b9d;
+        background: #eef4fb;
+      }
+      .alert-box strong {
+        color: #1d3557;
+      }
+      .alert-box .alert-title {
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.3rem;
+        color: #1d3557;
+      }
+
+      /* ── Change log ── */
+      .changelog {
+        border: 1px solid #dde3ec;
+        border-radius: 6px;
+        overflow: hidden;
+        font-size: 0.82rem;
+      }
+      .changelog-row {
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        border-bottom: 1px solid #eef2f7;
+      }
+      .changelog-row:last-child {
+        border-bottom: none;
+      }
+      .changelog-date {
+        background: #f4f5f7;
+        padding: 0.6rem 0.85rem;
+        font-weight: 600;
+        color: #7a90a8;
+        font-size: 0.75rem;
+      }
+      .changelog-text {
+        padding: 0.6rem 0.85rem;
+        color: #3d5068;
+      }
+
+      /* ── Timeline ── */
+      .tracking-table td,
+      .tracking-table th {
+        text-align: center;
+      }
+      .tracking-table td:first-child,
+      .tracking-table th:first-child {
+        text-align: left;
+      }
+      .empty-cell {
+        color: #bdc4ce;
+        font-style: italic;
+        font-size: 0.75rem;
+      }
+
+      /* ── Footer ── */
+      .footer {
+        text-align: center;
+        padding: 1.5rem;
+        font-size: 0.75rem;
+        color: #7a90a8;
+        background: #f4f5f7;
+        border-top: 1px solid #dde3ec;
+        margin-top: 2rem;
+        border-radius: 8px;
+      }
+      .footer strong {
+        color: #1d3557;
+      }
+
+      /* ── Print ── */
+      @media print {
+        body {
+          background: #fff;
+        }
+        .page {
+          padding: 0;
+        }
+        .section {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- ══════════════════════ HEADER ══════════════════════ -->
+      <div class="brand-header">
+        <div>
+          <div class="logo-line">AlyoS Ingénierie — Document interne confidentiel</div>
+          <h1>edifio <span>Sourcing</span><br />Étude de marché infrastructure</h1>
+        </div>
+        <div class="meta">
+          <strong>Version 2.0</strong><br />
+          Mise à jour : 2026-05-26<br />
+          Version initiale : 2026-05-10<br />
+          Statut : <strong>Prévisionnel MVP</strong><br />
+          Phase : Gates 6–8 actives
+        </div>
+      </div>
+
+      <!-- ══════════════════════ 1. SYNTHÈSE ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">📊</span>1. Synthèse exécutive</h2>
+
+        <div class="summary-grid">
+          <div class="kpi-card green">
+            <div class="kpi-label">Phase preview (Gates 6–8)</div>
+            <div class="kpi-value">35–110 €</div>
+            <div class="kpi-sub">par mois HT</div>
+          </div>
+          <div class="kpi-card orange">
+            <div class="kpi-label">Phase prod (après Gate 9)</div>
+            <div class="kpi-value">59–134 €</div>
+            <div class="kpi-sub">par mois HT</div>
+          </div>
+          <div class="kpi-card highlight">
+            <div class="kpi-label">Plafond Phase 1 acté Board</div>
+            <div class="kpi-value">150 €</div>
+            <div class="kpi-sub">HT / mois — escalade si dépassement</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Marge de sécurité (prod)</div>
+            <div class="kpi-value">16–91 €</div>
+            <div class="kpi-sub">avant seuil d'alerte Board</div>
+          </div>
+        </div>
+
+        <div class="alert-box green">
+          <div class="alert-title">✅ Plafond respecté</div>
+          Le scénario haute (134 €/mois en prod) reste sous le plafond de 150 € HT. La marge est
+          suffisante même en hypothèse haute Anthropic (72 €) + Pappers actif (10 €) + Supabase Pro
+          (24 €).
+        </div>
+
+        <div class="alert-box blue">
+          <div class="alert-title">ℹ️ Changements v2.0 vs v1.0</div>
+          <strong>3 mises à jour majeures depuis le 2026-05-10 :</strong>
+          (1) Fly.io redimensionné <code>shared-cpu-2x</code> 2 GB + auto-stop (scrapers PLACE +
+          Francmarchés) ; (2) Pappers API ajouté pour l'enrichissement des architectes (nouveau
+          service) ; (3) P5 Haiku <code>architect_matching_rationale</code> désormais actif en
+          production.
+        </div>
+      </div>
+
+      <!-- ══════════════════════ 2. COÛTS MENSUELS ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">💶</span>2. Coûts mensuels consolidés</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Poste</th>
+              <th>Service</th>
+              <th>Configuration actuelle</th>
+              <th>Coût HT/mois</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Hébergement front + API</td>
+              <td><strong>Vercel</strong></td>
+              <td>Pro — 1 utilisateur AlyoS</td>
+              <td><strong>20 €</strong></td>
+              <td><span class="badge badge-green">actif</span></td>
+            </tr>
+            <tr>
+              <td>BDD + Auth + Storage</td>
+              <td><strong>Supabase</strong></td>
+              <td>Free (× 2 projets preview / prod)</td>
+              <td><strong>0 €</strong> → 24 € à Gate 9</td>
+              <td><span class="badge badge-blue">free tier</span></td>
+            </tr>
+            <tr>
+              <td>Container scraping</td>
+              <td><strong>Fly.io EU</strong></td>
+              <td>shared-cpu-2x · 2 GB RAM · cdg (Paris) · auto-stop</td>
+              <td><strong>3–8 €</strong> <small>(variable selon usage)</small></td>
+              <td><span class="badge badge-orange">v2 — mis à jour</span></td>
+            </tr>
+            <tr>
+              <td>Email architectes</td>
+              <td><strong>Brevo</strong></td>
+              <td>Free (300 envois/jour)</td>
+              <td><strong>0 €</strong> → 7 € si dépassement</td>
+              <td><span class="badge badge-blue">free tier</span></td>
+            </tr>
+            <tr>
+              <td>Email notifications</td>
+              <td><strong>Resend</strong></td>
+              <td>Free (3 000 envois/mois)</td>
+              <td><strong>0 €</strong> → 20 € si dépassement</td>
+              <td><span class="badge badge-blue">free tier</span></td>
+            </tr>
+            <tr>
+              <td>API IA (P1 à P12)</td>
+              <td><strong>Anthropic</strong></td>
+              <td>Sonnet 4.6 + Haiku 4.5 · usage-based · limit 100 €/mois</td>
+              <td><strong>12–72 €</strong></td>
+              <td><span class="badge badge-green">actif</span></td>
+            </tr>
+            <tr>
+              <td>Enrichissement architectes</td>
+              <td><strong>Pappers API</strong> <span class="badge badge-new">NOUVEAU</span></td>
+              <td>Pay-per-call ou Starter 9,90 €/mois si &gt; 100 appels</td>
+              <td>
+                <strong>0–10 €</strong> <small>(+ one-time 29 € enrichissement initial)</small>
+              </td>
+              <td><span class="badge badge-purple">actif depuis 26/05</span></td>
+            </tr>
+            <tr>
+              <td>Monitoring erreurs</td>
+              <td><strong>Sentry</strong></td>
+              <td>Developer free (5 000 erreurs/mois)</td>
+              <td><strong>0 €</strong></td>
+              <td><span class="badge badge-gray">Gate 7+</span></td>
+            </tr>
+            <tr>
+              <td>DNS</td>
+              <td><strong>OVH</strong></td>
+              <td>Déjà payé par AlyoS</td>
+              <td><strong>0 €</strong></td>
+              <td><span class="badge badge-gray">existant</span></td>
+            </tr>
+            <tr class="subtotal-row">
+              <td colspan="3"><strong>TOTAL Preview</strong> (Gates 6–8 — Supabase Free)</td>
+              <td><strong>35–110 € / mois</strong></td>
+              <td></td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="3"><strong>TOTAL Prod</strong> (après Gate 9 — Supabase Pro)</td>
+              <td><strong>59–134 € / mois</strong></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>
+          <small>
+            Hypothèse de calcul : 1 seul utilisateur AlyoS en MVP · ~5–15 AO Studio IA/mois · ~30–60
+            sollicitations architectes/mois · ~1 000 AO sourcés/mois (BOAMP + PLACE + Francmarchés).
+          </small>
+        </p>
+      </div>
+
+      <!-- ══════════════════════ 3. DÉTAIL FLY.IO ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">🐳</span>3. Fly.io — Configuration v2 (mise à jour)</h2>
+
+        <div class="alert-box orange">
+          <div class="alert-title">⚠️ Mise à jour vs v1.0</div>
+          La v1.0 estimait 5 €/mois pour un container 256 Mo always-on. La configuration réelle est
+          différente : <strong>shared-cpu-2x · 2 GB RAM · auto-stop</strong> pour supporter
+          Playwright (Chromium), les scrapers PLACE + Francmarchés simultanément, et les pages JS
+          lourdes. Le <code>auto_stop_machines = "stop"</code> ramène le coût réel à 3–8 €/mois
+          selon la fréquence des scrapes.
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Paramètre</th>
+              <th>Valeur</th>
+              <th>Justification</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Machine</td>
+              <td><code>shared-cpu-2x</code></td>
+              <td>Chromium headless + 2 scrapers en parallèle nécessitent &gt; 1 vCPU</td>
+            </tr>
+            <tr>
+              <td>RAM</td>
+              <td><strong>2 048 MB</strong></td>
+              <td>Playwright peak ~800–1 200 MB par browser context actif</td>
+            </tr>
+            <tr>
+              <td>Région</td>
+              <td><code>cdg</code> (Paris)</td>
+              <td>Latence minimale vers sites FR (PLACE, Francmarchés) + conformité UE</td>
+            </tr>
+            <tr>
+              <td>Auto-stop</td>
+              <td><code>auto_stop_machines = "stop"</code></td>
+              <td>Machine arrêtée ~5 min après le dernier job — économie ~60 % vs always-on</td>
+            </tr>
+            <tr>
+              <td>Auto-start</td>
+              <td><code>auto_start_machines = true</code></td>
+              <td>Démarrage automatique à chaque POST /v1/scrape (cold start ~8–12 s)</td>
+            </tr>
+            <tr>
+              <td>Fréquence scraping</td>
+              <td>2 × /jour (cron 04:30 UTC) × 2 plateformes × 1 profil</td>
+              <td>~4 jobs/jour, ~20–60 min cumul actif/jour</td>
+            </tr>
+            <tr>
+              <td>Coût estimé</td>
+              <td><strong>3–8 € HT/mois</strong></td>
+              <td>Fly.io Machines billing: $0.00000225/vCPU/s + $0.0000035/MB/s</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Variables d'environnement requises (Fly.io Secrets)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Description</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>SCRAPER_TRIGGER_SECRET</code></td>
+              <td>Secret symétrique Vercel ↔ Fly.io</td>
+              <td>Générer 32 car. aléatoires</td>
+            </tr>
+            <tr>
+              <td><code>SUPABASE_URL</code></td>
+              <td>URL projet Supabase</td>
+              <td>Supabase Dashboard → Settings → API</td>
+            </tr>
+            <tr>
+              <td><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
+              <td>Service role key (jamais exposée côté client)</td>
+              <td>Supabase Dashboard → Settings → API</td>
+            </tr>
+            <tr>
+              <td><code>PORT</code></td>
+              <td>Port d'écoute (défaut 8080)</td>
+              <td>Optionnel</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="alert-box blue">
+          <div class="alert-title">📋 Déploiement (action Steve)</div>
+          <code>cd infra/playwright && fly deploy</code><br />
+          Puis :
+          <code
+            >fly secrets set SCRAPER_TRIGGER_SECRET=... SUPABASE_URL=...
+            SUPABASE_SERVICE_ROLE_KEY=...</code
+          >
+        </div>
+      </div>
+
+      <!-- ══════════════════════ 4. PAPPERS API ══════════════════════ -->
+      <div class="section">
+        <h2>
+          <span class="icon">🏗️</span>4. Pappers API —
+          <span class="badge badge-new">Nouveau service</span>
+        </h2>
+
+        <p>
+          Pappers est l'API française d'enrichissement des données entreprises (SIRET, dirigeants,
+          bilans, Kbis, etc.). Intégré le 2026-05-26 pour enrichir automatiquement les fiches
+          architectes depuis
+          <code>/sourcing/architectes</code>.
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Scénario</th>
+              <th>Volume appels</th>
+              <th>Plan recommandé</th>
+              <th>Coût mensuel HT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>MVP (usage courant)</strong></td>
+              <td>&lt; 100 appels/mois (relances ponctuelles)</td>
+              <td>Pay-per-call</td>
+              <td><strong>0–3 €</strong></td>
+            </tr>
+            <tr>
+              <td><strong>MVP (profil actif)</strong></td>
+              <td>100–500 appels/mois</td>
+              <td>Starter 9,90 €/mois (500 appels inclus)</td>
+              <td><strong>9,90 €</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Phase 2 (multi-profils)</strong></td>
+              <td>&gt; 500 appels/mois</td>
+              <td>Essential ou Plus (à évaluer)</td>
+              <td><strong>20–50 €</strong></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Coûts ponctuels (one-time)</h3>
+        <div class="alert-box orange">
+          <div class="alert-title">
+            💳 Enrichissement initial — action à déclencher manuellement
+          </div>
+          L'enrichissement en masse de la base architectes existante (~3 000 entrées) coûte environ
+          <strong>29 € une seule fois</strong>. À déclencher via le bouton « Enrichir depuis Pappers
+          » dans <code>/sourcing/architectes</code> après validation Steve.
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Usage</th>
+              <th>Estimation volume</th>
+              <th>Coût estimé</th>
+              <th>Fréquence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Enrichissement initial base ~3 000 architectes</td>
+              <td>~3 000 appels</td>
+              <td><strong>~29 €</strong></td>
+              <td>Une seule fois</td>
+            </tr>
+            <tr>
+              <td>Enrichissement nouveaux architectes (cron)</td>
+              <td>~10–50 nouveaux/mois</td>
+              <td><strong>&lt; 1 €</strong></td>
+              <td>Mensuel</td>
+            </tr>
+            <tr>
+              <td>Rafraîchissement annuel base complète</td>
+              <td>~3 000 appels / an</td>
+              <td><strong>~29 €</strong></td>
+              <td>Annuel</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>
+          <small>
+            <strong>Clé d'API</strong> : <code>PAPPERS_API_KEY</code> dans
+            <code>.env.local</code> et Vercel env vars. Jamais committée. Procurer sur
+            <a href="https://www.pappers.fr/api" target="_blank">pappers.fr/api</a> (compte AlyoS).
+          </small>
+        </p>
+      </div>
+
+      <!-- ══════════════════════ 5. DÉTAIL ANTHROPIC ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">🤖</span>5. Détail Anthropic API (usage variable)</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Prompt</th>
+              <th>Modèle</th>
+              <th>Coût/appel est.</th>
+              <th>Fréquence est.</th>
+              <th>Coût mensuel</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>P1</code> rc_analysis_full</td>
+              <td>Sonnet 4.6</td>
+              <td>0,30–0,80 €</td>
+              <td>5–15 AO/mois</td>
+              <td>1,5–12 €</td>
+              <td><span class="badge badge-green">actif</span></td>
+            </tr>
+            <tr>
+              <td><code>P2</code> memo_technique_generation</td>
+              <td>Sonnet 4.6</td>
+              <td>0,50–1,50 €</td>
+              <td>5–15 mémoires/mois</td>
+              <td>2,5–22 €</td>
+              <td><span class="badge badge-green">actif</span></td>
+            </tr>
+            <tr>
+              <td><code>P3</code> cerfa_field_inference</td>
+              <td>Sonnet 4.6</td>
+              <td>0,20–0,50 €</td>
+              <td>5–15/mois</td>
+              <td>1–7,5 €</td>
+              <td><span class="badge badge-green">actif</span></td>
+            </tr>
+            <tr>
+              <td><code>P4</code> tender_scoring_complementary</td>
+              <td>Haiku 4.5</td>
+              <td>0,005–0,02 €</td>
+              <td>~1 000 AO/mois</td>
+              <td>5–20 €</td>
+              <td><span class="badge badge-green">actif</span></td>
+            </tr>
+            <tr style="background: #fffbf0 !important">
+              <td><code>P5</code> architect_matching_rationale</td>
+              <td>Haiku 4.5</td>
+              <td>0,001 €</td>
+              <td>~50 sollicitations/mois</td>
+              <td><strong>~0,05 €</strong> (négligeable)</td>
+              <td><span class="badge badge-orange">actif depuis 26/05</span></td>
+            </tr>
+            <tr>
+              <td><code>P6/P7</code> sujets emails</td>
+              <td>Haiku 4.5</td>
+              <td>0,003–0,01 €</td>
+              <td>60–120/mois</td>
+              <td>0,2–1,2 €</td>
+              <td><span class="badge badge-gray">planifié</span></td>
+            </tr>
+            <tr>
+              <td><code>P8</code> tender_summary_short</td>
+              <td>Haiku 4.5</td>
+              <td>0,003–0,01 €</td>
+              <td>~200/mois</td>
+              <td>0,6–2 €</td>
+              <td><span class="badge badge-gray">planifié</span></td>
+            </tr>
+            <tr>
+              <td><code>P9</code> decline_motif_categorize</td>
+              <td>Haiku 4.5</td>
+              <td>0,003–0,01 €</td>
+              <td>~100/mois</td>
+              <td>0,3–1 €</td>
+              <td><span class="badge badge-gray">planifié</span></td>
+            </tr>
+            <tr>
+              <td><code>P10</code> library_piece_match</td>
+              <td>Haiku 4.5</td>
+              <td>0,005–0,02 €</td>
+              <td>~200/mois</td>
+              <td>1–4 €</td>
+              <td><span class="badge badge-gray">planifié</span></td>
+            </tr>
+            <tr>
+              <td><code>P11</code> attestation_expiry_alert_text</td>
+              <td>Haiku 4.5</td>
+              <td>0,003–0,01 €</td>
+              <td>~20/mois</td>
+              <td>0,06–0,2 €</td>
+              <td><span class="badge badge-gray">planifié</span></td>
+            </tr>
+            <tr>
+              <td><code>P12</code> accroche_memo_intro</td>
+              <td>Haiku 4.5</td>
+              <td>0,005–0,02 €</td>
+              <td>5–15/mois</td>
+              <td>0,03–0,3 €</td>
+              <td><span class="badge badge-gray">planifié</span></td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="4"><strong>Total Anthropic estimé</strong></td>
+              <td><strong>12–72 €</strong></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="alert-box blue">
+          <div class="alert-title">ℹ️ P5 — Note de mise à jour</div>
+          La v1.0 listait P5 comme planifié. Le prompt <code>architect_matching_rationale</code> est
+          désormais câblé et actif via <code>createHaikuRationaleClient()</code> dans
+          <code>src/lib/ai/haiku-rationale-client.ts</code> (commit 2026-05-26). Coût réel :
+          <strong>négligeable</strong> (~0,05 €/mois pour 50 appels à 0,001 €/appel Haiku 4.5).
+        </div>
+
+        <div class="alert-box orange">
+          <div class="alert-title">⚙️ Garde-fou Anthropic</div>
+          Limit mensuelle configurée sur l'API key : <strong>100 €/mois</strong>. Au-delà de 80 €,
+          alerte email admin AlyoS. Les appels Sonnet sont mis en pause si le seuil dur de 100 € est
+          approché (Haiku conservé pour P4/P5 sourcing).
+        </div>
+      </div>
+
+      <!-- ══════════════════════ 6. ALERTES ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">🔔</span>6. Alertes et garde-fous</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Seuil alerte</th>
+              <th>Seuil dur</th>
+              <th>Action automatique / manuelle</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Anthropic</strong></td>
+              <td>80 €/mois</td>
+              <td>100 €/mois</td>
+              <td>Email admin AlyoS → pause Sonnet, Haiku conservé</td>
+            </tr>
+            <tr>
+              <td><strong>Vercel</strong></td>
+              <td>90 % bande passante Pro</td>
+              <td>—</td>
+              <td>Alerte CEO (email Vercel)</td>
+            </tr>
+            <tr>
+              <td><strong>Brevo</strong></td>
+              <td>250 envois/jour</td>
+              <td>300 envois/jour (Free limit)</td>
+              <td>Migration Lite ~7 €/mois</td>
+            </tr>
+            <tr>
+              <td><strong>Resend</strong></td>
+              <td>2 700/mois</td>
+              <td>3 000/mois (Free limit)</td>
+              <td>Migration Pro ~20 €/mois</td>
+            </tr>
+            <tr>
+              <td><strong>Supabase</strong></td>
+              <td>800 Mo stockage (Free = 1 Go)</td>
+              <td>Avant Gate 9</td>
+              <td>Upgrade Pro 24 €/mois obligatoire avant migration prod</td>
+            </tr>
+            <tr>
+              <td><strong>Fly.io</strong></td>
+              <td>RAM &gt; 1,5 Go prolongé</td>
+              <td>Machine OOM / crash</td>
+              <td>Investigation logs scraping — possibilité upgrade 4 Go</td>
+            </tr>
+            <tr>
+              <td><strong>Pappers</strong></td>
+              <td>80 appels/mois (Free)</td>
+              <td>100 appels/mois</td>
+              <td>Souscription Starter 9,90 €/mois (500 appels inclus)</td>
+            </tr>
+            <tr>
+              <td><strong>Budget global</strong></td>
+              <td>120 €/mois</td>
+              <td><strong>150 €/mois</strong></td>
+              <td>Escalade Board obligatoire — décision modification scope ou plafond</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════ 7. ÉVOLUTION ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">📈</span>7. Hypothèses d'évolution</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Horizon</th>
+              <th>Trigger</th>
+              <th>Impact budget mensuel</th>
+              <th>Nouveau total estimé</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Gate 9</strong></td>
+              <td>Migration Supabase Free → Pro</td>
+              <td>+24 €/mois</td>
+              <td>83–158 € → ⚠️ proche plafond si Anthropic haut</td>
+            </tr>
+            <tr>
+              <td><strong>Phase 2 — utilisateurs</strong></td>
+              <td>3–5 users Vercel Pro</td>
+              <td>+40–80 €/mois</td>
+              <td>~120–200 € → dépassement plafond probable</td>
+            </tr>
+            <tr>
+              <td><strong>Phase 2 — email volume</strong></td>
+              <td>Brevo Free → Lite</td>
+              <td>+7 €/mois</td>
+              <td>+7 €</td>
+            </tr>
+            <tr>
+              <td><strong>Phase 2 — notifs volume</strong></td>
+              <td>Resend Free → Pro</td>
+              <td>+20 €/mois</td>
+              <td>+20 €</td>
+            </tr>
+            <tr>
+              <td><strong>Phase 2 — IA × volume</strong></td>
+              <td>Anthropic × 5–10 clients</td>
+              <td>+60–720 €/mois</td>
+              <td>Nécessite renégociation Anthropic Enterprise</td>
+            </tr>
+            <tr>
+              <td><strong>Phase 2 — Pappers volume</strong></td>
+              <td>Starter → Essential</td>
+              <td>+10–40 €/mois</td>
+              <td>+10–40 €</td>
+            </tr>
+            <tr>
+              <td><strong>Fly.io — scrapers supplémentaires</strong></td>
+              <td>MP.info, Marchés Online…</td>
+              <td>+0–5 €/mois (auto-stop)</td>
+              <td>Marginal grâce au billing Fly.io par usage</td>
+            </tr>
+            <tr>
+              <td><strong>Domaine custom</strong></td>
+              <td>sourcing.alyosingenierie.fr</td>
+              <td>0 €</td>
+              <td>OVH déjà payé par AlyoS</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="alert-box red">
+          <div class="alert-title">🚨 Point d'attention Gate 9 — plafond sous pression</div>
+          Après Gate 9 (Supabase Pro +24 €), le scénario haute se situe à
+          <strong>134–158 €/mois</strong> selon l'usage Anthropic. Si l'utilisation Sonnet
+          (P1+P2+P3) monte au maximum estimé (41,5 €), on dépasse le plafond de 150 €.
+          <strong>Recommandation</strong> : prévoir une révision du plafond à 175 € HT pour Gate 9,
+          ou différer le Supabase Pro de 1 mois.
+        </div>
+      </div>
+
+      <!-- ══════════════════════ 8. PROCUREMENT ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">🔑</span>8. État du procurement des clés API</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Clé / Variable</th>
+              <th>Tier</th>
+              <th>État</th>
+              <th>Action Steve</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Supabase</strong></td>
+              <td>
+                <code>SUPABASE_URL</code> · <code>SUPABASE_ANON_KEY</code> ·
+                <code>SERVICE_ROLE_KEY</code>
+              </td>
+              <td><span class="badge badge-red">Tier 1 bloquant</span></td>
+              <td><span class="badge badge-green">✅ configuré</span></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><strong>Anthropic</strong></td>
+              <td><code>ANTHROPIC_API_KEY</code></td>
+              <td><span class="badge badge-red">Tier 1 bloquant</span></td>
+              <td><span class="badge badge-green">✅ configuré</span></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><strong>Vercel</strong></td>
+              <td>Déploiement + env vars</td>
+              <td><span class="badge badge-red">Tier 1 bloquant</span></td>
+              <td><span class="badge badge-green">✅ connecté</span></td>
+              <td>Ajouter <code>SCRAPER_BASE_URL</code> + <code>SCRAPER_TRIGGER_SECRET</code></td>
+            </tr>
+            <tr>
+              <td><strong>Brevo</strong></td>
+              <td><code>BREVO_API_KEY</code></td>
+              <td><span class="badge badge-orange">Tier 2 important</span></td>
+              <td><span class="badge badge-blue">à vérifier</span></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><strong>Resend</strong></td>
+              <td><code>RESEND_API_KEY</code></td>
+              <td><span class="badge badge-orange">Tier 2 important</span></td>
+              <td><span class="badge badge-blue">à vérifier</span></td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><strong>Fly.io</strong></td>
+              <td><code>FLY_API_TOKEN</code> · Secrets machine</td>
+              <td><span class="badge badge-orange">Tier 2 important</span></td>
+              <td><span class="badge badge-orange">⏳ en attente déploiement</span></td>
+              <td><code>fly deploy</code> + <code>fly secrets set ...</code></td>
+            </tr>
+            <tr>
+              <td><strong>Pappers</strong> <span class="badge badge-new">NEW</span></td>
+              <td><code>PAPPERS_API_KEY</code></td>
+              <td><span class="badge badge-orange">Tier 2 important</span></td>
+              <td><span class="badge badge-orange">⏳ clé à obtenir</span></td>
+              <td>pappers.fr/api → créer compte + clé → Vercel env</td>
+            </tr>
+            <tr>
+              <td><strong>PLACE</strong></td>
+              <td><code>PLACE_USERNAME</code> · <code>PLACE_PASSWORD</code></td>
+              <td><span class="badge badge-orange">Tier 2 important</span></td>
+              <td><span class="badge badge-orange">⏳ compte à créer</span></td>
+              <td>marches-publics.gouv.fr → compte entreprise → Vercel env</td>
+            </tr>
+            <tr>
+              <td><strong>Sentry</strong></td>
+              <td><code>NEXT_PUBLIC_SENTRY_DSN</code></td>
+              <td><span class="badge badge-gray">Tier 3 — Gate 7+</span></td>
+              <td><span class="badge badge-gray">non requis MVP</span></td>
+              <td>À faire en Gate 7</td>
+            </tr>
+            <tr>
+              <td><strong>Odoo</strong></td>
+              <td>XML-RPC credentials</td>
+              <td><span class="badge badge-gray">Tier 4 — hors MVP</span></td>
+              <td><span class="badge badge-gray">hors scope</span></td>
+              <td>Phase 2 si Odoo AlyoS existant</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══════════════════════ 9. SUIVI MENSUEL ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">📅</span>9. Suivi mensuel des dépenses réelles</h2>
+
+        <p>
+          À compléter par <strong>PS_OPERATOR Yann</strong> chaque début de mois sur la base des
+          factures réelles.
+        </p>
+
+        <table class="tracking-table">
+          <thead>
+            <tr>
+              <th>Mois</th>
+              <th>Vercel</th>
+              <th>Supabase</th>
+              <th>Fly.io</th>
+              <th>Brevo</th>
+              <th>Resend</th>
+              <th>Anthropic</th>
+              <th>Pappers</th>
+              <th>OVH</th>
+              <th><strong>TOTAL HT</strong></th>
+              <th>vs Budget</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2026-05</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td>~29 € <small>(one-time)</small></td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">à compléter</td>
+              <td class="empty-cell">—</td>
+            </tr>
+            <tr>
+              <td>2026-06</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">à compléter</td>
+              <td class="empty-cell">—</td>
+            </tr>
+            <tr>
+              <td>2026-07</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">à compléter</td>
+              <td class="empty-cell">—</td>
+            </tr>
+            <tr>
+              <td>2026-08</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">à compléter</td>
+              <td class="empty-cell">—</td>
+            </tr>
+            <tr>
+              <td>2026-09 (Gate 9?)</td>
+              <td class="empty-cell">—</td>
+              <td><small>→ Pro 24 €</small></td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">—</td>
+              <td class="empty-cell">à compléter</td>
+              <td class="empty-cell">—</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          <small
+            >Colonne « vs Budget » = TOTAL réel − total prévisionnel médian (scénario à 72 €
+            Anthropic). Toute variation &gt; 20 % du prévisionnel → escalade Board.</small
+          >
+        </p>
+      </div>
+
+      <!-- ══════════════════════ 10. CHANGELOG ══════════════════════ -->
+      <div class="section">
+        <h2><span class="icon">📝</span>10. Historique des révisions</h2>
+
+        <div class="changelog">
+          <div class="changelog-row">
+            <div class="changelog-date">2026-05-26</div>
+            <div class="changelog-text">
+              <strong>v2.0</strong> — 3 mises à jour : (1) Fly.io passé de 256 Mo always-on à
+              shared-cpu-2x 2 GB auto-stop (scrapers PLACE + Francmarchés) ; (2) Pappers API ajouté
+              (enrichissement architectes, one-time 29 € + 0–10 €/mois) ; (3) P5 Haiku câblé et
+              actif (<code>architect_matching_rationale</code> — &lt;0,1 €/mois). Totaux révisés :
+              preview 35–110 €, prod 59–134 €. <em>— Alex</em>
+            </div>
+          </div>
+          <div class="changelog-row">
+            <div class="changelog-date">2026-05-10</div>
+            <div class="changelog-text">
+              <strong>v1.0</strong> — Budget initial. Fly.io 256 Mo 5 €/mois, P5 planifié non actif,
+              pas de Pappers. Totaux : preview 45–85 €, prod 70–110 €. <em>— CEO Marc</em>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════ FOOTER ══════════════════════ -->
+      <div class="footer">
+        <strong>edifio Sourcing</strong> — Document interne confidentiel AlyoS Ingénierie<br />
+        Plafond Phase 1 acté Board : <strong>150 € HT/mois</strong> · Escalade Board si
+        dépassement<br />
+        <br />
+        © AlyoS Ingénierie 2026 — Outil interne · Toute diffusion externe interdite<br />
+        <em>Prochaine révision : début 2026-06 sur base des premières factures réelles</em>
+      </div>
+    </div>
+  </body>
+</html>
