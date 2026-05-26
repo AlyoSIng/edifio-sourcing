@@ -1,26 +1,29 @@
 "use server";
 
 /**
- * Server Actions — module Bureaux d'Études (liste, édition, import CSV, RGPD).
+ * Server Actions — module Bureaux d'Études (liste, édition, import CSV, RGPD, documents).
  *
  * Pattern calqué sur `src/app/sourcing/architectes/actions.ts`.
  *
  * Sécurité :
  *  - Auth check via `requireAlyosUser` (domaine @alyosingenierie.fr)
  *  - Filtre tenant explicite `ALYOS_ORG_ID` sur toutes les requêtes
- *  - Écriture (upsertBE, importBEFromCsv) : admin uniquement
+ *  - Écriture (upsertBE, importBEFromCsv, upload/deleteBeDocument) : admin uniquement
  *
  * Créé dans feat/be-companies (Nadia, 2026-05-26).
+ * Documents BE ajoutés dans feat/be-documents (Alex, 2026-05-26).
  */
 
 import { and, count, eq, ilike, or, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 import { db as defaultDb } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
+import { beDocuments, type BeDocument, type BeDocumentKind } from "@/db/schema/be-documents";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BureauEtudes, NewBureauEtudes } from "@/db/schema/bureaux-etudes";
 
 // ============================================================================
@@ -73,6 +76,7 @@ export interface ImportBEResult {
 
 const PAGE_SIZE = 25;
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const BE_DOCS_BUCKET = "be-docs";
 
 // ============================================================================
 // Helper auth
@@ -369,4 +373,248 @@ export async function importBEFromCsv(formData: FormData): Promise<ImportBEResul
   }
 
   return { imported, updated, errors };
+}
+
+// ============================================================================
+// Types publics documents BE
+// ============================================================================
+
+/** Résultat standard d'une mutation document BE. */
+export type BeDocumentActionResult<T = undefined> =
+  | (T extends undefined ? { ok: true } : { ok: true; data: T })
+  | {
+      ok: false;
+      error:
+        | "not_authenticated"
+        | "forbidden_domain"
+        | "forbidden_role"
+        | "invalid_input"
+        | "not_found"
+        | "internal_error";
+    };
+
+export type BeDocumentRow = BeDocument;
+export type { BeDocumentKind };
+
+// ============================================================================
+// 4. uploadBeDocument — upload Storage + enregistrement BDD (admin)
+// ============================================================================
+
+/**
+ * Upload un document administratif vers le bucket Supabase Storage "be-docs"
+ * (privé) et insère la métadonnée en BDD.
+ *
+ * Le chemin Storage est : `{organizationId}/{beId}/{timestamp}_{filename}`.
+ * Réservé aux admins.
+ *
+ * @param beId      UUID du bureau d'études propriétaire
+ * @param file      FormData contenant le champ "file" (File)
+ * @param kind      Catégorie du document (BeDocumentKind)
+ * @param label     Nom lisible affiché (ex. "DC1 — AO EDM 26 S 01")
+ * @param expiresAt Date d'expiration optionnelle (null = pas d'expiration)
+ */
+export async function uploadBeDocument(
+  beId: string,
+  file: FormData,
+  kind: BeDocumentKind,
+  label: string,
+  expiresAt?: Date | null,
+  dbClient: DrizzleClient = defaultDb,
+): Promise<BeDocumentActionResult<{ id: string }>> {
+  const authClient = createSupabaseServerClient();
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+  if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+
+  if (!UUID_SHAPE.test(beId)) return { ok: false, error: "invalid_input" };
+  if (!label.trim()) return { ok: false, error: "invalid_input" };
+
+  const rawFile = file.get("file");
+  if (!(rawFile instanceof File)) return { ok: false, error: "invalid_input" };
+
+  try {
+    // Construction du chemin Storage
+    const timestamp = Date.now();
+    const sanitizedFilename = rawFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `${ALYOS_ORG_ID}/${beId}/${timestamp}_${sanitizedFilename}`;
+
+    // Upload vers Supabase Storage
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(BE_DOCS_BUCKET)
+      .upload(storagePath, rawFile, {
+        contentType: rawFile.type || "application/octet-stream",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("[be-actions:upload:storage:fail]", uploadError);
+      return { ok: false, error: "internal_error" };
+    }
+
+    // Enregistrement BDD
+    const rows = await dbClient
+      .insert(beDocuments)
+      .values({
+        beId,
+        organizationId: ALYOS_ORG_ID,
+        kind,
+        label: label.trim(),
+        storagePath,
+        filename: rawFile.name,
+        uploadedBy: authResult.userId,
+        expiresAt: expiresAt ?? null,
+      })
+      .returning({ id: beDocuments.id });
+
+    if (!rows[0]) throw new Error("INSERT be_documents returned no row");
+
+    revalidatePath(`/sourcing/bureaux-etudes/${beId}`);
+    return { ok: true, data: { id: rows[0].id } };
+  } catch (err) {
+    console.error("[be-actions:upload:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ============================================================================
+// 5. deleteBeDocument — suppression Storage + BDD (admin)
+// ============================================================================
+
+/**
+ * Supprime un document BE (fichier Storage + ligne BDD).
+ * Réservé aux admins.
+ *
+ * @param documentId UUID du document à supprimer
+ */
+export async function deleteBeDocument(
+  documentId: string,
+  dbClient: DrizzleClient = defaultDb,
+): Promise<BeDocumentActionResult> {
+  const authClient = createSupabaseServerClient();
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+  if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+
+  if (!UUID_SHAPE.test(documentId)) return { ok: false, error: "invalid_input" };
+
+  try {
+    // Récupération du chemin Storage + beId avant suppression
+    const docs = await dbClient
+      .select({
+        storagePath: beDocuments.storagePath,
+        beId: beDocuments.beId,
+      })
+      .from(beDocuments)
+      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, ALYOS_ORG_ID)))
+      .limit(1);
+
+    if (!docs[0]) return { ok: false, error: "not_found" };
+
+    const { storagePath, beId } = docs[0];
+
+    // Suppression Storage (best-effort — on continue même si le fichier est déjà absent)
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { error: storageError } = await supabaseAdmin.storage
+      .from(BE_DOCS_BUCKET)
+      .remove([storagePath]);
+
+    if (storageError) {
+      console.error("[be-actions:delete-doc:storage:fail]", storageError);
+      // On continue quand même pour supprimer la métadonnée BDD
+    }
+
+    // Suppression BDD
+    await dbClient
+      .delete(beDocuments)
+      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, ALYOS_ORG_ID)));
+
+    revalidatePath(`/sourcing/bureaux-etudes/${beId}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[be-actions:delete-doc:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ============================================================================
+// 6. getBeDocumentUrl — URL signée 60 min (tous rôles)
+// ============================================================================
+
+/**
+ * Génère une URL signée Supabase Storage valable 60 minutes pour télécharger
+ * un document BE.
+ * Accessible à tous les rôles authentifiés AlyoS.
+ *
+ * @param documentId UUID du document
+ */
+export async function getBeDocumentUrl(
+  documentId: string,
+  dbClient: DrizzleClient = defaultDb,
+): Promise<BeDocumentActionResult<{ url: string }>> {
+  const authClient = createSupabaseServerClient();
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+
+  if (!UUID_SHAPE.test(documentId)) return { ok: false, error: "invalid_input" };
+
+  try {
+    // Vérification tenant + récupération du chemin Storage
+    const docs = await dbClient
+      .select({ storagePath: beDocuments.storagePath })
+      .from(beDocuments)
+      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, ALYOS_ORG_ID)))
+      .limit(1);
+
+    if (!docs[0]) return { ok: false, error: "not_found" };
+
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { data, error } = await supabaseAdmin.storage
+      .from(BE_DOCS_BUCKET)
+      .createSignedUrl(docs[0].storagePath, 60 * 60); // 60 minutes
+
+    if (error || !data?.signedUrl) {
+      console.error("[be-actions:download-url:fail]", error);
+      return { ok: false, error: "internal_error" };
+    }
+
+    return { ok: true, data: { url: data.signedUrl } };
+  } catch (err) {
+    console.error("[be-actions:download-url:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ============================================================================
+// 7. listBeDocuments — lecture des documents d'un BE (tous rôles)
+// ============================================================================
+
+/**
+ * Liste tous les documents d'un bureau d'études, triés par date d'upload.
+ * Accessible à tous les rôles authentifiés.
+ *
+ * @param beId UUID du bureau d'études
+ */
+export async function listBeDocuments(
+  beId: string,
+  dbClient: DrizzleClient = defaultDb,
+): Promise<BeDocumentRow[]> {
+  const authClient = createSupabaseServerClient();
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return [];
+
+  if (!UUID_SHAPE.test(beId)) return [];
+
+  try {
+    const rows = await dbClient
+      .select()
+      .from(beDocuments)
+      .where(and(eq(beDocuments.beId, beId), eq(beDocuments.organizationId, ALYOS_ORG_ID)))
+      .orderBy(beDocuments.uploadedAt);
+
+    return rows;
+  } catch (err) {
+    console.error("[be-actions:list-docs:fail]", err);
+    return [];
+  }
 }

@@ -8,6 +8,8 @@ import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BE_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
 
+import { listBeDocuments } from "../actions";
+import { BEDocumentsSection } from "./BEDocumentsSection";
 import { BEEditForm } from "./BEEditForm";
 
 /**
@@ -17,7 +19,12 @@ import { BEEditForm } from "./BEEditForm";
  *  - Lecture : tous rôles authentifiés AlyoS.
  *  - Édition : admin uniquement (formulaire BEEditForm si admin).
  *
+ * Section Documents administratifs : chargée en parallèle de la fiche.
  * Pattern résilience : try/catch absorbé + ErrorBanner.
+ *
+ * Mis à jour dans feat/be-documents (Alex, 2026-05-26) :
+ *  - import listBeDocuments + BEDocumentsSection
+ *  - chargement parallèle be + documents
  */
 export const dynamic = "force-dynamic";
 
@@ -38,9 +45,11 @@ export default async function BEFichePage({ params }: { params: { id: string } }
 
   let be: Awaited<ReturnType<typeof fetchBE>> | null = null;
   let fetchError: string | null = null;
+  // Chargement des documents administratifs en parallèle de la fiche
+  let documents: Awaited<ReturnType<typeof listBeDocuments>> = [];
 
   try {
-    be = await fetchBE(params.id);
+    [be, documents] = await Promise.all([fetchBE(params.id), listBeDocuments(params.id)]);
   } catch (err) {
     console.error("[be-fiche:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -200,6 +209,9 @@ export default async function BEFichePage({ params }: { params: { id: string } }
               <p className="whitespace-pre-line text-sm text-ink">{be.notes}</p>
             </section>
           ) : null}
+
+          {/* Documents administratifs */}
+          <BEDocumentsSection beId={be.id} documents={documents} isAdmin={adminUser} />
 
           {/* Formulaire édition (admin) */}
           {adminUser ? (

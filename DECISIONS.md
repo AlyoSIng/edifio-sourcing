@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-05-26 — feat/be-documents — Documents administratifs des BET (Alex)
+
+- **2026-05-26 · G6 · Alex (dev) · feat/be-documents — schéma Drizzle + migration SQL + server actions + composant UI documents BET.**
+  *Branche créée depuis main. Fichiers créés/modifiés :*
+  *- `src/db/schema/be-documents.ts` : table `be_documents` — FK `be_id` → `bureaux_etudes.id`, `organization_id` tenant, `kind` (type applicatif `BeDocumentKind` : 12 valeurs), `label`, `storage_path`, `filename`, `uploaded_by`, `uploaded_at`, `expires_at`. Constantes exportées : `BE_DOCUMENT_KIND_LABELS`, `BE_DOCUMENT_KINDS`.*
+  *- `src/db/schema/index.ts` : export `./be-documents` ajouté.*
+  *- `src/db/migrations/0016_be_documents.sql` : DDL CREATE TABLE `be_documents` + index `idx_be_docs_be` + index `idx_be_docs_org`.*
+  *- `src/db/migrations/meta/_journal.json` : entrée idx=16 ajoutée.*
+  *- `src/app/sourcing/bureaux-etudes/actions.ts` : 4 nouvelles server actions — `uploadBeDocument` (Storage "be-docs" + BDD), `deleteBeDocument` (Storage + BDD), `getBeDocumentUrl` (URL signée 60 min), `listBeDocuments` (lecture tous rôles). Auth : `requireAlyosUser` + `ALYOS_ORG_ID` + écriture admin only.*
+  *- `src/app/sourcing/bureaux-etudes/[id]/BEDocumentsSection.tsx` : Client Component — liste des documents par kind avec label lisible, date upload, badge expiration (rouge/amber/vert), bouton télécharger (URL signée), bouton supprimer (admin). Formulaire inline d'ajout : sélecteur 12 types, libellé, file input, date expiration optionnelle.*
+  *- `src/app/sourcing/bureaux-etudes/[id]/page.tsx` : chargement parallèle `be` + `documents` via `Promise.all`, intégration `<BEDocumentsSection>` entre Notes et formulaire édition.*
+  *Décision technique : bucket Storage "be-docs" (private) à créer manuellement par Steve dans le dashboard Supabase avant la 1re utilisation.*
+
+---
+
 ## 2026-05-26 — feat/cotraitant-library — Bibliothèque cotraitants (Nadia)
 
 - **2026-05-26 · G6 · Nadia (dev2) · feat/cotraitant-library — schema Drizzle + migration + server actions + UI bibliothèque + page Tandem cotraitant.**
