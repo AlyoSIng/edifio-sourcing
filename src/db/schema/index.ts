@@ -29,3 +29,5 @@ export * from "./ai";
 export * from "./integrations";
 export * from "./audit";
 export * from "./messaging";
+export * from "./bureaux-etudes";
+export * from "./companies";

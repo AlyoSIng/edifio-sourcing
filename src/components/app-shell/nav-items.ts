@@ -128,21 +128,19 @@ export const NAV_ITEMS: NavSection[] = [
         icon: "building",
         matchPrefix: "/sourcing/architectes",
       },
-      // Bureaux d'Études — placeholder Phase 2.
+      // Bureaux d'Études — livré feat/be-companies (Nadia, 2026-05-26).
       {
         href: "/sourcing/bureaux-etudes",
         label: "Bureaux d'Études",
         icon: "compass",
         matchPrefix: "/sourcing/bureaux-etudes",
-        comingSoon: true,
       },
-      // Entreprises/Majors — placeholder Phase 2.
+      // Entreprises/Majors — livré feat/be-companies (Nadia, 2026-05-26).
       {
         href: "/sourcing/entreprises",
         label: "Entreprises/Majors",
         icon: "hard-hat",
         matchPrefix: "/sourcing/entreprises",
-        comingSoon: true,
       },
     ],
   },

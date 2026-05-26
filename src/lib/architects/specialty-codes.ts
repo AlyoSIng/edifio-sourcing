@@ -39,3 +39,19 @@ export const BE_SPECIALTY_CODES: SpecialtyCode[] = [
   { code: "be_demolition", label: "Démolition / PEMD / Amiante" },
   { code: "be_paysage", label: "Paysage & espaces verts" },
 ];
+
+/** Spécialités entreprises du bâtiment (Conception-Réalisation / TCE). */
+export const COMPANY_SPECIALTY_CODES: SpecialtyCode[] = [
+  { code: "co_gros_oeuvre", label: "Gros œuvre / Maçonnerie" },
+  { code: "co_tce", label: "Tous corps d'état (TCE)" },
+  { code: "co_charpente", label: "Charpente / Ossature bois" },
+  { code: "co_couverture", label: "Couverture / Étanchéité" },
+  { code: "co_facades", label: "Façades / ITE" },
+  { code: "co_menuiserie", label: "Menuiserie / Serrurerie" },
+  { code: "co_electricite", label: "Électricité / CFO-CFA" },
+  { code: "co_plomberie", label: "Plomberie / CVC" },
+  { code: "co_demolition", label: "Démolition / Déconstruction" },
+  { code: "co_vrd", label: "VRD / Terrassement" },
+  { code: "co_peinture", label: "Peinture / Revêtements" },
+  { code: "co_cr", label: "Conception-réalisation" },
+];
