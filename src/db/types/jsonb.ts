@@ -254,7 +254,7 @@ export interface AuditLogDataSearchProfileChange {
 export interface AuditLogDataTenderSelect {
   tender_id: string;
   tender_ref: string;
-  mode: "solo" | "tandem";
+  mode: "solo" | "tandem" | "conception_realisation";
   score: number;
 }
 

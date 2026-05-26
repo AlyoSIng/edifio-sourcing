@@ -77,6 +77,23 @@ export interface TenderOfTheDay {
    * passée. Exposé pour debug et pour un futur tag UI « précédemment différé ».
    */
   deferredUntil: Date | null;
+  /** URL de l'avis source sur la plateforme (ex. lien BOAMP) */
+  sourceUrl: string | null;
+  /** URL du DCE / RC sur la plateforme (si disponible) */
+  dceUrl: string | null;
+  /**
+   * Payload brut de la plateforme — utilisé côté UI pour extraire :
+   *  - le brief de l'AO (record.description / record.objet)
+   *  - le département / code postal (record.departement)
+   */
+  rawData: import("@/db/types/jsonb").TenderRawData | null;
+  /**
+   * Exclusion réversible (migration 0013). `null` = AO visible dans le
+   * digest. En pratique les rows retournées par `getTendersOfTheDay` ont
+   * toujours `null` (filtré par `isNull(tenders.excludedAt)`). Exposé pour
+   * la prop `isExcluded` de `TenderCardActions` (utile si vue « AO exclus »).
+   */
+  excludedAt: Date | null;
 }
 
 // ============================================================================
@@ -124,6 +141,10 @@ export async function getTendersOfTheDay(
       platformCode: platforms.code,
       externalRef: tenders.externalRef,
       deferredUntil: tenders.deferredUntil,
+      sourceUrl: tenders.sourceUrl,
+      dceUrl: tenders.dceUrl,
+      rawData: tenders.rawData,
+      excludedAt: tenders.excludedAt,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
@@ -138,6 +159,9 @@ export async function getTendersOfTheDay(
         // stock cron normal. À expiration, l'AO réapparait automatiquement
         // dans le digest.
         or(isNull(tenders.deferredUntil), lt(tenders.deferredUntil, sql`now()`)),
+        // Migration 0013 : masquer les AO exclus par l'utilisateur.
+        // excluded_at IS NULL = AO visible (comportement par défaut).
+        isNull(tenders.excludedAt),
       ),
     )
     // NULLS LAST sur score (postgres-js + Drizzle : on passe par `sql` brut

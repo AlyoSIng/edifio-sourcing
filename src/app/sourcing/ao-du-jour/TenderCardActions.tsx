@@ -37,12 +37,15 @@
  *    la liste après mutation.
  */
 
-
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-
-import { deferTenderAction, rejectTenderAction, selectTenderAction } from "./actions";
+import {
+  deferTenderAction,
+  excludeTenderAction,
+  rejectTenderAction,
+  selectTenderAction,
+} from "./actions";
 import { RejectReasonModal } from "./RejectReasonModal";
 import { SoloTandemModal } from "./SoloTandemModal";
 
@@ -98,6 +101,15 @@ export interface TenderCardActionsProps {
   tenderAmount: string;
   /** Deadline formatée (ex. « 28 mai ») — affichée en subtitle modale Solo/Tandem */
   tenderDeadline: string;
+  /** Score de pertinence 0-100 issu de `tenders.score` — transmis à SoloTandemModal pour le badge. */
+  tenderScore: number | null;
+  /**
+   * AO actuellement exclu ? (prop optionnelle — `false` par défaut).
+   * En pratique toujours `false` sur la page AO du jour (les exclus sont
+   * filtrés par `getTendersOfTheDay`), mais utile pour une future vue
+   * « AO exclus » où l'utilisateur peut les réintégrer via « Inclure ».
+   */
+  isExcluded?: boolean;
 }
 
 export function TenderCardActions({
@@ -105,6 +117,8 @@ export function TenderCardActions({
   tenderTitle,
   tenderAmount,
   tenderDeadline,
+  tenderScore,
+  isExcluded = false,
 }: TenderCardActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -136,7 +150,7 @@ export function TenderCardActions({
     };
   }, [showDeferPopover]);
 
-  function handleSelect(mode: "solo" | "tandem"): void {
+  function handleSelect(mode: "solo" | "tandem" | "conception_realisation"): void {
     setShowSoloTandemModal(false);
     startTransition(async () => {
       const result = await selectTenderAction(tenderId, mode);
@@ -144,11 +158,14 @@ export function TenderCardActions({
         emitError(result.error);
         return;
       }
-      // Sous-étape 5 Tandem : après bascule en `selected_tandem`, on
-      // redirige vers la page short-list. Solo reste sur la page AO du
-      // jour (révalidation du cache via la Server Action).
+      // Après bascule :
+      //  - solo   : reste sur la page AO du jour (revalidatePath côté Server Action)
+      //  - tandem : redirige vers la page short-list architectes
+      //  - conception_realisation : redirige vers la page globale C/R (pipeline Phase 2)
       if (mode === "tandem") {
         router.push(`/sourcing/ao/${tenderId}/tandem`);
+      } else if (mode === "conception_realisation") {
+        router.push(`/sourcing/conception-realisation`);
       }
     });
   }
@@ -168,6 +185,14 @@ export function TenderCardActions({
     setShowRejectModal(false);
     startTransition(async () => {
       const result = await rejectTenderAction(tenderId, reason);
+      if (!result.ok) emitError(result.error);
+    });
+  }
+
+  function handleExclude(): void {
+    startTransition(async () => {
+      // isExcluded=true → on inclut (exclude=false) ; isExcluded=false → on exclut (exclude=true)
+      const result = await excludeTenderAction(tenderId, !isExcluded);
       if (!result.ok) emitError(result.error);
     });
   }
@@ -236,6 +261,20 @@ export function TenderCardActions({
           <span aria-hidden>&#x2715;</span>
           Écarter
         </button>
+
+        <button
+          type="button"
+          onClick={() => handleExclude()}
+          disabled={isPending}
+          title={
+            isExcluded
+              ? "Inclure à nouveau cet AO dans la liste"
+              : "Exclure cet AO de la liste (réversible)"
+          }
+          className="inline-flex items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-muted transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 focus-visible:ring-offset-1 disabled:opacity-50"
+        >
+          {isExcluded ? "↩ Inclure" : "⊘ Exclure"}
+        </button>
       </div>
 
       {showSoloTandemModal ? (
@@ -243,6 +282,7 @@ export function TenderCardActions({
           tenderTitle={tenderTitle}
           tenderAmount={tenderAmount}
           tenderDeadline={tenderDeadline}
+          tenderScore={tenderScore}
           onConfirm={handleSelect}
           onCancel={() => setShowSoloTandemModal(false)}
         />

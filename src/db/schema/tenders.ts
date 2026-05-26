@@ -78,6 +78,18 @@ export const tenders = pgTable(
      * Nullable par défaut : un AO neuf n'est jamais différé.
      */
     deferredUntil: timestamp("deferred_until", { withTimezone: true }),
+    /**
+     * Exclusion réversible de l'AO par l'utilisateur (migration 0013).
+     *
+     * Quand l'utilisateur clique « Exclure » sur la `TenderCard`, on pose
+     * `excluded_at = now()`. L'AO disparaît du digest « AO du jour » via le
+     * filtre `excluded_at IS NULL` dans `getTendersOfTheDay`. L'utilisateur
+     * peut annuler en cliquant « Inclure » (remet à NULL). Le statut tender
+     * reste `sourced` — l'exclusion est orthogonale au workflow de traitement.
+     *
+     * Nullable par défaut : un AO neuf n'est jamais exclu.
+     */
+    excludedAt: timestamp("excluded_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -120,6 +132,15 @@ export const tenders = pgTable(
     scoreIdx: index("idx_tenders_score")
       .on(table.organizationId, table.score.desc())
       .where(sql`${table.status} = 'sourced'`),
+    /**
+     * Index partiel sur `excluded_at` — n'indexe que les lignes exclues
+     * (minorité). Utilisé pour la vue future « AO exclus » + accélère le
+     * filtre négatif `excluded_at IS NULL` côté `getTendersOfTheDay`.
+     * Prédicat `IS NOT NULL` IMMUTABLE — sans risque SQLSTATE 42P17.
+     */
+    excludedAtIdx: index("idx_tenders_excluded_at")
+      .on(table.excludedAt)
+      .where(sql`${table.excludedAt} IS NOT NULL`),
   }),
 );
 

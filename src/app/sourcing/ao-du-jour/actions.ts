@@ -206,7 +206,7 @@ function snapshotScore(rawScore: string | null): number | null {
  */
 export async function selectTenderAction(
   tenderId: string,
-  mode: "solo" | "tandem",
+  mode: "solo" | "tandem" | "conception_realisation",
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
@@ -220,7 +220,8 @@ export async function selectTenderAction(
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
-  if (mode !== "solo" && mode !== "tandem") return { ok: false, error: "invalid_input" };
+  if (mode !== "solo" && mode !== "tandem" && mode !== "conception_realisation")
+    return { ok: false, error: "invalid_input" };
 
   // 3. Transaction métier
   let snapshot: TenderSnapshot | null = null;
@@ -230,6 +231,7 @@ export async function selectTenderAction(
       if (!snap) throw new BusinessError("tender_not_found");
       if (snap.status !== "sourced") throw new BusinessError("invalid_state");
 
+      // conception_realisation utilise selected_tandem (pas de statut DB dédié en V1 MVP).
       const newStatus = mode === "solo" ? "selected_solo" : "selected_tandem";
       await tx
         .update(tenders)
@@ -475,6 +477,60 @@ export async function rejectTenderAction(
   });
 
   // 5. Revalidate
+  revalidatePath("/sourcing/ao-du-jour");
+
+  return { ok: true };
+}
+
+// ============================================================================
+// 4. excludeTenderAction — exclusion réversible (migration 0013)
+// ============================================================================
+
+/**
+ * Exclure / inclure un AO de façon réversible.
+ *
+ * exclude=true  → pose `excluded_at = now()` : l'AO disparaît du digest.
+ * exclude=false → remet `excluded_at = NULL` : l'AO réapparaît dans le digest.
+ *
+ * Le statut tender reste `sourced` — l'exclusion est orthogonale au workflow
+ * de traitement (Sélectionner / Différer / Écarter). Pas de transaction ni
+ * de SELECT FOR UPDATE ici : l'exclusion ne dépend pas du statut courant,
+ * et une double-action idempotente (exclure un AO déjà exclu) est sans effet.
+ *
+ * Pas d'entrée dans `tender_events` ni d'audit log A-série pour V1 (action
+ * légère, réversible, non bloquante). À reconsidérer si l'exclusion fait
+ * l'objet d'un reporting métier.
+ */
+export async function excludeTenderAction(
+  tenderId: string,
+  exclude: boolean,
+  deps: ActionDeps = {},
+): Promise<ActionResult> {
+  const dbInstance = deps.db ?? defaultDb;
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+
+  // 1. Validation input
+  if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
+
+  // 2. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+
+  // 3. Mise à jour directe (pas de transaction — idempotente)
+  try {
+    await dbInstance
+      .update(tenders)
+      .set({
+        excludedAt: exclude ? sql`now()` : null,
+        updatedAt: sql`now()`,
+      })
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)));
+  } catch (err) {
+    console.error("[tender-actions:exclude:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+
+  // 4. Revalidate RSC cache
   revalidatePath("/sourcing/ao-du-jour");
 
   return { ok: true };

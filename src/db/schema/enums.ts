@@ -84,10 +84,11 @@ export const tenderStatus = pgEnum("tender_status", [
 
 /**
  * selection_mode — mode de réponse choisi pour un AO.
- * solo   : réponse en propre (Mode 1 historique)
- * tandem : cotraitance avec architecte (Mode 2 historique)
+ * solo                  : réponse en propre / mandataire seul (Mode 1 historique)
+ * tandem                : cotraitance avec architecte (Mode 2 historique)
+ * conception_realisation: groupement conception-réalisation (ajouté PR feat/modal-mandataire-cr)
  */
-export const selectionMode = pgEnum("selection_mode", ["solo", "tandem"]);
+export const selectionMode = pgEnum("selection_mode", ["solo", "tandem", "conception_realisation"]);
 
 /**
  * architect_response_status — état de la réponse architecte à une sollicitation.

@@ -168,14 +168,15 @@ async function requireAlyosUser(
 /**
  * Calcule et retourne les top N architectes pour un AO Tandem. Lecture
  * seule — ne persiste rien en BDD (la persistance dans `match_proposals`
- * arrive à l'envoi via `sendArchitectSolicitation`).
+ * est déclenchée immédiatement par le composant Client via
+ * `persistMatchProposals` après réception des résultats).
  *
  * @param tenderId — UUID du tender (mode Tandem)
- * @param topN — nombre d'architectes à retourner (défaut 10)
+ * @param topN — nombre d'architectes à retourner (défaut 50)
  */
 export async function matchArchitectsForTender(
   tenderId: string,
-  topN: number = 10,
+  topN: number = 50,
   deps: ActionDeps = {},
 ): Promise<MatchActionResult> {
   const db = deps.db ?? defaultDb;
@@ -187,7 +188,7 @@ export async function matchArchitectsForTender(
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
-  if (!Number.isInteger(topN) || topN < 1 || topN > 20) {
+  if (!Number.isInteger(topN) || topN < 1 || topN > 100) {
     return { ok: false, error: "invalid_input" };
   }
 
@@ -295,6 +296,50 @@ export async function matchArchitectsForTender(
     return { ok: true, matches };
   } catch (err) {
     console.error("[tandem-actions:match:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ============================================================================
+// 1b. persistMatchProposals — persiste les proposals immédiatement après calcul
+// ============================================================================
+
+/**
+ * Persiste les match proposals en BDD immédiatement après calcul.
+ * Idempotent via ON CONFLICT DO UPDATE (UPSERT sur (tenderId, architectId)).
+ * Appelé par TandemShortlistClient dès réception des matches.
+ */
+export async function persistMatchProposals(
+  tenderId: string,
+  matches: Array<{ architectId: string; score: number; rank: number; rationale: string }>,
+  deps: { db?: typeof defaultDb } = {},
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
+  if (!Array.isArray(matches) || matches.length === 0) return { ok: true };
+  const dbInstance = deps.db ?? defaultDb;
+  try {
+    const rows = matches.map((m) => ({
+      tenderId,
+      organizationId: ALYOS_ORG_ID,
+      architectId: m.architectId,
+      score: String(m.score),
+      rank: m.rank,
+      rationale: m.rationale,
+    }));
+    await dbInstance
+      .insert(matchProposals)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [matchProposals.tenderId, matchProposals.architectId],
+        set: {
+          score: sql`EXCLUDED.score`,
+          rank: sql`EXCLUDED.rank`,
+          rationale: sql`EXCLUDED.rationale`,
+        },
+      });
+    return { ok: true };
+  } catch (err) {
+    console.error("[tandem:persist_proposals:fail]", err);
     return { ok: false, error: "internal_error" };
   }
 }
