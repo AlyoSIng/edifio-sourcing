@@ -416,9 +416,226 @@ describe("relatedSpecialty", () => {
 });
 
 describe("totalScore", () => {
-  it("somme les 5 colonnes du breakdown", () => {
+  it("somme les 6 colonnes du breakdown (dont staffSize)", () => {
     expect(
-      totalScore({ specialty: 15, geo: 30, history: 25, availability: 10, preference: 5 }),
+      totalScore({
+        specialty: 15,
+        geo: 30,
+        history: 25,
+        availability: 10,
+        preference: 5,
+        staffSize: 0,
+      }),
     ).toBe(85);
+    expect(
+      totalScore({
+        specialty: 15,
+        geo: 30,
+        history: 25,
+        availability: 10,
+        preference: 5,
+        staffSize: 8,
+      }),
+    ).toBe(93);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Bonus staffSize                                                            */
+/* -------------------------------------------------------------------------- */
+
+describe("scoreArchitect — bonus staffSize", () => {
+  const baseTender = {
+    title: "Réhabilitation école",
+    buyer: "Mairie 75001 Paris",
+    rawData: null,
+  };
+  const baseWeights = WEIGHTS_BY_PROFILE.sparse_data;
+  const base: Architect = makeArchitect({
+    specialtyCodes: [],
+    geoZones: [],
+    preferred: false,
+    pastCollabsCount: 0,
+    headcount: null,
+  });
+
+  it("headcount null → staffSize 0", () => {
+    const b = scoreArchitect(
+      { ...base, headcount: null },
+      baseTender,
+      0,
+      baseWeights,
+      new Set(),
+      null,
+    );
+    expect(b.staffSize).toBe(0);
+  });
+  it("headcount 2 → staffSize 0", () => {
+    const b = scoreArchitect(
+      { ...base, headcount: 2 },
+      baseTender,
+      0,
+      baseWeights,
+      new Set(),
+      null,
+    );
+    expect(b.staffSize).toBe(0);
+  });
+  it("headcount 3 → staffSize 3", () => {
+    const b = scoreArchitect(
+      { ...base, headcount: 3 },
+      baseTender,
+      0,
+      baseWeights,
+      new Set(),
+      null,
+    );
+    expect(b.staffSize).toBe(3);
+  });
+  it("headcount 9 → staffSize 3", () => {
+    const b = scoreArchitect(
+      { ...base, headcount: 9 },
+      baseTender,
+      0,
+      baseWeights,
+      new Set(),
+      null,
+    );
+    expect(b.staffSize).toBe(3);
+  });
+  it("headcount 10 → staffSize 8", () => {
+    const b = scoreArchitect(
+      { ...base, headcount: 10 },
+      baseTender,
+      0,
+      baseWeights,
+      new Set(),
+      null,
+    );
+    expect(b.staffSize).toBe(8);
+  });
+  it("headcount 50 → staffSize 8", () => {
+    const b = scoreArchitect(
+      { ...base, headcount: 50 },
+      baseTender,
+      0,
+      baseWeights,
+      new Set(),
+      null,
+    );
+    expect(b.staffSize).toBe(8);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Composition shortlist — bigFirms + midFirms                               */
+/* -------------------------------------------------------------------------- */
+
+describe("rankArchitects — composition headcount (bigFirms + midFirms)", () => {
+  const tender = makeTender({
+    title: "Réhabilitation école",
+    buyer: "Mairie 75001 Paris",
+  });
+
+  it("3 premiers résultats viennent des bigFirms (>=10) quand ils ont de bons scores", () => {
+    // 3 big firms (headcount >= 10) + 3 mid firms (3-9) + 1 small (< 3)
+    const archis: Architect[] = [
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000b01",
+        headcount: 15,
+        geoZones: ["75"],
+        specialtyCodes: ["rehabilitation"],
+      }),
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000b02",
+        headcount: 20,
+        geoZones: ["75"],
+        specialtyCodes: ["rehabilitation"],
+      }),
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000b03",
+        headcount: 12,
+        geoZones: ["75"],
+        specialtyCodes: ["rehabilitation"],
+      }),
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000m01",
+        headcount: 5,
+        geoZones: ["75"],
+        specialtyCodes: ["rehabilitation"],
+      }),
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000m02",
+        headcount: 7,
+        geoZones: ["75"],
+        specialtyCodes: ["rehabilitation"],
+      }),
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000m03",
+        headcount: 4,
+        geoZones: ["75"],
+        specialtyCodes: ["rehabilitation"],
+      }),
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000s01",
+        headcount: 1,
+        geoZones: ["75"],
+        specialtyCodes: ["rehabilitation"],
+      }),
+    ];
+    const top = rankArchitects(
+      tender,
+      { architects: archis, recentSolicitationsByArchitect: new Map() },
+      { topN: 6, profile: "sparse_data" },
+    );
+    expect(top.length).toBe(6);
+    // Les 3 premiers doivent être des bigFirms
+    const bigIds = new Set([
+      "00000000-0000-0000-0000-000000000b01",
+      "00000000-0000-0000-0000-000000000b02",
+      "00000000-0000-0000-0000-000000000b03",
+    ]);
+    expect(bigIds.has(top[0]!.architectId)).toBe(true);
+    expect(bigIds.has(top[1]!.architectId)).toBe(true);
+    expect(bigIds.has(top[2]!.architectId)).toBe(true);
+    // Les suivants viennent des midFirms (ou fallback)
+    const midIds = new Set([
+      "00000000-0000-0000-0000-000000000m01",
+      "00000000-0000-0000-0000-000000000m02",
+      "00000000-0000-0000-0000-000000000m03",
+    ]);
+    expect(midIds.has(top[3]!.architectId)).toBe(true);
+  });
+
+  it("complete avec le fallback si pas assez de bigFirms", () => {
+    // Seulement 1 big firm — les places restantes doivent être comblées
+    const archis: Architect[] = [
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000c01",
+        headcount: 10,
+        geoZones: ["75"],
+      }),
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000c02",
+        headcount: 2,
+        geoZones: ["75"],
+      }),
+      makeArchitect({
+        id: "00000000-0000-0000-0000-000000000c03",
+        headcount: 1,
+        geoZones: ["75"],
+      }),
+    ];
+    const top = rankArchitects(
+      tender,
+      { architects: archis, recentSolicitationsByArchitect: new Map() },
+      { topN: 3, profile: "sparse_data" },
+    );
+    // Tous les architectes doivent figurer dans la shortlist (fallback)
+    expect(top.length).toBe(3);
+    const ids = top.map((s) => s.architectId);
+    expect(ids).toContain("00000000-0000-0000-0000-000000000c01");
+    expect(ids).toContain("00000000-0000-0000-0000-000000000c02");
+    expect(ids).toContain("00000000-0000-0000-0000-000000000c03");
   });
 });

@@ -71,6 +71,7 @@ export interface MatchBreakdown {
   history: number;
   availability: number;
   preference: number;
+  staffSize: number;
 }
 
 export interface MatchScore {
@@ -372,6 +373,7 @@ export function scoreArchitect(
     history: 0,
     availability: 0,
     preference: 0,
+    staffSize: 0,
   };
 
   // Spécialité — exact > connexe > rien
@@ -433,6 +435,11 @@ export function scoreArchitect(
   // Préférence — flag admin
   breakdown.preference = architect.preferred ? weights.preference : 0;
 
+  // Effectif — bonus absolu pour structures de taille suffisante.
+  // headcount >= 10 → +8 pts ; headcount 3-9 → +3 pts ; sinon → 0.
+  const h = architect.headcount ?? 0;
+  breakdown.staffSize = h >= 10 ? 8 : h >= 3 ? 3 : 0;
+
   return breakdown;
 }
 
@@ -445,7 +452,8 @@ export function totalScore(breakdown: MatchBreakdown): number {
     breakdown.geo +
     breakdown.history +
     breakdown.availability +
-    breakdown.preference
+    breakdown.preference +
+    breakdown.staffSize
   );
 }
 
@@ -492,7 +500,47 @@ export function rankArchitects(
   });
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, topN);
+
+  // Composition souhaitée : ~3 cabinets headcount ≥ 10, reste headcount 3-9.
+  // Best-effort : si pas assez d'une catégorie, on complète avec le meilleur score.
+  const headcountById = new Map(inputs.architects.map((a) => [a.id, a.headcount ?? 0]));
+
+  const bigFirms = scored.filter((s) => headcountById.get(s.architectId)! >= 10);
+  const midFirms = scored.filter((s) => {
+    const h = headcountById.get(s.architectId)!;
+    return h >= 3 && h < 10;
+  });
+
+  const result: MatchScore[] = [];
+  const usedIds = new Set<string>();
+
+  // Jusqu'à 3 cabinets ≥ 10 (meilleur score en premier)
+  for (const s of bigFirms) {
+    if (result.length >= Math.min(3, topN)) break;
+    result.push(s);
+    usedIds.add(s.architectId);
+  }
+
+  // Cabinets 3-9 pour remplir le reste
+  for (const s of midFirms) {
+    if (result.length >= topN) break;
+    if (!usedIds.has(s.architectId)) {
+      result.push(s);
+      usedIds.add(s.architectId);
+    }
+  }
+
+  // Compléter les places restantes par le meilleur score toutes tailles confondues
+  for (const s of scored) {
+    if (result.length >= topN) break;
+    if (!usedIds.has(s.architectId)) {
+      result.push(s);
+      usedIds.add(s.architectId);
+    }
+  }
+
+  // Retrier par score décroissant pour un affichage cohérent
+  return result.sort((a, b) => b.score - a.score);
 }
 
 /**

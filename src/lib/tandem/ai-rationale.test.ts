@@ -51,6 +51,7 @@ describe("fallbackRationale", () => {
       history: 0,
       availability: 0,
       preference: 0,
+      staffSize: 0,
     });
     expect(r).toContain("aucun critère");
   });
@@ -60,7 +61,7 @@ describe("fallbackRationale", () => {
       makeArchitect({ pastCollabsCount: 3, preferred: true }),
       { title: "Construction école" },
       80,
-      { specialty: 15, geo: 30, history: 15, availability: 15, preference: 5 },
+      { specialty: 15, geo: 30, history: 15, availability: 15, preference: 5, staffSize: 0 },
     );
     expect(r).toContain("Atelier Dupont");
     expect(r).toContain("80/100");
@@ -77,6 +78,7 @@ describe("fallbackRationale", () => {
       history: 0,
       availability: 5,
       preference: 0,
+      staffSize: 0,
     });
     expect(r.length).toBeLessThanOrEqual(220);
   });
@@ -87,7 +89,7 @@ describe("generateRationaleWithAi", () => {
     const r = await generateRationaleWithAi(
       makeArchitect(),
       { title: "x", buyer: "y" },
-      { specialty: 0, geo: 0, history: 0, availability: 0, preference: 0 },
+      { specialty: 0, geo: 0, history: 0, availability: 0, preference: 0, staffSize: 0 },
       0,
       {
         generate: async () => "Très bon match grâce à ses 3 dernières collaborations.",
@@ -100,7 +102,7 @@ describe("generateRationaleWithAi", () => {
     const r = await generateRationaleWithAi(
       makeArchitect(),
       { title: "x", buyer: "y" },
-      { specialty: 0, geo: 0, history: 0, availability: 0, preference: 0 },
+      { specialty: 0, geo: 0, history: 0, availability: 0, preference: 0, staffSize: 0 },
       0,
       {
         generate: async () => {
@@ -115,7 +117,7 @@ describe("generateRationaleWithAi", () => {
     const r = await generateRationaleWithAi(
       makeArchitect(),
       { title: "x", buyer: "y" },
-      { specialty: 0, geo: 0, history: 0, availability: 0, preference: 0 },
+      { specialty: 0, geo: 0, history: 0, availability: 0, preference: 0, staffSize: 0 },
       0,
       { generate: async () => null },
     );
@@ -126,7 +128,7 @@ describe("generateRationaleWithAi", () => {
     const r = await generateRationaleWithAi(
       makeArchitect(),
       { title: "x", buyer: "y" },
-      { specialty: 0, geo: 0, history: 0, availability: 0, preference: 0 },
+      { specialty: 0, geo: 0, history: 0, availability: 0, preference: 0, staffSize: 0 },
       0,
     );
     expect(r).toContain("aucun critère");
