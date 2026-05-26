@@ -6,6 +6,17 @@
 
 ---
 
+## 2026-05-26 — PR-E module dossier IA (ZIP compile)
+
+- **2026-05-26 · G6 · Alex (dev) · Implémentation PR-E : compilation ZIP dossier candidature (branche `feat/dossier-zip-compile`).**
+  *Fichiers créés : `src/lib/dossier/zip-compile.ts` (`compileDossierZip` — fflate.zipSync), `src/app/sourcing/ao/[id]/dossier/pieces/actions.ts` (`compileDossierAction` — Server Action). Modification : `PiecesClient.tsx` (bouton "Compiler le dossier" activé). Upload ZIP → bucket `response_files`, signed URL 1h, insert `response_files(kind='dossier_zip')`. Zero erreur TypeScript.*
+  *Correctifs post-review Hugo (PR #56) : distinction `zip_download_failed` (Storage inatteignable) vs `zip_empty` (bibliothèque vide) via `hadDownloadFailures` flag dans `ZipCompileResult`.*
+
+- **2026-05-26 · G6 · Alex (dev) · `fflate.zipSync` — usage synchrone accepté au MVP (usage interne faible concurrence).**
+  *Motif : pur JS, compatible Node.js 24, aucune dépendance native. Risque event-loop négligeable au MVP (quelques PDF + 2 JSON, usage interne ~5 utilisateurs). Action Phase 2 : migrer vers `fflate.zip` (async) si bibliothèque atteint 20+ pièces volumineuses.*
+
+---
+
 ## 2026-05-26 — PR-C + PR-D module dossier IA
 
 - **2026-05-26 · G6 · Alex (dev) · Implémentation PR-C (CERFA DC1/DC2) + PR-D (pièces complémentaires) sur branche `feat/dossier-cerfa-pieces`.**
