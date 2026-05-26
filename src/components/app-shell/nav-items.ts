@@ -141,6 +141,13 @@ export const NAV_ITEMS: NavSection[] = [
         icon: "hard-hat",
         matchPrefix: "/sourcing/entreprises",
       },
+      // Bibliothèque cotraitants — livré feat/cotraitant-library (Nadia, 2026-05-26).
+      {
+        href: "/sourcing/cotraitants",
+        label: "Cotraitants",
+        icon: "users",
+        matchPrefix: "/sourcing/cotraitants",
+      },
     ],
   },
   {
