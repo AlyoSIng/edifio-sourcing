@@ -28,7 +28,7 @@
  * `Page()` appelle effectivement le helper.
  */
 
-import { and, asc, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 
 import type { db as defaultDb } from "@/db/client";
 import { platforms, searchProfiles } from "@/db/schema/config";
@@ -153,7 +153,176 @@ export async function getTendersOfTheDay(
 }
 
 // ============================================================================
-// 3. getActiveSearchProfileName — nom du profil actif (header UI)
+// 3. TenderSelected + getTendersSelected — liste « Sélectionnés »
+// ============================================================================
+
+/**
+ * Extension de `TenderOfTheDay` pour les pages Sélectionnés et Réponse Solo.
+ * On expose le `status` en type narrow pour le routing CTA côté UI.
+ */
+export interface TenderSelected extends TenderOfTheDay {
+  status: "selected_solo" | "selected_tandem";
+}
+
+/**
+ * Retourne les AO sélectionnés (solo + tandem) pour l'organisation passée.
+ *
+ * Filtres :
+ *  - `organization_id = $1` (multi-tenant explicite)
+ *  - `status IN ('selected_solo', 'selected_tandem')`
+ *  - `deadline IS NULL OR deadline > now()` (on masque les AO dont la date
+ *    de remise est dépassée — cf. même logique que `getTendersOfTheDay`)
+ *
+ * Tri : `deadline ASC NULLS LAST` — les AO avec clôture imminente en premier.
+ * Limite : 100 (MVP — si > 100 AO sélectionnés, le contexte métier a changé).
+ *
+ * @param organizationId — UUID du tenant courant
+ * @param client         — instance Drizzle (mock-friendly)
+ */
+export async function getTendersSelected(
+  organizationId: string,
+  client: DrizzleClient,
+): Promise<TenderSelected[]> {
+  const rows = await client
+    .select({
+      id: tenders.id,
+      title: tenders.title,
+      buyer: tenders.buyer,
+      amount: tenders.amount,
+      deadline: tenders.deadline,
+      cpv: tenders.cpv,
+      score: tenders.score,
+      platformCode: platforms.code,
+      externalRef: tenders.externalRef,
+      deferredUntil: tenders.deferredUntil,
+      status: tenders.status,
+    })
+    .from(tenders)
+    .innerJoin(platforms, eq(tenders.platformId, platforms.id))
+    .where(
+      and(
+        eq(tenders.organizationId, organizationId),
+        inArray(tenders.status, ["selected_solo", "selected_tandem"]),
+        or(isNull(tenders.deadline), gt(tenders.deadline, sql`now()`)),
+      ),
+    )
+    .orderBy(sql`${tenders.deadline} ASC NULLS LAST`)
+    .limit(100);
+
+  // Le statut issu de Drizzle est le type enum Postgres broad — on le rétrécit
+  // via `as` après avoir filtré IN sur les 2 valeurs cibles. TypeScript seul
+  // ne peut pas inférer la restriction ; le WHERE IN garantit la validité.
+  return rows as TenderSelected[];
+}
+
+// ============================================================================
+// 4. getTendersSolo — liste « Réponse solo »
+// ============================================================================
+
+/**
+ * Retourne les AO sélectionnés uniquement en mode Solo.
+ *
+ * Filtres :
+ *  - `organization_id = $1`
+ *  - `status = 'selected_solo'`
+ *  - `deadline IS NULL OR deadline > now()`
+ *
+ * Tri + limite : identiques à `getTendersSelected`.
+ *
+ * @param organizationId — UUID du tenant courant
+ * @param client         — instance Drizzle (mock-friendly)
+ */
+export async function getTendersSolo(
+  organizationId: string,
+  client: DrizzleClient,
+): Promise<TenderSelected[]> {
+  const rows = await client
+    .select({
+      id: tenders.id,
+      title: tenders.title,
+      buyer: tenders.buyer,
+      amount: tenders.amount,
+      deadline: tenders.deadline,
+      cpv: tenders.cpv,
+      score: tenders.score,
+      platformCode: platforms.code,
+      externalRef: tenders.externalRef,
+      deferredUntil: tenders.deferredUntil,
+      status: tenders.status,
+    })
+    .from(tenders)
+    .innerJoin(platforms, eq(tenders.platformId, platforms.id))
+    .where(
+      and(
+        eq(tenders.organizationId, organizationId),
+        eq(tenders.status, "selected_solo"),
+        or(isNull(tenders.deadline), gt(tenders.deadline, sql`now()`)),
+      ),
+    )
+    .orderBy(sql`${tenders.deadline} ASC NULLS LAST`)
+    .limit(100);
+
+  return rows as TenderSelected[];
+}
+
+// ============================================================================
+// 5. getTendersDeferred — liste « Différés »
+// ============================================================================
+
+/**
+ * Retourne les AO différés dont l'échéance de report n'est pas encore atteinte.
+ *
+ * Filtres :
+ *  - `organization_id = $1`
+ *  - `deferred_until IS NOT NULL` ET `deferred_until > now()` — seuls les AO
+ *    effectivement « en attente » (pas encore revenus dans le digest).
+ *
+ * Tri : `deferred_until ASC` — les AO qui reviennent le plus tôt en premier
+ * (l'utilisateur peut anticiper ceux qui reviendront bientôt).
+ * Limite : 100.
+ *
+ * Note : contrairement aux autres helpers, il n'y a PAS de filtre sur
+ * `deadline > now()` ici : un AO différé dont la deadline est dépassée mérite
+ * d'être visible pour que l'utilisateur puisse le gérer consciemment (le
+ * différer encore ou l'écarter). Ce choix est intentionnel MVP.
+ *
+ * @param organizationId — UUID du tenant courant
+ * @param client         — instance Drizzle (mock-friendly)
+ */
+export async function getTendersDeferred(
+  organizationId: string,
+  client: DrizzleClient,
+): Promise<TenderOfTheDay[]> {
+  const rows = await client
+    .select({
+      id: tenders.id,
+      title: tenders.title,
+      buyer: tenders.buyer,
+      amount: tenders.amount,
+      deadline: tenders.deadline,
+      cpv: tenders.cpv,
+      score: tenders.score,
+      platformCode: platforms.code,
+      externalRef: tenders.externalRef,
+      deferredUntil: tenders.deferredUntil,
+    })
+    .from(tenders)
+    .innerJoin(platforms, eq(tenders.platformId, platforms.id))
+    .where(
+      and(
+        eq(tenders.organizationId, organizationId),
+        isNotNull(tenders.deferredUntil),
+        gt(tenders.deferredUntil, sql`now()`),
+      ),
+    )
+    .orderBy(asc(tenders.deferredUntil))
+    .limit(100);
+
+  return rows;
+}
+
+// ============================================================================
+// 6. getActiveSearchProfileName — nom du profil actif (header UI)
 // ============================================================================
 
 /**

@@ -2,7 +2,9 @@
  * Page dossier IA — `/sourcing/ao/[id]/dossier`.
  *
  * Server Component **protégé** (middleware `@alyosingenierie.fr` + path
- * `/sourcing/*`). Accessible dès que `tender.status === 'architect_accepted'`.
+ * `/sourcing/*`). Accessible pour deux statuts :
+ *   - `architect_accepted` : cotraitance validée — eyebrow « Tandem »
+ *   - `selected_solo`      : réponse en propre  — eyebrow « Solo »
  *
  * Source de vérité :
  *   - Spec PR-B module dossier IA (brief Board 2026-05-25)
@@ -18,6 +20,7 @@
  *   try/catch absorbé autour de `loadDossierPageData` → `<ErrorBanner>`.
  */
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
@@ -37,11 +40,20 @@ export const metadata = {
   title: "Dossier de candidature · edifio Sourcing",
 };
 
+/**
+ * Statuts autorisant l'accès au dossier de candidature.
+ * - `architect_accepted` : flux Tandem (architecte partenaire accepté)
+ * - `selected_solo`      : flux Solo (réponse AlyoS seule)
+ */
+const DOSSIER_ALLOWED_STATUSES = ["architect_accepted", "selected_solo"] as const;
+type DossierAllowedStatus = (typeof DOSSIER_ALLOWED_STATUSES)[number];
+
 interface PageProps {
   params: { id: string };
 }
 
-const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const UUID_SHAPE =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 /** Format court de date français (ex. 15/07/2026) */
 function formatDate(date: Date | null): string {
@@ -109,38 +121,56 @@ export default async function DossierPage({ params }: PageProps) {
 
   const { data } = loadResult;
 
-  // Restriction : dossier uniquement disponible pour les AOs acceptés en Tandem
-  if (data.tender.status !== "architect_accepted") {
+  // Garde statut : architect_accepted (Tandem) ou selected_solo (Solo)
+  if (!DOSSIER_ALLOWED_STATUSES.includes(data.tender.status as DossierAllowedStatus)) {
     return (
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <ErrorBanner message="Ce dossier n'est accessible que pour les AOs acceptés par un architecte." />
+        <ErrorBanner message="Ce dossier n'est pas encore accessible. Sélectionnez d'abord cet AO." />
       </main>
     );
   }
+
+  const isSolo = data.tender.status === "selected_solo";
+  const eyebrow = isSolo ? "Dossier de candidature — Solo" : "Dossier de candidature — Tandem";
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
       {/* En-tête AO */}
       <header className="mb-6">
         <nav className="mb-3 flex items-center gap-2 text-xs text-muted" aria-label="Fil d'Ariane">
-          <a
-            href="/sourcing/cotraitance"
-            className="hover:text-ink hover:underline focus:outline-none"
-          >
-            Cotraitance
-          </a>
-          <span aria-hidden>/</span>
-          <a
-            href={`/sourcing/ao/${params.id}/tandem`}
-            className="hover:text-ink hover:underline focus:outline-none"
-          >
-            Short-list
-          </a>
-          <span aria-hidden>/</span>
-          <span className="text-ink">Dossier</span>
+          {isSolo ? (
+            <>
+              <Link
+                href="/sourcing/reponse-solo"
+                className="hover:text-ink hover:underline focus:outline-none"
+              >
+                Réponse solo
+              </Link>
+              <span aria-hidden>/</span>
+              <span className="text-ink">Dossier</span>
+            </>
+          ) : (
+            <>
+              <a
+                href="/sourcing/cotraitance"
+                className="hover:text-ink hover:underline focus:outline-none"
+              >
+                Cotraitance
+              </a>
+              <span aria-hidden>/</span>
+              <a
+                href={`/sourcing/ao/${params.id}/tandem`}
+                className="hover:text-ink hover:underline focus:outline-none"
+              >
+                Short-list
+              </a>
+              <span aria-hidden>/</span>
+              <span className="text-ink">Dossier</span>
+            </>
+          )}
         </nav>
 
-        <span className="pill-eyebrow">Dossier de candidature — Tandem</span>
+        <span className="pill-eyebrow">{eyebrow}</span>
         <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
           {data.tender.title}
         </h1>
@@ -148,7 +178,8 @@ export default async function DossierPage({ params }: PageProps) {
           <span>{data.tender.buyer}</span>
           {data.tender.deadline && (
             <span>
-              Deadline : <strong className="text-ink">{formatDate(data.tender.deadline)}</strong>
+              Deadline :{" "}
+              <strong className="text-ink">{formatDate(data.tender.deadline)}</strong>
             </span>
           )}
         </div>
