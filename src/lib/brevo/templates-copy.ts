@@ -23,7 +23,8 @@
  *  `BREVO_TEMPLATE_ID_ARCHITECT_SOLICITATION_*`) pointent vers des templates
  *  créés dans l'interface Brevo. Ces templates Brevo doivent exposer les
  *  variables suivantes (syntaxe Brevo `{{ params.NOM_VAR }}`) :
- *    - {{ params.civilite }}           — "Madame" / "Monsieur" / "Madame, Monsieur,"
+ *    - {{ params.greeting }}           — salutation complète ("Bonjour Madame Dupont," / "Bonjour Marie,")
+ *    - {{ params.civilite }}           — "Madame" / "Monsieur" / "Madame, Monsieur," (conservé)
  *    - {{ params.archi_prenom }}       — prénom architecte
  *    - {{ params.archi_nom }}          — nom architecte
  *    - {{ params.cabinet }}            — raison sociale cabinet
@@ -120,14 +121,14 @@ export const PRESENTATION_SOCIETE_TEXT_DEFAULT =
  * Corps du template `architect_solicitation_VOUS` — copy v2 §A.
  *
  * Variables Brevo (syntaxe `{{ params.VAR }}`) :
- *   civilite, archi_nom, ao_objet, ao_acheteur, ao_cloture,
+ *   greeting, ao_objet, ao_acheteur, ao_cloture,
  *   presentation_societe, lien_ao, rgpd_block
  *
  * Note : ce corps HTML est utilisé comme fallback par `resolveBrevoTemplate`
  * quand la table `message_templates` BDD n'a pas de contenu pour l'org.
  * En production normale, c'est le template Brevo (templateId) qui est utilisé.
  */
-export const BODY_SOLICITATION_VOUS_TEMPLATE = `<p>{{ params.civilite }} {{ params.archi_nom }},</p>
+export const BODY_SOLICITATION_VOUS_TEMPLATE = `<p>{{ params.greeting }}</p>
 
 <p>Nous venons de repérer un appel d'offres qui pourrait vous intéresser :
 <strong>{{ params.ao_objet }}</strong>, pour {{ params.ao_acheteur }}.
@@ -153,10 +154,10 @@ nous indiquer si vous êtes intéressé(e), en quelques clics :</p>
  * Corps du template `architect_solicitation_TU` — copy v2 §B.
  *
  * Variables Brevo (syntaxe `{{ params.VAR }}`) :
- *   archi_prenom, ao_objet, ao_acheteur, ao_cloture,
+ *   greeting, ao_objet, ao_acheteur, ao_cloture,
  *   presentation_societe, lien_ao, rgpd_block
  */
-export const BODY_SOLICITATION_TU_TEMPLATE = `<p>Salut {{ params.archi_prenom }},</p>
+export const BODY_SOLICITATION_TU_TEMPLATE = `<p>{{ params.greeting }}</p>
 
 <p>On vient de repérer un appel d'offres qui pourrait nous intéresser tous les
 deux : <strong>{{ params.ao_objet }}</strong>, pour {{ params.ao_acheteur }}.
