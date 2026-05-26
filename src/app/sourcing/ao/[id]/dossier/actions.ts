@@ -30,6 +30,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { auditLogs } from "@/db/schema/audit";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
@@ -442,6 +443,33 @@ export async function analyzeRcAction(
         ok: false,
         error: result.error,
       };
+    }
+
+    // Insert audit log A7 — ai_run (traçabilité Gate 5 §7)
+    try {
+      await db.insert(auditLogs).values({
+        organizationId: ALYOS_ORG_ID,
+        actorId: auth.profile.id,
+        actorEmail: auth.profile.email,
+        actorRole: auth.profile.role as "admin" | "user" | "viewer",
+        action: "ai_run",
+        subjectType: "tender",
+        subjectId: tenderId,
+        data: {
+          prompt_name: result.promptName,
+          prompt_version: result.promptVersion,
+          model: result.model as "sonnet-4-6" | "haiku-4-5",
+          tender_id: tenderId,
+          cost_usd: result.costUsd,
+          latency_ms: result.latencyMs,
+          succeeded: true,
+          tokens_in: result.tokensIn,
+          tokens_out: result.tokensOut,
+        },
+      });
+    } catch (err) {
+      console.error("[dossier:analyze-rc:audit-log:fail]", err);
+      // Non bloquant — l'analyse est disponible même si l'audit log échoue
     }
 
     // Insert tender_event rc_analyzed (audit trail + source pour page-data.ts)

@@ -338,7 +338,7 @@ function AnalysisTriggerSection({
 // Section 3 : Résultats de l'analyse
 // ---------------------------------------------------------------------------
 
-function AnalysisResultSection({ analysis }: { analysis: RcAnalysis }) {
+function AnalysisResultSection({ analysis, tenderId }: { analysis: RcAnalysis; tenderId: string }) {
   return (
     <div className="space-y-5">
       {/* Alertes */}
@@ -480,22 +480,15 @@ function AnalysisResultSection({ analysis }: { analysis: RcAnalysis }) {
         </section>
       )}
 
-      {/* Bouton Préparer les DC (PR-C — désactivé) */}
+      {/* Bouton Préparer les DC (PR-C — activé) */}
       <div className="flex justify-end pt-2">
-        <div className="relative">
-          <a
-            href="#"
-            aria-disabled="true"
-            tabIndex={-1}
-            className="inline-flex cursor-not-allowed items-center rounded-md bg-paper-2 px-4 py-2 text-sm font-medium text-muted"
-            title="Disponible prochainement"
-          >
-            Préparer les DC →
-          </a>
-          <span className="absolute -right-1 -top-1 rounded bg-ink px-1 py-0.5 font-mono text-[9px] text-white">
-            bientôt
-          </span>
-        </div>
+        <a
+          href={`/sourcing/ao/${tenderId}/dossier/cerfa`}
+          className="hover:bg-ink/80 inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-medium text-white transition"
+        >
+          Préparer les DC
+          <span aria-hidden>&rarr;</span>
+        </a>
       </div>
     </div>
   );
@@ -552,7 +545,7 @@ export function DossierClient({ data }: DossierClientProps) {
           >
             2. Résultats de l&apos;analyse RC
           </h2>
-          <AnalysisResultSection analysis={localAnalysis} />
+          <AnalysisResultSection analysis={localAnalysis} tenderId={tender.id} />
         </section>
       )}
     </div>
