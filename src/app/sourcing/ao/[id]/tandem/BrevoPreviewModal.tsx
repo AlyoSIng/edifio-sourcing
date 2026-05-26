@@ -55,13 +55,21 @@ interface TenderLike {
 interface Props {
   architect: ArchitectLike;
   tender: TenderLike;
+  /** Nom commercial de la société émettrice. Fallback : "AlyoS Ingénierie". */
+  nomCommercial?: string;
   onCancel: () => void;
   onConfirm: (register: BrevoRegister, customNote: string | undefined) => void;
 }
 
 const MAX_NOTE_LEN = 500;
 
-export function BrevoPreviewModal({ architect, tender, onCancel, onConfirm }: Props) {
+export function BrevoPreviewModal({
+  architect,
+  tender,
+  nomCommercial,
+  onCancel,
+  onConfirm,
+}: Props) {
   const titleId = useId();
   const [register, setRegister] = useState<BrevoRegister>(architect.tutoiement ? "tu" : "vous");
   const [customNote, setCustomNote] = useState("");
@@ -86,13 +94,14 @@ export function BrevoPreviewModal({ architect, tender, onCancel, onConfirm }: Pr
     onConfirm(register, customNote.trim() || undefined);
   }
 
-  const { prenom, nom } = splitContactName(architect.contactName);
+  const { prenom, nom: nomArchi } = splitContactName(architect.contactName);
   const isTu = register === "tu";
+  const nomSociete = nomCommercial || "AlyoS Ingénierie";
 
   // Salutation alignée copy validé (greeting v3).
   // Pour le VOUS en preview : pas de title/civilité disponible dans la short-list
   // → fallback "Madame, Monsieur,". Le mail réel calculé côté server aura la civilité correcte.
-  const salut = buildGreeting(register, "Madame, Monsieur,", prenom, nom);
+  const salut = buildGreeting(register, "Madame, Monsieur,", prenom, nomArchi);
   const cloture = formatClotureFr(tender.deadline);
 
   return (
@@ -149,37 +158,62 @@ export function BrevoPreviewModal({ architect, tender, onCancel, onConfirm }: Pr
           <div className="rounded-md border border-line bg-white p-6 font-sans text-sm leading-relaxed text-ink">
             <p className="font-semibold">Objet : Cotraitance — {tender.title}</p>
             <hr className="my-3 border-line" />
+
+            {/* Salutation */}
             <p>{salut}</p>
+
+            {/* Accroche copy v3 */}
             <p className="mt-3">
-              {isTu
-                ? "Chez AlyoS Ingénierie, on prépare une réponse à un AO public et on aimerait te proposer une cotraitance."
-                : "Chez AlyoS Ingénierie, nous préparons une réponse à un AO public et nous aimerions vous proposer une cotraitance."}
+              {isTu ? (
+                <>
+                  L&rsquo;entreprise <strong>{nomSociete}</strong> envisage de répondre à un AO en
+                  cotraitance et te propose le rôle de <strong>mandataire MOE</strong>. Tu peux
+                  répondre en un clic, sans créer de compte.
+                </>
+              ) : (
+                <>
+                  La société <strong>{nomSociete}</strong> envisage de répondre à un AO en
+                  cotraitance et vous propose le rôle de <strong>mandataire MOE</strong>. Vous
+                  pouvez répondre en un clic, sans créer de compte.
+                </>
+              )}
             </p>
-            <ul className="mt-3 space-y-1 text-sm text-ink-2">
-              <li>
-                <strong className="text-ink">AO :</strong> {tender.title}
-              </li>
+
+            {/* Bloc opération */}
+            <p className="mt-4 font-semibold">▸ L&rsquo;opération</p>
+            <p className="mt-1">{tender.title}</p>
+            <ul className="mt-2 space-y-1 text-sm text-ink-2">
               <li>
                 <strong className="text-ink">Acheteur :</strong> {tender.buyer}
               </li>
               <li>
-                <strong className="text-ink">Clôture :</strong> {cloture}
+                <strong className="text-ink">Département :</strong>{" "}
+                <span className="italic text-muted">(calculé à l&rsquo;envoi)</span>
+              </li>
+              <li>
+                <strong className="text-ink">Remise des plis :</strong> {cloture}
               </li>
             </ul>
-            <p className="mt-3">
-              {isTu
-                ? "Si tu es partant ou si tu veux plus d'infos, clique sur le bouton ci-dessous — un lien sécurisé t'amène sur la fiche AO complète."
-                : "Si vous êtes partant ou si vous souhaitez plus d'informations, cliquez sur le bouton ci-dessous — un lien sécurisé vous amène sur la fiche AO complète."}
+
+            {/* Bloc présentation société — placeholder en preview */}
+            <p className="mt-4 rounded-md border border-dashed border-line bg-paper-2 px-3 py-2 text-xs italic text-muted">
+              [Présentation {nomSociete} — chargée depuis la configuration]
             </p>
-            <p className="mt-3">
+
+            {/* Options */}
+            <p className="mt-4 font-semibold">{isTu ? "▸ Tes options" : "▸ Vos options"}</p>
+            <p className="mt-2">
               <span className="inline-block rounded-md bg-brand-red px-4 py-2 text-xs font-semibold text-white">
-                Voir l&rsquo;AO complet (lien sécurisé)
+                {isTu ? "→ Oui, je suis partant" : "→ Oui, je suis partant(e)"}
               </span>
             </p>
-            <p className="mt-3 text-sm">
+            <p className="mt-2 text-xs text-muted underline">Non, pas cette fois</p>
+
+            {/* Signature */}
+            <p className="mt-4 text-sm">
               {isTu ? "À très vite," : "Bien cordialement,"}
               <br />
-              L&rsquo;équipe AlyoS Ingénierie
+              <em>— via edifio Sourcing</em>
             </p>
 
             {/* Bloc RGPD art.14 — affiché en preview pour validation user */}
@@ -187,11 +221,11 @@ export function BrevoPreviewModal({ architect, tender, onCancel, onConfirm }: Pr
               className="mt-6 border-t border-line pt-3 text-xs italic leading-snug text-muted"
               data-testid="preview-rgpd-block"
             >
-              Vous recevez ce message car AlyoS Ingénierie a identifié {architect.cabinet} comme
+              Vous recevez ce message car {nomSociete} a identifié {architect.cabinet} comme
               partenaire potentiel pour une réponse en cotraitance à des marchés publics de maîtrise
               d&rsquo;œuvre. Vos coordonnées professionnelles proviennent de bases professionnelles
-              et publiques (dont les données ouvertes SIRENE). AlyoS Ingénierie traite ces données
-              dans le seul but de vous proposer des opportunités de cotraitance, sur la base de son
+              et publiques (dont les données ouvertes SIRENE). {nomSociete} traite ces données dans
+              le seul but de vous proposer des opportunités de cotraitance, sur la base de son
               intérêt légitime. Vous disposez d&rsquo;un droit d&rsquo;accès, de rectification et
               d&rsquo;opposition — un lien d&rsquo;opposition figure dans le mail envoyé.
             </p>

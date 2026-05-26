@@ -24,6 +24,7 @@
  *  créés dans l'interface Brevo. Ces templates Brevo doivent exposer les
  *  variables suivantes (syntaxe Brevo `{{ params.NOM_VAR }}`) :
  *    - {{ params.greeting }}           — salutation complète ("Bonjour Madame Dupont," / "Bonjour Marie,")
+ *    - {{ params.nom_commercial }}     — nom commercial société émettrice (v3, ex. "AlyoS Ingénierie")
  *    - {{ params.civilite }}           — "Madame" / "Monsieur" / "Madame, Monsieur," (conservé)
  *    - {{ params.archi_prenom }}       — prénom architecte
  *    - {{ params.archi_nom }}          — nom architecte
@@ -41,15 +42,15 @@
  *  à jour ces templates dans l'interface Brevo. Ils constituent également le
  *  fallback de `resolveBrevoTemplate` (Lot C).
  *
- * MISE À JOUR BREVO REQUISE (Lot #56) :
- *  Suite au passage copy v1 → v2, les templates Brevo existants doivent être
+ * MISE À JOUR BREVO REQUISE (PR #63 — copy v3) :
+ *  Suite au passage copy v2 → v3, les templates Brevo existants doivent être
  *  mis à jour dans l'interface Brevo :
  *    - `architect_solicitation_VOUS` :
  *        sujet : SUBJECT_SOLICITATION_VOUS (ci-dessous)
- *        corps  : voir BODY_SOLICITATION_VOUS_TEMPLATE
+ *        corps  : voir BODY_SOLICITATION_VOUS_TEMPLATE (v3 — ajouter {{ params.nom_commercial }})
  *    - `architect_solicitation_TU` :
  *        sujet : SUBJECT_SOLICITATION_TU (ci-dessous)
- *        corps  : voir BODY_SOLICITATION_TU_TEMPLATE
+ *        corps  : voir BODY_SOLICITATION_TU_TEMPLATE (v3 — ajouter {{ params.nom_commercial }})
  *  Les 3 autres templates (followup TU/VOUS, decline_ack) restent inchangés.
  */
 
@@ -118,11 +119,11 @@ export const PRESENTATION_SOCIETE_TEXT_DEFAULT =
 /* -------------------------------------------------------------------------- */
 
 /**
- * Corps du template `architect_solicitation_VOUS` — copy v2 §A.
+ * Corps du template `architect_solicitation_VOUS` — copy v3 (PR #63).
  *
  * Variables Brevo (syntaxe `{{ params.VAR }}`) :
- *   greeting, ao_objet, ao_acheteur, ao_cloture,
- *   presentation_societe, lien_ao, rgpd_block
+ *   greeting, nom_commercial, ao_objet, ao_acheteur, ao_departement, ao_cloture,
+ *   presentation_societe, lien_ao, lien_opposition, rgpd_block
  *
  * Note : ce corps HTML est utilisé comme fallback par `resolveBrevoTemplate`
  * quand la table `message_templates` BDD n'a pas de contenu pour l'org.
@@ -130,51 +131,52 @@ export const PRESENTATION_SOCIETE_TEXT_DEFAULT =
  */
 export const BODY_SOLICITATION_VOUS_TEMPLATE = `<p>{{ params.greeting }}</p>
 
-<p>Nous venons de repérer un appel d'offres qui pourrait vous intéresser :
-<strong>{{ params.ao_objet }}</strong>, pour {{ params.ao_acheteur }}.
-La clôture est fixée au {{ params.ao_cloture }}.</p>
+<p>La société <strong>{{ params.nom_commercial }}</strong> envisage de répondre à un AO en cotraitance et vous propose le rôle de <strong>mandataire MOE</strong>. Vous pouvez répondre en un clic, sans créer de compte.</p>
 
-<p>Le projet correspond bien à votre champ d'intervention, et nous serions ravis
-d'y répondre <strong>avec vous, en cotraitance</strong>.</p>
+<p><strong>▸ L'opération</strong></p>
+<p>{{ params.ao_objet }}</p>
+<ul>
+  <li><strong>Acheteur :</strong> {{ params.ao_acheteur }}</li>
+  <li><strong>Département :</strong> {{ params.ao_departement }}</li>
+  <li><strong>Remise des plis :</strong> {{ params.ao_cloture }}</li>
+</ul>
 
 {{ params.presentation_societe }}
 
-<p>Le détail de l'AO est consultable ci-dessous — vous pouvez le parcourir et
-nous indiquer si vous êtes intéressé(e), en quelques clics :</p>
+<p><strong>▸ Vos options</strong></p>
+<p><a href="{{ params.lien_ao }}" style="color:#FF0033;font-weight:bold;">→ Oui, je suis partant(e)</a></p>
+<p><a href="{{ params.lien_opposition }}" style="color:#666;">Non, pas cette fois</a></p>
 
-<p><strong><a href="{{ params.lien_ao }}" style="color:#FF0033;">
-→ Voir l'AO et répondre
-</a></strong></p>
-
-<p>Bien à vous,<br>L'équipe AlyoS Ingénierie<br><em>via edifio Sourcing</em></p>
+<p>Bien cordialement,<br><em>— via edifio Sourcing</em></p>
 
 {{ params.rgpd_block }}`;
 
 /**
- * Corps du template `architect_solicitation_TU` — copy v2 §B.
+ * Corps du template `architect_solicitation_TU` — copy v3 (PR #63).
  *
  * Variables Brevo (syntaxe `{{ params.VAR }}`) :
- *   greeting, ao_objet, ao_acheteur, ao_cloture,
- *   presentation_societe, lien_ao, rgpd_block
+ *   greeting, nom_commercial, ao_objet, ao_acheteur, ao_departement, ao_cloture,
+ *   presentation_societe, lien_ao, lien_opposition, rgpd_block
  */
 export const BODY_SOLICITATION_TU_TEMPLATE = `<p>{{ params.greeting }}</p>
 
-<p>On vient de repérer un appel d'offres qui pourrait nous intéresser tous les
-deux : <strong>{{ params.ao_objet }}</strong>, pour {{ params.ao_acheteur }}.
-Clôture le {{ params.ao_cloture }}.</p>
+<p>L'entreprise <strong>{{ params.nom_commercial }}</strong> envisage de répondre à un AO en cotraitance et te propose le rôle de <strong>mandataire MOE</strong>. Tu peux répondre en un clic, sans créer de compte.</p>
 
-<p>Ça colle bien à ce que tu fais, et ce serait l'occasion d'y répondre
-ensemble, en cotraitance.</p>
+<p><strong>▸ L'opération</strong></p>
+<p>{{ params.ao_objet }}</p>
+<ul>
+  <li><strong>Acheteur :</strong> {{ params.ao_acheteur }}</li>
+  <li><strong>Département :</strong> {{ params.ao_departement }}</li>
+  <li><strong>Remise des plis :</strong> {{ params.ao_cloture }}</li>
+</ul>
 
 {{ params.presentation_societe }}
 
-<p>Le détail est ici, tu nous dis si tu es partant en deux clics :</p>
+<p><strong>▸ Tes options</strong></p>
+<p><a href="{{ params.lien_ao }}" style="color:#FF0033;font-weight:bold;">→ Oui, je suis partant</a></p>
+<p><a href="{{ params.lien_opposition }}" style="color:#666;">Non, pas cette fois</a></p>
 
-<p><strong><a href="{{ params.lien_ao }}" style="color:#FF0033;">
-→ Voir l'AO et répondre
-</a></strong></p>
-
-<p>À très vite,<br>L'équipe AlyoS Ingénierie<br><em>via edifio Sourcing</em></p>
+<p>À très vite,<br><em>— via edifio Sourcing</em></p>
 
 {{ params.rgpd_block }}`;
 

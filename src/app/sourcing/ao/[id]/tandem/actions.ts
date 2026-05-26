@@ -561,17 +561,23 @@ export async function sendArchitectSolicitation(
     };
   }
 
-  // Chargement de la présentation société depuis organization_profiles (lot D acté).
-  // Fallback silencieux sur PRESENTATION_SOCIETE_HTML_DEFAULT si absent en BDD.
+  // Chargement de la présentation société + nom commercial depuis organization_profiles (lot D acté).
+  // Fallback silencieux sur PRESENTATION_SOCIETE_HTML_DEFAULT / "AlyoS Ingénierie" si absent en BDD.
   let presentationSociete: string | undefined;
+  let nomCommercial: string | undefined;
   try {
     const orgRows = await db
-      .select({ presentationBlock: organizationProfiles.presentationBlock })
+      .select({
+        presentationBlock: organizationProfiles.presentationBlock,
+        commercialName: organizationProfiles.commercialName,
+      })
       .from(organizationProfiles)
       .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
       .limit(1);
     const block = orgRows[0]?.presentationBlock;
     if (block) presentationSociete = block;
+    const cname = orgRows[0]?.commercialName;
+    if (cname) nomCommercial = cname;
   } catch {
     // Non-bloquant — fallback hardcoded utilisé
   }
@@ -583,6 +589,7 @@ export async function sendArchitectSolicitation(
     lienAo: `${getSiteUrl()}/archi/${architectToken.token}`,
     lienOpposition: `${getSiteUrl()}/archi/oppose/${oppositionToken.jti}`,
     presentationSociete,
+    nomCommercial,
     register,
   });
 
@@ -605,6 +612,7 @@ export async function sendArchitectSolicitation(
     to: { email: architect.email, name: toName || variables.cabinet },
     params: {
       greeting: variables.greeting,
+      nom_commercial: variables.nom_commercial,
       civilite: variables.civilite,
       archi_prenom: variables.archi_prenom,
       archi_nom: variables.archi_nom,

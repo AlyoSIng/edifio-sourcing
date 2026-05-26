@@ -55,6 +55,12 @@ export interface BrevoArchitectVariables {
    */
   greeting: string;
   /**
+   * Nom commercial de la société émettrice (ex. "AlyoS Ingénierie").
+   * Source : `organization_profiles.commercialName`. Fallback : "AlyoS Ingénierie".
+   * Utilisé dans les templates Brevo v3 via `{{ params.nom_commercial }}`.
+   */
+  nom_commercial: string;
+  /**
    * Civilité : "Madame" | "Monsieur" | "Madame, Monsieur," (fallback).
    * Utilisée dans la variante VOUS (formelle) pour l'appel.
    */
@@ -97,6 +103,11 @@ export interface BuildVariablesInput {
    * Si absent, on utilise `PRESENTATION_SOCIETE_HTML_DEFAULT`.
    */
   presentationSociete?: string;
+  /**
+   * Nom commercial — `organization_profiles.commercialName`. Fallback : "AlyoS Ingénierie".
+   * Injecté dans les templates Brevo v3 via `{{ params.nom_commercial }}`.
+   */
+  nomCommercial?: string;
   /**
    * Registre TU/VOUS — utilisé pour calculer la salutation.
    * Si absent, fallback VOUS (vouvoiement par défaut).
@@ -216,9 +227,11 @@ export function buildBrevoVariables(input: BuildVariablesInput): BrevoArchitectV
   const civilite_value = deriveCivilite(input.architect.title);
   const register = input.register ?? "vous";
   const greeting = buildGreeting(register, civilite_value, prenom, nom);
+  const nom_commercial = input.nomCommercial?.trim() || "AlyoS Ingénierie";
 
   return {
     greeting,
+    nom_commercial,
     civilite: civilite_value,
     archi_prenom: prenom,
     archi_nom: nom,

@@ -6,6 +6,33 @@
 
 ---
 
+## 2026-05-26 — PR #63 nav v3, email copy v3, Brevo nom_commercial (Nadia)
+
+- **2026-05-26 · G6 · Nadia (dev2) · feat/nav-email-v3 — restructuration menu + copy Brevo v3 + variable nom_commercial.**
+  *Branche créée depuis main. Fichiers modifiés :*
+  *- `src/components/icons/AppIcons.tsx` : ajout icônes `layers`, `compass`, `hard-hat` (viewBox 24×24, stroke-2 round, fill-none).*
+  *- `src/components/app-shell/nav-items.ts` : restructuration `NAV_ITEMS` — 5 sections (Sourcing / Pilotage / Contacts / Configuration / Admin). Pilotage : Cotraitance + Mandataire (ex-Réponse solo) + Conception/Réalisation (comingSoon). Contacts : Architectes + Bureaux d'Études (comingSoon) + Entreprises/Majors (comingSoon).*
+  *- `src/lib/brevo/variables.ts` : champ `nom_commercial: string` dans `BrevoArchitectVariables` + `nomCommercial?: string` dans `BuildVariablesInput` + calcul avec fallback "AlyoS Ingénierie".*
+  *- `src/lib/brevo/templates-copy.ts` : copy v3 — templates TU/VOUS réécrits avec `{{ params.nom_commercial }}`, bloc opération structuré, CTA accept/refus distincts.*
+  *- `src/app/sourcing/ao/[id]/tandem/actions.ts` : chargement `commercialName` depuis org_profiles, passage à `buildBrevoVariables`, ajout dans params Brevo.*
+  *- `src/lib/tandem/followup-cron.ts` : même propagation pour relance J+3.*
+  *- `src/app/sourcing/ao/[id]/tandem/BrevoPreviewModal.tsx` : prop `nomCommercial?`, body preview copy v3, pas de dangerouslySetInnerHTML.*
+  *- `src/app/sourcing/ao/[id]/tandem/TandemShortlistClient.tsx` : passage `nomCommercial="AlyoS Ingénierie"` hardcodé MVP.*
+  *- `src/lib/brevo/variables.test.ts` : 4 tests `nom_commercial` ajoutés.*
+
+---
+
+## 2026-05-26 — PR #64 — Profil architecte v2 (budget, concours, spécialités checkboxes)
+
+- **2026-05-26 · G6 · Alex (dev) · Implémentation PR #64 : profil architecte v2 (branche `feat/architect-profile-v2`).**
+  *Fichiers créés : `src/lib/architects/specialty-codes.ts` (listes ARCHITECT_SPECIALTY_CODES + BE_SPECIALTY_CODES — 23 codes au total, vocabulaire normalisé UNSFA).*
+  *Schema : ajout 3 colonnes Drizzle — `budgetMin` INTEGER nullable, `budgetMax` INTEGER nullable, `concoursOnly` BOOLEAN NOT NULL DEFAULT FALSE.*
+  *Migration : `src/db/migrations/0010_architect_budget_concours.sql` (3 ALTER TABLE ADD COLUMN).*
+  *Formulaire : `ArchitectEditForm.tsx` — spécialités en checkboxes (Set), geoZones CSV text, budget min/max numériques, checkbox concoursOnly, `router.refresh()` après sauvegarde. Supersède les changements ArchitectEditForm de PR #61 (spécialités/zones géo CSV text).*
+  *Page fiche : affichage lecture budget + mention "Concours uniquement" dans section Matching.*
+
+---
+
 ## 2026-05-26 — PR-E module dossier IA (ZIP compile)
 
 - **2026-05-26 · G6 · Alex (dev) · Implémentation PR-E : compilation ZIP dossier candidature (branche `feat/dossier-zip-compile`).**

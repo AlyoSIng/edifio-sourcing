@@ -442,6 +442,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
             buyer: initialData.tender.buyer,
             deadline: initialData.tender.deadline,
           }}
+          nomCommercial="AlyoS Ingénierie"
           onCancel={handleClosePreview}
           onConfirm={handleConfirmSend}
         />
