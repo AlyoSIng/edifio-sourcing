@@ -1,4 +1,4 @@
-﻿-- Mise a jour headcount + annual_revenue des architectes depuis export Odoo
+- Mise a jour headcount + annual_revenue des architectes depuis export Odoo
 -- Genere le 2026-05-26 depuis Contact_complete.xlsx (3805 lignes)
 -- A appliquer dans Supabase SQL Editor (prod)
 -- Matching : email > siren > cabinet (nom exact)
@@ -2158,41 +2158,41 @@ UPDATE architects SET headcount = 3, annual_revenue = 832663, updated_at = now()
 -- SECTION 3 : UPDATES PAR CABINET (38 lignes)
 -- ============================================================
 
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = '2ADM Agence d''Architecture' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = '2L ARCHITECTURE' AND (headcount IS DISTINCT FROM 2);
-UPDATE architects SET headcount = 6, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Philippe VESCO' AND (headcount IS DISTINCT FROM 6);
-UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'A ²R Concept' AND (headcount IS DISTINCT FROM 3);
-UPDATE architects SET headcount = 7, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'AAMC' AND (headcount IS DISTINCT FROM 7);
-UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'AGENCE D’ARCHITECTURE ARQUITECTURA' AND (headcount IS DISTINCT FROM 2);
-UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Ada' AND (headcount IS DISTINCT FROM 2);
-UPDATE architects SET headcount = 12, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Agence Marc Piepszownik' AND (headcount IS DISTINCT FROM 12);
-UPDATE architects SET headcount = 50, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Agence Villebois' AND (headcount IS DISTINCT FROM 50);
-UPDATE architects SET headcount = 230, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Alain Coupel' AND (headcount IS DISTINCT FROM 230);
-UPDATE architects SET headcount = 5, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Alain Manoilesco Architecte' AND (headcount IS DISTINCT FROM 5);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Architecte Nvieira' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 12, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Architectes Urbanistes Hdz Sarl' AND (headcount IS DISTINCT FROM 12);
-UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Architecture Roussel Lagouge SOC' AND (headcount IS DISTINCT FROM 3);
-UPDATE architects SET headcount = 8, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Atelier Créa' AND (headcount IS DISTINCT FROM 8);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Atelier Lize' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Atelier PICCON LE BRUCHEC architectes' AND (headcount IS DISTINCT FROM 3);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Atelier de la Porte Rouge - Emilie Le Cavorzin' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 4, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Ateliers Benoit Leleu' AND (headcount IS DISTINCT FROM 4);
-UPDATE architects SET headcount = 11, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Bernard Buée' AND (headcount IS DISTINCT FROM 11);
-UPDATE architects SET headcount = 32, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Bernard Porcher' AND (headcount IS DISTINCT FROM 32);
-UPDATE architects SET headcount = 40, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Blanchard Architectes' AND (headcount IS DISTINCT FROM 40);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Bruno Person' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'CET Architecture' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Cabinet Leroy Architecte D.P.L.G Urbaniste' AND (headcount IS DISTINCT FROM 3);
-UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Castanet et Taupin' AND (headcount IS DISTINCT FROM 3);
-UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Catherine Lauvergeat' AND (headcount IS DISTINCT FROM 3);
-UPDATE architects SET headcount = 150, annual_revenue = 13602265, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Chabanne Et Partners' AND (headcount IS DISTINCT FROM 150 OR annual_revenue IS DISTINCT FROM 13602265);
-UPDATE architects SET headcount = 80, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Christian Breuillaud Limondin' AND (headcount IS DISTINCT FROM 80);
-UPDATE architects SET headcount = 30, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Colette Lebrun' AND (headcount IS DISTINCT FROM 30);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Equer' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'François Pougheol' AND (headcount IS DISTINCT FROM 2);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'JACQUEMARD François et FLORENCE sarl' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'La Coursive' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Laure Gueroult' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Oui et Recherche' AND (headcount IS DISTINCT FROM 1);
-UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'Pascal Hofstein' AND (headcount IS DISTINCT FROM 2);
-UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND name = 'studio13aRCHITECTURE - Marc FRIBOULET' AND (headcount IS DISTINCT FROM 2);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = '2ADM Agence d''Architecture' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = '2L ARCHITECTURE' AND (headcount IS DISTINCT FROM 2);
+UPDATE architects SET headcount = 6, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Philippe VESCO' AND (headcount IS DISTINCT FROM 6);
+UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'A ²R Concept' AND (headcount IS DISTINCT FROM 3);
+UPDATE architects SET headcount = 7, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'AAMC' AND (headcount IS DISTINCT FROM 7);
+UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'AGENCE D’ARCHITECTURE ARQUITECTURA' AND (headcount IS DISTINCT FROM 2);
+UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Ada' AND (headcount IS DISTINCT FROM 2);
+UPDATE architects SET headcount = 12, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Agence Marc Piepszownik' AND (headcount IS DISTINCT FROM 12);
+UPDATE architects SET headcount = 50, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Agence Villebois' AND (headcount IS DISTINCT FROM 50);
+UPDATE architects SET headcount = 230, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Alain Coupel' AND (headcount IS DISTINCT FROM 230);
+UPDATE architects SET headcount = 5, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Alain Manoilesco Architecte' AND (headcount IS DISTINCT FROM 5);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Architecte Nvieira' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 12, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Architectes Urbanistes Hdz Sarl' AND (headcount IS DISTINCT FROM 12);
+UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Architecture Roussel Lagouge SOC' AND (headcount IS DISTINCT FROM 3);
+UPDATE architects SET headcount = 8, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Atelier Créa' AND (headcount IS DISTINCT FROM 8);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Atelier Lize' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Atelier PICCON LE BRUCHEC architectes' AND (headcount IS DISTINCT FROM 3);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Atelier de la Porte Rouge - Emilie Le Cavorzin' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 4, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Ateliers Benoit Leleu' AND (headcount IS DISTINCT FROM 4);
+UPDATE architects SET headcount = 11, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Bernard Buée' AND (headcount IS DISTINCT FROM 11);
+UPDATE architects SET headcount = 32, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Bernard Porcher' AND (headcount IS DISTINCT FROM 32);
+UPDATE architects SET headcount = 40, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Blanchard Architectes' AND (headcount IS DISTINCT FROM 40);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Bruno Person' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'CET Architecture' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Cabinet Leroy Architecte D.P.L.G Urbaniste' AND (headcount IS DISTINCT FROM 3);
+UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Castanet et Taupin' AND (headcount IS DISTINCT FROM 3);
+UPDATE architects SET headcount = 3, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Catherine Lauvergeat' AND (headcount IS DISTINCT FROM 3);
+UPDATE architects SET headcount = 150, annual_revenue = 13602265, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Chabanne Et Partners' AND (headcount IS DISTINCT FROM 150 OR annual_revenue IS DISTINCT FROM 13602265);
+UPDATE architects SET headcount = 80, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Christian Breuillaud Limondin' AND (headcount IS DISTINCT FROM 80);
+UPDATE architects SET headcount = 30, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Colette Lebrun' AND (headcount IS DISTINCT FROM 30);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Equer' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'François Pougheol' AND (headcount IS DISTINCT FROM 2);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'JACQUEMARD François et FLORENCE sarl' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'La Coursive' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Laure Gueroult' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 1, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Oui et Recherche' AND (headcount IS DISTINCT FROM 1);
+UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'Pascal Hofstein' AND (headcount IS DISTINCT FROM 2);
+UPDATE architects SET headcount = 2, updated_at = now() WHERE organization_id = '11111111-1111-1111-1111-111111111111' AND cabinet = 'studio13aRCHITECTURE - Marc FRIBOULET' AND (headcount IS DISTINCT FROM 2);
