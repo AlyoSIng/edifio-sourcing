@@ -190,16 +190,16 @@ const searchProfileChangeSchema = z.object({
 });
 
 /**
- * A4 — `tender_select` (STRICT — implémenté PR #2).
+ * A4 — `tender_select` (STRICT — implémenté PR #2, étendu PR #66).
  *
  * Déclenchée quand un utilisateur sélectionne un AO dans « AO du jour »
- * (mode solo ou tandem). C'est la première action audit live du module
- * sourcing.
+ * (mode mandataire / cotraitance / conception-réalisation).
  *
  * Contraintes :
  *  - `tender_id` : UUID v4 valide (FK logique vers `tenders.id`)
  *  - `tender_ref` : non vide (externalRef BOAMP, ex. `25-AO-00142`)
- *  - `mode` : enum strict `solo | tandem` (cf. enum Postgres `selection_mode`)
+ *  - `mode` : enum strict `solo | tandem | conception_realisation`
+ *             (cf. enum Postgres `selection_mode` — migration 0012)
  *  - `score` : entier 0-100 (contrainte CHECK BDD côté `tenders.score`)
  *
  * (Regex `UUID_SHAPE` partagée — déclarée plus haut, juste après `placeholder`.)
@@ -207,7 +207,7 @@ const searchProfileChangeSchema = z.object({
 const tenderSelectSchema = z.object({
   tender_id: z.string().regex(UUID_SHAPE, { message: "tender_id doit être un UUID" }),
   tender_ref: z.string().min(1, { message: "tender_ref ne peut pas être vide" }),
-  mode: z.enum(["solo", "tandem"]),
+  mode: z.enum(["solo", "tandem", "conception_realisation"]),
   score: z.number().int().min(0).max(100),
 });
 
