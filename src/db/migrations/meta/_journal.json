@@ -113,6 +113,20 @@
       "when": 1748995500000,
       "tag": "0015_cotraitant_library",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1748995560000,
+      "tag": "0016_be_documents",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1748995620000,
+      "tag": "0017_architect_annual_revenue",
+      "breakpoints": true
     }
   ]
 }

@@ -327,6 +327,88 @@ describe("normalize — cas réels fixture", () => {
   });
 });
 
+// ============================================================================
+// normalize — cascade montant BOAMP (5B)
+// ============================================================================
+
+describe("normalize — cascade montant BOAMP", () => {
+  function makeRaw(fields: Partial<BoampApiRecord>): RawTender {
+    return {
+      externalRef: "TEST-CASCADE",
+      platformCode: "boamp",
+      rawData: {
+        platform_code: "boamp",
+        record: fields as unknown as Record<string, unknown>,
+        fetched_at: "2026-05-26T12:00:00.000Z",
+      },
+      fetchedAt: "2026-05-26T12:00:00.000Z",
+    };
+  }
+
+  it("utilise montant_estime en priorité", () => {
+    const n = normalize(
+      makeRaw({
+        idweb: "TEST-CASCADE",
+        montant_estime: 500000,
+        valeur_estimee: 999999,
+      }),
+    );
+    expect(n.amount).toBe(500000);
+  });
+
+  it("fallback sur valeur_estimee si montant_estime absent", () => {
+    const n = normalize(
+      makeRaw({
+        idweb: "TEST-CASCADE",
+        valeur_estimee: 350000,
+        valeur_globale: 999999,
+      }),
+    );
+    expect(n.amount).toBe(350000);
+  });
+
+  it("fallback sur valeur_globale si montant_estime et valeur_estimee absents", () => {
+    const n = normalize(
+      makeRaw({
+        idweb: "TEST-CASCADE",
+        valeur_globale: 750000,
+        montant_global: 999999,
+      }),
+    );
+    expect(n.amount).toBe(750000);
+  });
+
+  it("fallback sur montant_global si les précédents absents", () => {
+    const n = normalize(
+      makeRaw({
+        idweb: "TEST-CASCADE",
+        montant_global: 1200000,
+        montant_minimum: 999999,
+      }),
+    );
+    expect(n.amount).toBe(1200000);
+  });
+
+  it("fallback ultime sur montant_minimum (marché à bon de commande)", () => {
+    const n = normalize(
+      makeRaw({
+        idweb: "TEST-CASCADE",
+        montant_minimum: 80000,
+      }),
+    );
+    expect(n.amount).toBe(80000);
+  });
+
+  it("retourne null si tous les champs montant sont absents", () => {
+    const n = normalize(
+      makeRaw({
+        idweb: "TEST-CASCADE",
+      }),
+    );
+    expect(n.amount).toBeNull();
+  });
+});
+
 describe("normalize — snapshot bout-en-bout (small[0])", () => {
   it("produit la forme NormalizedTender attendue pour small[0]", () => {
     const record = at(fixtureBuckets.small, 0);

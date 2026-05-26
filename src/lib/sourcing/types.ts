@@ -88,6 +88,16 @@ export interface BoampApiRecord {
    *  peut renvoyer un string pour les très gros montants — d'où `unknown`
    *  ici, parsing dans `normalize.ts`) */
   montant_estime?: unknown;
+  /** Montant estimé alternatif (parfois utilisé par BOAMP à la place de montant_estime) */
+  valeur_estimee?: unknown;
+  /** Valeur globale du marché */
+  valeur_globale?: unknown;
+  /** Montant global */
+  montant_global?: unknown;
+  /** Montant minimum du marché (marchés à bon de commande) */
+  montant_minimum?: unknown;
+  /** Montant maximum du marché (marchés à bon de commande) */
+  montant_maximum?: unknown;
   /** Procédure : "adapte" | "restreint" | "ouvert" | "negocie" | "dialogue" | ... */
   procedure?: string;
   /** Famille de supports (segmentation interne BOAMP) */

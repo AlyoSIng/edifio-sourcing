@@ -60,17 +60,19 @@ function makeArchitect(overrides: Partial<Architect> = {}): Architect {
     budgetMin: null,
     budgetMax: null,
     concoursOnly: false,
+    annualRevenue: null,
     ...overrides,
   };
 }
 
 function makeTender(
-  overrides: Partial<Pick<Tender, "title" | "buyer" | "rawData">> = {},
-): Pick<Tender, "title" | "buyer" | "rawData"> {
+  overrides: Partial<Pick<Tender, "title" | "buyer" | "rawData" | "amount">> = {},
+): Pick<Tender, "title" | "buyer" | "rawData" | "amount"> {
   return {
     title: "Construction d'un équipement public",
     buyer: "Mairie de Paris, 75001 Paris",
     rawData: null,
+    amount: null,
     ...overrides,
   };
 }
@@ -637,5 +639,74 @@ describe("rankArchitects — composition headcount (bigFirms + midFirms)", () =>
     expect(ids).toContain("00000000-0000-0000-0000-000000000c01");
     expect(ids).toContain("00000000-0000-0000-0000-000000000c02");
     expect(ids).toContain("00000000-0000-0000-0000-000000000c03");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Filtre CA éligibilité                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe("rankArchitects — filtre CA", () => {
+  const recentMap = new Map<string, number>();
+
+  it("architecte avec annualRevenue=100_000 et tender.amount='300000' → exclu (100k < 40% de 300k)", () => {
+    const archi = makeArchitect({
+      id: "00000000-0000-0000-0000-000000cafe01",
+      annualRevenue: 100_000,
+    });
+    const tender = makeTender({ amount: "300000" });
+    const top = rankArchitects(
+      tender,
+      { architects: [archi], recentSolicitationsByArchitect: recentMap },
+      { topN: 3 },
+    );
+    // 100_000 < 300_000 * 0.4 = 120_000 → exclu
+    expect(top.length).toBe(0);
+  });
+
+  it("architecte avec annualRevenue=150_000 et tender.amount='300000' → inclus (150k >= 120k)", () => {
+    const archi = makeArchitect({
+      id: "00000000-0000-0000-0000-000000cafe02",
+      annualRevenue: 150_000,
+    });
+    const tender = makeTender({ amount: "300000" });
+    const top = rankArchitects(
+      tender,
+      { architects: [archi], recentSolicitationsByArchitect: recentMap },
+      { topN: 3 },
+    );
+    // 150_000 >= 300_000 * 0.4 = 120_000 → inclus
+    expect(top.length).toBe(1);
+    expect(top[0]!.architectId).toBe("00000000-0000-0000-0000-000000cafe02");
+  });
+
+  it("architecte avec annualRevenue=null et tender.amount='300000' → inclus (inconnu → bénéfice du doute)", () => {
+    const archi = makeArchitect({
+      id: "00000000-0000-0000-0000-000000cafe03",
+      annualRevenue: null,
+    });
+    const tender = makeTender({ amount: "300000" });
+    const top = rankArchitects(
+      tender,
+      { architects: [archi], recentSolicitationsByArchitect: recentMap },
+      { topN: 3 },
+    );
+    expect(top.length).toBe(1);
+    expect(top[0]!.architectId).toBe("00000000-0000-0000-0000-000000cafe03");
+  });
+
+  it("architecte avec annualRevenue=50_000 et tender.amount=null → inclus (montant inconnu → bénéfice du doute)", () => {
+    const archi = makeArchitect({
+      id: "00000000-0000-0000-0000-000000cafe04",
+      annualRevenue: 50_000,
+    });
+    const tender = makeTender({ amount: null });
+    const top = rankArchitects(
+      tender,
+      { architects: [archi], recentSolicitationsByArchitect: recentMap },
+      { topN: 3 },
+    );
+    expect(top.length).toBe(1);
+    expect(top[0]!.architectId).toBe("00000000-0000-0000-0000-000000cafe04");
   });
 });

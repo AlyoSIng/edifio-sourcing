@@ -304,7 +304,191 @@ export async function upsertArchitect(
 }
 
 // ============================================================================
-// 3. setRgpdOpposition — toggle opposition RGPD art. 21 (admin uniquement)
+// 3. importArchitectsFromCsv — import CSV (admin uniquement)
+// ============================================================================
+
+export interface ImportArchitectsResult {
+  imported: number;
+  updated: number;
+  errors: string[];
+}
+
+/**
+ * Importe des architectes depuis un CSV (admin uniquement).
+ *
+ * Colonnes CSV attendues (ligne 1 = header ignoré) :
+ *   cabinet,email,phone,siren,zip,city,specialty_codes,geo_zones,
+ *   budget_min,budget_max,concours_only,tutoiement,notes,headcount,annual_revenue
+ *
+ * `specialty_codes` et `geo_zones` : split sur `;` (pour éviter conflit avec la virgule CSV).
+ * `headcount` : parseInt ou null.
+ * `annual_revenue` : parseInt ou null.
+ * Upsert par `(organizationId, email)` si email présent, sinon INSERT.
+ */
+export async function importArchitectsFromCsv(formData: FormData): Promise<ImportArchitectsResult> {
+  const authClient = createSupabaseServerClient();
+
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) {
+    return { imported: 0, updated: 0, errors: ["Non authentifié ou domaine non autorisé."] };
+  }
+  const { profile } = authResult;
+
+  if (!isAdmin(profile)) {
+    return { imported: 0, updated: 0, errors: ["Action réservée aux administrateurs."] };
+  }
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string") {
+    return { imported: 0, updated: 0, errors: ["Aucun fichier CSV fourni."] };
+  }
+
+  const text = await (file as Blob).text();
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    return {
+      imported: 0,
+      updated: 0,
+      errors: ["Le fichier CSV est vide ou n'a pas de données."],
+    };
+  }
+
+  // Ignorer la ligne de header
+  const dataLines = lines.slice(1);
+
+  let imported = 0;
+  let updated = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < dataLines.length; i++) {
+    const line = dataLines[i];
+    if (!line) continue;
+    // Parsing simple : split virgule (pas de support guillemets complexes au MVP)
+    const cols = line.split(",");
+
+    const cabinet = cols[0]?.trim() ?? "";
+    const email = cols[1]?.trim() || null;
+    const phone = cols[2]?.trim() || null;
+    const siren = cols[3]?.trim() || null;
+    const zip = cols[4]?.trim() || null;
+    const city = cols[5]?.trim() || null;
+    const specialtyCodes = cols[6]
+      ? cols[6]
+          .split(";")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    const geoZones = cols[7]
+      ? cols[7]
+          .split(";")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    const budgetMin = cols[8] ? parseInt(cols[8].trim(), 10) || null : null;
+    const budgetMax = cols[9] ? parseInt(cols[9].trim(), 10) || null : null;
+    const concoursOnly = cols[10]?.trim().toLowerCase() === "true";
+    const tutoiement = cols[11]?.trim().toLowerCase() === "true";
+    const notes = cols[12]?.trim() || null;
+    const headcount = cols[13] ? parseInt(cols[13].trim(), 10) || null : null;
+    const annualRevenue = cols[14] ? parseInt(cols[14].trim(), 10) || null : null;
+
+    if (!cabinet) {
+      errors.push(`Ligne ${i + 2} : cabinet manquant, ligne ignorée.`);
+      continue;
+    }
+
+    try {
+      if (email) {
+        // Upsert par (organizationId, email)
+        const existing = await defaultDb
+          .select({ id: architects.id })
+          .from(architects)
+          .where(and(eq(architects.organizationId, ALYOS_ORG_ID), eq(architects.email, email)))
+          .limit(1);
+
+        if (existing[0]) {
+          await defaultDb
+            .update(architects)
+            .set({
+              cabinet,
+              phone,
+              siren,
+              zip,
+              city,
+              specialtyCodes,
+              geoZones,
+              budgetMin,
+              budgetMax,
+              concoursOnly,
+              tutoiement,
+              notes,
+              headcount,
+              annualRevenue,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(eq(architects.id, existing[0].id), eq(architects.organizationId, ALYOS_ORG_ID)),
+            );
+          updated++;
+        } else {
+          await defaultDb.insert(architects).values({
+            organizationId: ALYOS_ORG_ID,
+            cabinet,
+            email,
+            phone,
+            siren,
+            zip,
+            city,
+            specialtyCodes,
+            geoZones,
+            budgetMin,
+            budgetMax,
+            concoursOnly,
+            tutoiement,
+            notes,
+            headcount,
+            annualRevenue,
+          });
+          imported++;
+        }
+      } else {
+        // Pas d'email → INSERT simple
+        await defaultDb.insert(architects).values({
+          organizationId: ALYOS_ORG_ID,
+          cabinet,
+          email: null,
+          phone,
+          siren,
+          zip,
+          city,
+          specialtyCodes,
+          geoZones,
+          budgetMin,
+          budgetMax,
+          concoursOnly,
+          tutoiement,
+          notes,
+          headcount,
+          annualRevenue,
+        });
+        imported++;
+      }
+    } catch (err) {
+      errors.push(
+        `Ligne ${i + 2} (${cabinet}) : ${err instanceof Error ? err.message : "erreur inconnue"}`,
+      );
+    }
+  }
+
+  return { imported, updated, errors };
+}
+
+// ============================================================================
+// 4. setRgpdOpposition — toggle opposition RGPD art. 21 (admin uniquement)
 // ============================================================================
 
 /**

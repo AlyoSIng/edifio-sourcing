@@ -208,7 +208,17 @@ export function normalize(raw: RawTender): NormalizedTender {
 
   const cpvCodes = parseCpvCodes(fields.codecpv_principal, fields.codecpv_secondaire ?? null);
 
-  const amount = parseAmount(fields.montant_estime);
+  // Tenter plusieurs champs BOAMP en cascade : montant_estime est le principal,
+  // mais BOAMP utilise parfois valeur_estimee, valeur_globale ou montant_global.
+  // montant_minimum utilisé en fallback ultime pour les marchés à bon de commande.
+  const rawAmount =
+    fields.montant_estime ??
+    fields.valeur_estimee ??
+    fields.valeur_globale ??
+    fields.montant_global ??
+    fields.montant_minimum ??
+    null;
+  const amount = parseAmount(rawAmount);
   const deadline = parseDate(fields.datelimitereponse);
 
   // Champs facultatifs non garantis par la fixture — extraits via les noms

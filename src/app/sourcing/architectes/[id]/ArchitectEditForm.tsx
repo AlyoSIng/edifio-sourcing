@@ -81,6 +81,9 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
   // Effectif — saisie manuelle (enrichissement)
   const [headcount, setHeadcount] = useState(architect.headcount?.toString() ?? "");
 
+  // CA annuel moyen — saisie manuelle (filtre éligibilité Tandem)
+  const [annualRevenue, setAnnualRevenue] = useState(architect.annualRevenue?.toString() ?? "");
+
   // -------------------------------------------------------------------------
   // Soumission formulaire principal
   // -------------------------------------------------------------------------
@@ -127,6 +130,7 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
           rgpdOpposition: architect.rgpdOpposition,
           rgpdOppositionDate: architect.rgpdOppositionDate,
           headcount: headcount ? parseInt(headcount, 10) : null,
+          annualRevenue: annualRevenue ? parseInt(annualRevenue, 10) : null,
           companySize: architect.companySize,
           companyCreatedAt: architect.companyCreatedAt,
           odooExternalId: architect.odooExternalId,
@@ -396,23 +400,41 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
             </div>
           </div>
 
-          {/* Effectif */}
-          <div className="max-w-[200px]">
-            <label htmlFor="headcount" className="block text-xs font-medium text-ink">
-              Effectif{" "}
-              <span className="text-xs font-normal text-muted">(personnes, optionnel)</span>
-            </label>
-            <input
-              id="headcount"
-              type="number"
-              min={1}
-              max={9999}
-              step={1}
-              value={headcount}
-              onChange={(e) => setHeadcount(e.target.value)}
-              placeholder="ex : 5"
-              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
-            />
+          {/* Effectif + CA — grille 2 colonnes */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="headcount" className="block text-xs font-medium text-ink">
+                Effectif{" "}
+                <span className="text-xs font-normal text-muted">(personnes, optionnel)</span>
+              </label>
+              <input
+                id="headcount"
+                type="number"
+                min={1}
+                max={9999}
+                step={1}
+                value={headcount}
+                onChange={(e) => setHeadcount(e.target.value)}
+                placeholder="ex : 5"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label htmlFor="annualRevenue" className="block text-xs font-medium text-ink">
+                CA annuel moyen (€ HT){" "}
+                <span className="text-xs font-normal text-muted">optionnel</span>
+              </label>
+              <input
+                id="annualRevenue"
+                type="number"
+                min={0}
+                step={10000}
+                value={annualRevenue}
+                onChange={(e) => setAnnualRevenue(e.target.value)}
+                placeholder="ex : 500000"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
           </div>
 
           {/* Drapeaux */}
