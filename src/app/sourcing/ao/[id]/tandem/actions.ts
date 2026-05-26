@@ -53,6 +53,7 @@ import {
   matchProposals,
 } from "@/db/schema/selections";
 import { brevoMessages } from "@/db/schema/integrations";
+import { organizationProfiles } from "@/db/schema/messaging";
 import { tenders } from "@/db/schema/tenders";
 import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
@@ -560,15 +561,29 @@ export async function sendArchitectSolicitation(
     };
   }
 
+  // Chargement de la présentation société depuis organization_profiles (lot D acté).
+  // Fallback silencieux sur PRESENTATION_SOCIETE_HTML_DEFAULT si absent en BDD.
+  let presentationSociete: string | undefined;
+  try {
+    const orgRows = await db
+      .select({ presentationBlock: organizationProfiles.presentationBlock })
+      .from(organizationProfiles)
+      .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+      .limit(1);
+    const block = orgRows[0]?.presentationBlock;
+    if (block) presentationSociete = block;
+  } catch {
+    // Non-bloquant — fallback hardcoded utilisé
+  }
+
   const variables = buildBrevoVariables({
     architect,
     tender,
     tenderDepartment: extractDepartment(tender),
     lienAo: `${getSiteUrl()}/archi/${architectToken.token}`,
     lienOpposition: `${getSiteUrl()}/archi/oppose/${oppositionToken.jti}`,
-    // `presentation_societe` : si le template BDD fournit un contenu custom, on
-    // pourrait l'injecter ici (lot D). Pour l'instant on laisse buildBrevoVariables
-    // utiliser son défaut (PRESENTATION_SOCIETE_HTML_DEFAULT).
+    presentationSociete,
+    register,
   });
 
   let templateId: number;
@@ -589,7 +604,7 @@ export async function sendArchitectSolicitation(
     templateId,
     to: { email: architect.email, name: toName || variables.cabinet },
     params: {
-      // v2 : civilite + presentation_societe
+      greeting: variables.greeting,
       civilite: variables.civilite,
       archi_prenom: variables.archi_prenom,
       archi_nom: variables.archi_nom,
