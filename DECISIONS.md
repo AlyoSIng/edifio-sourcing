@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-05-26 — PR #65 feat/be-companies — Bureaux d'Études + Entreprises/Majors (Nadia)
+
+- **2026-05-26 · G6 · Nadia (dev2) · feat/be-companies — schema, pages, import CSV pour BET et Entreprises.**
+  *Branche créée depuis main (a2473c6). Fichiers créés/modifiés :*
+  *- `src/lib/architects/specialty-codes.ts` : ajout `COMPANY_SPECIALTY_CODES` (12 codes co_*) pour entreprises CR/TCE.*
+  *- `src/db/schema/bureaux-etudes.ts` : table `bureaux_etudes` (clone adapté architects) — solicitable dérivé GENERATED, tutoiement, concoursOnly, budget, RGPD, indexes GIN.*
+  *- `src/db/schema/companies.ts` : table `companies` — sans tutoiement ni concoursOnly, SIREN comme clé dédup, indexes GIN.*
+  *- `src/db/schema/index.ts` : exports des deux nouvelles tables.*
+  *- `src/db/migrations/0011_be_companies.sql` : DDL CREATE TABLE bureaux_etudes + companies + FK + indexes.*
+  *- `src/db/migrations/meta/_journal.json` : entrée idx=11 ajoutée.*
+  *- `src/app/sourcing/bureaux-etudes/` : page liste, fiche [id], BEEditForm, nouveau/BECreateForm, actions.ts (fetch/upsert/importBEFromCsv).*
+  *- `src/app/sourcing/entreprises/` : page liste, fiche [id], CompanyEditForm, nouveau/CompanyCreateForm, actions.ts (fetch/upsert/importCompanyFromCsv).*
+  *- `src/components/contacts/CsvImportModal.tsx` : modal partagé type="be"|"company", template CSV téléchargeable, résultat import affiché.*
+  *- `src/components/app-shell/nav-items.ts` : suppression comingSoon sur Bureaux d'Études et Entreprises/Majors.*
+
+---
+
 ## 2026-05-26 — PR #63 nav v3, email copy v3, Brevo nom_commercial (Nadia)
 
 - **2026-05-26 · G6 · Nadia (dev2) · feat/nav-email-v3 — restructuration menu + copy Brevo v3 + variable nom_commercial.**

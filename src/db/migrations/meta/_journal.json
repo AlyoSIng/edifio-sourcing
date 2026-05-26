@@ -78,6 +78,13 @@
       "when": 1748908800000,
       "tag": "0010_architect_budget_concours",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1748995200000,
+      "tag": "0011_be_companies",
+      "breakpoints": true
     }
   ]
 }
