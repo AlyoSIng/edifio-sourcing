@@ -102,8 +102,8 @@ describe("matchArchitectsForTender — invariants pré-BDD", () => {
     if (!result.ok) expect(result.error).toBe("invalid_input");
   });
 
-  it("invalid_input si topN > 10", async () => {
-    const result = await matchArchitectsForTender(VALID_TENDER_ID, 11, {
+  it("invalid_input si topN > 20", async () => {
+    const result = await matchArchitectsForTender(VALID_TENDER_ID, 21, {
       authClient: authClientWith({ id: "u1", email: "nadia@alyosingenierie.fr" }),
     });
     expect(result.ok).toBe(false);
