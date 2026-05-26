@@ -184,11 +184,12 @@ describe("sendArchitectSolicitation — invariants pré-BDD", () => {
  *   1. SELECT tender (pré-fetch)
  *   2. SELECT architect (pré-fetch)
  *   3. SELECT opposition token existant
- *   4. tx : INSERT architect_tokens → returning({id})
- *   5. tx : INSERT/UPSERT match_proposals
- *   6. tx : SELECT architect_responses existant
- *   7. tx : INSERT architect_responses
- *   8. tx : UPDATE tenders.status
+ *   4. SELECT organization_profiles (presentationSociete — nouveau)
+ *   5. tx : INSERT architect_tokens → returning({id})
+ *   6. tx : INSERT/UPSERT match_proposals
+ *   7. tx : SELECT architect_responses existant
+ *   8. tx : INSERT architect_responses
+ *   9. tx : UPDATE tenders.status
  * Ensuite pickBrevoTemplateId est appelé puis brevoClient.send.
  *
  * Stratégie : on suit l'ordre des appels via un compteur `selectCount`.
@@ -316,13 +317,23 @@ function buildSolicitMockDb(tutoiement: boolean): DrizzleClient {
           }),
         };
       }
-      // SELECT opposition token (3e appel) — on retourne vide pour forcer création
+      if (selectCount === 3) {
+        // SELECT opposition token (3e appel) — on retourne vide pour forcer création
+        return {
+          from: () => ({
+            where: () => ({
+              orderBy: () => ({
+                limit: async () => [],
+              }),
+            }),
+          }),
+        };
+      }
+      // SELECT organization_profiles (4e appel et suivants) — retourne vide → fallback hardcoded
       return {
         from: () => ({
           where: () => ({
-            orderBy: () => ({
-              limit: async () => [],
-            }),
+            limit: async () => [],
           }),
         }),
       };
