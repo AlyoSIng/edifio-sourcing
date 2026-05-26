@@ -42,7 +42,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, ilike, inArray, not, sql } from "drizzle-orm";
 
 import { db as defaultDb } from "@/db/client";
 import { architects } from "@/db/schema/architects";
@@ -170,11 +170,11 @@ async function requireAlyosUser(
  * arrive à l'envoi via `sendArchitectSolicitation`).
  *
  * @param tenderId — UUID du tender (mode Tandem)
- * @param topN — nombre d'architectes à retourner (défaut 3)
+ * @param topN — nombre d'architectes à retourner (défaut 10)
  */
 export async function matchArchitectsForTender(
   tenderId: string,
-  topN: number = 3,
+  topN: number = 10,
   deps: ActionDeps = {},
 ): Promise<MatchActionResult> {
   const db = deps.db ?? defaultDb;
@@ -186,7 +186,7 @@ export async function matchArchitectsForTender(
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
-  if (!Number.isInteger(topN) || topN < 1 || topN > 10) {
+  if (!Number.isInteger(topN) || topN < 1 || topN > 20) {
     return { ok: false, error: "invalid_input" };
   }
 
@@ -235,26 +235,47 @@ export async function matchArchitectsForTender(
       .groupBy(architectResponses.architectId);
     const recentMap = new Map<string, number>(recentRows.map((r) => [r.architectId, r.count]));
 
-    // 6. Run matcher V1
+    // 6. Relevance learning : compte les acceptations passées par architecte.
+    //    Bonus +3 par acceptation, capé à +15 (ne doit pas écraser les autres critères).
+    const acceptedRows = await db
+      .select({
+        architectId: architectResponses.architectId,
+        count: sql<number>`count(*)::int`.as("count"),
+      })
+      .from(architectResponses)
+      .where(
+        and(
+          eq(architectResponses.organizationId, ALYOS_ORG_ID),
+          eq(architectResponses.status, "accepted"),
+        ),
+      )
+      .groupBy(architectResponses.architectId);
+    const acceptedMap = new Map<string, number>(acceptedRows.map((r) => [r.architectId, r.count]));
+
+    // 7. Run matcher V1
     const scores = rankArchitects(
       { title: tender.title, buyer: tender.buyer, rawData: tender.rawData },
       { architects: activeArchitects, recentSolicitationsByArchitect: recentMap },
       { topN },
     );
 
-    // 7. Enrichit avec architect snapshot + fallback rationale
+    // 8. Enrichit avec architect snapshot + fallback rationale + bonus acceptances
     const archMap = new Map<string, Architect>(activeArchitects.map((a) => [a.id, a]));
     const matches: MatchScoreWithArchitect[] = await Promise.all(
       scores.map(async (s) => {
         const a = archMap.get(s.architectId)!;
+        // Bonus acceptations : +3 par acceptation passée, capé à +15
+        const acceptanceBonus = Math.min((acceptedMap.get(s.architectId) ?? 0) * 3, 15);
+        const boostedScore = Math.min(s.score + acceptanceBonus, 100);
         const rationale = await generateRationaleWithAi(
           a,
           { title: tender.title, buyer: tender.buyer },
           s.breakdown,
-          s.score,
+          boostedScore,
         );
         return {
           ...s,
+          score: boostedScore,
           rationale,
           architect: {
             id: a.id,
@@ -645,4 +666,166 @@ class InvalidStateError extends Error {
     super(message);
     this.name = "InvalidStateError";
   }
+}
+
+// ============================================================================
+// 3. searchArchitectsForShortlist — recherche d'architecte pour ajout manuel
+// ============================================================================
+
+export type SearchArchitectsResult =
+  | {
+      ok: true;
+      architects: Array<{
+        id: string;
+        cabinet: string;
+        contactName: string | null;
+        email: string;
+        specialtyCodes: string[];
+        geoZones: string[];
+        preferred: boolean;
+      }>;
+    }
+  | { ok: false; error: "not_authenticated" | "forbidden_domain" | "internal_error" };
+
+/**
+ * Recherche des architectes solicitables par nom de cabinet ou nom de contact.
+ * Utilisée par le composant Client pour l'ajout manuel d'un architecte à la short-list.
+ *
+ * @param query — terme de recherche (min 2 caractères)
+ * @param excludeIds — UUIDs à exclure (déjà dans la short-list)
+ */
+export async function searchArchitectsForShortlist(
+  query: string,
+  excludeIds: string[],
+  deps: ActionDeps = {},
+): Promise<SearchArchitectsResult> {
+  const db = deps.db ?? defaultDb;
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+
+  // Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+
+  // Requête trop courte — retourne liste vide sans aller en BDD
+  if (query.trim().length < 2) {
+    return { ok: true, architects: [] };
+  }
+
+  try {
+    const likePattern = `%${query.trim()}%`;
+
+    // Filtre : actif, solicitable, tenant, et hors des IDs déjà dans la short-list
+    const conditions = [
+      eq(architects.organizationId, ALYOS_ORG_ID),
+      eq(architects.active, true),
+      eq(architects.solicitable, true),
+      // Recherche cabinets OU contact (OR applicatif)
+      sql`(${ilike(architects.cabinet, likePattern)} OR ${ilike(architects.contactName, likePattern)})`,
+    ];
+    if (excludeIds.length > 0) {
+      conditions.push(not(inArray(architects.id, excludeIds)));
+    }
+
+    const rows = await db
+      .select({
+        id: architects.id,
+        cabinet: architects.cabinet,
+        contactName: architects.contactName,
+        email: architects.email,
+        specialtyCodes: architects.specialtyCodes,
+        geoZones: architects.geoZones,
+        preferred: architects.preferred,
+      })
+      .from(architects)
+      .where(and(...conditions))
+      .limit(10);
+
+    // email est nullable dans le schéma mais solicitable=true garantit email NOT NULL
+    return {
+      ok: true,
+      architects: rows.map((r) => ({
+        ...r,
+        email: r.email as string,
+      })),
+    };
+  } catch (err) {
+    console.error("[tandem-actions:search:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ============================================================================
+// 4. sendBulkArchitectSolicitation — envoi groupé de sollicitations
+// ============================================================================
+
+export interface BulkSolicitInput {
+  architectId: string;
+  score: number;
+  rationale: string;
+  rank: number;
+  register?: BrevoRegister;
+}
+
+export type BulkSolicitResult =
+  | {
+      ok: true;
+      /** Nombre de mails envoyés avec succès. */
+      sent: number;
+      /** Architectes ayant échoué avec la raison. */
+      failed: Array<{ architectId: string; error: string }>;
+    }
+  | {
+      ok: false;
+      error: "not_authenticated" | "forbidden_domain" | "invalid_input" | "internal_error";
+    };
+
+/**
+ * Envoie une sollicitation Tandem à plusieurs architectes d'un seul coup.
+ * Appelle `sendArchitectSolicitation` pour chaque item et collecte les résultats —
+ * un échec individuel ne bloque pas les autres envois.
+ *
+ * @param tenderId — UUID du tender
+ * @param items — liste des architectes à solliciter (1..10)
+ */
+export async function sendBulkArchitectSolicitation(
+  tenderId: string,
+  items: BulkSolicitInput[],
+  deps: ActionDeps = {},
+): Promise<BulkSolicitResult> {
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+
+  // Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+
+  // Validation
+  if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
+  if (!Array.isArray(items) || items.length < 1 || items.length > 10) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  let sent = 0;
+  const failed: Array<{ architectId: string; error: string }> = [];
+
+  // Envoi séquentiel pour éviter les races sur le statut du tender
+  for (const item of items) {
+    const result = await sendArchitectSolicitation(
+      tenderId,
+      item.architectId,
+      {
+        score: item.score,
+        rationale: item.rationale,
+        rank: item.rank,
+        register: item.register,
+      },
+      deps,
+    );
+    if (result.ok) {
+      sent++;
+    } else {
+      failed.push({ architectId: item.architectId, error: result.error });
+    }
+  }
+
+  return { ok: true, sent, failed };
 }
