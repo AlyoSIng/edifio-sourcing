@@ -26,8 +26,6 @@
  *   - Patterns : `src/app/sourcing/admin/bibliotheque/actions.ts`
  */
 
-export const runtime = "nodejs";
-
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
