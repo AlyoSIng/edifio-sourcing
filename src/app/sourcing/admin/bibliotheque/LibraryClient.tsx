@@ -26,16 +26,29 @@ import { deleteLibraryDoc, uploadLibraryDoc } from "./actions";
 // Constantes : catégories de documents
 // ---------------------------------------------------------------------------
 
+/**
+ * Catégories officielles de la bibliothèque entreprise AlyoS.
+ * Ordre validé par Steve (2026-05-26) : formulaires DC d'abord, puis attestations
+ * avec expiration, puis documents de présentation et références, "autre" en dernier.
+ *
+ * Note backward-compat : les documents existants avec un kind hors de cette liste
+ * (ex. "bilan", "dc2_vierge", "dc4_vierge") sont automatiquement redirigés vers
+ * la section "autre" dans la logique de groupement (cf. byKind fallback ci-dessous).
+ */
 export const LIBRARY_KINDS = [
+  { key: "dc1", label: "DC1 — Déclaration du candidat", hasExpiry: false },
+  { key: "dc2", label: "DC2 — Déclaration du candidat (lots)", hasExpiry: false },
+  { key: "dc4", label: "DC4 — Déclaration de sous-traitance (optionnel)", hasExpiry: false },
+  { key: "pouvoir_mandataire", label: "Pouvoir mandataire", hasExpiry: false },
   { key: "kbis", label: "Extrait Kbis", hasExpiry: true },
   { key: "urssaf", label: "Attestation URSSAF", hasExpiry: true },
   { key: "attestation_fiscale", label: "Attestation fiscale DGFiP", hasExpiry: true },
   { key: "assurance_rc", label: "Assurance RC professionnelle", hasExpiry: true },
-  { key: "bilan", label: "Bilan comptable", hasExpiry: false },
   { key: "rib", label: "RIB bancaire", hasExpiry: false },
+  { key: "presentation_entreprise", label: "Présentation de l'entreprise", hasExpiry: false },
+  { key: "moyens_humains", label: "Moyens humains et matériels", hasExpiry: false },
   { key: "references", label: "Références de marchés", hasExpiry: false },
-  { key: "dc2_vierge", label: "DC2 vierge (template)", hasExpiry: false },
-  { key: "dc4_vierge", label: "DC4 / Pouvoir vierge (template)", hasExpiry: false },
+  { key: "memoire_rse", label: "Mémoire RSE / développement durable", hasExpiry: false },
   { key: "autre", label: "Autre document", hasExpiry: false },
 ] as const;
 
