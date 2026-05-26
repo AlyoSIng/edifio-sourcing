@@ -12,6 +12,7 @@ import {
   PUBLIC_ARCHITECT_API_PREFIX,
   PUBLIC_ARCHITECT_PREFIX,
   PUBLIC_BREVO_WEBHOOK_PATH,
+  PUBLIC_COTRAITANT_PREFIX,
   PUBLIC_ROUTES,
 } from "./routes";
 
@@ -61,6 +62,10 @@ describe("constantes", () => {
   it("PUBLIC_BREVO_WEBHOOK_PATH vaut /api/webhooks/brevo (module Tandem)", () => {
     expect(PUBLIC_BREVO_WEBHOOK_PATH).toBe("/api/webhooks/brevo");
   });
+
+  it("PUBLIC_COTRAITANT_PREFIX vaut /cotraitant/ (partage cotraitant)", () => {
+    expect(PUBLIC_COTRAITANT_PREFIX).toBe("/cotraitant/");
+  });
 });
 
 describe("isPublicRoute", () => {
@@ -83,6 +88,17 @@ describe("isPublicRoute", () => {
     "/api/webhooks/brevo",
   ])("%s est publique (module Tandem — auth crypto côté handler)", (pathname) => {
     expect(isPublicRoute(pathname)).toBe(true);
+  });
+
+  it.each(["/cotraitant/550e8400-e29b-41d4-a716-446655440000", "/cotraitant/any-token-here"])(
+    "%s est publique (partage cotraitant — token opaque)",
+    (pathname) => {
+      expect(isPublicRoute(pathname)).toBe(true);
+    },
+  );
+
+  it("/cotraitant sans slash final n'est PAS publique (match préfixe strict)", () => {
+    expect(isPublicRoute("/cotraitant")).toBe(false);
   });
 
   it.each([

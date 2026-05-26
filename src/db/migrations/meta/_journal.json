@@ -99,6 +99,13 @@
       "when": 1748995320000,
       "tag": "0013_tender_excluded",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1748995380000,
+      "tag": "0014_cotraitant_sharing",
+      "breakpoints": true
     }
   ]
 }

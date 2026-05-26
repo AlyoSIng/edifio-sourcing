@@ -31,3 +31,4 @@ export * from "./audit";
 export * from "./messaging";
 export * from "./bureaux-etudes";
 export * from "./companies";
+export * from "./sharing";

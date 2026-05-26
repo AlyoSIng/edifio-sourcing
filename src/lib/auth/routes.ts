@@ -57,15 +57,23 @@ export const PUBLIC_ARCHITECT_API_PREFIX = "/api/archi/" as const;
 export const PUBLIC_BREVO_WEBHOOK_PATH = "/api/webhooks/brevo" as const;
 
 /**
+ * Préfixe public du module partage cotraitant — page tokenisée accessible
+ * sans auth AlyoS. Sécurité assurée par le token UUID opaque (expiration 30j,
+ * révocation manuelle). Cf. src/app/cotraitant/[token]/.
+ */
+export const PUBLIC_COTRAITANT_PREFIX = "/cotraitant/" as const;
+
+/**
  * Retourne `true` si le pathname est une route publique (servie sans
  * vérification de session). Couvre les routes exactes de `PUBLIC_ROUTES`
- * ET les préfixes du module Tandem (auth cryptographique côté handler).
+ * ET les préfixes des modules Tandem et partage cotraitant.
  */
 export function isPublicRoute(pathname: string): boolean {
   if ((PUBLIC_ROUTES as readonly string[]).includes(pathname)) return true;
   if (pathname.startsWith(PUBLIC_ARCHITECT_PREFIX)) return true;
   if (pathname.startsWith(PUBLIC_ARCHITECT_API_PREFIX)) return true;
   if (pathname === PUBLIC_BREVO_WEBHOOK_PATH) return true;
+  if (pathname.startsWith(PUBLIC_COTRAITANT_PREFIX)) return true;
   return false;
 }
 
