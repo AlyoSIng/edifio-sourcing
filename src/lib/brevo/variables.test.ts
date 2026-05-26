@@ -207,6 +207,26 @@ describe("buildBrevoVariables — intégration (v2)", () => {
     expect(v.ao_cloture).toBe("à confirmer");
   });
 
+  it("nom_commercial fallback 'AlyoS Ingénierie' si nomCommercial absent", () => {
+    const v = buildBrevoVariables(baseInput); // pas de nomCommercial
+    expect(v.nom_commercial).toBe("AlyoS Ingénierie");
+  });
+
+  it("nom_commercial = valeur fournie si nomCommercial présent", () => {
+    const v = buildBrevoVariables({ ...baseInput, nomCommercial: "Dupont Ingénierie" });
+    expect(v.nom_commercial).toBe("Dupont Ingénierie");
+  });
+
+  it("nom_commercial fallback si nomCommercial est une chaine vide", () => {
+    const v = buildBrevoVariables({ ...baseInput, nomCommercial: "" });
+    expect(v.nom_commercial).toBe("AlyoS Ingénierie");
+  });
+
+  it("nom_commercial fallback si nomCommercial est uniquement des espaces", () => {
+    const v = buildBrevoVariables({ ...baseInput, nomCommercial: "   " });
+    expect(v.nom_commercial).toBe("AlyoS Ingénierie");
+  });
+
   it("greeting VOUS connu → 'Bonjour Madame Dupont,'", () => {
     const v = buildBrevoVariables({ ...baseInput, register: "vous" });
     expect(v.greeting).toBe("Bonjour Madame Dupont,");

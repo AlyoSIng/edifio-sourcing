@@ -58,6 +58,13 @@ export interface NavSection {
 /**
  * Configuration figée au MVP. Toute évolution doit rester data-driven ici —
  * pas de logique conditionnelle dans `Sidebar`.
+ *
+ * Mise à jour feat/nav-email-v3 (Nadia, 2026-05-26) :
+ *  - Section "Sourcing" : AO du jour / Sélectionnés / Différés
+ *  - Section "Pilotage" : Cotraitance / Mandataire / Conception-Réalisation (comingSoon)
+ *  - Section "Contacts" : Architectes / Bureaux d'Études (comingSoon) / Entreprises (comingSoon)
+ *  - Section "Configuration" : inchangée (adminOnly)
+ *  - Section "Admin" : inchangée (adminOnly)
  */
 export const NAV_ITEMS: NavSection[] = [
   {
@@ -81,12 +88,6 @@ export const NAV_ITEMS: NavSection[] = [
         icon: "clock",
         matchPrefix: "/sourcing/differes",
       },
-      {
-        href: "/sourcing/reponse-solo",
-        label: "Mandataire",
-        icon: "file-text",
-        matchPrefix: "/sourcing/reponse-solo",
-      },
     ],
   },
   {
@@ -99,6 +100,26 @@ export const NAV_ITEMS: NavSection[] = [
         icon: "handshake",
         matchPrefix: "/sourcing/cotraitance",
       },
+      // Mandataire MOE — ex-"Réponse solo" renommé pour clarté Tandem.
+      {
+        href: "/sourcing/reponse-solo",
+        label: "Mandataire",
+        icon: "file-text",
+        matchPrefix: "/sourcing/reponse-solo",
+      },
+      // Conception/Réalisation — placeholder Phase 2.
+      {
+        href: "/sourcing/conception-realisation",
+        label: "Conception/Réalisation",
+        icon: "layers",
+        matchPrefix: "/sourcing/conception-realisation",
+        comingSoon: true,
+      },
+    ],
+  },
+  {
+    title: "Contacts",
+    items: [
       // Annuaire architectes — visible tous rôles (lecture) ; édition filtrée
       // côté page via `isAdmin(profile)`. Migration Lot B (2026-05-25).
       {
@@ -106,6 +127,22 @@ export const NAV_ITEMS: NavSection[] = [
         label: "Architectes",
         icon: "building",
         matchPrefix: "/sourcing/architectes",
+      },
+      // Bureaux d'Études — placeholder Phase 2.
+      {
+        href: "/sourcing/bureaux-etudes",
+        label: "Bureaux d'Études",
+        icon: "compass",
+        matchPrefix: "/sourcing/bureaux-etudes",
+        comingSoon: true,
+      },
+      // Entreprises/Majors — placeholder Phase 2.
+      {
+        href: "/sourcing/entreprises",
+        label: "Entreprises/Majors",
+        icon: "hard-hat",
+        matchPrefix: "/sourcing/entreprises",
+        comingSoon: true,
       },
     ],
   },

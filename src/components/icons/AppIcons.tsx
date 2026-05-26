@@ -118,7 +118,11 @@ export type IconName =
   | "euro"
   // edifio Sourcing — icônes métier
   | "handshake"
-  | "ao";
+  | "ao"
+  // Tandem / contacts — nouvelles (feat/nav-email-v3)
+  | "layers"
+  | "compass"
+  | "hard-hat";
 
 export interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;
@@ -659,6 +663,41 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
       <polyline points="14 2 14 8 20 8" />
       <circle cx="10" cy="14" r="2.5" />
       <line x1="12" y1="16" x2="15" y2="19" strokeWidth="2.5" />
+    </>
+  ),
+
+  /**
+   * Layers — conception/réalisation (stack de couches).
+   * Deux polygones superposés décalés évoquant un empilement de niveaux.
+   */
+  layers: (
+    <>
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 12 12 17 22 12" />
+      <polyline points="2 17 12 22 22 17" />
+    </>
+  ),
+
+  /**
+   * Compass — bureaux d'études (boussole).
+   * Cercle avec aiguille diagonale bisectée, symbole classique de précision.
+   */
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z" />
+    </>
+  ),
+
+  /**
+   * Hard-hat — entreprises/majors (casque de chantier).
+   * Forme de casque avec bord plat et bande centrale.
+   */
+  "hard-hat": (
+    <>
+      <path d="M2 18h20v2H2z" />
+      <path d="M4 18v-3a8 8 0 0 1 16 0v3" />
+      <path d="M12 6v6" />
     </>
   ),
 };

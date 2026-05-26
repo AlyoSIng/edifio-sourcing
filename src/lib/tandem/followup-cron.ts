@@ -149,16 +149,22 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
     return age >= FOLLOWUP_THRESHOLD_MS;
   });
 
-  // Chargement une fois pour toute la boucle
+  // Chargement une fois pour toute la boucle (présentation société + nom commercial)
   let orgPresentationSociete: string | undefined;
+  let orgNomCommercial: string | undefined;
   try {
     const orgRows = await db
-      .select({ presentationBlock: organizationProfiles.presentationBlock })
+      .select({
+        presentationBlock: organizationProfiles.presentationBlock,
+        commercialName: organizationProfiles.commercialName,
+      })
       .from(organizationProfiles)
       .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
       .limit(1);
     const block = orgRows[0]?.presentationBlock;
     if (block) orgPresentationSociete = block;
+    const cname = orgRows[0]?.commercialName;
+    if (cname) orgNomCommercial = cname;
   } catch {
     // Fallback silencieux
   }
@@ -257,6 +263,7 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
         lienOpposition,
         register,
         presentationSociete: orgPresentationSociete,
+        nomCommercial: orgNomCommercial,
       });
       void tokenRows; // pour silence linter
     } catch (err) {
@@ -274,6 +281,7 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
       to: { email: item.architect.email, name: toName || variables.cabinet },
       params: {
         greeting: variables.greeting,
+        nom_commercial: variables.nom_commercial,
         archi_prenom: variables.archi_prenom,
         archi_nom: variables.archi_nom,
         cabinet: variables.cabinet,
