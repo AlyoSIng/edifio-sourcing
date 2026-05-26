@@ -6,6 +6,25 @@
 
 ---
 
+## 2026-05-26 — feat/cotraitant-library — Bibliothèque cotraitants (Nadia)
+
+- **2026-05-26 · G6 · Nadia (dev2) · feat/cotraitant-library — schema Drizzle + migration + server actions + UI bibliothèque + page Tandem cotraitant.**
+  *Branche créée depuis main. Fichiers créés/modifiés :*
+  *- `src/db/schema/cotraitants.ts` : 3 tables — `cotraitants` (annuaire), `tender_cotraitants` (association AO↔cotraitant, UNIQUE tender_id MVP), `cotraitant_documents` (pièces Storage "cotraitant-docs"). Export ajouté dans `src/db/schema/index.ts`.*
+  *- `src/db/migrations/0015_cotraitant_library.sql` : DDL 3 tables + indexes + contrainte unique partielle email/org.*
+  *- `src/db/migrations/meta/_journal.json` : entrée idx=15 ajoutée.*
+  *- `src/app/sourcing/cotraitants/actions.ts` : 11 server actions — listCotraitants, createCotraitant, updateCotraitant, deleteCotraitant (soft via active=false), associateToTender, dissociateFromTender, uploadCotraitantDocument (Storage "cotraitant-docs"), deleteCotraitantDocument, getDownloadUrl (URL signée 60 min), listDocumentsForCotraitant, getTenderCotraitant.*
+  *- `src/app/sourcing/cotraitants/page.tsx` : Server Component liste cotraitants avec résilience try/catch.*
+  *- `src/app/sourcing/cotraitants/CotraitantsListClient.tsx` : Client Component tableau + panneau latéral formulaire (validation Zod native, sans react-hook-form).*
+  *- `src/app/sourcing/ao/[id]/tandem/cotraitant/page.tsx` : Server Component — charge tender + association + liste globale + documents.*
+  *- `src/app/sourcing/ao/[id]/tandem/cotraitant/TandemCotraitantClient.tsx` : Client Component — section association (sélection/dissociation) + section documents (3 sous-sections, upload inline, téléchargement, suppression).*
+  *- `src/components/app-shell/nav-items.ts` : lien "Cotraitants" ajouté dans section Contacts (icône users).*
+  *- `src/app/sourcing/ao/[id]/tandem/TandemShortlistClient.tsx` : lien "Cotraitant — gestion et documents" ajouté dans le bloc liens Tandem.*
+  *Décision technique : pas de react-hook-form (absent du projet) — formulaire contrôlé natif React + validation Zod.*
+  *Bucket Storage requis (ops) : "cotraitant-docs" (private) — à créer dans le dashboard Supabase avant la 1re utilisation.*
+
+---
+
 ## 2026-05-26 — PR #65 feat/be-companies — Bureaux d'Études + Entreprises/Majors (Nadia)
 
 - **2026-05-26 · G6 · Nadia (dev2) · feat/be-companies — schema, pages, import CSV pour BET et Entreprises.**
