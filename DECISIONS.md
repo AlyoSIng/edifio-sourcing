@@ -6,6 +6,15 @@
 
 ---
 
+## 2026-05-26 — PR-C + PR-D module dossier IA
+
+- **2026-05-26 · G6 · Alex (dev) · Implémentation PR-C (CERFA DC1/DC2) + PR-D (pièces complémentaires) sur branche `feat/dossier-cerfa-pieces`.**
+  *Fichiers créés : `src/lib/dossier/cerfa-prefill.ts` (logique pure, testable), `src/lib/dossier/pieces-match.ts` (matching bibliothèque, testable), `src/app/sourcing/ao/[id]/dossier/cerfa/actions.ts`, `cerfa/CerfaFormClient.tsx`, `cerfa/page.tsx`, `pieces/PiecesClient.tsx`, `pieces/page.tsx`. Modification : `DossierClient.tsx` (activation bouton "Préparer les DC" → lien href réel). Tests unitaires : `cerfa-prefill.test.ts` + `pieces-match.test.ts`. Zero erreur TypeScript. Pas de migration BDD.*
+  *Décision technique : `isTandem` toujours `true` au MVP car la page dossier exige `tender.status === 'architect_accepted'` — documenté en commentaire. Conservé en paramètre pour Phase 2 Solo.*
+  *Bucket `response_files` utilisé pour les JSON CERFA (même bucket que les autres pièces de réponse — cohérence schéma).*
+
+---
+
 ## 2026-05-07 — Phase 0 (Onboarding)
 
 - **2026-05-07 · P0 · Board · Public cible = SaaS multi-clients dès le MVP.** [BOARD-OK 2026-05-07]
