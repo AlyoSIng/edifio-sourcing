@@ -127,10 +127,6 @@ function CerfaStatusCard({
 }
 
 // ---------------------------------------------------------------------------
-// Composant principal
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Labels d'erreur compilation
 // ---------------------------------------------------------------------------
 
@@ -142,6 +138,8 @@ function compileErrorLabel(code: string | undefined): string {
       return "DC1 et DC2 doivent être validés avant de compiler le dossier.";
     case "zip_empty":
       return "Aucun document disponible — ajoutez des pièces à la bibliothèque d'abord.";
+    case "zip_download_failed":
+      return "Erreur de téléchargement des pièces depuis le stockage — réessayez.";
     case "storage_upload_failed":
     case "signed_url_failed":
       return "Erreur de stockage — réessayez.";

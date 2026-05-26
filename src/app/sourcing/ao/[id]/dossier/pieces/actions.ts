@@ -22,8 +22,7 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { responseFiles } from "@/db/schema/library";
-import { presentationLibrary } from "@/db/schema/library";
+import { presentationLibrary, responseFiles } from "@/db/schema/library";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
@@ -56,6 +55,7 @@ export interface CompileDossierResult {
     | "tender_not_found"
     | "no_cerfa"
     | "zip_empty"
+    | "zip_download_failed"
     | "storage_upload_failed"
     | "signed_url_failed"
     | "db_insert_failed"
@@ -159,7 +159,12 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
     const zipResult = await compileDossierZip(supabase, { dc1, dc2, pieceMatches });
 
     if (zipResult.fileCount === 0) {
-      return { ok: false, error: "zip_empty" };
+      // Distinguer "bibliothèque vide" (aucune pièce à inclure) de
+      // "pièces existent mais Storage inatteignable" (échec silencieux download)
+      return {
+        ok: false,
+        error: zipResult.hadDownloadFailures ? "zip_download_failed" : "zip_empty",
+      };
     }
 
     // 7. Upload ZIP vers Storage

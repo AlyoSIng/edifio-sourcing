@@ -43,6 +43,12 @@ export interface ZipCompileResult {
   buffer: Uint8Array;
   /** Nombre de fichiers inclus dans le ZIP. */
   fileCount: number;
+  /**
+   * Vrai si au moins un téléchargement Storage a échoué silencieusement.
+   * Permet à l'appelant de distinguer "aucune pièce" (bibliothèque vide)
+   * de "pièces existent mais Storage inatteignable".
+   */
+  hadDownloadFailures: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,12 +108,15 @@ export async function compileDossierZip(
   input: ZipCompileInput,
 ): Promise<ZipCompileResult> {
   const files: Record<string, Uint8Array> = {};
+  let hadDownloadFailures = false;
 
   // 1. DC1.json
   if (input.dc1?.storagePath) {
     const dc1Bytes = await downloadFromStorage(supabase, "response_files", input.dc1.storagePath);
     if (dc1Bytes) {
       files["dossier_candidature/CERFA/DC1.json"] = dc1Bytes;
+    } else {
+      hadDownloadFailures = true;
     }
   }
 
@@ -116,6 +125,8 @@ export async function compileDossierZip(
     const dc2Bytes = await downloadFromStorage(supabase, "response_files", input.dc2.storagePath);
     if (dc2Bytes) {
       files["dossier_candidature/CERFA/DC2.json"] = dc2Bytes;
+    } else {
+      hadDownloadFailures = true;
     }
   }
 
@@ -137,6 +148,8 @@ export async function compileDossierZip(
     if (bytes) {
       const safeFilename = sanitizeFilename(item.name);
       files[`dossier_candidature/pieces/${safeFilename}`] = bytes;
+    } else {
+      hadDownloadFailures = true;
     }
   }
 
@@ -144,10 +157,10 @@ export async function compileDossierZip(
   const fileCount = Object.keys(files).length;
 
   if (fileCount === 0) {
-    return { buffer: new Uint8Array(0), fileCount: 0 };
+    return { buffer: new Uint8Array(0), fileCount: 0, hadDownloadFailures };
   }
 
   const zipped = zipSync(files, { level: 6 });
 
-  return { buffer: zipped, fileCount };
+  return { buffer: zipped, fileCount, hadDownloadFailures };
 }
