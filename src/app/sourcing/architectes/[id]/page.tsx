@@ -229,6 +229,26 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
                 <dt className="text-muted">Collaborations passées</dt>
                 <dd className="mt-0.5 text-ink">{architect.pastCollabsCount}</dd>
               </div>
+              {architect.budgetMin !== null || architect.budgetMax !== null ? (
+                <div>
+                  <dt className="text-muted">Budget opération (€ HT)</dt>
+                  <dd className="mt-0.5 text-ink">
+                    {architect.budgetMin !== null
+                      ? `min. ${architect.budgetMin.toLocaleString("fr-FR")} €`
+                      : ""}
+                    {architect.budgetMin !== null && architect.budgetMax !== null ? " — " : ""}
+                    {architect.budgetMax !== null
+                      ? `max. ${architect.budgetMax.toLocaleString("fr-FR")} €`
+                      : ""}
+                  </dd>
+                </div>
+              ) : null}
+              {architect.concoursOnly ? (
+                <div>
+                  <dt className="text-muted">Procédure</dt>
+                  <dd className="mt-0.5 font-medium text-amber-700">Concours uniquement</dd>
+                </div>
+              ) : null}
             </dl>
           </section>
 

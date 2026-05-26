@@ -36,6 +36,9 @@ function makeArchitect(overrides: Partial<Architect> = {}): Architect {
     updatedAt: new Date(),
     rgpdOpposition: false,
     rgpdOppositionDate: null,
+    budgetMin: null,
+    budgetMax: null,
+    concoursOnly: false,
     ...overrides,
   };
 }
