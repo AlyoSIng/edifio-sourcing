@@ -6,6 +6,7 @@ import type { Architect } from "@/db/schema/architects";
 
 import { fetchArchitectsPage } from "./actions";
 import { CsvImportButton } from "./CsvImportButton";
+import { PappersEnrichButton } from "./PappersEnrichButton";
 
 export const metadata = {
   title: "Architectes — edifio Sourcing",
@@ -116,7 +117,8 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
           </p>
         </div>
         {adminUser ? (
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap items-start gap-2">
+            <PappersEnrichButton />
             <CsvImportButton />
             <span className="inline-flex items-center rounded-md border border-line bg-white px-3 py-1.5 text-xs text-muted opacity-50">
               Export CSV (bientôt)

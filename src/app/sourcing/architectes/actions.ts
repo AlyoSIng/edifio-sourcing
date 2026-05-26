@@ -28,6 +28,11 @@ import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import {
+  getPappersBySiren,
+  mapTrancheToHeadcount,
+  searchPappersByName,
+} from "@/lib/pappers/client";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Architect, NewArchitect } from "@/db/schema/architects";
 
@@ -566,4 +571,177 @@ export async function setRgpdOpposition(
     console.error("[architects-actions:rgpd-opposition:fail]", err);
     return { ok: false, error: "internal_error" };
   }
+}
+
+// ============================================================================
+// 5. enrichArchitectsFromPappers — moulinette Pappers (admin uniquement)
+// ============================================================================
+
+export interface PappersEnrichResult {
+  /** Fiches mises à jour (au moins un champ enrichi). */
+  updated: number;
+  /** Fiches sans modification (données déjà présentes ou Pappers sans réponse). */
+  skipped: number;
+  /** Architectes non trouvés dans Pappers (ni par SIREN, ni par nom). */
+  notFound: number;
+  /** Offset à passer pour le batch suivant (= offset + limit si encore des architectes). */
+  nextOffset: number;
+  /** Nombre total d'architectes dans l'organisation. */
+  total: number;
+}
+
+/**
+ * Enrichit les fiches architectes depuis l'API Pappers (admin uniquement).
+ *
+ * Mode batch : traite `limit` architectes à partir de `offset`.
+ * Appeler en boucle côté client jusqu'à `nextOffset >= total`.
+ *
+ * Stratégie d'enrichissement :
+ *   1. Si `architect.siren` est renseigné → lookup direct par SIREN
+ *   2. Sinon si `architect.cabinet` est renseigné → recherche par nom
+ *      → retenir si 1 seul résultat ET score ≥ 0.6 ET code NAF contient "711"
+ *      (activités d'architecture — NAF 7111Z, 7112B, etc.)
+ *      → renseigner le SIREN trouvé
+ *
+ * Champs mis à jour : `headcount` (si NULL), `annual_revenue` (si NULL),
+ * `siren` (si NULL). Les données existantes ne sont JAMAIS écrasées
+ * (préserve les corrections manuelles de l'admin).
+ *
+ * @param params.limit   - Taille du batch (défaut 50)
+ * @param params.offset  - Décalage (défaut 0)
+ * @param params.dryRun  - Si true, calcule les stats sans rien écrire en BDD
+ */
+export async function enrichArchitectsFromPappers(params: {
+  limit?: number;
+  offset?: number;
+  dryRun?: boolean;
+}): Promise<PappersEnrichResult> {
+  const { limit = 50, offset = 0, dryRun = false } = params;
+
+  // Vérification clé API Pappers
+  const apiKey = process.env.PAPPERS_API_KEY;
+  if (!apiKey) {
+    console.error("[pappers-enrich] PAPPERS_API_KEY manquante — enrichissement impossible.");
+    return { updated: 0, skipped: 0, notFound: 0, nextOffset: 0, total: 0 };
+  }
+
+  // Auth + domaine
+  const authClient = createSupabaseServerClient();
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) {
+    return { updated: 0, skipped: 0, notFound: 0, nextOffset: 0, total: 0 };
+  }
+  const { profile } = authResult;
+
+  // Réservé aux admins
+  if (!isAdmin(profile)) {
+    return { updated: 0, skipped: 0, notFound: 0, nextOffset: 0, total: 0 };
+  }
+
+  const orgFilter = eq(architects.organizationId, ALYOS_ORG_ID);
+
+  // Récupération du total et du batch en parallèle
+  const [batch, totalRows] = await Promise.all([
+    defaultDb
+      .select()
+      .from(architects)
+      .where(orgFilter)
+      .orderBy(architects.cabinet)
+      .limit(limit)
+      .offset(offset),
+    defaultDb
+      .select({ total: sql<number>`count(*)::int` })
+      .from(architects)
+      .where(orgFilter),
+  ]);
+
+  const total = totalRows[0]?.total ?? 0;
+
+  let updated = 0;
+  let skipped = 0;
+  let notFound = 0;
+
+  for (const arch of batch) {
+    let foundSiren: string | null = null;
+    let pappers: { tranche_effectif_salarie?: string; chiffre_affaires?: number } | null = null;
+
+    if (arch.siren) {
+      // Stratégie 1 : lookup direct par SIREN
+      const result = await getPappersBySiren(arch.siren, apiKey);
+      if (result) {
+        foundSiren = arch.siren;
+        pappers = result;
+      }
+    } else if (arch.cabinet) {
+      // Stratégie 2 : recherche par nom cabinet
+      const searchResult = await searchPappersByName(arch.cabinet, apiKey);
+      const resultats = searchResult?.resultats_entreprises ?? [];
+
+      if (resultats.length === 1 && resultats[0]) {
+        const hit = resultats[0];
+        const score = hit.score ?? 0;
+        const codeNaf = hit.siege?.code_naf ?? "";
+
+        // Retenir uniquement si score suffisant ET activité architecture (NAF 711x)
+        if (score >= 0.6 && codeNaf.startsWith("711")) {
+          foundSiren = hit.siren;
+          // Lookup détaillé pour récupérer CA + effectif
+          const detail = await getPappersBySiren(foundSiren, apiKey);
+          if (detail) {
+            pappers = detail;
+          }
+        }
+      }
+    }
+
+    if (!pappers && !foundSiren) {
+      // Aucune donnée Pappers trouvée pour cet architecte
+      notFound++;
+      // Pause respectueuse des rate limits
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      continue;
+    }
+
+    // Calcul des nouvelles valeurs (uniquement pour les champs NULL)
+    const newHeadcount = pappers ? mapTrancheToHeadcount(pappers.tranche_effectif_salarie) : null;
+    const newAnnualRevenue = pappers?.chiffre_affaires ?? null;
+
+    // Détecter si au moins un champ NULL peut être enrichi
+    const needsUpdate =
+      (arch.siren === null && foundSiren !== null) ||
+      (arch.headcount === null && newHeadcount !== null) ||
+      (arch.annualRevenue === null && newAnnualRevenue !== null);
+
+    if (!needsUpdate) {
+      skipped++;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      continue;
+    }
+
+    if (!dryRun) {
+      // Mise à jour uniquement des champs NULL — préserve les corrections manuelles
+      await defaultDb
+        .update(architects)
+        .set({
+          siren: arch.siren ?? foundSiren,
+          headcount: arch.headcount ?? newHeadcount,
+          annualRevenue: arch.annualRevenue ?? newAnnualRevenue,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(architects.id, arch.id), orgFilter));
+    }
+
+    updated++;
+
+    // Pause entre chaque appel API pour respecter les rate limits Pappers
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return {
+    updated,
+    skipped,
+    notFound,
+    nextOffset: offset + limit,
+    total,
+  };
 }
