@@ -16,8 +16,6 @@
  * Source de vérité : brief Board PR-C 2026-05-25.
  */
 
-export const runtime = "nodejs";
-
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
