@@ -99,7 +99,7 @@ describe("resolveBrevoTemplate — fallback défaut", () => {
     const result = await resolveBrevoTemplate("architect_solicitation_VOUS", VALID_ORG_ID, db);
     expect(result.source).toBe("default");
     expect(result.subject).toContain("cotraitance");
-    expect(result.body).toContain("AlyoS Ingénierie");
+    expect(result.body).toContain("{{ params.nom_commercial }}");
   });
 
   it("fallback silencieux si table n'existe pas (erreur 42P01)", async () => {
