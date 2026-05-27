@@ -24,7 +24,7 @@ import { presentationLibrary, responseFiles } from "@/db/schema/library";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
 import { compileDossierZip } from "@/lib/dossier/zip-compile";
@@ -153,8 +153,10 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
       }
     }
 
-    // 6. Compiler le ZIP
-    const zipResult = await compileDossierZip(supabase, { dc1, dc2, pieceMatches });
+    // 6. Compiler le ZIP (téléchargements depuis Storage via admin client)
+    // Storage admin : RLS bypass intentionnel — auth vérifiée L.97
+    const supabaseAdmin = createSupabaseAdminClient();
+    const zipResult = await compileDossierZip(supabaseAdmin, { dc1, dc2, pieceMatches });
 
     if (zipResult.fileCount === 0) {
       // Distinguer "bibliothèque vide" (aucune pièce à inclure) de
@@ -169,7 +171,8 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
     const timestamp = Date.now();
     const storagePath = `${ALYOS_ORG_ID}/${tenderId}/dossier_${timestamp}.zip`;
 
-    const { error: storageError } = await supabase.storage
+    // Storage admin : RLS bypass intentionnel — auth vérifiée L.97
+    const { error: storageError } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(storagePath, zipResult.buffer, {
         contentType: "application/zip",
@@ -182,7 +185,8 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
     }
 
     // 8. Créer URL signée (1 heure)
-    const { data: signedData, error: signedError } = await supabase.storage
+    // Storage admin : RLS bypass intentionnel — auth vérifiée L.97
+    const { data: signedData, error: signedError } = await supabaseAdmin.storage
       .from(BUCKET)
       .createSignedUrl(storagePath, SIGNED_URL_SECONDS);
 

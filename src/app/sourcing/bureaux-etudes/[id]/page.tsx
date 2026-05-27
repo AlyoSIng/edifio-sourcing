@@ -130,6 +130,7 @@ export default async function BEFichePage({ params }: { params: { id: string } }
               <InfoField label="Email" value={be.email} isEmail />
               <InfoField label="Téléphone" value={be.phone} />
               <InfoField label="Site web" value={be.website} isUrl />
+              <InfoField label="SIRET" value={be.siret} />
               <InfoField label="SIREN" value={be.siren} />
               <InfoField
                 label="Ville"

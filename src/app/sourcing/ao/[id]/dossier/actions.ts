@@ -34,7 +34,7 @@ import { auditLogs } from "@/db/schema/audit";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { analyzeRc } from "@/lib/ai/analyze-rc";
 import type { RcAnalysis } from "@/lib/ai/schemas";
 
@@ -217,10 +217,12 @@ export async function downloadDceFromUrl(tenderId: string): Promise<DceActionRes
 
     const buffer = await response.arrayBuffer();
 
-    // Upload Storage : chemin tenant-scoped pour satisfaire la RLS policy
+    // Upload Storage : chemin tenant-scoped
     const storagePath = `${ALYOS_ORG_ID}/${tenderId}/${Date.now()}_RC.pdf`;
 
-    const { error: storageError } = await auth.supabase.storage
+    // Storage admin : RLS bypass intentionnel — auth vérifiée L.175
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { error: storageError } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(storagePath, buffer, {
         contentType: "application/pdf",
@@ -247,7 +249,8 @@ export async function downloadDceFromUrl(tenderId: string): Promise<DceActionRes
     } catch (err) {
       console.error("[dossier:download-dce:db:fail]", err);
       // Nettoyage Storage best-effort
-      await auth.supabase.storage.from(BUCKET).remove([storagePath]);
+      // Storage admin : RLS bypass intentionnel — auth vérifiée L.175
+      await supabaseAdmin.storage.from(BUCKET).remove([storagePath]);
       return { ok: false, error: "db_insert_failed" };
     }
 
@@ -311,7 +314,9 @@ export async function uploadDcePdf(tenderId: string, formData: FormData): Promis
     const storagePath = `${ALYOS_ORG_ID}/${tenderId}/${Date.now()}_${safeFilename}`;
 
     const fileBuffer = await file.arrayBuffer();
-    const { error: storageError } = await auth.supabase.storage
+    // Storage admin : RLS bypass intentionnel — auth vérifiée L.282
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { error: storageError } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(storagePath, fileBuffer, {
         contentType: "application/pdf",
@@ -337,7 +342,8 @@ export async function uploadDcePdf(tenderId: string, formData: FormData): Promis
       });
     } catch (err) {
       console.error("[dossier:upload-pdf:db:fail]", err);
-      await auth.supabase.storage.from(BUCKET).remove([storagePath]);
+      // Storage admin : RLS bypass intentionnel — auth vérifiée L.282
+      await supabaseAdmin.storage.from(BUCKET).remove([storagePath]);
       return { ok: false, error: "db_insert_failed" };
     }
 
@@ -398,7 +404,9 @@ export async function analyzeRcAction(
     if (!doc) return { ok: false, error: "document_not_found" };
 
     // Téléchargement depuis Supabase Storage
-    const { data: storageData, error: downloadError } = await auth.supabase.storage
+    // Storage admin : RLS bypass intentionnel — auth vérifiée L.378
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { data: storageData, error: downloadError } = await supabaseAdmin.storage
       .from(BUCKET)
       .download(doc.storagePath);
 

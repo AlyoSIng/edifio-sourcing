@@ -25,7 +25,7 @@ import { responseFiles } from "@/db/schema/library";
 import { tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CerfaField } from "@/lib/dossier/cerfa-prefill";
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,9 @@ export async function validateCerfa(
     const filename = `${cerfaKind.toLowerCase()}_${Date.now()}.json`;
     const storagePath = `${ALYOS_ORG_ID}/${tenderId}/cerfa/${filename}`;
 
-    const { error: storageError } = await auth.supabase.storage
+    // Storage admin : RLS bypass intentionnel — auth vérifiée L.133
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { error: storageError } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(storagePath, jsonBuffer, {
         contentType: "application/json",
@@ -212,8 +214,9 @@ export async function validateCerfa(
       });
     } catch (err) {
       console.error("[cerfa:validate:db:fail]", err);
-      // Nettoyage Storage best-effort en cas d'échec BDD (W-4 : on logue le résultat)
-      const { error: removeErr } = await auth.supabase.storage.from(BUCKET).remove([storagePath]);
+      // Nettoyage Storage best-effort en cas d'échec BDD
+      // Storage admin : RLS bypass intentionnel — auth vérifiée L.133
+      const { error: removeErr } = await supabaseAdmin.storage.from(BUCKET).remove([storagePath]);
       if (removeErr) {
         console.error("[cerfa:validate:storage:cleanup:fail]", removeErr);
       }

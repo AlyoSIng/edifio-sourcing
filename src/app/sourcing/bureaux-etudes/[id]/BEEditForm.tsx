@@ -37,6 +37,7 @@ export function BEEditForm({ be }: BEEditFormProps) {
   const [phone, setPhone] = useState(be.phone ?? "");
   const [website, setWebsite] = useState(be.website ?? "");
   const [siren, setSiren] = useState(be.siren ?? "");
+  const [siret, setSiret] = useState(be.siret ?? "");
   const [zip, setZip] = useState(be.zip ?? "");
   const [city, setCity] = useState(be.city ?? "");
   const [notes, setNotes] = useState(be.notes ?? "");
@@ -76,6 +77,13 @@ export function BEEditForm({ be }: BEEditFormProps) {
     const budgetMinValue = budgetMin ? parseInt(budgetMin, 10) : null;
     const budgetMaxValue = budgetMax ? parseInt(budgetMax, 10) : null;
 
+    // Validation SIRET : si renseigné, doit être 14 chiffres
+    const siretValue = siret.trim() || null;
+    if (siretValue !== null && !/^\d{14}$/.test(siretValue)) {
+      setEditError("Le SIRET doit comporter exactement 14 chiffres.");
+      return;
+    }
+
     startTransition(async () => {
       const result = await upsertBE(
         {
@@ -84,6 +92,7 @@ export function BEEditForm({ be }: BEEditFormProps) {
           email: email.trim() || null,
           phone: phone.trim() || null,
           website: website.trim() || null,
+          siret: siretValue,
           siren: siren.trim() || null,
           zip: zip.trim() || null,
           city: city.trim() || null,
@@ -203,11 +212,25 @@ export function BEEditForm({ be }: BEEditFormProps) {
           </div>
         </div>
 
-        {/* SIREN + CP + Ville */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* SIRET + SIREN */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="be-siret" className="block text-xs font-medium text-ink">
+              SIRET (14 chiffres) <span className="text-xs font-normal text-muted">optionnel</span>
+            </label>
+            <input
+              id="be-siret"
+              type="text"
+              value={siret}
+              onChange={(e) => setSiret(e.target.value)}
+              maxLength={14}
+              placeholder="ex : 12345678901234"
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
+          </div>
           <div>
             <label htmlFor="be-siren" className="block text-xs font-medium text-ink">
-              SIREN (9 chiffres)
+              SIREN (9 chiffres) <span className="text-xs font-normal text-muted">matching</span>
             </label>
             <input
               id="be-siren"
@@ -218,6 +241,10 @@ export function BEEditForm({ be }: BEEditFormProps) {
               className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
             />
           </div>
+        </div>
+
+        {/* CP + Ville */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="be-zip" className="block text-xs font-medium text-ink">
               Code postal

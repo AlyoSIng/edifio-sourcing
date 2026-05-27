@@ -18,6 +18,7 @@ function makeArchitect(overrides: Partial<Architect> = {}): Architect {
     phone: null,
     website: null,
     siren: null,
+    siret: null,
     zip: null,
     city: null,
     headcount: null,

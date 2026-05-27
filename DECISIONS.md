@@ -2,6 +2,34 @@
 
 ---
 
+## 2026-05-27 — Bouton DCE + AO manuel (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — bouton téléchargement DCE BOAMP : exposition `tender.dce_url` existant.**
+  *UX — accès direct DCE depuis page de détail AO. La `TenderCard` (ao-du-jour) avait déjà les liens DCE en petit texte. La page `/sourcing/ao/[id]/page.tsx` est créée (elle n'existait pas) avec un bouton stylé `bg-primary` « Récupérer le DCE » conditionné sur `dce_url != null`. Affichage « DCE non disponible » si null.*
+  *Fichiers créés : `src/app/sourcing/ao/[id]/page.tsx`.*
+
+- **2026-05-27 · G6 · Alex (dev) · feat — AO manuel (consultation privée) : nouvelle route `/sourcing/ao/nouveau` + plateforme `prive`.**
+  *Besoin métier : gré à gré et consultations privées hors BOAMP. Enum `platform_code` étendu à `"prive"` (migration 0023 — `ALTER TYPE ... ADD VALUE IF NOT EXISTS` + INSERT seed `platforms` idempotent). Type `PlatformCode` dans `src/lib/sourcing/types.ts` aligné. Server Action `createPrivateTender` : auth+isAdmin, validation serveur, upload Storage signé 10 ans, INSERT `tenders` + `tender_documents`. Navigation : bouton « Ajouter un AO » dans la page AO du jour (admins uniquement).*
+  *Fichiers créés : `src/db/migrations/0023_platform_prive.sql`, `src/app/sourcing/ao/nouveau/page.tsx`, `src/app/sourcing/ao/nouveau/actions.ts`, `src/app/sourcing/ao/nouveau/PrivateTenderForm.tsx`.*
+
+---
+
+## 2026-05-27 — Fix storage upload RLS + ajout colonne SIRET (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · fix — storage upload RLS : switch admin client pour bucket ops après isAdmin() check.**
+  *Cause racine : `raw_app_meta_data` des users Supabase prod ne contient pas les custom claims attendus par les policies RLS Storage (`current_organization_id()`, `current_user_role()`). Les policies retournaient FALSE → upload bloqué.*
+  *Fix : dans chaque server action qui appelle Storage (upload, remove, download, createSignedUrl), création d'un `supabaseAdmin = createSupabaseAdminClient()` après que le check `isAdmin()` est passé. Le check auth JWT reste sur le client user (anon key). Le client admin bypass RLS Storage intentionnellement — l'autorisation est garantie par le code applicatif (defense in depth).*
+  *Fichiers corrigés : `admin/bibliotheque/actions.ts` (uploadLibraryDoc, deleteLibraryDoc), `cerfa/actions.ts` (validateCerfa), `dossier/actions.ts` (downloadDceFromUrl, uploadDcePdf, analyzeRcAction), `pieces/actions.ts` (compileDossierAction — zip compile + upload + signed URL).*
+  *Commentaire `// Storage admin : RLS bypass intentionnel — auth vérifiée L.xx` ajouté sur chaque usage.*
+
+- **2026-05-27 · G6 · Alex (dev) · feat — ajout colonne `siret` (14 chars) sur `architects`, `bureaux_etudes`, `organizations`.**
+  *Besoin métier : le SIRET de l'établissement (14 chiffres = SIREN 9 + NIC 5) est requis dans les dossiers de candidature (DC1, DC2, RIB) et les fiches de contact partenaires.*
+  *Schéma Drizzle : colonne `siret TEXT` nullable ajoutée dans `architects.ts`, `bureaux-etudes.ts`, `organizations.ts`. La colonne `siren` existante est conservée intacte (sert au matching Opendatasoft).*
+  *Migration 0023 : `ALTER TABLE ... ADD COLUMN IF NOT EXISTS siret TEXT` sur les 3 tables.*
+  *UI : champ SIRET éditable ajouté dans `ArchitectEditForm.tsx` (avec validation regex `/^\d{14}$/`), `BEEditForm.tsx` (même validation), `OrgProfileForm.tsx` (section dédiée avec action `saveOrgSiretAction` — table organizations). Affichage lecture dans les pages fiche architecte et fiche BET.*
+
+---
+
 ## 2026-05-27 — Backfill departments prod + fix extractDepartment (Alex)
 
 - **2026-05-27 · G6 · Alex (dev) · fix — champ BOAMP réel `code_departement` (commit `991cbee`).**

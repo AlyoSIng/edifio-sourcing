@@ -83,6 +83,8 @@ export const architects = pgTable(
     website: text("website"),
     /** SIREN 9 chars (entreprise). Le SIRET 14 chars n'est pas dans l'export. */
     siren: text("siren"),
+    /** SIRET 14 chars (établissement). Saisie manuelle ou enrichissement API SIRENE. */
+    siret: text("siret"),
     zip: text("zip"),
     city: text("city"),
     /** Effectif (enrichissement, hors matching V1). */
