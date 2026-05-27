@@ -116,6 +116,11 @@ jobs:
           # En CI : retourne le setting request.jwt.claims s'il existe, sinon
           # NULL (acceptable : aucune session simulee n'est posee avant pgTAP).
           psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS \$\$ SELECT NULLIF(current_setting('request.jwt.claims', true), '')::jsonb \$\$ LANGUAGE sql STABLE;"
+          # Stub `auth.uid()` -- utilisee dans les policies RLS du module
+          # superadmin (0019_superadmin_module.sql). En prod Supabase Auth,
+          # auth.uid() lit le claim 'sub' du JWT. En CI : on derive depuis
+          # request.jwt.claims de la meme facon (NULL si pas de session simulee).
+          psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS \$\$ SELECT (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid \$\$;"
           # Active pgTAP dans la DB cible (pour pg_prove).
           psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
 
