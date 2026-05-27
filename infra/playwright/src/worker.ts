@@ -21,7 +21,13 @@ import { chromium, type Browser } from "playwright";
 import { randomUUID } from "node:crypto";
 import { scrapeFrancmarches } from "./scrapers/francmarches.js";
 import { scrapePlace } from "./scrapers/place.js";
-import type { ScrapeRequest, ScrapeJobResult } from "./scrapers/types.js";
+import { scrapeMarChesPublicsInfo } from "./scrapers/marchespublicsinfo.js";
+import { scrapeMpe76 } from "./scrapers/mpe76.js";
+import { scrapeMarchesOnline } from "./scrapers/marchesonline.js";
+import { scrapeMarChesPublicsNormandie } from "./scrapers/marchespublicsnormandie.js";
+import { scrapeMarEgionSud } from "./scrapers/maregionsud.js";
+import { scrapeDepartement13 } from "./scrapers/departement13.js";
+import type { ScrapeRequest, ScrapeJobResult, ScrapingPlatform } from "./scrapers/types.js";
 
 const VERSION = "1.0.0";
 const PORT = Number(process.env.PORT ?? 8080);
@@ -129,7 +135,18 @@ async function postWebhook(webhookUrl: string, payload: ScrapeJobResult): Promis
 // Validation du corps de la requête /v1/scrape
 // ---------------------------------------------------------------------------
 
-type ScrapePlatform = "place" | "francmarches";
+type ScrapePlatform = ScrapingPlatform;
+
+const VALID_PLATFORMS = new Set<ScrapingPlatform>([
+  "place",
+  "francmarches",
+  "marchespublicsinfo",
+  "mpe76",
+  "marchesonline",
+  "marchespublicsnormandie",
+  "maregionsud",
+  "departement13",
+]);
 
 interface ScrapeBodyRaw {
   platform?: unknown;
@@ -142,7 +159,7 @@ interface ScrapeBodyRaw {
 }
 
 function isValidPlatform(value: unknown): value is ScrapePlatform {
-  return value === "place" || value === "francmarches";
+  return typeof value === "string" && VALID_PLATFORMS.has(value as ScrapingPlatform);
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -190,11 +207,32 @@ async function runScrapingJob(req: ScrapeRequest, runId: string): Promise<void> 
   try {
     const b = await getBrowser();
 
-    if (req.platform === "francmarches") {
-      tenders = await scrapeFrancmarches(req, b);
-    } else {
-      // platform === "place" — garanti par la validation en amont
-      tenders = await scrapePlace(req, b);
+    switch (req.platform) {
+      case "francmarches":
+        tenders = await scrapeFrancmarches(req, b);
+        break;
+      case "marchespublicsinfo":
+        tenders = await scrapeMarChesPublicsInfo(req, b);
+        break;
+      case "mpe76":
+        tenders = await scrapeMpe76(req, b);
+        break;
+      case "marchesonline":
+        tenders = await scrapeMarchesOnline(req, b);
+        break;
+      case "marchespublicsnormandie":
+        tenders = await scrapeMarChesPublicsNormandie(req, b);
+        break;
+      case "maregionsud":
+        tenders = await scrapeMarEgionSud(req, b);
+        break;
+      case "departement13":
+        tenders = await scrapeDepartement13(req, b);
+        break;
+      default:
+        // "place" — garanti par la validation en amont
+        tenders = await scrapePlace(req, b);
+        break;
     }
 
     console.info(
@@ -239,7 +277,7 @@ app.post<{ Body: ScrapeBodyRaw }>("/v1/scrape", async (request, reply) => {
   if (!isValidPlatform(body.platform)) {
     return reply.code(400).send({
       error: "invalid_platform",
-      message: "platform doit être 'place' ou 'francmarches'",
+      message: `platform doit être l'une de : ${[...VALID_PLATFORMS].join(", ")}`,
     });
   }
   if (!isNonEmptyString(body.profileId)) {
@@ -273,7 +311,12 @@ app.post<{ Body: ScrapeBodyRaw }>("/v1/scrape", async (request, reply) => {
   );
 
   // Réponse immédiate 202 — le scraping se fait en background
-  const estimatedDuration = scrapeReq.platform === "place" ? 120 : 90;
+  const estimatedDuration =
+    scrapeReq.platform === "place" ||
+    scrapeReq.platform === "maregionsud" ||
+    scrapeReq.platform === "departement13"
+      ? 120
+      : 90;
   void reply.code(202).send({ runId, estimatedDuration });
 
   // Lancement en background — process.nextTick pour ne pas bloquer la réponse HTTP

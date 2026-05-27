@@ -5,7 +5,15 @@
  * Ils sont consommés par worker.ts et par chaque module scraper.
  */
 
-export type ScrapingPlatform = "place" | "francmarches";
+export type ScrapingPlatform =
+  | "place"
+  | "francmarches"
+  | "marchespublicsinfo"
+  | "mpe76"
+  | "marchesonline"
+  | "marchespublicsnormandie"
+  | "maregionsud"
+  | "departement13";
 
 export interface ScrapeRequest {
   /** Plateforme cible */
