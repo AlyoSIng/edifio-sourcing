@@ -26,6 +26,8 @@ export const organizations = pgTable(
     name: text("name").notNull(),
     /** SIREN entreprise — unique. NULL si recette (cf. plan_recette_gate7) */
     siren: text("siren").unique(),
+    /** SIRET 14 chars (établissement principal). Utilisé dans DC1, DC2, RIB. */
+    siret: text("siret"),
     /** Config XML-RPC Odoo (credentials via Vault, jamais en clair ici) */
     odooConfig: jsonb("odoo_config").$type<OrganizationOdooConfig>(),
     /**

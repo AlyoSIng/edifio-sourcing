@@ -50,6 +50,8 @@ export const bureauEtudes = pgTable(
     website: text("website"),
     /** SIREN 9 chars (entreprise). */
     siren: text("siren"),
+    /** SIRET 14 chars (établissement). Saisie manuelle ou enrichissement API SIRENE. */
+    siret: text("siret"),
     zip: text("zip"),
     city: text("city"),
     /** Effectif salarié (enrichissement). */
