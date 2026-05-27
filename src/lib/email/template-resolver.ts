@@ -155,7 +155,7 @@ export const TEMPLATE_META: Record<
   },
   tender_summary_to_user: {
     channel: "resend",
-    labelFr: "Récapitulatif AO (Solo)",
+    labelFr: "Récapitulatif AO (Mandataire)",
     requiredVars: [],
   },
   user_provisional_password: {
@@ -299,10 +299,10 @@ Pour toute question, n'hésitez pas à revenir vers moi.
   },
 
   tender_summary_to_user: {
-    subject: "[edifio Sourcing] AO sélectionné en Solo — {{ao_objet}}",
+    subject: "[edifio Sourcing] AO sélectionné en Mandataire — {{ao_objet}}",
     body: `Bonjour {{user_prenom}},
 
-Vous avez sélectionné en Solo l'AO suivant :
+Vous avez sélectionné en Mandataire l'AO suivant :
 
 ▸ {{ao_objet}}
 Acheteur : {{ao_acheteur}}

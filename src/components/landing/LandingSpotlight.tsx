@@ -50,8 +50,8 @@ export function LandingSpotlight() {
         <p className="relative mb-7 max-w-[600px] text-[16px] leading-[1.6] text-white/85">
           Chaque matin à 6 h 30, edifio Sourcing scanne les plateformes de marchés publics, filtre
           selon tes profils de recherche, te livre les AO pertinents triés par score. Tu
-          sélectionnes en un tap. Mode Solo ou Tandem avec architecte cotraitant. L&apos;IA analyse
-          le RC et prépare le dossier en 30 minutes.
+          sélectionnes en un tap. Mode Mandataire ou Cotraitance avec architecte partenaire.
+          L&apos;IA analyse le RC et prépare le dossier en 30 minutes.
         </p>
 
         <Link

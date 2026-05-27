@@ -107,7 +107,7 @@ function EmptyStateReponseSolo() {
       </div>
       <h2 className="font-display text-lg font-semibold text-ink">Aucun AO en mode Mandataire</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-        Sélectionnez un AO en solo depuis{" "}
+        Sélectionnez un AO en mandataire depuis{" "}
         <Link href="/sourcing/ao-du-jour" className="text-brand-red underline underline-offset-2">
           AO du jour
         </Link>{" "}

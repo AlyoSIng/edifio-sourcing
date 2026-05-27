@@ -132,7 +132,7 @@ export default async function DossierPage({ params }: PageProps) {
   const isSolo = data.tender.status === "selected_solo";
   const eyebrow = isSolo
     ? "Dossier de candidature — Mandataire"
-    : "Dossier de candidature — Co-traitant";
+    : "Dossier de candidature — Cotraitance";
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">

@@ -162,7 +162,7 @@ function StatusBadge({ status }: { status: "selected_solo" | "selected_tandem" }
         isSolo ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
       }`}
     >
-      {isSolo ? "Mandataire" : "Co-traitant"}
+      {isSolo ? "Mandataire" : "Cotraitance"}
     </span>
   );
 }

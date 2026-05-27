@@ -25,7 +25,9 @@ interface FaqAccordionProps {
 const CATEGORY_LABELS: Record<string, string> = {
   general: "Général",
   sourcing: "Sourcing",
-  tandem: "Tandem",
+  cotraitance: "Cotraitance",
+  tandem: "Cotraitance",
+  compte: "Compte",
 };
 
 function getCategoryLabel(category: string): string {
