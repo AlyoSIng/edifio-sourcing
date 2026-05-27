@@ -9,6 +9,7 @@ import {
   getTendersOfTheDay,
   type TenderSortOrder,
 } from "@/lib/sourcing/queries";
+import { listSearchProfiles } from "@/lib/profile/search-profiles-queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { EmptyState } from "./EmptyState";
@@ -17,6 +18,7 @@ import { formatTodayLongFr } from "./format";
 import { TenderActionsErrorToast } from "./TenderActionsErrorToast";
 import { TenderCard } from "./TenderCard";
 import { TenderFilterToolbar } from "./TenderFilterToolbar";
+import { ProfileTabs } from "./ProfileTabs";
 
 export const metadata = {
   title: "AO du jour — edifio Sourcing",
@@ -70,7 +72,7 @@ export default async function AoDuJourPage({
   const profile = toUserProfile(user);
 
   // -------------------------------------------------------------------------
-  // Parsing des searchParams (tri + filtres)
+  // Parsing des searchParams (tri + filtres + onglet profil — Tâche #29)
   // -------------------------------------------------------------------------
   const rawSort = String(searchParams.sort ?? "score");
   const sort: TenderSortOrder = (["score", "department", "deadline"] as const).includes(
@@ -87,6 +89,11 @@ export default async function AoDuJourPage({
     ? (rawClosing as 7 | 15 | 30)
     : null;
 
+  // Onglet profil : `?profile=<uuid>`. Si absent, on utilisera le profil par défaut.
+  const rawProfile = searchParams.profile;
+  const requestedProfileId =
+    typeof rawProfile === "string" && rawProfile.length > 0 ? rawProfile : null;
+
   // -------------------------------------------------------------------------
   // Résilience runtime (hotfix PR #22, Board 2026-05-21) — INCHANGÉ
   // -------------------------------------------------------------------------
@@ -98,9 +105,41 @@ export default async function AoDuJourPage({
   let tenders: Awaited<ReturnType<typeof getTendersOfTheDay>> = [];
   let profileName: Awaited<ReturnType<typeof getActiveSearchProfileName>> = null;
   let fetchError: string | null = null;
+  /** Profils actifs pour les onglets (Tâche #29). Vide si erreur ou un seul. */
+  let activeProfiles: Array<{ id: string; name: string; isDefault: boolean }> = [];
+  /** UUID du profil effectivement affiché (résout le profil par défaut si absent) */
+  let activeProfileId: string | null = null;
+
   try {
+    // 1. Charger les profils actifs pour les onglets
+    const profileRows = await listSearchProfiles(ALYOS_ORG_ID, db);
+    activeProfiles = profileRows.map((p) => ({
+      id: p.id,
+      name: p.name,
+      isDefault: p.isDefault,
+    }));
+
+    // 2. Résoudre l'onglet actif :
+    //    - si ?profile=<uuid> valide → l'utiliser
+    //    - sinon → prendre le profil par défaut (isDefault = true)
+    //    - sinon → prendre le premier profil actif
+    if (requestedProfileId && activeProfiles.some((p) => p.id === requestedProfileId)) {
+      activeProfileId = requestedProfileId;
+    } else {
+      const defaultProfile = activeProfiles.find((p) => p.isDefault) ?? activeProfiles[0] ?? null;
+      activeProfileId = defaultProfile?.id ?? null;
+    }
+
+    // 3. Charger les AOs et le nom du profil actif en parallèle
     [tenders, profileName] = await Promise.all([
-      getTendersOfTheDay(ALYOS_ORG_ID, db, { sort, departments, closingDays }),
+      getTendersOfTheDay(ALYOS_ORG_ID, db, {
+        sort,
+        departments,
+        closingDays,
+        // Filtre par profil uniquement si plusieurs profils existent (Tâche #29).
+        // Avec un seul profil, pas de filtre supplémentaire (comportement V1).
+        profileId: activeProfiles.length > 1 ? activeProfileId : null,
+      }),
       getActiveSearchProfileName(ALYOS_ORG_ID, db),
     ]);
   } catch (err) {
@@ -153,6 +192,11 @@ export default async function AoDuJourPage({
           )}
         </p>
       </header>
+
+      {/* Onglets profils — visibles uniquement si plusieurs profils actifs (Tâche #29) */}
+      {!fetchError && activeProfiles.length > 1 ? (
+        <ProfileTabs profiles={activeProfiles} activeProfileId={activeProfileId} />
+      ) : null}
 
       {/* KPI row — 3 cases (cf. M-A lignes 216-221, on retire « différés » MVP) */}
       {!fetchError ? (

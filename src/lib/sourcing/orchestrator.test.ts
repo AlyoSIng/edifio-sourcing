@@ -35,6 +35,8 @@ function makeProfile(overrides: Partial<SearchProfile> = {}): SearchProfile {
     id: "11111111-1111-1111-1111-111111111111",
     organizationId: "22222222-2222-2222-2222-222222222222",
     name: "Profil rénovation BTP",
+    isDefault: true,
+    displayOrder: 0,
     keywords: { positive: ["rénovation"], negative: [], exact: [] },
     cpvCodes: ["45"],
     geoZones: [],

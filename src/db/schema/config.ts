@@ -6,6 +6,11 @@
  * `platforms` est une table de référence (4 lignes seedées dans la migration
  * d'init métier — étape 5 du plan Gate 6 via `pnpm db:seed`). À ce stade
  * on pose juste la structure.
+ *
+ * Migration 0025 (2026-05-27) : ajout des colonnes `is_default` et
+ * `display_order` pour le support multi-profils par organisation (Tâche #29).
+ * Le profil seedé prod `Profil AlyoS BTP` est automatiquement promu
+ * `is_default = true` par la migration (UPDATE sur le plus ancien actif).
  */
 
 import { sql } from "drizzle-orm";
@@ -37,6 +42,20 @@ export const searchProfiles = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /**
+     * Profil par défaut de l'organisation — un seul par org (garanti applicatif
+     * via `setDefaultProfileAction` qui reset les autres à false avant d'activer).
+     * Le profil par défaut est utilisé pour l'onglet actif au premier chargement
+     * de la page AO du jour et pour le cron nocturne si aucun profil n'est
+     * explicitement sélectionné.
+     */
+    isDefault: boolean("is_default").notNull().default(false),
+    /**
+     * Ordre d'affichage des onglets (0 = premier). Permet à l'admin de réordonner
+     * les profils sans supprimer/recréer. Valeur initiale : 0 pour le premier
+     * profil seedé.
+     */
+    displayOrder: integer("display_order").notNull().default(0),
     keywords: jsonb("keywords")
       .$type<SearchProfileKeywords>()
       .notNull()
@@ -74,6 +93,10 @@ export const searchProfiles = pgTable(
     orgActiveIdx: index("idx_search_profiles_org")
       .on(table.organizationId)
       .where(sql`active`),
+    /** Index pour retrouver rapidement le profil par défaut d'une org */
+    orgDefaultIdx: index("idx_search_profiles_org_default")
+      .on(table.organizationId)
+      .where(sql`is_default`),
   }),
 );
 

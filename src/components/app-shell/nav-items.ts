@@ -181,6 +181,13 @@ export const NAV_ITEMS: NavSection[] = [
         adminOnly: true,
       },
       {
+        href: "/sourcing/admin/search-profiles",
+        label: "Multi-profils",
+        icon: "sliders",
+        matchPrefix: "/sourcing/admin/search-profiles",
+        adminOnly: true,
+      },
+      {
         href: "/sourcing/admin/modeles-email",
         label: "Modèles d'e-mail",
         icon: "mail",
