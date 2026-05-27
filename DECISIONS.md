@@ -2,6 +2,107 @@
 
 ---
 
+## 2026-05-27 — Phases 4/5 — Modules profil utilisateur (Nadia / dev_tandem)
+
+- **2026-05-27 · G6 · Nadia (dev_tandem) · feat — 6 modules profil utilisateur opérationnels (commit `43b6398`).**
+  *Actualités : `profil/news/actions.ts` `markNewsReadAction` (UPSERT user_news_reads ON CONFLICT DO NOTHING) + `NewsCard.tsx` (badge Nouveau, expand excerpt, mise à jour optimiste) + `page.tsx` (newsItems publiés + userNewsReads userId).*
+  *Support : `profil/support/actions.ts` `createTicketAction` (validation 200/5000 chars, INSERT support_tickets ALYOS_ORG_ID) + `TicketForm.tsx` + `NewTicketToggle.tsx` + `page.tsx` (liste tickets, badges statut open/in_progress/closed, réponse dépliable `<details>`).*
+  *Formations : `profil/formations/page.tsx` (grille sm:grid-cols-2, badges type/durée, badge "Test disponible" si guided_test associé — lecture seule).*
+  *Tests guidés : `profil/guided-tests/actions.ts` `submitGuidedTestAction` (calcul score QCM auto, INSERT ou UPDATE idempotent, ALYOS_ORG_ID) + `GuidedTestPlayer.tsx` (machine d'état summary/playing/done, QCM radio + open textarea, champ remarques final).*
+  *FAQ : `profil/faq/FaqAccordion.tsx` (accordéon groupé par catégorie, toggle Set\<string\>, chevron CSS) + `page.tsx`.*
+  *Démo : `profil/demo/DemoViewer.tsx` (détection YouTube → iframe embed, mp4 → \<video\>, sinon lien direct, height 55vh) + `page.tsx` (lit app_content key demo_video_url).*
+  *Contraintes respectées : userId re-fetché par page, ALYOS_ORG_ID sur tous les INSERTs, try/catch absorbé partout, layout + ProfilNav non modifiés.*
+
+---
+
+## 2026-05-27 — Bouton "Supprimer" contacts listes Architectes + BE (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — Hard delete architectes + BE depuis les listes (commit `fdabaf6`).**
+  *`deleteArchitectAction` : guard `has_active_solicitations` (architect_responses pending OU match_proposals existants), hard DELETE filtré ALYOS_ORG_ID, audit `architect_edit` operation=delete.*
+  *`deleteBEAction` : idem sans guard be_responses (table inexistante Phase 2 Tandem BET).*
+  *`DeleteArchitectButton.tsx` + `DeleteBEButton.tsx` : confirmation inline 2 clics (idle → confirm → pending), badge rouge erreur `has_active_solicitations`, reload après succès.*
+  *Intégration dans `ArchitectRow` + `BERow` (cellule admin, flex gap-3 avec lien Éditer).*
+  *Décision technique : guard conservatif sur match_proposals (pas de colonne status sur cette table en V1) — blocage si une proposition existe, à affiner en Phase 2 si status ajouté.*
+
+---
+
+## 2026-05-27 — Phase 3 superadmin — Plaquette, Roadmap, Tests guidés (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — 3 modules superadmin Phase 3 (commit `9c6f3b6`).**
+  *Plaquette (`/superadmin/pitch`) : `savePitchUrlAction` (UPSERT app_content key pitch_pdf_url) + `PitchPdfForm.tsx` + `PitchPdfViewer.tsx` (\<object type="application/pdf"\> + lien téléchargement + toggle formulaire).*
+  *Roadmap (`/superadmin/roadmap`) : identique, clé `roadmap_pdf_url`.*
+  *Tests guidés (`/superadmin/guided-tests`) : 5 Server Actions (`createGuidedTestAction`, `updateGuidedTestStepsAction`, `toggleGuidedTestAction`, `deleteGuidedTestAction` avec guard has_submissions, `listGuidedTestSubmissionsAction`) + `StepEditor.tsx` (éditeur QCM inline : 4 options + correctIndex radio, questions ouvertes) + `GuidedTestCard.tsx` (toggle actif, suppression, accordéons étapes + soumissions lazy) + `NewTestToggle.tsx` + `page.tsx` (LEFT JOIN guided_test_submissions, COUNT + AVG score).*
+
+---
+
+## 2026-05-27 — Enrichissement Pappers à l'unité (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — Bouton Pappers unitaire sur fiches contact (commit `05f795b`).**
+  *`enrichSingleArchitectFromPappers(id)` dans `architectes/actions.ts` : lookup SIREN direct ou recherche nom + filtre NAF 711x, met à jour uniquement les champs NULL (siren, headcount, annualRevenue), audit architect_edit, retourne `{ ok, updated, changes, summary }`.*
+  *`enrichSingleBEFromPappers(id)` dans `bureaux-etudes/actions.ts` : idem sur bureauEtudes (siren + headcount uniquement, pas de annualRevenue dans le schema BE).*
+  *`PappersEnrichSingleButton.tsx` (architectes + BE) : état machine idle/pending/done/error, icône éclair amber, badge vert + reload si enrichi, badge gris si déjà complet.*
+  *Placement : section Contact de chaque fiche (après \<dl\>, admin uniquement).*
+
+---
+
+## 2026-05-27 — Phase 2 superadmin — News CRUD + Market Study (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — Modules superadmin Phase 2 (commit `48281af`).**
+  *News (`/superadmin/news`) : `createNewsAction` (INSERT news_items, isPublished=false), `togglePublishAction` (flip isPublished + publishedAt), `deleteNewsAction` (guard) + `NewsForm.tsx` + `NewsToggleWrapper.tsx` + `page.tsx`.*
+  *Market Study (`/superadmin/market-study`) : `saveMarketStudyUrlAction` (UPSERT app_content key market_study_url) + `MarketStudyForm.tsx` + `MarketStudyViewer.tsx` (iframe height 70vh + bouton modifier) + `page.tsx`.*
+
+---
+
+## 2026-05-27 — Fix isAdmin() — superadmin ⊃ admin (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · fix — `isAdmin()` sémantique étendue aux superadmins (commit `8f1b266`).**
+  *Problème : Steve (rôle superadmin) était bloqué sur toutes les pages admin (`/sourcing/admin/*`) car `isAdmin()` ne retournait `true` que pour `role === "admin"`.*
+  *Fix : `isAdmin()` retourne `true` pour `admin` OU `superadmin` (superadmin ⊃ admin). `isSuperAdmin()` reste réservé aux vérifications exclusivement superadmin (routes `/superadmin/*`).*
+  *Le middleware Gate 7 était déjà correct (`profile.role !== "admin" && !isSuperAdmin(profile)`) — seuls les guards page-level (`if (!isAdmin(profile))`) étaient affectés.*
+  *21 occurrences corrigées par le changement unique dans `src/lib/auth/types.ts`.*
+
+---
+
+## 2026-05-27 — CI db-rls — stub auth.uid() manquant (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · fix — Stub `auth.uid()` ajouté dans le workflow CI pgTAP (commit `9d7e674`).**
+  *Problème : migration 0019 utilise `auth.uid()` dans 6 RLS policies ; le step CI "Prepare Supabase auth schema stub" ne créait que `auth.jwt()`, pas `auth.uid()` → crash `42883 function does not exist`.*
+  *Fix : `CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid $$;` ajouté dans `.github/workflows/db-rls.yml`.*
+
+---
+
+## 2026-05-27 — Support module — actions.ts + ReplyForm.tsx (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · fix — Fichiers support module non-trackés git (commit `e900ac9`).**
+  *`superadmin/support/actions.ts` : `replyToTicketAction` (UPDATE status in_progress + response + respondedAt + respondedBy, INSERT user_notifications) + `closeTicketAction`.*
+  *`superadmin/support/ReplyForm.tsx` : formulaire inline avec `useTransition`, textarea + compteur, feedback erreur. CSS corrigé : `bg-brand` → `bg-brand-red`, `focus:border-brand` → `focus:border-brand-red`.*
+  *Cause racine : fichiers créés mais jamais `git add`és — non détectés par le CI.*
+
+---
+
+## 2026-05-27 — Migrations 0019 et 0009 vérifiées en prod (Steve / MCP Supabase)
+
+- **2026-05-27 · G6 · Steve (Board) · ops — Vérification migrations prod via Supabase MCP.**
+  *Migration 0019 (module superadmin) : 9 tables présentes en prod (app_content, faq_items, formations, guided_test_submissions, guided_tests, news_items, support_tickets, user_news_reads, user_notifications). Appliquée manuellement avant cette session.*
+  *Migration 0009 (rls_messaging) : `message_templates` + `organization_profiles` — relrowsecurity=true + relforcerowsecurity=true. Tâche #13 clôturée.*
+
+---
+
+## 2026-05-27 — Bouton "Dédoublonner" pages Architectes et Bureaux d'Études (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · Feature dédoublonnage — détection + suppression doublons annuaires.**
+  *Fichiers créés :*
+  *- `src/app/sourcing/architectes/duplicate-actions.ts` : Server Actions `detectArchitectDuplicatesAction` (query SQL raw `GROUP BY lower(trim(cabinet)) HAVING count > 1`) + `deleteArchitectDuplicateAction` (4 guards : session + isAdmin + UUID v4 + tenant ; 2 contraintes métier : pas de `architect_responses` pending, pas de `match_proposals` actifs).*
+  *- `src/app/sourcing/architectes/DuplicateManager.tsx` : Client Component bandeau warn avec état local optimiste (useTransition + useState). Bouton "Supprimer" sur toutes les entrées sauf la dernière du groupe. Formatage des erreurs retour serveur.*
+  *- `src/app/sourcing/bureaux-etudes/duplicate-be-actions.ts` : même pattern que architectes. Note : pas encore de table `be_responses`/`be_proposals` (Phase 2 Tandem BET) ; la contrainte `has_active_solicitations` n'est pas applicable ; les `be_documents` cascadent automatiquement via FK `ON DELETE CASCADE`.*
+  *- `src/app/sourcing/bureaux-etudes/DuplicateBEManager.tsx` : même pattern que DuplicateManager.*
+  *Fichiers modifiés :*
+  *- `src/app/sourcing/architectes/page.tsx` : import + appel `detectArchitectDuplicatesAction` (try/catch absorbé, uniquement si `adminUser`) + rendu conditionnel `<DuplicateManager>` entre header et FilterBar.*
+  *- `src/app/sourcing/bureaux-etudes/page.tsx` : même intégration avec `DuplicateBEManager`.*
+  *Décision technique : la détection est faite à chaque chargement de page (Server Component, `force-dynamic` déjà en place) plutôt que via un endpoint dédié — cohérent avec le pattern existant et sans état supplémentaire côté client. La suppression se fait via Server Action (pas d'API route dédiée).*
+
+---
+
 ## 2026-05-27 — Module superadmin Phase 1 — fondations BDD + types + middleware + squelettes (Alex)
 
 - **2026-05-27 · G6 · Board · Décision — 3e rôle `superadmin` réservé à l'éditeur edifio (`contact@edifio.fr` + `steissier@alyosingenierie.fr`). `@edifio.fr` autorisé en plus de `@alyosingenierie.fr` dans la garde de domaine. [BOARD-OK 2026-05-27]**
