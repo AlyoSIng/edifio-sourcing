@@ -136,6 +136,14 @@ export const brevoRegister = pgEnum("brevo_register", ["tu", "vous", "neutre"]);
  * `architect_edit`, `architect_import`, `architect_export` ajoutés par
  * migration Lot B (2026-05-25, décision CTO Sophie) — codes A17, A18, A19.
  * Actions admin uniquement : édition fiche, import CSV, export CSV.
+ *
+ * `library_doc_upload`, `library_doc_delete`, `dce_download` ajoutés par
+ * migration 0021 (Bloc C, 2026-05-27) — codes A20, A21, A22.
+ * A20 : upload pièce bibliothèque cotraitant/BE (admin).
+ * A21 : suppression pièce bibliothèque cotraitant/BE (admin).
+ * A22 : téléchargement DCE/RC depuis l'annonce (tous rôles authentifiés).
+ * L'ordre d'ajout est important — `ALTER TYPE ... ADD VALUE` ne peut pas
+ * tourner dans une transaction Postgres (cf. migration 0021).
  */
 export const auditAction = pgEnum("audit_action", [
   "login",
@@ -157,6 +165,9 @@ export const auditAction = pgEnum("audit_action", [
   "architect_edit",
   "architect_import",
   "architect_export",
+  "library_doc_upload",
+  "library_doc_delete",
+  "dce_download",
 ]);
 
 /**

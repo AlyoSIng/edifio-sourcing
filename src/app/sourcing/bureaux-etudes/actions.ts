@@ -475,6 +475,21 @@ export async function uploadBeDocument(
 
     if (!rows[0]) throw new Error("INSERT be_documents returned no row");
 
+    // Audit A20 — library_doc_upload (best-effort, hors transaction)
+    await audit({
+      action: "library_doc_upload",
+      subjectType: "bureau_etudes",
+      subjectId: beId,
+      data: {
+        subject_type: "bureau_etudes",
+        subject_id: beId,
+        kind,
+        file_name: rawFile.name,
+        size_bytes: rawFile.size,
+        storage_path: storagePath,
+      },
+    });
+
     revalidatePath(`/sourcing/bureaux-etudes/${beId}`);
     return { ok: true, data: { id: rows[0].id } };
   } catch (err) {
@@ -505,11 +520,12 @@ export async function deleteBeDocument(
   if (!UUID_SHAPE.test(documentId)) return { ok: false, error: "invalid_input" };
 
   try {
-    // Récupération du chemin Storage + beId avant suppression
+    // Récupération du chemin Storage + métadonnées avant suppression
     const docs = await dbClient
       .select({
         storagePath: beDocuments.storagePath,
         beId: beDocuments.beId,
+        kind: beDocuments.kind,
       })
       .from(beDocuments)
       .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, ALYOS_ORG_ID)))
@@ -517,7 +533,7 @@ export async function deleteBeDocument(
 
     if (!docs[0]) return { ok: false, error: "not_found" };
 
-    const { storagePath, beId } = docs[0];
+    const { storagePath, beId, kind } = docs[0];
 
     // Suppression Storage (best-effort — on continue même si le fichier est déjà absent)
     const supabaseAdmin = createSupabaseAdminClient();
@@ -534,6 +550,20 @@ export async function deleteBeDocument(
     await dbClient
       .delete(beDocuments)
       .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, ALYOS_ORG_ID)));
+
+    // Audit A21 — library_doc_delete (best-effort, hors transaction)
+    await audit({
+      action: "library_doc_delete",
+      subjectType: "bureau_etudes",
+      subjectId: beId,
+      data: {
+        subject_type: "bureau_etudes",
+        subject_id: beId,
+        document_id: documentId,
+        kind,
+        storage_path: storagePath,
+      },
+    });
 
     revalidatePath(`/sourcing/bureaux-etudes/${beId}`);
     return { ok: true };

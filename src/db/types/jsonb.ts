@@ -391,6 +391,53 @@ export interface AuditLogDataArchitectResponse {
 }
 
 /**
+ * A20 — `library_doc_upload` (Bloc C, 2026-05-27).
+ *
+ * Cf. `src/lib/audit/schemas.ts` (libraryDocUploadSchema).
+ * Émise après upload réussi vers Supabase Storage + INSERT BDD dans
+ * `cotraitant_documents` ou `be_documents`.
+ */
+export interface AuditLogDataLibraryDocUpload {
+  subject_type: "cotraitant" | "bureau_etudes";
+  subject_id: string;
+  kind: string;
+  file_name: string;
+  size_bytes: number;
+  storage_path: string;
+}
+
+/**
+ * A21 — `library_doc_delete` (Bloc C, 2026-05-27).
+ *
+ * Cf. `src/lib/audit/schemas.ts` (libraryDocDeleteSchema).
+ * Émise après suppression Storage + BDD d'une pièce bibliothèque.
+ * `storage_path` conservé comme trace même si la suppression Storage
+ * best-effort a échoué.
+ */
+export interface AuditLogDataLibraryDocDelete {
+  subject_type: "cotraitant" | "bureau_etudes";
+  subject_id: string;
+  document_id: string;
+  kind: string;
+  storage_path: string;
+}
+
+/**
+ * A22 — `dce_download` (Bloc C, 2026-05-27).
+ *
+ * Cf. `src/lib/audit/schemas.ts` (dceDownloadSchema).
+ * Émise par `trackDceDownload` quand un utilisateur accède au lien DCE/RC.
+ * `dce_url` loguée pour investigation — ne contient jamais de credentials.
+ * `download_status` : résultat de la tentative côté server action.
+ */
+export interface AuditLogDataDceDownload {
+  tender_id: string;
+  tender_ref: string;
+  dce_url: string;
+  download_status: "success" | "failed_ssrf" | "failed_fetch" | "no_url";
+}
+
+/**
  * Union discriminée fonctionnelle côté app via le champ `action` (colonne
  * dédiée de la table, pas dans le jsonb). On expose ici un type union plat
  * pour le `.$type<>()` Drizzle.
@@ -411,4 +458,7 @@ export type AuditLogData =
   | AuditLogDataAccessAttempt
   | AuditLogDataTenderDefer
   | AuditLogDataTenderReject
-  | AuditLogDataArchitectResponse;
+  | AuditLogDataArchitectResponse
+  | AuditLogDataLibraryDocUpload
+  | AuditLogDataLibraryDocDelete
+  | AuditLogDataDceDownload;

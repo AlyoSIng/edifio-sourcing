@@ -38,6 +38,7 @@ import { brevoMessages } from "@/db/schema/integrations";
 import { organizationProfiles } from "@/db/schema/messaging";
 import { tenders } from "@/db/schema/tenders";
 import type { BrevoClient } from "@/lib/brevo/client";
+import { withTenantContext } from "@/lib/db/with-tenant-context";
 import {
   defaultRegisterFromTutoiement,
   pickBrevoTemplateId,
@@ -149,18 +150,22 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
     return age >= FOLLOWUP_THRESHOLD_MS;
   });
 
-  // Chargement une fois pour toute la boucle (présentation société + nom commercial)
+  // Chargement une fois pour toute la boucle (présentation société + nom commercial).
+  // withTenantContext pose app.current_organization_id pour FORCE RLS
+  // (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md + with-tenant-context.ts).
   let orgPresentationSociete: string | undefined;
   let orgNomCommercial: string | undefined;
   try {
-    const orgRows = await db
-      .select({
-        presentationBlock: organizationProfiles.presentationBlock,
-        commercialName: organizationProfiles.commercialName,
-      })
-      .from(organizationProfiles)
-      .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
-      .limit(1);
+    const orgRows = await withTenantContext(ALYOS_ORG_ID, db, (client) =>
+      client
+        .select({
+          presentationBlock: organizationProfiles.presentationBlock,
+          commercialName: organizationProfiles.commercialName,
+        })
+        .from(organizationProfiles)
+        .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+        .limit(1),
+    );
     const block = orgRows[0]?.presentationBlock;
     if (block) orgPresentationSociete = block;
     const cname = orgRows[0]?.commercialName;

@@ -34,6 +34,10 @@ import { and, eq } from "drizzle-orm";
 
 import type * as schema from "@/db/schema";
 import { messageTemplates } from "@/db/schema/messaging";
+import {
+  withTenantContext,
+  type DrizzleClient as TenantDrizzleClient,
+} from "@/lib/db/with-tenant-context";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -443,16 +447,26 @@ export function createTemplateResolver(db: DrizzleDb, organizationId: string) {
       let body: string;
       let fromDatabase = false;
 
-      // 1. Tentative de chargement depuis la BDD
+      // 1. Tentative de chargement depuis la BDD.
+      // withTenantContext pose app.current_organization_id pour FORCE RLS
+      // (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md + with-tenant-context.ts).
       let dbTemplate: typeof messageTemplates.$inferSelect | undefined;
       try {
-        const rows = await db
-          .select()
-          .from(messageTemplates)
-          .where(
-            and(eq(messageTemplates.organizationId, organizationId), eq(messageTemplates.key, key)),
-          )
-          .limit(1);
+        const rows = await withTenantContext(
+          organizationId,
+          db as unknown as TenantDrizzleClient,
+          (client) =>
+            client
+              .select()
+              .from(messageTemplates)
+              .where(
+                and(
+                  eq(messageTemplates.organizationId, organizationId),
+                  eq(messageTemplates.key, key),
+                ),
+              )
+              .limit(1),
+        );
         dbTemplate = rows[0];
       } catch {
         // BDD non disponible (CI, cold start Edge Function) → fallback silencieux
@@ -490,13 +504,22 @@ export function createTemplateResolver(db: DrizzleDb, organizationId: string) {
       key: TemplateKey,
     ): Promise<{ subject: string; body: string; fromDatabase: boolean; version: number }> {
       try {
-        const rows = await db
-          .select()
-          .from(messageTemplates)
-          .where(
-            and(eq(messageTemplates.organizationId, organizationId), eq(messageTemplates.key, key)),
-          )
-          .limit(1);
+        // withTenantContext pose app.current_organization_id pour FORCE RLS
+        const rows = await withTenantContext(
+          organizationId,
+          db as unknown as TenantDrizzleClient,
+          (client) =>
+            client
+              .select()
+              .from(messageTemplates)
+              .where(
+                and(
+                  eq(messageTemplates.organizationId, organizationId),
+                  eq(messageTemplates.key, key),
+                ),
+              )
+              .limit(1),
+        );
         const row = rows[0];
         if (row) {
           return {

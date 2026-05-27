@@ -21,6 +21,7 @@ import { db } from "@/db/client";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { organizations } from "@/db/schema/organizations";
 import { organizationProfiles } from "@/db/schema/messaging";
+import { withTenantContext } from "@/lib/db/with-tenant-context";
 import { toUserProfile } from "@/lib/auth/types";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
@@ -113,16 +114,20 @@ export default async function CerfaPage({ params }: PageProps) {
       .limit(1);
 
     // 3d. Profil commercial AlyoS (nullable)
-    const [orgProfile] = await db
-      .select({
-        commercialName: organizationProfiles.commercialName,
-        agencyDetails: organizationProfiles.agencyDetails,
-        phone: organizationProfiles.phone,
-        contactEmail: organizationProfiles.contactEmail,
-      })
-      .from(organizationProfiles)
-      .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
-      .limit(1);
+    // withTenantContext pose app.current_organization_id pour FORCE RLS
+    // (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md + with-tenant-context.ts).
+    const [orgProfile] = await withTenantContext(ALYOS_ORG_ID, db, (client) =>
+      client
+        .select({
+          commercialName: organizationProfiles.commercialName,
+          agencyDetails: organizationProfiles.agencyDetails,
+          phone: organizationProfiles.phone,
+          contactEmail: organizationProfiles.contactEmail,
+        })
+        .from(organizationProfiles)
+        .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+        .limit(1),
+    );
 
     // 3e. Fichiers CERFA existants (si déjà validés)
     const { dc1: existingDc1, dc2: existingDc2 } = await loadExistingCerfa(tenderId);

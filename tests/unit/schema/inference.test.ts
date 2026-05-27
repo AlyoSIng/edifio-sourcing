@@ -238,15 +238,17 @@ describe("schema Drizzle v1 — inférence de types", () => {
     expectTypeOf<Row["payload"]>().toEqualTypeOf<NotificationPayload | null>();
   });
 
-  it("audit_logs : data typé AuditLogData (jsonb union) + action enum 19 valeurs", () => {
+  it("audit_logs : data typé AuditLogData (jsonb union) + action enum 22 valeurs", () => {
     type Row = typeof auditLogs.$inferSelect;
     expectTypeOf<Row["data"]>().toEqualTypeOf<AuditLogData | null>();
-    // audit_action = 19 valeurs (cf. audit_log_v1.md).
+    // audit_action = 22 valeurs (cf. audit_log_v1.md).
     // - PR n°5 2026-05-21 : ajout A14 tender_defer + A15 tender_reject.
     // - PR feat/tandem-engine etape 1 2026-05-25 : ajout A16 architect_response
     //   (décision Board 2026-05-22 (b)).
     // - Migration Lot B 2026-05-25 : ajout A17 architect_edit + A18 architect_import
     //   + A19 architect_export (décision CTO Sophie).
+    // - Migration Bloc C 2026-05-27 : ajout A20 library_doc_upload + A21
+    //   library_doc_delete + A22 dce_download.
     expectTypeOf<Row["action"]>().toEqualTypeOf<
       | "login"
       | "membership_change"
@@ -267,6 +269,9 @@ describe("schema Drizzle v1 — inférence de types", () => {
       | "architect_edit"
       | "architect_import"
       | "architect_export"
+      | "library_doc_upload"
+      | "library_doc_delete"
+      | "dce_download"
     >();
     // actor_role est nullable (snapshot)
     // Extension 2026-05-27 : ajout de 'superadmin' (rôle éditeur edifio).

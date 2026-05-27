@@ -22,6 +22,7 @@ import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { organizationProfiles } from "@/db/schema/messaging";
+import { withTenantContext } from "@/lib/db/with-tenant-context";
 
 /* -------------------------------------------------------------------------- */
 /*  Schéma Zod                                                                 */
@@ -165,11 +166,15 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
  */
 export async function loadOrgProfile() {
   try {
-    const rows = await defaultDb
-      .select()
-      .from(organizationProfiles)
-      .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
-      .limit(1);
+    // withTenantContext pose app.current_organization_id pour FORCE RLS
+    // (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md + with-tenant-context.ts).
+    const rows = await withTenantContext(ALYOS_ORG_ID, defaultDb, (client) =>
+      client
+        .select()
+        .from(organizationProfiles)
+        .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+        .limit(1),
+    );
     return rows[0] ?? null;
   } catch {
     return null;

@@ -39,8 +39,10 @@ import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 
 import { db as defaultDb } from "@/db/client";
+import { tenderBriefs } from "@/db/schema/ai";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { audit } from "@/lib/audit";
+import { generateBrief } from "@/lib/ai/generate-brief";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
@@ -534,6 +536,176 @@ export async function excludeTenderAction(
   revalidatePath("/sourcing/ao-du-jour");
 
   return { ok: true };
+}
+
+// ============================================================================
+// 5. trackDceDownload — A22 dce_download
+// ============================================================================
+
+/**
+ * Enregistre en audit log (A22) le clic sur le lien « Accéder au DCE / RC »
+ * d'une TenderCard. Action non-bloquante : retourne toujours `{ ok: true }`.
+ *
+ * Pourquoi une Server Action et pas un simple `<a href>` côté client ?
+ * Le lien DCE est affiché côté RSC dans `TenderCard.tsx` mais la traçabilité
+ * RGPD art. 5 (e) impose de logger les accès aux documents de procédure.
+ * La Server Action est appelée en `onClick` avant l'ouverture de l'onglet.
+ *
+ * Guard SSRF minimal : on rejette les URLs non-http(s) et les IPs privées
+ * (127.0.0.1, 10.x, 192.168.x, 172.16-31.x) pour ne pas exposer le réseau
+ * interne Vercel/Supabase. En cas de rejet, l'audit est quand même émis avec
+ * `download_status: "failed_ssrf"` pour visibilité.
+ *
+ * @param tenderId   UUID de l'AO concerné
+ * @param tenderRef  Référence externe snapshot (ex. `25-AO-00142`)
+ * @param dceUrl     URL DCE/RC à ouvrir (validée côté server)
+ */
+export async function trackDceDownload(
+  tenderId: string,
+  tenderRef: string,
+  dceUrl: string,
+  deps: ActionDeps = {},
+): Promise<ActionResult> {
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const auditFn = deps.auditFn ?? audit;
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+
+  // 2. Validation UUID + tenderRef
+  if (!UUID_SHAPE.test(tenderId) || !tenderRef || tenderRef.trim().length === 0) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  // 3. Guard SSRF minimal — rejette URLs non-http(s) et IPs privées/loopback
+  let downloadStatus: "success" | "failed_ssrf" | "failed_fetch" | "no_url" = "success";
+  try {
+    const parsed = new URL(dceUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      downloadStatus = "failed_ssrf";
+    } else {
+      const hostname = parsed.hostname;
+      const PRIVATE_RANGES =
+        /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|::1$|localhost$)/i;
+      if (PRIVATE_RANGES.test(hostname)) {
+        downloadStatus = "failed_ssrf";
+      }
+    }
+  } catch {
+    // URL invalide → no_url (aucun accès réseau n'a lieu)
+    downloadStatus = "no_url";
+  }
+
+  // 4. Audit A22 (best-effort — ne bloque jamais l'action métier)
+  await auditFn({
+    action: "dce_download",
+    subjectType: "tender",
+    subjectId: tenderId,
+    data: {
+      tender_id: tenderId,
+      tender_ref: tenderRef.trim(),
+      dce_url: dceUrl,
+      download_status: downloadStatus,
+    },
+  });
+
+  return { ok: true };
+}
+
+// ============================================================================
+// 6. generateTenderBriefAction — brief IA à la demande
+// ============================================================================
+
+/**
+ * Génère (ou regénère) le brief IA pour un AO donné.
+ *
+ * Workflow :
+ *  1. Auth check (session + domaine)
+ *  2. Charge le tender pour vérifier org_id + récupérer rawData
+ *  3. Appelle generateBrief(rawData, tenderId, db)
+ *  4. Désactive le brief actif précédent
+ *  5. INSERT nouveau brief dans tender_briefs
+ *  6. revalidatePath('/sourcing/ao-du-jour')
+ *  7. Retourne { ok: true, briefText } ou { ok: false, error }
+ *
+ * Réf : SPEC_ADDENDUM_260524_AO_DU_JOUR_REPORT_ET_BRIEF.md §Exigence 2.
+ */
+export async function generateTenderBriefAction(
+  tenderId: string,
+  deps: ActionDeps = {},
+): Promise<{ ok: boolean; briefText?: string; error?: string }> {
+  const dbInstance = deps.db ?? defaultDb;
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) {
+    return { ok: false, error: authResult.error };
+  }
+
+  // 2. Validation UUID
+  if (!UUID_SHAPE.test(tenderId)) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  // 3. Charge le tender (vérifie org_id + récupère rawData)
+  const [tenderRow] = await dbInstance
+    .select({
+      id: tenders.id,
+      rawData: tenders.rawData,
+    })
+    .from(tenders)
+    .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+    .limit(1);
+
+  if (!tenderRow) {
+    return { ok: false, error: "tender_not_found" };
+  }
+
+  // 4. Appel au module IA
+  const briefResult = await generateBrief(tenderRow.rawData, tenderId, dbInstance);
+
+  if (!briefResult.ok) {
+    console.error("[generateTenderBriefAction:generateBrief:fail]", briefResult);
+    return {
+      ok: false,
+      error:
+        briefResult.error === "no_raw_data"
+          ? "Données brutes BOAMP absentes — brief impossible."
+          : briefResult.error === "prompt_not_seeded"
+            ? "Prompt ao_brief absent en BDD — relancer le seed."
+            : (briefResult.message ?? briefResult.error),
+    };
+  }
+
+  try {
+    // 5. Désactiver l'éventuel brief actif précédent
+    await dbInstance
+      .update(tenderBriefs)
+      .set({ isActive: false })
+      .where(and(eq(tenderBriefs.tenderId, tenderId), eq(tenderBriefs.isActive, true)));
+
+    // 6. INSERT nouveau brief actif
+    await dbInstance.insert(tenderBriefs).values({
+      tenderId,
+      organizationId: ALYOS_ORG_ID,
+      aiRunId: briefResult.runId !== "unknown" ? briefResult.runId : null,
+      content: briefResult.briefText,
+      isActive: true,
+    });
+  } catch (err) {
+    console.error("[generateTenderBriefAction:db:fail]", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Erreur BDD lors de l'enregistrement du brief.",
+    };
+  }
+
+  // 7. Revalidate RSC cache
+  revalidatePath("/sourcing/ao-du-jour");
+
+  return { ok: true, briefText: briefResult.briefText };
 }
 
 // ============================================================================

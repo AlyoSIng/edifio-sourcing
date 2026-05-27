@@ -2,6 +2,19 @@
 
 ---
 
+## 2026-05-27 — Bloc C — audit_action +3 valeurs + helper withTenantContext (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — Bloc C : audit A20/A21/A22 + helper FORCE RLS.**
+  *Enum : 3 valeurs ajoutées en fin de `auditAction` (codes A20-A22) — migration 0021 hors transaction (ALTER TYPE ADD VALUE IF NOT EXISTS).*
+  *Schémas Zod stricts : `libraryDocUploadSchema` (A20), `libraryDocDeleteSchema` (A21), `dceDownloadSchema` (A22) dans `src/lib/audit/schemas.ts`.*
+  *Interfaces TypeScript : `AuditLogDataLibraryDocUpload`, `AuditLogDataLibraryDocDelete`, `AuditLogDataDceDownload` dans `src/db/types/jsonb.ts` + union `AuditLogData`.*
+  *Audit branché côté server actions : `uploadCotraitantDocument` (A20), `deleteCotraitantDocument` (A21) dans `cotraitants/actions.ts` ; `uploadBeDocument` (A20), `deleteBeDocument` (A21) dans `bureaux-etudes/actions.ts` ; `trackDceDownload` (A22) créée dans `ao-du-jour/actions.ts` avec guard SSRF minimal (rejette non-https + IPs privées).*
+  *Helper `withTenantContext` créé dans `src/lib/db/with-tenant-context.ts` : pose `SET LOCAL app.current_organization_id` avant chaque lecture sur tables FORCE RLS (`message_templates`, `organization_profiles`). Appliqué dans 6 call-sites : `modeles-email/actions.ts`, `societe/actions.ts`, `tandem/actions.ts`, `followup-cron.ts`, `cerfa/page.tsx`, `email/template-resolver.ts` (2 méthodes).*
+  *Tests mis à jour : `schemas.test.ts` (22 actions), `followup-cron.test.ts` (mock `execute`), `inference.test.ts` (22 valeurs enum).*
+  *ESLint : import `sql` inutilisé retiré de `superadmin/formations/actions.ts`.*
+
+---
+
 ## 2026-05-27 — Phases 4/5 — Modules profil utilisateur (Nadia / dev_tandem)
 
 - **2026-05-27 · G6 · Nadia (dev_tandem) · feat — 6 modules profil utilisateur opérationnels (commit `43b6398`).**

@@ -54,6 +54,7 @@ import {
 } from "@/db/schema/selections";
 import { brevoMessages } from "@/db/schema/integrations";
 import { organizationProfiles } from "@/db/schema/messaging";
+import { withTenantContext } from "@/lib/db/with-tenant-context";
 import { tenders } from "@/db/schema/tenders";
 import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
@@ -610,17 +611,21 @@ export async function sendArchitectSolicitation(
 
   // Chargement de la présentation société + nom commercial depuis organization_profiles (lot D acté).
   // Fallback silencieux sur PRESENTATION_SOCIETE_HTML_DEFAULT / "AlyoS Ingénierie" si absent en BDD.
+  // withTenantContext pose app.current_organization_id pour FORCE RLS
+  // (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md + with-tenant-context.ts).
   let presentationSociete: string | undefined;
   let nomCommercial: string | undefined;
   try {
-    const orgRows = await db
-      .select({
-        presentationBlock: organizationProfiles.presentationBlock,
-        commercialName: organizationProfiles.commercialName,
-      })
-      .from(organizationProfiles)
-      .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
-      .limit(1);
+    const orgRows = await withTenantContext(ALYOS_ORG_ID, db, (client) =>
+      client
+        .select({
+          presentationBlock: organizationProfiles.presentationBlock,
+          commercialName: organizationProfiles.commercialName,
+        })
+        .from(organizationProfiles)
+        .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+        .limit(1),
+    );
     const block = orgRows[0]?.presentationBlock;
     if (block) presentationSociete = block;
     const cname = orgRows[0]?.commercialName;

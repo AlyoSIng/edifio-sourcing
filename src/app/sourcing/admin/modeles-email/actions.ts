@@ -39,6 +39,7 @@ import {
   type TemplateKey,
 } from "@/lib/email/template-resolver";
 import { messageTemplates } from "@/db/schema/messaging";
+import { withTenantContext } from "@/lib/db/with-tenant-context";
 
 /* -------------------------------------------------------------------------- */
 /*  Schéma Zod                                                                 */
@@ -141,12 +142,18 @@ export async function saveTemplateAction(formData: FormData): Promise<SaveTempla
 
   // 4. UPSERT en BDD
   try {
-    // On calcule la prochaine version en lisant la courante d'abord
-    const existing = await defaultDb
-      .select({ version: messageTemplates.version })
-      .from(messageTemplates)
-      .where(and(eq(messageTemplates.organizationId, ALYOS_ORG_ID), eq(messageTemplates.key, key)))
-      .limit(1);
+    // On calcule la prochaine version en lisant la courante d'abord.
+    // withTenantContext pose app.current_organization_id pour les tables
+    // avec FORCE ROW LEVEL SECURITY (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md).
+    const existing = await withTenantContext(ALYOS_ORG_ID, defaultDb, (client) =>
+      client
+        .select({ version: messageTemplates.version })
+        .from(messageTemplates)
+        .where(
+          and(eq(messageTemplates.organizationId, ALYOS_ORG_ID), eq(messageTemplates.key, key)),
+        )
+        .limit(1),
+    );
 
     const nextVersion = existing[0] ? existing[0].version + 1 : 1;
     const channel = TEMPLATE_META[key as TemplateKey].channel;

@@ -126,6 +126,9 @@ function makeMockDb(opts: {
         insertedBrevoMessages.push(v);
       },
     })),
+    // Requis par withTenantContext (pose app.current_organization_id via SET LOCAL).
+    // En mock, on ignore silencieusement l'instruction SET CONFIG.
+    execute: vi.fn(async () => []),
   } as unknown as Parameters<typeof runTandemFollowups>[0]["db"];
 
   return {

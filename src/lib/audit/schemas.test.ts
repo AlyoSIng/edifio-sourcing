@@ -408,12 +408,14 @@ describe("placeholders (9 actions non-strictes)", () => {
 // ----------------------------------------------------------------------------
 
 describe("AUDIT_ACTIONS + AUDIT_SCHEMAS — couverture", () => {
-  it("AUDIT_ACTIONS contient exactement 19 actions (migration Lot B 2026-05-25 : A17-A19)", () => {
+  it("AUDIT_ACTIONS contient exactement 22 actions (migration Bloc C 2026-05-27 : A20-A22)", () => {
     // A1-A13 (initial) + A14 tender_defer + A15 tender_reject (PR n°5 2026-05-21)
     // + A16 architect_response (Tandem étape 1 2026-05-25)
     // + A17 architect_edit + A18 architect_import + A19 architect_export
     //   (décision CTO Sophie, migration Lot B 2026-05-25)
-    expect(AUDIT_ACTIONS).toHaveLength(19);
+    // + A20 library_doc_upload + A21 library_doc_delete + A22 dce_download
+    //   (Bloc C, migration 0021, 2026-05-27)
+    expect(AUDIT_ACTIONS).toHaveLength(22);
   });
 
   it("chaque action dans AUDIT_ACTIONS a un schéma dans AUDIT_SCHEMAS", () => {
@@ -422,7 +424,7 @@ describe("AUDIT_ACTIONS + AUDIT_SCHEMAS — couverture", () => {
     }
   });
 
-  it("AUDIT_SCHEMAS n'a pas de clef en plus que les 19 actions", () => {
+  it("AUDIT_SCHEMAS n'a pas de clef en plus que les 22 actions", () => {
     const schemaKeys = Object.keys(AUDIT_SCHEMAS).sort();
     const expectedKeys = [...AUDIT_ACTIONS].sort();
     expect(schemaKeys).toEqual(expectedKeys);
@@ -438,6 +440,12 @@ describe("AUDIT_ACTIONS + AUDIT_SCHEMAS — couverture", () => {
     expect(AUDIT_ACTIONS).toContain("architect_edit");
     expect(AUDIT_ACTIONS).toContain("architect_import");
     expect(AUDIT_ACTIONS).toContain("architect_export");
+  });
+
+  it("AUDIT_ACTIONS contient library_doc_upload (A20), library_doc_delete (A21), dce_download (A22)", () => {
+    expect(AUDIT_ACTIONS).toContain("library_doc_upload");
+    expect(AUDIT_ACTIONS).toContain("library_doc_delete");
+    expect(AUDIT_ACTIONS).toContain("dce_download");
   });
 });
 

@@ -35,6 +35,7 @@ import {
   type CotraitantDocument,
   type CotraitantDocumentKind,
 } from "@/db/schema/cotraitants";
+import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
@@ -425,6 +426,21 @@ export async function uploadCotraitantDocument(
 
     if (!rows[0]) throw new Error("INSERT cotraitant_documents returned no row");
 
+    // Audit A20 — library_doc_upload (best-effort, hors transaction)
+    await audit({
+      action: "library_doc_upload",
+      subjectType: "cotraitant",
+      subjectId: cotraitantId,
+      data: {
+        subject_type: "cotraitant",
+        subject_id: cotraitantId,
+        kind,
+        file_name: rawFile.name,
+        size_bytes: rawFile.size,
+        storage_path: storagePath,
+      },
+    });
+
     revalidatePath(`/sourcing/ao/${tenderId}/tandem/cotraitant`);
     revalidatePath("/sourcing/cotraitants");
     return { ok: true, data: { id: rows[0].id } };
@@ -454,11 +470,13 @@ export async function deleteCotraitantDocument(
   if (!UUID_SHAPE.test(documentId)) return { ok: false, error: "invalid_input" };
 
   try {
-    // Récupération du chemin Storage avant suppression
+    // Récupération du chemin Storage + métadonnées avant suppression
     const docs = await dbClient
       .select({
         storagePath: cotraitantDocuments.storagePath,
         tenderId: cotraitantDocuments.tenderId,
+        cotraitantId: cotraitantDocuments.cotraitantId,
+        kind: cotraitantDocuments.kind,
       })
       .from(cotraitantDocuments)
       .where(
@@ -471,7 +489,7 @@ export async function deleteCotraitantDocument(
 
     if (!docs[0]) return { ok: false, error: "not_found" };
 
-    const { storagePath, tenderId } = docs[0];
+    const { storagePath, tenderId, cotraitantId, kind } = docs[0];
 
     // Suppression Storage (best-effort — on continue même si le fichier est déjà absent)
     const supabaseAdmin = createSupabaseAdminClient();
@@ -493,6 +511,20 @@ export async function deleteCotraitantDocument(
           eq(cotraitantDocuments.organizationId, ALYOS_ORG_ID),
         ),
       );
+
+    // Audit A21 — library_doc_delete (best-effort, hors transaction)
+    await audit({
+      action: "library_doc_delete",
+      subjectType: "cotraitant",
+      subjectId: cotraitantId,
+      data: {
+        subject_type: "cotraitant",
+        subject_id: cotraitantId,
+        document_id: documentId,
+        kind,
+        storage_path: storagePath,
+      },
+    });
 
     if (tenderId) revalidatePath(`/sourcing/ao/${tenderId}/tandem/cotraitant`);
     revalidatePath("/sourcing/cotraitants");

@@ -32,7 +32,7 @@ import { z } from "zod";
 // ============================================================================
 
 /**
- * Liste fermée des 19 actions sensibles tracées en audit log.
+ * Liste fermée des 22 actions sensibles tracées en audit log.
  *
  * IMPORTANT : tout ajout ici nécessite :
  *  - bump du payload spec `audit_log_v1.md`
@@ -71,6 +71,13 @@ export const AUDIT_ACTIONS = [
   "architect_edit",
   "architect_import",
   "architect_export",
+  // A20-A22 — Bloc C bibliothèque + DCE (migration 0021, 2026-05-27).
+  // `library_doc_upload` : upload pièce bibliothèque cotraitant/BE (admin).
+  // `library_doc_delete` : suppression pièce bibliothèque cotraitant/BE (admin).
+  // `dce_download`       : téléchargement DCE/RC depuis l'annonce (tous rôles).
+  "library_doc_upload",
+  "library_doc_delete",
+  "dce_download",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -377,6 +384,79 @@ const architectImportSchema = placeholder;
 const architectExportSchema = placeholder;
 
 /**
+ * A20 — `library_doc_upload` (STRICT — Bloc C, 2026-05-27).
+ *
+ * Déclenchée après un upload réussi vers Supabase Storage + INSERT BDD dans
+ * `cotraitant_documents` ou `be_documents` (admin).
+ *
+ * Contraintes :
+ *  - `subject_type` : discrimine le type de bibliothèque (`cotraitant` ou
+ *    `bureau_etudes`)
+ *  - `subject_id`   : UUID du cotraitant ou du bureau d'études
+ *  - `kind`         : catégorie du document (CotraitantDocumentKind /
+ *    BeDocumentKind — valeur libre max 64 chars côté schéma audit)
+ *  - `file_name`    : nom original du fichier (max 255 chars)
+ *  - `size_bytes`   : taille en octets (entier >= 0)
+ *  - `storage_path` : chemin Storage construit côté server action
+ */
+const libraryDocUploadSchema = z.object({
+  subject_type: z.enum(["cotraitant", "bureau_etudes"]),
+  subject_id: z.string().uuid(),
+  kind: z.string().min(1).max(64),
+  file_name: z.string().min(1).max(255),
+  size_bytes: z.number().int().nonnegative(),
+  storage_path: z.string().min(1),
+});
+
+/**
+ * A21 — `library_doc_delete` (STRICT — Bloc C, 2026-05-27).
+ *
+ * Déclenchée après suppression Storage + BDD d'une pièce bibliothèque
+ * cotraitant ou BE (admin).
+ *
+ * Contraintes :
+ *  - `subject_type`  : discriminant type bibliothèque
+ *  - `subject_id`    : UUID du cotraitant ou du bureau d'études
+ *  - `document_id`   : UUID du document supprimé (snapshot pour RGPD/audit)
+ *  - `kind`          : catégorie du document
+ *  - `storage_path`  : chemin Storage supprimé (utile si suppression Storage
+ *    best-effort échoue — la trace reste dans l'audit)
+ */
+const libraryDocDeleteSchema = z.object({
+  subject_type: z.enum(["cotraitant", "bureau_etudes"]),
+  subject_id: z.string().uuid(),
+  document_id: z.string().uuid(),
+  kind: z.string().min(1).max(64),
+  storage_path: z.string().min(1),
+});
+
+/**
+ * A22 — `dce_download` (STRICT — Bloc C, 2026-05-27).
+ *
+ * Déclenchée par la Server Action `trackDceDownload` quand un utilisateur
+ * clique le lien « Accéder au DCE / RC » sur une TenderCard. L'action
+ * enregistre la tentative même si le lien est invalide (download_status
+ * != 'success'). Tracé RGPD-friendly : l'URL est loguée pour investigation
+ * mais ne contient pas de credentials.
+ *
+ * Contraintes :
+ *  - `tender_id`        : UUID de l'AO concerné
+ *  - `tender_ref`       : référence externe snapshot (utile si tender supprimé)
+ *  - `dce_url`          : URL du DCE/RC (validée comme URL)
+ *  - `download_status`  : résultat de la tentative
+ *    - `success`        : redirection effectuée sans erreur côté server
+ *    - `failed_ssrf`    : URL rejetée par le guard SSRF
+ *    - `failed_fetch`   : fetch distant a échoué
+ *    - `no_url`         : pas d'URL DCE dans l'AO
+ */
+const dceDownloadSchema = z.object({
+  tender_id: z.string().uuid(),
+  tender_ref: z.string().min(1),
+  dce_url: z.string().url(),
+  download_status: z.enum(["success", "failed_ssrf", "failed_fetch", "no_url"]),
+});
+
+/**
  * A16 — `architect_response` (STRICT — Tandem étape 1+3, code alloué Board
  * 2026-05-22 (b)).
  *
@@ -434,6 +514,9 @@ export const AUDIT_SCHEMAS = {
   architect_edit: architectEditSchema,
   architect_import: architectImportSchema,
   architect_export: architectExportSchema,
+  library_doc_upload: libraryDocUploadSchema,
+  library_doc_delete: libraryDocDeleteSchema,
+  dce_download: dceDownloadSchema,
 } as const satisfies Record<AuditAction, z.ZodTypeAny>;
 
 // ============================================================================
@@ -461,6 +544,9 @@ export type AuditLogDataFor<A extends AuditAction> = z.infer<(typeof AUDIT_SCHEM
 export {
   architectResponseSchema,
   architectSolicitSchema,
+  dceDownloadSchema,
+  libraryDocDeleteSchema,
+  libraryDocUploadSchema,
   tenderDeferSchema,
   tenderRejectSchema,
   tenderSelectSchema,
