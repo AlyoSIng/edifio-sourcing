@@ -2,6 +2,17 @@
 
 ---
 
+## 2026-05-27 — Backfill departments prod + fix extractDepartment (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · fix — champ BOAMP réel `code_departement` (commit `991cbee`).**
+  *Constat terrain : le payload Opendatasoft stocke le département dans `code_departement` (array `["74"]`) et non dans `departement` (legacy). Les 107 tenders prod avaient `department IS NULL`.*
+  *Backfill SQL direct via Supabase MCP : `UPDATE tenders SET department = LPAD(code_departement[0], 2, '0')` avec padding 1-chiffre → `"06"`. 107/107 mis à jour.*
+  *Fix TypeScript : `extractDepartment()` dans `matching.ts` étendu pour lire `code_departement` en priorité (array ou string), padding 1→2 chiffres. Fallback `departement` (legacy) conservé.*
+  *JSDoc `derive-department.ts` mis à jour (note terrain : CP absent du payload Opendatasoft).*
+  *53 tests Vitest verts post-fix.*
+
+---
+
 ## 2026-05-27 — Renommage vocabulaire UI Solo→Mandataire / Tandem→Cotraitance (Alex)
 
 - **2026-05-27 · G6 · Alex (dev) · feat — labels UI alignés sur vocabulaire métier définitif (commit `717f3da`).**
