@@ -1,0 +1,78 @@
+# === edifio Sourcing — .gitignore ===
+
+# --- Secrets (JAMAIS commit) ---
+.env
+.env.local
+.env.*.local
+.env.development
+.env.preview
+.env.production
+
+# --- PII architectes / bases nominatives (JAMAIS commit — cf. specs/rgpd_registre_architectes_DRAFT.md) ---
+# Source Odoo brute (~3805 cabinets, ~1900 emails, ~1750 noms dirigeants)
+Contact_complete*.xlsx
+Contact_complete*.csv
+# Tout export PII via le round-trip admin (export/ré-import Excel/CSV)
+*_PII*
+# Le dossier seed ne doit JAMAIS accueillir de XLSX/CSV PII
+src/db/seed/*.xlsx
+src/db/seed/*.csv
+src/db/seed/architects_real*
+
+# --- Dépendances ---
+node_modules/
+.pnp
+.pnp.*
+.yarn/install-state.gz
+
+# --- Build Next.js ---
+.next/
+out/
+build/
+dist/
+
+# --- Plateformes ---
+.vercel/
+.turbo/
+.supabase/
+
+# --- Tests ---
+coverage/
+playwright-report/
+test-results/
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- TypeScript ---
+*.tsbuildinfo
+next-env.d.ts
+
+# --- OS / éditeurs ---
+.DS_Store
+Thumbs.db
+*.swp
+*.pem
+.idea/
+.vscode/
+
+# --- Claude Code local (settings.json projet committé, .local non) ---
+.claude/settings.local.json
+
+# --- Dossier backups/ (sauvegardes locales, JAMAIS commit) ---
+backups/
+
+# --- Dossier tmp/ — analyses jetables, rapports d'import, parsing XLSX local ---
+# Recommandation Nadia 2026-05-25 (CC_260525_0326) : tout ce qui est dans tmp/
+# est strictement local, jamais commit (analyses PII Contact_complete.xlsx,
+# rapports d'import architectes, dezip XLSX, etc.).
+tmp/
+
+# --- Seed fixtures et rapport distribution (decision Board etape 5) ---
+# Aucun ignore : `src/db/seed/fixtures/boamp-real.json` et
+# `src/db/seed/distribution-report.json` SONT committes (condition 2 CTO ADR-013).
+# On laisse cette ligne pour documenter l'intention.
