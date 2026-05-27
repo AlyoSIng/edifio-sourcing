@@ -2,6 +2,19 @@
 
 ---
 
+## 2026-05-27 — Validations Board : buckets Supabase + SLA support + fix pnpm 11 Docker
+
+- **2026-05-27 · G6 · Steve (Board) · validation — Buckets Supabase Storage validés par CTO Sophie.**
+  *`app-assets` (public) + `tender_documents` (private) : création à effectuer par Steve dans le dashboard Supabase. Handoff `ANSWER_260527_CTO_BUCKET_APP_ASSETS.md` reçu et acté.*
+
+- **2026-05-27 · G6 · Board · validation — SLA support validé : « Réponse sous 1 jour ouvré ».*
+  *Libellé affiché dans la page support profil utilisateur. Handoff `ANSWER_260527_BOARD_SLA_SUPPORT.md` acté.*
+
+- **2026-05-27 · G6 · Yann (ps_operator) · fix — pnpm 11 build scripts Docker.**
+  *pnpm 11 bloque les build scripts par défaut (`[ERR_PNPM_IGNORED_BUILDS]`). Fix : ajout `pnpm.onlyBuiltDependencies: ["esbuild", "sharp", "unrs-resolver"]` dans `package.json`. Résout les builds Fly.io et tout contexte Docker utilisant `pnpm@latest`.*
+
+---
+
 ## 2026-05-27 — Journal __drizzle_migrations prod — hashes 0023 + 0024 (Steve / MCP Supabase)
 
 - **2026-05-27 · G6 · Steve (Board) · ops — Enregistrement migrations 0023 et 0024 dans `drizzle.__drizzle_migrations`.**

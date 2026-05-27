@@ -1,4 +1,7 @@
-# esbuild : binaire natif désactivé — JS pur suffit, sécurité par défaut (arbitrage CTO 2026-05-18)
+# pnpm 11 — allowBuilds : liste explicite des packages autorisés à exécuter des build scripts.
+# Décision CTO 2026-05-18 : esbuild en JS pur — build script natif désactivé.
+# sharp et unrs-resolver nécessitent leurs binaires natifs (images + résolution).
+# Ref : https://pnpm.io/settings#allowbuilds
 allowBuilds:
   esbuild: false
   sharp: true

@@ -17,7 +17,8 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 
 # Étape dépendances (cache friendly).
-COPY package.json pnpm-lock.yaml* ./
+# pnpm-workspace.yaml contient la liste onlyBuiltDependencies (pnpm 11+).
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 RUN pnpm install --prod=false --frozen-lockfile=false
 
 # Étape code source.
