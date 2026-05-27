@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Étude de marché v5 — edifio Sourcing : Mandataire, Cotraitance & Conception-Réalisation</title>
+<style>
+  :root { --paper:#FFFFFF; --paper-alt:#FAFAF8; --ink:#1A1A1A; --ink-muted:#5C5C5C; --line:#E5E5E5; --alyos-red:#C8002A; --pill-bg:#FFE5EA; --pill-fg:#C8002A; --positive:#2D8659; --warning:#B5781C; --negative:#B83333; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:"Inter",-apple-system,BlinkMacSystemFont,sans-serif; font-size:11pt; line-height:1.5; }
+  body { max-width:210mm; margin:0 auto; padding:25mm 18mm; }
+  h1, h2, h3, h4 { font-family:"Space Grotesk","Inter",sans-serif; color:var(--ink); margin-top:1.5em; margin-bottom:0.5em; letter-spacing:-0.02em; }
+  h1 { font-size:30pt; line-height:1.05; margin-top:0; border-bottom:3px solid var(--alyos-red); padding-bottom:0.3em; }
+  h1 .accent { color:var(--alyos-red); }
+  h2 { font-size:17pt; margin-top:2em; padding-top:0.5em; border-top:1px solid var(--line); }
+  h3 { font-size:13pt; color:var(--alyos-red); }
+  h4 { font-size:11pt; font-weight:600; margin-bottom:0.25em; }
+  p { margin:0.5em 0 1em; }
+  ul, ol { margin:0.5em 0 1em; padding-left:1.5em; }
+  li { margin-bottom:0.3em; }
+  .pill { display:inline-block; background:var(--pill-bg); color:var(--pill-fg); padding:3px 10px; border-radius:20px; font-size:9pt; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }
+  .meta { color:var(--ink-muted); font-size:10pt; }
+  .meta strong { color:var(--ink); }
+  table { width:100%; border-collapse:collapse; margin:1em 0 1.5em; font-size:10pt; page-break-inside:avoid; }
+  table th, table td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table th { background:var(--paper-alt); font-weight:600; font-size:9.5pt; text-transform:uppercase; letter-spacing:0.04em; border-bottom:2px solid var(--ink); }
+  table tr:nth-child(even) td { background:var(--paper-alt); }
+  table td.num, table th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  table td.center, table th.center { text-align:center; }
+  table tr.total td { font-weight:700; background:var(--pill-bg) !important; border-top:2px solid var(--ink); }
+  .box { background:var(--paper-alt); border-left:4px solid var(--alyos-red); padding:12px 16px; margin:1em 0 1.5em; border-radius:0 4px 4px 0; }
+  .box.positive { border-left-color:var(--positive); }
+  .box.warning { border-left-color:var(--warning); }
+  .box h4 { margin-top:0; }
+  .kpi-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:1em 0 1.5em; }
+  .kpi { background:var(--paper-alt); border:1px solid var(--line); padding:14px; border-radius:6px; }
+  .kpi .label { font-size:9pt; color:var(--ink-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .kpi .value { font-family:"Space Grotesk",sans-serif; font-size:20pt; font-weight:700; color:var(--alyos-red); line-height:1; }
+  .kpi .unit { font-size:9.5pt; color:var(--ink-muted); margin-top:4px; }
+  .feat { background:var(--paper-alt); border:1px solid var(--line); border-left:4px solid var(--positive); border-radius:6px; padding:12px 16px; margin:0.8em 0; page-break-inside:avoid; }
+  .feat .head { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+  .feat .title { font-weight:600; font-size:11pt; font-family:"Space Grotesk",sans-serif; }
+  .feat .tag { margin-left:auto; background:var(--positive); color:white; font-size:8.5pt; padding:2px 8px; border-radius:4px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+  .feat.new-cap { border-left-color:var(--alyos-red); }
+  .feat.new-cap .tag { background:var(--alyos-red); }
+  .feat .body { font-size:10pt; line-height:1.5; }
+  .toc { background:var(--paper-alt); padding:16px 24px; border-radius:6px; margin:1em 0 2em; font-size:10pt; }
+  .toc ol { padding-left:1.5em; }
+  .footer-note { margin-top:3em; padding-top:1em; border-top:1px solid var(--line); color:var(--ink-muted); font-size:9pt; font-style:italic; }
+  .page-break { page-break-after:always; }
+  .chart-container { margin:1.5em 0; background:var(--paper-alt); padding:16px; border-radius:6px; border:1px solid var(--line); }
+  .chart-container .chart-title { font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:11pt; margin-bottom:12px; }
+  @media print { body { padding:15mm 12mm; max-width:100%; } h2 { page-break-after:avoid; } table, .kpi-grid, .box, .chart-container, .feat { page-break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<!-- ========= PAGE DE GARDE ========= -->
+<div>
+  <span class="pill">Étude de marché · v5.0 — terminologie produit + conception-réalisation</span>
+  <h1>edifio <span class="accent">Sourcing</span><br>Trois façons de répondre : mandataire, cotraitance, conception-réalisation</h1>
+  <p class="meta">
+    <strong>Auteurs</strong> : [CMO Léa] (positionnement) + [CEO Marc] (modèle financier) + [CTO Sophie] (produit &amp; coûts)<br>
+    <strong>Date</strong> : 2026-05-27 · v5.0<br>
+    <strong>Statut</strong> : v5.0 — usage interne Board AlyoS Ingénierie<br>
+    <strong>Changements vs v4</strong> :
+    <ul style="margin-top:6px;">
+      <li><strong>Retrait du branding « Solo » / « Tandem »</strong> (plus utilisés dans l'app), remplacés par les trois configurations métier réelles de l'interface : <strong>Mandataire</strong> (réponse en propre), <strong>Cotraitance</strong>, <strong>Conception-Réalisation</strong>.</li>
+      <li><strong>Ajout de la capacité Conception-Réalisation</strong> : montage de groupements sur marchés globaux (maîtrise d'œuvre + entreprise(s)), terrain naturel d'AlyoS Ingénierie.</li>
+      <li>Modèle financier <strong>inchangé vs v4</strong> (churn 12 %, coût variable 35 €, EBITDA An 5 +987 k€) — la mise à jour porte sur la terminologie et le périmètre produit, pas sur les hypothèses chiffrées.</li>
+    </ul>
+  </p>
+  <p class="meta" style="font-style:italic;">Terminologie : cette étude décrit les capacités produit par leur nature (commande publique), pas par d'anciens noms commerciaux. Si les libellés exacts de l'interface diffèrent, ils seront alignés sur ce vocabulaire.</p>
+</div>
+
+<div class="box positive">
+  <h4>Synthèse financière (inchangée vs v4)</h4>
+  <table style="margin:0;">
+    <tr style="background:transparent;"><th>Indicateur</th><th class="num">v3</th><th class="num">v4</th><th class="num">v5</th></tr>
+    <tr><td>ARPU mensuel moyen</td><td class="num">261,5 €</td><td class="num">261,5 €</td><td class="num">261,5 €</td></tr>
+    <tr><td>Churn annuel</td><td class="num">15 %</td><td class="num">12 %</td><td class="num">12 %</td></tr>
+    <tr><td>Coût variable / client / mois</td><td class="num">31 €</td><td class="num">35 €</td><td class="num">35 €</td></tr>
+    <tr><td>Clients fin An 5</td><td class="num">375</td><td class="num">456</td><td class="num">456</td></tr>
+    <tr><td>ARR An 5</td><td class="num">1,18 M€</td><td class="num">1,43 M€</td><td class="num">1,43 M€</td></tr>
+    <tr><td>EBITDA An 5</td><td class="num">+824 k€</td><td class="num">+987 k€</td><td class="num">+987 k€</td></tr>
+  </table>
+</div>
+
+<div class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li>Résumé exécutif v5</li>
+    <li>Le produit livré : trois configurations de réponse</li>
+    <li>Conception-Réalisation : nouveau terrain de jeu</li>
+    <li>Flywheel cross-app &amp; CRM Contacts</li>
+    <li>Rétention &amp; onboarding</li>
+    <li>Prévisionnel 5 ans (rappel v4)</li>
+    <li>Décision stratégique : console superadmin unifiée</li>
+    <li>Recommandation Board v5</li>
+  </ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 1. RÉSUMÉ ========= -->
+<h2>1. Résumé exécutif v5</h2>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="label">Cible 5 ans (clients)</div><div class="value">456</div><div class="unit">ARR ~1,43 M€</div></div>
+  <div class="kpi"><div class="label">EBITDA An 5</div><div class="value">+987 k€</div><div class="unit">~82 % de marge</div></div>
+  <div class="kpi"><div class="label">Configurations de réponse</div><div class="value">3</div><div class="unit">mandataire · cotraitance · conception-réalisation</div></div>
+</div>
+
+<h3>Conclusions clés v5</h3>
+<ol>
+  <li><strong>Le produit ne se raconte plus en « Solo / Tandem ».</strong> Il se décrit par la façon dont l'utilisateur répond à un marché : <strong>Mandataire</strong> (réponse en propre, seul), <strong>Cotraitance</strong> (avec un architecte / une maîtrise d'œuvre), ou <strong>Conception-Réalisation</strong> (groupement où AlyoS assure la maîtrise d'œuvre et coordonne un partenaire réalisateur). C'est un langage que les acheteurs publics et les entreprises BTP comprennent immédiatement.</li>
+  <li><strong>La conception-réalisation élargit le marché adressable.</strong> Les marchés globaux (conception-réalisation, marchés de performance) montent en puissance dans la commande publique. AlyoS Ingénierie, en tant que bureau d'ingénierie, est précisément à sa place pour monter ces groupements — c'est une capacité différenciante de plus, au-delà de la cotraitance classique.</li>
+  <li><strong>Le moat reste intact et tangible.</strong> Shortlist d'architectes avec scoring géographique, bibliothèque cotraitants, coffre documentaire BET, CRM Contacts : aucun concurrent (Vecteur Plus, Klekoon, Doublet) ne couvre le montage de groupement, quelle que soit sa forme.</li>
+  <li><strong>Les chiffres ne bougent pas.</strong> Le passage v4 → v5 est une mise à jour de vocabulaire et de périmètre fonctionnel ; le modèle financier (churn 12 %, coût variable 35 €, EBITDA An 5 +987 k€) reste celui validé en v4. La conception-réalisation est traitée ici comme un renfort qualitatif du positionnement, sans réestimation chiffrée prématurée.</li>
+</ol>
+
+<div class="box positive">
+  <h4>Recommandation Board v5</h4>
+  <p><strong>GO confirmé</strong>, pricing challenger maintenu (149 / 299 / 549 €). Aligner toute la communication (UI, plaquette, FAQ, démo) sur le triptyque <em>Mandataire / Cotraitance / Conception-Réalisation</em>. Trancher en Phase 2 la console superadmin unifiée (cf. §7).</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 2. PRODUIT ========= -->
+<h2>2. Le produit livré : trois configurations de réponse</h2>
+
+<p>edifio Sourcing détecte et qualifie les appels d'offres (socle commun), puis accompagne la réponse selon trois configurations. Toutes sont servies par le même moteur de détection, de scoring et de gestion des contacts.</p>
+
+<div class="feat">
+  <div class="head"><span class="title">Mandataire (réponse en propre)</span><span class="tag">Livré</span></div>
+  <div class="body">Vous répondez en propre, en mandataire seul : l'AO bascule en pipeline et l'opportunité est créée dans Odoo. En amont : détection quotidienne, scoring de pertinence, brief d'opportunité par IA, accès à l'annonce et au DCE. File « AO du jour » priorisée, triable et filtrable par <strong>département</strong> et par <strong>jours avant clôture</strong>, avec report / écartement des annonces non traitées.</div>
+</div>
+
+<div class="feat">
+  <div class="head"><span class="title">Cotraitance</span><span class="tag">Livré</span></div>
+  <div class="body">Vous mobilisez un architecte cotraitant : edifio Sourcing propose des architectes scorés (proximité géographique départementale + taille du cabinet) et envoie la sollicitation. Bibliothèque de cotraitants réutilisable d'un AO à l'autre. <em>Aucun concurrent ne gère le montage de groupement.</em></div>
+</div>
+
+<div class="feat new-cap">
+  <div class="head"><span class="title">Conception-Réalisation</span><span class="tag">Nouveau</span></div>
+  <div class="body">Vous répondez en groupement conception-réalisation sur les <strong>marchés globaux</strong> : <strong>AlyoS assure la maîtrise d'œuvre et coordonne un partenaire réalisateur</strong>. L'annuaire <strong>Entreprises / Majors</strong> du CRM Contacts sert à assembler le groupement, et le coffre documentaire évite la ressaisie. Terrain naturel d'AlyoS Ingénierie.</div>
+</div>
+
+<div class="feat">
+  <div class="head"><span class="title">Coffre documentaire &amp; CRM Contacts</span><span class="tag">Livré</span></div>
+  <div class="body">12 pièces administratives types par bureau d'études (DC1/DC2/DC4, Kbis, assurances, URSSAF, fiscale, RSE…) avec badges d'expiration. Trois annuaires : Architectes, Bureaux d'Études, Entreprises / Majors — la base qui alimente les trois configurations et le flywheel cross-app.</div>
+</div>
+
+<div class="feat">
+  <div class="head"><span class="title">Espace utilisateur &amp; console superadmin</span><span class="tag">Livré</span></div>
+  <div class="body">Côté utilisateur : formations, vidéo de démonstration, tests guidés, FAQ, support in-app, actualités + notifications (levier de rétention). Côté superadmin : support, tests guidés, news, plaquette, roadmap, étude de marché.</div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 3. CONCEPTION-RÉALISATION ========= -->
+<h2>3. Conception-Réalisation : nouveau terrain de jeu</h2>
+
+<h3>3.1. De quoi parle-t-on</h3>
+<p>Le marché de conception-réalisation permet au maître d'ouvrage public de confier à un <strong>unique groupement</strong> à la fois la conception (maîtrise d'œuvre) et la réalisation (travaux) d'un ouvrage. C'est une dérogation au principe de séparation conception / construction, justifiée par la complexité technique ou des objectifs de performance. Ces marchés globaux gagnent du terrain dans la commande publique (rénovation énergétique, performance, délais maîtrisés).</p>
+
+<h3>3.2. Pourquoi c'est pertinent pour edifio Sourcing</h3>
+<ul>
+  <li><strong>AlyoS Ingénierie est à sa place.</strong> Un bureau d'ingénierie est un acteur central du groupement conception-réalisation : edifio outille exactement le montage que ses utilisateurs pratiquent déjà.</li>
+  <li><strong>La donnée existe déjà.</strong> L'annuaire Entreprises / Majors et le coffre documentaire BET permettent d'assembler et de qualifier le groupement sans ressaisie.</li>
+  <li><strong>Différenciation supplémentaire.</strong> Les outils de veille concurrents s'arrêtent à l'annonce. edifio va jusqu'au montage du groupement, y compris sur les marchés les plus structurants.</li>
+</ul>
+
+<div class="box">
+  <h4>Impact marché (qualitatif)</h4>
+  <p>La conception-réalisation élargit le périmètre des marchés sur lesquels edifio apporte de la valeur (marchés globaux à fort enjeu). Cet effet est traité comme un <strong>renfort de positionnement</strong> : il consolide l'ARPU du palier Cotraitance / Studio IA et la rétention, sans réestimation chiffrée tant que le volume réel n'est pas observé (principe de prudence du modèle financier).</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 4. FLYWHEEL ========= -->
+<h2>4. Flywheel cross-app &amp; CRM Contacts</h2>
+
+<p>Le moat de croissance reste la circulation des leads entre les trois apps edifio (Sourcing, Suivi, ACT). Le CRM Contacts (Architectes / Bureaux d'Études / Entreprises-Majors) en est le réservoir concret : un architecte capté en cotraitance, une entreprise mobilisée en conception-réalisation, deviennent des prospects pour Suivi et ACT.</p>
+
+<div class="chart-container">
+  <div class="chart-title">Flywheel cross-app suite edifio — alimenté par le CRM Contacts</div>
+  <svg viewBox="0 0 700 360" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+    <circle cx="350" cy="80" r="62" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="350" y="68" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="350" y="88" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">Sourcing</text>
+    <circle cx="180" cy="290" r="62" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="180" y="278" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="180" y="298" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">Suivi</text>
+    <circle cx="520" cy="290" r="62" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="520" y="278" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="520" y="298" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">ACT</text>
+    <path d="M 305 125 Q 240 195 212 238" stroke="#C8002A" stroke-width="2.5" fill="none" marker-end="url(#a)"/>
+    <text x="218" y="180" font-size="9" fill="#C8002A" font-weight="600">Archi &amp; MOE → Suivi</text>
+    <path d="M 395 125 Q 460 195 488 238" stroke="#C8002A" stroke-width="2.5" fill="none" marker-end="url(#a)"/>
+    <text x="452" y="180" font-size="9" fill="#C8002A" font-weight="600">Entreprises → ACT</text>
+    <path d="M 242 290 L 458 290" stroke="#2D5C86" stroke-width="2.5" fill="none" marker-end="url(#b)"/>
+    <text x="350" y="284" font-size="9" fill="#2D5C86" font-weight="600" text-anchor="middle">Projets en phase exé</text>
+    <defs>
+      <marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#C8002A"/></marker>
+      <marker id="b" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2D5C86"/></marker>
+    </defs>
+  </svg>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 5. RÉTENTION ========= -->
+<h2>5. Rétention &amp; onboarding</h2>
+
+<p>L'espace utilisateur livré (formations, vidéo démo, tests guidés, FAQ, support in-app, actualités + notifications) attaque le risque #1 du modèle : le churn. C'est ce qui justifie l'hypothèse de churn ramenée de 15 % à 12 % (cf. v4), soit +81 clients et +163 k€ d'EBITDA An 5. Hypothèse maintenue, prudente, à confirmer sur 12 mois d'exploitation réelle.</p>
+
+<table>
+  <thead><tr><th>Brique onboarding</th><th>Mécanisme de rétention</th></tr></thead>
+  <tbody>
+    <tr><td>Vidéo de démonstration</td><td>Réduit le time-to-value dès la 1re session.</td></tr>
+    <tr><td>Formations + tests guidés</td><td>Montée en compétence guidée → moins d'abandon.</td></tr>
+    <tr><td>FAQ + support in-app</td><td>Résolution rapide sans quitter l'outil.</td></tr>
+    <tr><td>Actualités + notifications</td><td>Réengagement régulier, produit perçu comme vivant.</td></tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ========= 6. PRÉVISIONNEL ========= -->
+<h2>6. Prévisionnel 5 ans (rappel v4, inchangé)</h2>
+
+<table>
+  <thead>
+    <tr><th>Indicateur</th><th class="num">An 1</th><th class="num">An 2</th><th class="num">An 3</th><th class="num">An 4</th><th class="num">An 5</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Base clients fin année</td><td class="num">42</td><td class="num">105</td><td class="num">194</td><td class="num">314</td><td class="num">456</td></tr>
+    <tr><td>ARR fin année</td><td class="num">132 k€</td><td class="num">329 k€</td><td class="num">609 k€</td><td class="num">985 k€</td><td class="num">1 431 k€</td></tr>
+    <tr><td>Revenu annuel</td><td class="num">66 k€</td><td class="num">231 k€</td><td class="num">469 k€</td><td class="num">797 k€</td><td class="num">1 208 k€</td></tr>
+    <tr class="total"><td>EBITDA</td><td class="num">+42 k€</td><td class="num">+177 k€</td><td class="num">+372 k€</td><td class="num">+644 k€</td><td class="num">+987 k€</td></tr>
+    <tr><td>Marge EBITDA</td><td class="num">64 %</td><td class="num">77 %</td><td class="num">79 %</td><td class="num">81 %</td><td class="num">82 %</td></tr>
+  </tbody>
+</table>
+
+<p style="color:var(--ink-muted); font-size:9.5pt;">Hypothèses : ARPU 261,5 € · churn 12 % · CAC 250 € · coût variable 35 €/client/mo · coûts fixes mutualisés /3. Détail complet : étude v4. Cumul EBITDA 5 ans ~2,22 M€.</p>
+
+<div class="page-break"></div>
+
+<!-- ========= 7. CONSOLE UNIFIÉE ========= -->
+<h2>7. Décision stratégique : console superadmin unifiée</h2>
+
+<p><strong>Décision Board du 2026-05-27</strong> : mise en place d'une console superadmin <strong>unifiée edifio Suivi + edifio Sourcing</strong>, mais <strong>au lancement commercial (Phase 2)</strong>, avec un multi-tenant bâti sur la même architecture qu'edifio Suivi. À court terme, la console Sourcing reste autonome.</p>
+
+<table>
+  <thead><tr><th>Critère</th><th>Bénéfice de la console unifiée</th></tr></thead>
+  <tbody>
+    <tr><td>Maintenance</td><td>Modules transverses (support, news, formations, comptes) mutualisés, cohérent avec l'allocation des coûts /3.</td></tr>
+    <tr><td>Vue client</td><td>360° sur toute la suite — un client Suivi + Sourcing géré dans un seul back-office.</td></tr>
+    <tr><td>Flywheel</td><td>Base contacts/prospects partagée → leads cross-app câblés nativement.</td></tr>
+    <tr><td>Sécurité</td><td>Exige un RLS + scoping produit rigoureux (audit + tests pgTAP avant ouverture).</td></tr>
+  </tbody>
+</table>
+
+<div class="box">
+  <h4>Prochaine marche (CTO)</h4>
+  <p>Une <strong>note de faisabilité</strong> est préparée (<code>handoff/NOTE_FAISABILITE_260527_CONSOLE_UNIFIEE_MULTITENANT.md</code>). Premier jalon Phase 2 : <strong>audit de l'architecture edifio Suivi</strong> (stack, schéma, identité, RLS) avant de figer le modèle d'identité partagé. Aucun travail multi-tenant n'est lancé avant validation de la Gate 6.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 8. RECO ========= -->
+<h2>8. Recommandation Board v5</h2>
+
+<div class="box positive">
+  <h4>GO — produit livré, langage clarifié, marché élargi</h4>
+  <p>La v5 ne change pas l'économie du projet (EBITDA An 5 ~+987 k€) mais clarifie le discours et élargit le périmètre : edifio Sourcing couvre désormais explicitement les trois façons de répondre à un marché public — <strong>Mandataire, Cotraitance, Conception-Réalisation</strong> — ce qui correspond aux pratiques réelles d'AlyoS Ingénierie et aux tendances de la commande publique.</p>
+</div>
+
+<h3>Décisions Board demandées</h3>
+<div class="box">
+  <ul>
+    <li>☑ <strong>Triptyque de communication validé</strong> (libellés interface confirmés Board 27/05) : <strong>Mandataire / Cotraitance / Conception-Réalisation</strong> — répercuté sur UI, plaquette, FAQ, vidéo démo.</li>
+    <li>☐ <strong>Maintien du pricing challenger</strong> 149 / 299 / 549 € — confirmé.</li>
+    <li>☐ <strong>Console superadmin unifiée</strong> : principe acté, exécution Phase 2 (audit edifio Suivi en préalable).</li>
+  </ul>
+</div>
+
+<div class="footer-note">
+  Document v5.0 — relivré le 2026-05-27 après directive Board : « les termes Solo et Tandem ne sont plus utilisés, il manque la partie Conception-Réalisation ». Remplace v4 pour la terminologie et le périmètre produit ; conserve le modèle financier v4. Le vocabulaire employé est celui de la commande publique ; les libellés d'interface seront alignés après confirmation du Board.<br><br>
+  Sources : <code>design/copy/etude_marche_v4.html</code>, compte-rendu DEV <code>CC_260527_1200_BILAN_SESSION_PHASES_2_3_4_5.md</code>, <code>CC_260526_2000.md</code>, directive Board 2026-05-27.<br><br>
+  — [CMO Léa] avec [CEO Marc] et [CTO Sophie] · edifio Sourcing · AlyoS Ingénierie · 2026-05-27
+</div>
+
+</body>
+</html>

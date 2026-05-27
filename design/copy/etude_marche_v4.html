@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Étude de marché v4 — edifio Sourcing : produit livré, moat renforcé, rétention onboarding</title>
+<style>
+  :root { --paper:#FFFFFF; --paper-alt:#FAFAF8; --ink:#1A1A1A; --ink-muted:#5C5C5C; --line:#E5E5E5; --alyos-red:#C8002A; --pill-bg:#FFE5EA; --pill-fg:#C8002A; --positive:#2D8659; --warning:#B5781C; --negative:#B83333; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:"Inter",-apple-system,BlinkMacSystemFont,sans-serif; font-size:11pt; line-height:1.5; }
+  body { max-width:210mm; margin:0 auto; padding:25mm 18mm; }
+  h1, h2, h3, h4 { font-family:"Space Grotesk","Inter",sans-serif; color:var(--ink); margin-top:1.5em; margin-bottom:0.5em; letter-spacing:-0.02em; }
+  h1 { font-size:30pt; line-height:1.05; margin-top:0; border-bottom:3px solid var(--alyos-red); padding-bottom:0.3em; }
+  h1 .accent { color:var(--alyos-red); }
+  h2 { font-size:17pt; margin-top:2em; padding-top:0.5em; border-top:1px solid var(--line); }
+  h3 { font-size:13pt; color:var(--alyos-red); }
+  h4 { font-size:11pt; font-weight:600; margin-bottom:0.25em; }
+  p { margin:0.5em 0 1em; }
+  ul, ol { margin:0.5em 0 1em; padding-left:1.5em; }
+  li { margin-bottom:0.3em; }
+  .pill { display:inline-block; background:var(--pill-bg); color:var(--pill-fg); padding:3px 10px; border-radius:20px; font-size:9pt; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }
+  .meta { color:var(--ink-muted); font-size:10pt; }
+  .meta strong { color:var(--ink); }
+  table { width:100%; border-collapse:collapse; margin:1em 0 1.5em; font-size:10pt; page-break-inside:avoid; }
+  table th, table td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table th { background:var(--paper-alt); font-weight:600; font-size:9.5pt; text-transform:uppercase; letter-spacing:0.04em; border-bottom:2px solid var(--ink); }
+  table tr:nth-child(even) td { background:var(--paper-alt); }
+  table td.num, table th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  table td.center, table th.center { text-align:center; }
+  table tr.total td { font-weight:700; background:var(--pill-bg) !important; border-top:2px solid var(--ink); }
+  table tr.subtotal td { font-weight:600; border-top:1px solid var(--ink); }
+  .box { background:var(--paper-alt); border-left:4px solid var(--alyos-red); padding:12px 16px; margin:1em 0 1.5em; border-radius:0 4px 4px 0; }
+  .box.positive { border-left-color:var(--positive); }
+  .box.warning { border-left-color:var(--warning); }
+  .box h4 { margin-top:0; }
+  .kpi-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:1em 0 1.5em; }
+  .kpi { background:var(--paper-alt); border:1px solid var(--line); padding:14px; border-radius:6px; }
+  .kpi .label { font-size:9pt; color:var(--ink-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .kpi .value { font-family:"Space Grotesk",sans-serif; font-size:20pt; font-weight:700; color:var(--alyos-red); line-height:1; }
+  .kpi .unit { font-size:9.5pt; color:var(--ink-muted); margin-top:4px; }
+  .feat { background:var(--paper-alt); border:1px solid var(--line); border-left:4px solid var(--positive); border-radius:6px; padding:12px 16px; margin:0.8em 0; page-break-inside:avoid; }
+  .feat .head { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+  .feat .title { font-weight:600; font-size:11pt; font-family:"Space Grotesk",sans-serif; }
+  .feat .tag { margin-left:auto; background:var(--positive); color:white; font-size:8.5pt; padding:2px 8px; border-radius:4px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+  .feat .body { font-size:10pt; line-height:1.5; }
+  .toc { background:var(--paper-alt); padding:16px 24px; border-radius:6px; margin:1em 0 2em; font-size:10pt; }
+  .toc ol { padding-left:1.5em; }
+  .footer-note { margin-top:3em; padding-top:1em; border-top:1px solid var(--line); color:var(--ink-muted); font-size:9pt; font-style:italic; }
+  .page-break { page-break-after:always; }
+  .chart-container { margin:1.5em 0; background:var(--paper-alt); padding:16px; border-radius:6px; border:1px solid var(--line); }
+  .chart-container .chart-title { font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:11pt; margin-bottom:12px; }
+  .delta-pos { color:var(--positive); font-weight:600; }
+  .delta-neg { color:var(--negative); font-weight:600; }
+  @media print { body { padding:15mm 12mm; max-width:100%; } h2 { page-break-after:avoid; } table, .kpi-grid, .box, .chart-container, .feat { page-break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<!-- ========= PAGE DE GARDE ========= -->
+<div>
+  <span class="pill">Étude de marché · v4.0 — produit livré + moat renforcé + rétention onboarding</span>
+  <h1>edifio <span class="accent">Sourcing</span><br>Du positionnement promis au produit livré</h1>
+  <p class="meta">
+    <strong>Auteurs</strong> : [CMO Léa] (positionnement) + [CEO Marc] (modèle financier) + [CTO Sophie] (produit &amp; coûts)<br>
+    <strong>Date</strong> : 2026-05-27 · v4.0<br>
+    <strong>Statut</strong> : v4.0 — usage interne Board AlyoS Ingénierie<br>
+    <strong>Changements vs v3</strong> :
+    <ul style="margin-top:6px;">
+      <li><strong>Le produit est désormais livré en prod</strong> (Gate 6) : module Tandem cotraitance complet, coffre documentaire BET, CRM Contacts BTP, espace utilisateur (onboarding) et console superadmin.</li>
+      <li>Réévaluation du <strong>churn à la baisse : 15 % → 12 %</strong> grâce à la suite onboarding (formations, démo, tests guidés, FAQ, support in-app, actus+notifications).</li>
+      <li>Ajustement des <strong>coûts variables 31 € → 35 €</strong>/client/mois (coffres documentaires Storage + IA Haiku rationale matching).</li>
+      <li>Renforcement du <strong>flywheel cross-app</strong> par le CRM Contacts structuré (Architectes / Bureaux d'Études / Entreprises-Majors).</li>
+      <li>Nouveau point de décision Board : <strong>console superadmin unifiée</strong> Sourcing + Suivi.</li>
+    </ul>
+  </p>
+</div>
+
+<div class="box positive">
+  <h4>Impact synthétique v4 vs v3</h4>
+  <table style="margin:0;">
+    <tr style="background:transparent;"><th>Indicateur</th><th class="num">v2 (Cowork + premium)</th><th class="num">v3 (challenger + flywheel)</th><th class="num">v4 (produit livré + rétention)</th></tr>
+    <tr><td>ARPU mensuel moyen</td><td class="num">350 €</td><td class="num">261,5 €</td><td class="num">261,5 €</td></tr>
+    <tr><td>CAC effectif moyen</td><td class="num">600 €</td><td class="num">250 €</td><td class="num">250 €</td></tr>
+    <tr><td>Churn annuel</td><td class="num">15 %</td><td class="num">15 %</td><td class="num"><strong>12 %</strong></td></tr>
+    <tr><td>Coût variable / client / mois</td><td class="num">31 €</td><td class="num">31 €</td><td class="num">35 €</td></tr>
+    <tr><td>Clients fin An 5</td><td class="num">262</td><td class="num">375</td><td class="num"><strong>456</strong></td></tr>
+    <tr><td>ARR An 5</td><td class="num">1,10 M€</td><td class="num">1,18 M€</td><td class="num"><strong>1,43 M€</strong></td></tr>
+    <tr><td>EBITDA An 5</td><td class="num">+752 k€</td><td class="num">+824 k€</td><td class="num"><strong>+987 k€</strong></td></tr>
+    <tr><td>Position de marché (clients = part SAM)</td><td class="num">2,6 %</td><td class="num">3,75 %</td><td class="num"><strong>4,56 %</strong></td></tr>
+  </table>
+</div>
+
+<div class="toc">
+  <strong>Sommaire</strong>
+  <ol>
+    <li>Résumé exécutif v4</li>
+    <li>Le produit livré : un moat désormais tangible</li>
+    <li>Flywheel cross-app renforcé par le CRM Contacts</li>
+    <li>Rétention &amp; onboarding : le nouveau levier financier</li>
+    <li>Coûts révisés (coffres documentaires + IA)</li>
+    <li>Prévisionnel 5 ans révisé (churn 12 %)</li>
+    <li>Sensibilités et risques v4</li>
+    <li>Décision stratégique : console superadmin unifiée ?</li>
+    <li>Recommandation Board v4</li>
+  </ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 1. RÉSUMÉ ========= -->
+<h2>1. Résumé exécutif v4</h2>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Cible 5 ans (clients)</div>
+    <div class="value">456</div>
+    <div class="unit">vs 375 v3 · +22 % grâce à la rétention</div>
+  </div>
+  <div class="kpi">
+    <div class="label">ARR An 5</div>
+    <div class="value">~1,43 M€</div>
+    <div class="unit">ARPU 261,5 €/mo</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA An 5</div>
+    <div class="value">+987 k€</div>
+    <div class="unit">~82 % de marge EBITDA</div>
+  </div>
+</div>
+
+<h3>Conclusions clés v4</h3>
+
+<ol>
+  <li><strong>L'étude ne vend plus une promesse, elle décrit un produit livré.</strong> Entre la v3 (18 mai) et aujourd'hui, le MVP a basculé en production : module Tandem cotraitance complet (shortlist top 10, scoring géographique départemental, bibliothèque cotraitants, coffre documentaire BET), CRM Contacts BTP, espace utilisateur d'onboarding et console superadmin. Le moat décrit dans la v3 est désormais <strong>tangible et démontrable en démo</strong>.</li>
+  <li><strong>La cotraitance + le coffre documentaire sont un différenciateur sans équivalent.</strong> Aucun concurrent (Vecteur Plus, Klekoon, Doublet…) ne gère la constitution d'un groupement (architecte + BET + cotraitants) avec les 12 pièces administratives types (DC1/DC2/DC4, Kbis, assurances, URSSAF, attestation fiscale, RSE…) et leurs dates d'expiration. C'est notre argument produit n°1.</li>
+  <li><strong>L'onboarding fait baisser le churn — le levier financier le plus puissant.</strong> La v3 montrait que le churn était le risque le plus structurant (un doublement du churn coûtait −334 k€ d'EBITDA An 5). La suite onboarding livrée (formations, vidéo démo, tests guidés branchés aux formations, FAQ, support in-app, actualités + notifications) justifie de passer l'hypothèse de churn de 15 % à <strong>12 %</strong> → +81 clients et +163 k€ d'EBITDA An 5.</li>
+  <li><strong>Le flywheel cross-app a maintenant son réservoir.</strong> Le CRM Contacts (Architectes / Bureaux d'Études / Entreprises-Majors) structure la donnée qui alimente Suivi et ACT. Le moat de la v3 passe du théorique au câblé.</li>
+  <li><strong>Les coûts variables montent légèrement (31 → 35 €)</strong> à cause du stockage des coffres documentaires (buckets Supabase Storage) et de l'IA Haiku — mais cet effet est largement absorbé par la baisse du churn.</li>
+  <li><strong>Décision à prendre : console superadmin unifiée Sourcing + Suivi.</strong> Avec deux produits potentiellement vendus aux mêmes clients, une console d'administration commune réduit la dette et renforce la promesse « suite edifio » (cf. §8).</li>
+</ol>
+
+<div class="box positive">
+  <h4>Recommandation Board v4</h4>
+  <p><strong>GO confirmé</strong> : pricing challenger maintenu (149 / 299 / 549 €), produit livré, rétention renforcée par l'onboarding. Deux décisions à acter : (a) le principe d'une <strong>console superadmin unifiée</strong> (sous réserve d'une note de faisabilité CTO), (b) l'affectation des contenus manquants (vidéo démo, plaquette, roadmap, FAQ) pour finaliser l'espace utilisateur.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 2. PRODUIT LIVRÉ ========= -->
+<h2>2. Le produit livré : un moat désormais tangible</h2>
+
+<p>Les fonctionnalités ci-dessous sont en production (ou en finalisation Gate 6). Elles transforment l'argumentaire commercial : on démontre, on ne promet plus.</p>
+
+<div class="feat">
+  <div class="head"><span class="title">Module Tandem — cotraitance intelligente</span><span class="tag">Livré</span></div>
+  <div class="body">Shortlist des <strong>10 architectes les plus pertinents</strong> par AO, avec scoring géographique départemental (+35 pts même département, +15 pts limitrophe, carte complète des 101 départements Corse + DOM inclus) et scoring de l'effectif des cabinets (priorité aux structures ≥ 10 personnes). <strong>Bibliothèque cotraitants</strong> réutilisable d'un AO à l'autre. <em>Aucun concurrent ne propose la gestion de groupement.</em></div>
+</div>
+
+<div class="feat">
+  <div class="head"><span class="title">Coffre documentaire Bureau d'Études</span><span class="tag">Livré</span></div>
+  <div class="body">12 pièces administratives types (DC1, DC2, DC4, Pouvoir, Kbis, attestations assurance / URSSAF / fiscale, présentation BE, moyens humains &amp; matériels, références, mémoire RSE), stockées en bucket privé, avec <strong>badges d'expiration</strong> (vert / orange à 30 j / rouge expiré). Gain de temps déterminant sur la constitution des dossiers de candidature.</div>
+</div>
+
+<div class="feat">
+  <div class="head"><span class="title">CRM Contacts BTP structuré</span><span class="tag">Livré</span></div>
+  <div class="body">Trois annuaires : <strong>Architectes</strong>, <strong>Bureaux d'Études</strong>, <strong>Entreprises / Majors</strong>. C'est la base de données qui alimente le flywheel cross-app (§3) et le pilotage des AO Tandem.</div>
+</div>
+
+<div class="feat">
+  <div class="head"><span class="title">AO du jour intelligent</span><span class="tag">Livré + en cours</span></div>
+  <div class="body">Report / écartement des AO non traités (snooze +1 / +3 / +7 j), file priorisée par score, brief d'opportunité IA (3-4 lignes, Sonnet), liens annonce + DCE. <strong>En cours d'ajout (demande Board 27/05)</strong> : affichage du code postal du lieu d'exécution (à défaut du MOA) et tri / filtre par <strong>département</strong> et par <strong>jours avant clôture</strong>.</div>
+</div>
+
+<div class="feat">
+  <div class="head"><span class="title">Espace utilisateur — onboarding intégré</span><span class="tag">Livré (attend contenu)</span></div>
+  <div class="body">Formations, vidéo de démonstration, tests guidés branchés aux formations, FAQ, support in-app (tickets), actualités produit avec notifications. <em>Levier direct de rétention</em> (§4). Pages déployées ; restent à alimenter en contenu.</div>
+</div>
+
+<div class="feat">
+  <div class="head"><span class="title">Console superadmin</span><span class="tag">Livré</span></div>
+  <div class="body">Traitement du support, traitement des remarques des tests guidés, publication d'actualités, hébergement de l'étude de marché, de la plaquette commerciale et de la roadmap produit. Socle opérationnel pour l'exploitation et l'ouverture multi-tenant (Phase 2).</div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 3. FLYWHEEL ========= -->
+<h2>3. Flywheel cross-app renforcé par le CRM Contacts</h2>
+
+<p>Le moat de la v3 reposait sur la circulation des leads entre les 3 apps edifio. La v4 lui donne son réservoir concret : le <strong>CRM Contacts BTP</strong> capture et structure désormais les données qui rendent ce flywheel opérationnel.</p>
+
+<div class="chart-container">
+  <div class="chart-title">Flywheel cross-app suite edifio — alimenté par le CRM Contacts</div>
+  <svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+    <circle cx="350" cy="80" r="65" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="350" y="65" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="350" y="85" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">Sourcing</text>
+    <text x="350" y="103" text-anchor="middle" font-size="9" fill="#5C5C5C">PME BTP &amp; cotraitance</text>
+
+    <circle cx="180" cy="300" r="65" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="180" y="285" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="180" y="305" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">Suivi</text>
+    <text x="180" y="323" text-anchor="middle" font-size="9" fill="#5C5C5C">Architectes MOE</text>
+
+    <circle cx="520" cy="300" r="65" fill="#FFE5EA" stroke="#C8002A" stroke-width="3"/>
+    <text x="520" y="285" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="13" fill="#1A1A1A">edifio</text>
+    <text x="520" y="305" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="15" fill="#C8002A">ACT</text>
+    <text x="520" y="323" text-anchor="middle" font-size="9" fill="#5C5C5C">Phase ACT / chantier</text>
+
+    <path d="M 305 130 Q 240 200 215 245" stroke="#C8002A" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+    <text x="220" y="180" font-size="9" fill="#C8002A" font-weight="600">Cotraitants archi</text>
+    <text x="220" y="193" font-size="9" fill="#C8002A">→ leads Suivi</text>
+
+    <path d="M 395 130 Q 460 200 485 245" stroke="#C8002A" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+    <text x="450" y="180" font-size="9" fill="#C8002A" font-weight="600">Entreprises BTP</text>
+    <text x="450" y="193" font-size="9" fill="#C8002A">→ leads ACT</text>
+
+    <path d="M 220 245 Q 280 180 320 135" stroke="#2D5C86" stroke-width="2.5" fill="none" marker-end="url(#arrow2)"/>
+    <text x="240" y="230" font-size="9" fill="#2D5C86" font-weight="600">MOE projets BTP</text>
+    <text x="240" y="243" font-size="9" fill="#2D5C86">→ leads Sourcing</text>
+
+    <path d="M 245 300 L 455 300" stroke="#2D5C86" stroke-width="2.5" fill="none" marker-end="url(#arrow2)"/>
+    <text x="350" y="295" font-size="9" fill="#2D5C86" font-weight="600" text-anchor="middle">Projets en phase exé</text>
+    <text x="350" y="308" font-size="9" fill="#2D5C86" text-anchor="middle">→ leads ACT</text>
+
+    <path d="M 480 245 Q 420 180 380 135" stroke="#2D8659" stroke-width="2.5" fill="none" marker-end="url(#arrow3)"/>
+    <text x="460" y="230" font-size="9" fill="#2D8659" font-weight="600">Entreprises chantier</text>
+    <text x="460" y="243" font-size="9" fill="#2D8659">→ leads Sourcing</text>
+
+    <defs>
+      <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#C8002A"/></marker>
+      <marker id="arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2D5C86"/></marker>
+      <marker id="arrow3" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2D8659"/></marker>
+    </defs>
+  </svg>
+</div>
+
+<div class="box positive">
+  <h4>Ce que la v4 change pour le flywheel</h4>
+  <p>En v3, le flywheel était une hypothèse. En v4, les annuaires Contacts (Architectes / BE / Entreprises-Majors) sont la <strong>source de données réelle</strong> à partir de laquelle se construiront les passerelles Suivi/ACT. Le CAC effectif de 250 € reste prudent ; il deviendra défendable une fois la base prospects unifiée câblée (cf. décision §8 sur l'administration commune).</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 4. RÉTENTION ONBOARDING ========= -->
+<h2>4. Rétention &amp; onboarding : le nouveau levier financier</h2>
+
+<h3>4.1. Pourquoi le churn baisse</h3>
+
+<p>La v3 identifiait le churn comme le risque le plus structurant. L'espace utilisateur livré attaque ce risque de front : un utilisateur formé, autonome et tenu au courant reste abonné.</p>
+
+<table>
+  <thead>
+    <tr><th>Brique onboarding livrée</th><th>Mécanisme de rétention</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Vidéo de démonstration</td><td>Réduit le « time-to-value » : l'utilisateur comprend la valeur dès la 1re session.</td></tr>
+    <tr><td>Formations + tests guidés branchés</td><td>Montée en compétence guidée → moins d'abandon par incompréhension.</td></tr>
+    <tr><td>FAQ + support in-app (tickets)</td><td>Résolution rapide des blocages sans quitter l'outil → moins de frustration.</td></tr>
+    <tr><td>Actualités + notifications</td><td>Réengagement régulier : l'utilisateur revient, découvre les nouveautés, perçoit un produit vivant.</td></tr>
+  </tbody>
+</table>
+
+<h3>4.2. Impact chiffré du churn 15 % → 12 %</h3>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Clients fin An 5</div>
+    <div class="value">456</div>
+    <div class="unit">+81 vs v3 (churn 15 %)</div>
+  </div>
+  <div class="kpi">
+    <div class="label">ARR additionnel An 5</div>
+    <div class="value">+254 k€</div>
+    <div class="unit">vs scénario v3</div>
+  </div>
+  <div class="kpi">
+    <div class="label">EBITDA additionnel An 5</div>
+    <div class="value">+163 k€</div>
+    <div class="unit">net de la hausse des coûts variables</div>
+  </div>
+</div>
+
+<div class="box">
+  <p>L'hypothèse de churn 12 % reste <strong>prudente</strong> : un SaaS B2B vertical avec onboarding structuré et faible substituabilité (le module Tandem n'a pas d'équivalent) vise généralement 8-10 % de churn annuel à maturité. On conserve 12 % pour rester conservateur tant que la rétention réelle n'est pas mesurée sur 12 mois pleins.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 5. COÛTS RÉVISÉS ========= -->
+<h2>5. Coûts révisés (coffres documentaires + IA)</h2>
+
+<h3>5.1. Évolution du coût variable par client</h3>
+
+<table>
+  <thead>
+    <tr><th>Poste de coût variable</th><th class="num">v3 (€/client/mo)</th><th class="num">v4 (€/client/mo)</th><th>Motif</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Anthropic API (scoring + brief IA)</td><td class="num">~14 €</td><td class="num">~16 €</td><td>Ajout du rationale Haiku sur le matching Tandem</td></tr>
+    <tr><td>Supabase compute + DB</td><td class="num">~9 €</td><td class="num">~9 €</td><td>Inchangé</td></tr>
+    <tr><td>Supabase Storage (coffres documentaires)</td><td class="num">~2 €</td><td class="num">~5 €</td><td>Buckets cotraitant-docs + be-docs (pièces administratives)</td></tr>
+    <tr><td>Brevo + Resend (emails sollicitation + notifs)</td><td class="num">~6 €</td><td class="num">~5 €</td><td>Optimisation templates</td></tr>
+    <tr class="total"><td>Coût variable total</td><td class="num">31 €</td><td class="num">35 €</td><td>+13 %</td></tr>
+  </tbody>
+</table>
+
+<div class="box warning">
+  <h4>Point de vigilance Storage</h4>
+  <p>Le coffre documentaire (12 pièces × cotraitants + BE) fait croître le stockage avec l'usage. À 456 clients, le poste Storage reste marginal (&lt; 6 % du coût variable), mais il faut <strong>une politique de rétention</strong> (purge des pièces expirées + archivage froid) pour éviter une dérive en Phase 2. À spécifier avant l'ouverture multi-tenant.</p>
+</div>
+
+<h3>5.2. Coûts fixes mutualisés — inchangés vs v3</h3>
+
+<p>La construction de l'espace utilisateur et de la console superadmin s'est faite <strong>sans coût de main-d'œuvre marginal</strong> (modèle Cowork + Claude Code, déjà dans l'abonnement mutualisé). Les charges fixes allouées à edifio Sourcing restent à ~145 €/mo An 1 → ~240 €/mo An 5 (allocation /3 entre Sourcing, Suivi, ACT).</p>
+
+<div class="page-break"></div>
+
+<!-- ========= 6. PRÉVISIONNEL ========= -->
+<h2>6. Prévisionnel 5 ans révisé (churn 12 %)</h2>
+
+<h3>6.1. Hypothèses v4</h3>
+
+<table>
+  <thead>
+    <tr><th>Paramètre</th><th class="num">v3</th><th class="num">v4</th><th>Motif du changement</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Acquisition Année 1 (nouveaux clients)</td><td class="num">45</td><td class="num">45</td><td>Inchangé (conservateur)</td></tr>
+    <tr><td>Croissance acquisition % / an</td><td class="num">+50 %</td><td class="num">+50 %</td><td>Inchangé</td></tr>
+    <tr><td>Churn annuel</td><td class="num">15 %</td><td class="num"><strong>12 %</strong></td><td>Suite onboarding livrée (formations, démo, support, actus)</td></tr>
+    <tr><td>ARPU mensuel moyen</td><td class="num">261,5 €</td><td class="num">261,5 €</td><td>Pricing challenger maintenu</td></tr>
+    <tr><td>CAC moyen</td><td class="num">250 €</td><td class="num">250 €</td><td>Inchangé</td></tr>
+    <tr><td>Coût variable / client / mois</td><td class="num">31 €</td><td class="num">35 €</td><td>Storage coffres + IA Haiku</td></tr>
+    <tr><td>Coûts fixes mensuels An 1 (alloués Sourcing)</td><td class="num">145 €</td><td class="num">145 €</td><td>Inchangé (mutualisation /3)</td></tr>
+  </tbody>
+</table>
+
+<h3>6.2. Détail année par année v4</h3>
+
+<table>
+  <thead>
+    <tr><th>Indicateur</th><th class="num">An 1</th><th class="num">An 2</th><th class="num">An 3</th><th class="num">An 4</th><th class="num">An 5</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Nouveaux clients</td><td class="num">45</td><td class="num">68</td><td class="num">102</td><td class="num">143</td><td class="num">180</td></tr>
+    <tr><td>Churn (-12 %)</td><td class="num">-3</td><td class="num">-5</td><td class="num">-13</td><td class="num">-23</td><td class="num">-38</td></tr>
+    <tr><td><strong>Base clients fin année</strong></td><td class="num"><strong>42</strong></td><td class="num"><strong>105</strong></td><td class="num"><strong>194</strong></td><td class="num"><strong>314</strong></td><td class="num"><strong>456</strong></td></tr>
+    <tr><td><strong>MRR fin année</strong></td><td class="num"><strong>11,0 k€</strong></td><td class="num"><strong>27,5 k€</strong></td><td class="num"><strong>50,7 k€</strong></td><td class="num"><strong>82,1 k€</strong></td><td class="num"><strong>119,2 k€</strong></td></tr>
+    <tr><td>ARR fin année</td><td class="num">132 k€</td><td class="num">329 k€</td><td class="num">609 k€</td><td class="num">985 k€</td><td class="num">1 431 k€</td></tr>
+    <tr><td>Revenu annuel</td><td class="num">66 k€</td><td class="num">231 k€</td><td class="num">469 k€</td><td class="num">797 k€</td><td class="num">1 208 k€</td></tr>
+    <tr><td>Coûts variables (35 €/mo)</td><td class="num">-9 k€</td><td class="num">-31 k€</td><td class="num">-63 k€</td><td class="num">-107 k€</td><td class="num">-162 k€</td></tr>
+    <tr><td>CAC (250 €/nouveau)</td><td class="num">-11,3 k€</td><td class="num">-17 k€</td><td class="num">-25,5 k€</td><td class="num">-35,8 k€</td><td class="num">-45 k€</td></tr>
+    <tr><td>Coûts fixes mutualisés (alloc. Sourcing)</td><td class="num">-1,7 k€</td><td class="num">-2,0 k€</td><td class="num">-2,3 k€</td><td class="num">-2,5 k€</td><td class="num">-2,9 k€</td></tr>
+    <tr><td>Coûts semi-fixes infra</td><td class="num">-2,5 k€</td><td class="num">-4 k€</td><td class="num">-6 k€</td><td class="num">-8 k€</td><td class="num">-11 k€</td></tr>
+    <tr class="total"><td>EBITDA</td><td class="num">+42 k€</td><td class="num">+177 k€</td><td class="num">+372 k€</td><td class="num">+644 k€</td><td class="num">+987 k€</td></tr>
+    <tr><td>Marge EBITDA (%)</td><td class="num">+64 %</td><td class="num">+77 %</td><td class="num">+79 %</td><td class="num">+81 %</td><td class="num">+82 %</td></tr>
+  </tbody>
+</table>
+
+<div class="box positive">
+  <p><strong>EBITDA positif dès l'Année 1</strong> (+42 k€), marge dépassant 80 % à partir de l'Année 4. Cumul EBITDA 5 ans = <strong>~2,22 M€</strong> (vs 1,91 M€ en v3).</p>
+</div>
+
+<h3>6.3. EBITDA Année 5 — comparatif v2 / v3 / v4</h3>
+
+<div class="chart-container">
+  <div class="chart-title">EBITDA Année 5 — progression des scénarios</div>
+  <svg viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">
+    <text x="10" y="25" font-size="9" fill="#5C5C5C">1 000 k€</text>
+    <text x="10" y="65" font-size="9" fill="#5C5C5C">800 k€</text>
+    <text x="10" y="105" font-size="9" fill="#5C5C5C">600 k€</text>
+    <text x="10" y="145" font-size="9" fill="#5C5C5C">400 k€</text>
+    <text x="10" y="185" font-size="9" fill="#5C5C5C">200 k€</text>
+    <text x="10" y="220" font-size="9" fill="#5C5C5C">0 €</text>
+    <line x1="60" y1="220" x2="690" y2="220" stroke="#1A1A1A" stroke-width="1.5"/>
+
+    <rect x="100" y="70" width="120" height="150" fill="#B5781C"/>
+    <text x="160" y="65" font-size="11" font-weight="700" text-anchor="middle">+752 k€</text>
+    <text x="160" y="240" font-size="10" text-anchor="middle">v2 (premium)</text>
+    <text x="160" y="253" font-size="8" fill="#5C5C5C" text-anchor="middle">262 clients</text>
+
+    <rect x="290" y="55" width="120" height="165" fill="#C8002A" opacity="0.55"/>
+    <text x="350" y="50" font-size="11" font-weight="700" text-anchor="middle">+824 k€</text>
+    <text x="350" y="240" font-size="10" text-anchor="middle">v3 (challenger)</text>
+    <text x="350" y="253" font-size="8" fill="#5C5C5C" text-anchor="middle">375 clients</text>
+
+    <rect x="480" y="22" width="120" height="198" fill="#C8002A"/>
+    <text x="540" y="17" font-size="11" font-weight="700" text-anchor="middle">+987 k€</text>
+    <text x="540" y="240" font-size="10" text-anchor="middle" font-weight="600">v4 (produit + rétention)</text>
+    <text x="540" y="253" font-size="8" fill="#5C5C5C" text-anchor="middle">456 clients · ARR 1,43 M€</text>
+  </svg>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 7. RISQUES ========= -->
+<h2>7. Sensibilités et risques v4</h2>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>Risque</th><th class="center">Probabilité</th><th class="center">Impact</th><th>Mitigation</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Rétention réelle inférieure à 12 %</strong> (onboarding insuffisamment adopté)</td><td class="center">Modérée (~30 %)</td><td class="center">Retour à 15 % → -163 k€ EBITDA An 5</td><td>Mesurer l'adoption des formations / tests guidés ; relances notif sur utilisateurs inactifs ; itérer sur la FAQ à partir des tickets support.</td></tr>
+    <tr><td>2</td><td><strong>Contenu d'onboarding non finalisé</strong> (vidéo démo, plaquette, FAQ manquantes)</td><td class="center">Élevée (~50 %)</td><td class="center">L'espace user reste une coquille → pas d'effet rétention</td><td>Affecter le contenu maintenant (cf. §9). C'est du livrable Cowork/Board, pas du dev.</td></tr>
+    <tr><td>3</td><td><strong>Dérive du coût Storage</strong> en Phase 2 multi-tenant</td><td class="center">Modérée (~30 %)</td><td class="center">Coût variable +2-4 € supplémentaires</td><td>Politique de rétention documentaire (purge expirés + archivage froid) à spécifier avant ouverture.</td></tr>
+    <tr><td>4</td><td><strong>Flywheel cross-app toujours pas câblé</strong> (Suivi/ACT pas connectés)</td><td class="center">Modérée (~30 %)</td><td class="center">CAC reste à 600 € → -113 k€ EBITDA An 5</td><td>Trancher la console unifiée (§8) qui pose la base prospects partagée.</td></tr>
+    <tr><td>5</td><td><strong>Vecteur Plus baisse ses prix</strong> en réaction</td><td class="center">Modérée (~35 %)</td><td class="center">-15 % volume</td><td>Communiquer sur le continuum + module Tandem (uniques), pas sur le prix.</td></tr>
+  </tbody>
+</table>
+
+<div class="box positive">
+  <p><strong>Le profil de risque s'améliore vs v3.</strong> Le risque churn (le plus coûteux) est désormais activement mitigé par un produit livré, et non plus seulement par une intention. Le risque dominant devient <strong>opérationnel</strong> (finaliser le contenu d'onboarding), ce qui est entièrement sous le contrôle du Board.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 8. CONSOLE UNIFIÉE ========= -->
+<h2>8. Décision stratégique : console superadmin unifiée ?</h2>
+
+<p>Le Board projette de rassembler <strong>edifio Suivi</strong> et <strong>edifio Sourcing</strong> comme deux produits logiciels, avec des clients potentiellement différents ou identiques. La question : faut-il deux consoles superadmin (une par produit) ou une seule console commune ?</p>
+
+<table>
+  <thead>
+    <tr><th>Critère</th><th>Deux consoles séparées</th><th>Console unifiée « edifio Admin »</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Effort de dev / maintenance</td><td>×2 (support, news, formations dupliqués)</td><td class="delta-pos">Mutualisé — cohérent avec l'allocation /3</td></tr>
+    <tr><td>Vue client multi-produits</td><td>Cloisonnée — un client Suivi+Sourcing géré dans 2 back-offices</td><td class="delta-pos">Vue 360° du client sur toute la suite</td></tr>
+    <tr><td>Flywheel cross-app</td><td>Base prospects fragmentée</td><td class="delta-pos">Base contacts partagée → flywheel câblé nativement</td></tr>
+    <tr><td>Isolation des données / sécurité</td><td class="delta-pos">Étanchéité maximale par produit</td><td>Exige un RLS + scoping produit rigoureux</td></tr>
+    <tr><td>Time-to-market</td><td class="delta-pos">Rien à refondre</td><td>Note de faisabilité + éventuelle refonte du modèle d'accès</td></tr>
+  </tbody>
+</table>
+
+<div class="box">
+  <h4>Recommandation CEO + CTO</h4>
+  <p><strong>Viser une console superadmin unifiée « edifio Admin »</strong>, mais ne pas l'imposer avant une <strong>note de faisabilité CTO</strong> (compatibilité des modèles de données Suivi ↔ Sourcing, scoping RLS par produit, périmètre des rôles). C'est cohérent avec la promesse « suite edifio » et c'est ce qui rend le flywheel réellement opérationnel. À court terme, la console Sourcing actuelle reste autonome ; la convergence est un chantier Phase 2 à cadrer, pas un blocage Gate 6.</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ========= 9. RECO ========= -->
+<h2>9. Recommandation Board v4</h2>
+
+<div class="box positive">
+  <h4>GO — produit livré, rétention renforcée</h4>
+  <p>La v4 porte l'EBITDA An 5 de <strong>+824 k€ à +987 k€ (+20 %)</strong> et la base clients de <strong>375 à 456 (+22 %)</strong>, par le seul effet de rétention de la suite onboarding, net de la hausse des coûts variables. Le moat (cotraitance + coffre documentaire + CRM Contacts) est désormais démontrable en démo, ce qui crédibilise tout l'argumentaire commercial.</p>
+</div>
+
+<h3>9.1. Décisions Board demandées</h3>
+
+<div class="box">
+  <ul>
+    <li>☐ <strong>Validation du modèle v4</strong> : churn 12 %, coût variable 35 €, EBITDA An 5 ~+987 k€.</li>
+    <li>☐ <strong>Principe de la console superadmin unifiée</strong> « edifio Admin » (sous réserve note de faisabilité CTO).</li>
+    <li>☐ <strong>Finalisation du contenu d'onboarding</strong> (affectations §9.2) pour activer l'effet rétention.</li>
+    <li>☐ <strong>Maintien du pricing challenger</strong> (149 / 299 / 549 €) — confirmé, pas de baisse supplémentaire justifiée.</li>
+  </ul>
+</div>
+
+<h3>9.2. Contenus manquants à produire (espace utilisateur)</h3>
+
+<table>
+  <thead>
+    <tr><th>Contenu</th><th>Propriétaire</th><th>Priorité</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Vidéo de démonstration (URL)</td><td>Board (à enregistrer / héberger)</td><td>🔴 Haute</td></tr>
+    <tr><td>Plaquette commerciale (PDF)</td><td>[CMO Léa] — Cowork</td><td>🟠 Moyenne</td></tr>
+    <tr><td>Roadmap produit (PDF)</td><td>[CEO Marc] — Cowork</td><td>🟠 Moyenne</td></tr>
+    <tr><td>FAQ (5-10 questions MVP)</td><td>[CMO Léa] — Cowork</td><td>🟡 Normale</td></tr>
+    <tr><td>1re fiche formation (vidéo prise en main)</td><td>Board + [CMO Léa]</td><td>🟡 Normale</td></tr>
+    <tr><td>Étude de marché (cette URL une fois hébergée)</td><td>[CEO Marc] — Cowork</td><td>🟡 Normale</td></tr>
+  </tbody>
+</table>
+
+<div class="footer-note">
+  Document v4.0 — relivré le 2026-05-27 après livraison du MVP en production (module Tandem cotraitance, coffre documentaire BET, CRM Contacts, espace utilisateur onboarding, console superadmin) et directive Board « mettre à jour l'étude avec les nouvelles fonctionnalités + ajustement des coûts ». Remplace v1/v2/v3 pour toute référence stratégique. Modèle financier directionnel : hypothèses de churn et de coût variable à confirmer sur 12 mois d'exploitation réelle.<br><br>
+  Sources : <code>design/copy/etude_marche_v3.html</code>, <code>design/copy/etude_couts_v3.html</code>, compte-rendu DEV <code>CC_260526_1730.md</code> (PR #69-72), REQUEST contenu profil utilisateur (Alex, 2026-05-27), abonnement Claude Cowork mutualisé 3 apps.<br><br>
+  — [CMO Léa] avec [CEO Marc] et [CTO Sophie] · edifio Sourcing · AlyoS Ingénierie · 2026-05-27
+</div>
+
+</body>
+</html>
