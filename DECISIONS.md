@@ -2,6 +2,18 @@
 
 ---
 
+## 2026-05-27 — Bucket Supabase Storage `be-docs` — action manuelle requise (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · infra-doc — Bucket `be-docs` Supabase Storage.**
+  *Le bucket `be-docs` (private) est requis pour le fonctionnement de `BEDocumentsSection.tsx`
+  (upload et génération d'URL signées). Il est documenté dans `src/db/migrations/0016_be_documents.sql`
+  comme étape MANUELLE — il n'est pas créé par la migration SQL.*
+  *Action à effectuer par Steve (ps_operator) si ce n'est pas déjà fait :*
+  *Supabase dashboard → Storage → New Bucket → nom : `be-docs` → Private (cocher "Private") → Create.*
+  *Sans ce bucket, tout upload de document administratif retourne une erreur `internal_error`.*
+
+---
+
 ## 2026-05-27 — PR #78 — Relance badge J+3 Cotraitance (Alex)
 
 - **2026-05-27 · G6 · Alex (dev) · feat — badge relance archi non-réponse J+3 (PR #78).**

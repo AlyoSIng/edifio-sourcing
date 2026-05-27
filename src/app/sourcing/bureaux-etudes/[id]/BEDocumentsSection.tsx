@@ -15,7 +15,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 
 import {
   BE_DOCUMENT_KIND_LABELS,
@@ -42,7 +42,11 @@ interface BEDocumentsSectionProps {
 
 export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSectionProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+
+  // État d'upload (remplace useTransition — React 18 ne supporte pas les
+  // async callbacks dans startTransition, ce qui rendait isPending incorrect
+  // et pouvait faire ignorer router.refresh() après l'upload).
+  const [isUploading, setIsUploading] = useState(false);
 
   // Formulaire d'ajout
   const [showForm, setShowForm] = useState(false);
@@ -95,7 +99,9 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
         setDeleteError("Erreur lors de la suppression.");
         return;
       }
-      startTransition(() => router.refresh());
+      // router.refresh() appelé directement — pas dans startTransition
+      // (évite le problème async callback React 18 identique à handleUpload).
+      router.refresh();
     } finally {
       setDeletingId(null);
     }
@@ -120,29 +126,36 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
 
     const expiresAt = formExpiresAt ? new Date(formExpiresAt) : null;
 
-    startTransition(async () => {
-      try {
-        const result = await uploadBeDocument(beId, formData, formKind, formLabel, expiresAt);
-        if (!result.ok) {
-          const messages: Record<string, string> = {
-            forbidden_role: "Accès réservé aux administrateurs.",
-            invalid_input: "Données invalides. Vérifiez le fichier et le libellé.",
-            internal_error: "Erreur serveur lors de l'upload.",
-          };
-          setFormError(messages[result.error] ?? "Erreur inconnue.");
-          return;
-        }
-        setFormSuccess("Document ajouté avec succès.");
-        setFormLabel("");
-        setFormExpiresAt("");
-        setFormKind("dc1");
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        setShowForm(false);
-        router.refresh();
-      } catch {
-        setFormError("Erreur inattendue lors de l'upload.");
+    // Fonction async normale — plus de startTransition(async () => {...}).
+    // Le startTransition async (React 18) complète immédiatement dès que la
+    // Promise est retournée : isPending passe à false avant la fin du fetch,
+    // et router.refresh() pouvait être ignoré dans certains contextes.
+    setIsUploading(true);
+    try {
+      const result = await uploadBeDocument(beId, formData, formKind, formLabel, expiresAt);
+      if (!result.ok) {
+        const messages: Record<string, string> = {
+          forbidden_role: "Accès réservé aux administrateurs.",
+          invalid_input: "Données invalides. Vérifiez le fichier et le libellé.",
+          internal_error: "Erreur serveur lors de l'upload.",
+        };
+        setFormError(messages[result.error] ?? "Erreur inconnue.");
+        return;
       }
-    });
+      setFormSuccess("Document ajouté avec succès.");
+      setFormLabel("");
+      setFormExpiresAt("");
+      setFormKind("dc1");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setShowForm(false);
+      // Appel direct — sans startTransition — pour garantir que Next.js
+      // re-fetch bien les Server Components après l'upload.
+      router.refresh();
+    } catch {
+      setFormError("Erreur inattendue lors de l'upload.");
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   // ============================================================================
@@ -270,10 +283,10 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
           <div className="mt-4 flex gap-2">
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isUploading}
               className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-md bg-brand-red px-4 py-2 text-xs font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-60"
             >
-              {isPending ? "Upload…" : "Ajouter"}
+              {isUploading ? "Upload…" : "Ajouter"}
             </button>
             <button
               type="button"
@@ -357,7 +370,7 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
                     <button
                       type="button"
                       onClick={() => handleDelete(doc.id)}
-                      disabled={deletingId === doc.id || isPending}
+                      disabled={deletingId === doc.id || isUploading}
                       aria-label={`Supprimer ${doc.label}`}
                       className="rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-60"
                     >
