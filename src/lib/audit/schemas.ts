@@ -155,8 +155,9 @@ const membershipChangeSchema = z.object({
     .string()
     .min(3)
     .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "email invalide"),
-  from_role: z.enum(["admin", "user", "viewer"]).optional(),
-  to_role: z.enum(["admin", "user", "viewer"]).optional(),
+  // Extension 2026-05-27 : ajout de 'superadmin' (rôle éditeur edifio — Board 2026-05-27).
+  from_role: z.enum(["admin", "user", "viewer", "superadmin"]).optional(),
+  to_role: z.enum(["admin", "user", "viewer", "superadmin"]).optional(),
   operation: z.enum(["invite", "update", "revoke", "regenerate_provisional"]),
 });
 

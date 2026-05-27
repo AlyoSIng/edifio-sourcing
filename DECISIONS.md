@@ -2,6 +2,50 @@
 
 ---
 
+## 2026-05-27 — Module superadmin Phase 1 — fondations BDD + types + middleware + squelettes (Alex)
+
+- **2026-05-27 · G6 · Board · Décision — 3e rôle `superadmin` réservé à l'éditeur edifio (`contact@edifio.fr` + `steissier@alyosingenierie.fr`). `@edifio.fr` autorisé en plus de `@alyosingenierie.fr` dans la garde de domaine. [BOARD-OK 2026-05-27]**
+
+- **2026-05-27 · G6 · Alex (dev) · Migration 0019 — Module superadmin.**
+  *Fichiers créés/modifiés :*
+  *- `src/db/migrations/0019_superadmin_module.sql` (nouveau) : ALTER TYPE membership_role ADD VALUE 'superadmin' ; 9 tables (support_tickets, news_items, user_news_reads, formations, faq_items, guided_tests, guided_test_submissions, app_content, user_notifications) ; RLS ENABLE+FORCE + policies sur les 9 tables ; 6 index ; trigger touch_updated_at sur 4 tables. Note : table renommée `user_notifications` (et non `notifications`) pour éviter la collision avec la table existante du module intégrations.*
+  *- `src/db/migrations/meta/_journal.json` : entrée idx=19 ajoutée.*
+  *- `src/db/schema/superadmin.ts` (nouveau) : schéma Drizzle pour les 9 nouvelles tables + types TS exportés.*
+  *- `src/db/schema/index.ts` : barrel étendu avec `./superadmin`.*
+  *- `src/db/schema/enums.ts` : `membershipRole` étendu avec `"superadmin"` + JSDoc.*
+  *- `src/db/types/jsonb.ts` : `AuditLogDataMembershipChange.from_role` et `to_role` étendus avec `"superadmin"`.*
+
+- **2026-05-27 · G6 · Alex (dev) · Couche auth — superadmin.**
+  *- `src/lib/auth/types.ts` : `type Role` étendu avec `"superadmin"` ; `isSuperAdmin(profile)` ajouté.*
+  *- `src/lib/auth/domain.ts` : `ALLOWED_DOMAINS` (array) remplace `ALLOWED_DOMAIN` (singular, conservé comme alias deprecated) ; `isAuthorizedEmail` teste les deux domaines.*
+  *- `src/lib/auth/routes.ts` : `SUPERADMIN_PREFIX` + `SUPERADMIN_API_PREFIX` + `isSuperAdminRoute()` ajoutés ; `isProtectedApiRoute` étendu pour inclure `SUPERADMIN_API_PREFIX`.*
+  *- `src/lib/audit/schemas.ts` : schémas Zod `membership_change` from_role/to_role étendus avec `"superadmin"`.*
+
+- **2026-05-27 · G6 · Alex (dev) · Middleware Gate 8 — superadmin.**
+  *- `src/middleware.ts` : import `isSuperAdminRoute` + `isSuperAdmin` ; Gate 7 admin corrigée (superadmin peut accéder aux routes admin) ; Gate 8 ajoutée pour bloquer les non-superadmin sur `/sourcing/superadmin/*` et `/api/superadmin/*`.*
+
+- **2026-05-27 · G6 · Alex (dev) · AppShell — compatibilité rôle superadmin.**
+  *- `src/components/app-shell/Sidebar.tsx` + `SidebarMobileDrawer.tsx` : prop `role` étendue avec `"superadmin"` ; `isAdmin` tient compte du superadmin pour les items `adminOnly`.*
+
+- **2026-05-27 · G6 · Alex (dev) · Squelettes routes superadmin.**
+  *- `src/app/sourcing/superadmin/layout.tsx` : triple garde (session + domaine + isSuperAdmin) + chrome visuel badge violet.*
+  *- `src/app/sourcing/superadmin/page.tsx` : dashboard 6 cartes.*
+  *- 6 pages squelettes : support, news, guided-tests, market-study, pitch, roadmap.*
+
+- **2026-05-27 · G6 · Alex (dev) · Squelettes routes profil utilisateur.**
+  *- `src/app/sourcing/profil/layout.tsx` (Server) + `ProfilNav.tsx` (Client, usePathname) : garde session + domaine + tabs latéraux.*
+  *- `src/app/sourcing/profil/page.tsx` : redirect vers /news.*
+  *- 6 pages squelettes : support, news, formations, guided-tests, faq, demo.*
+
+- **2026-05-27 · G6 · Alex (dev) · Bouton promotion superadmin.**
+  *- `src/app/sourcing/admin/users/PromoteSuperadminButton.tsx` (nouveau) : bouton client violet (promotion admin→superadmin) / neutral (rétrogradation superadmin→admin). Visible uniquement si viewer=superadmin et cible admin/superadmin.*
+  *- `src/app/sourcing/admin/users/actions.ts` : `updateUserSuperadminAction` ajoutée (5 guards : session + isSuperAdmin + UUID v4 + self-demotion + target-not-admin).*
+  *- `src/app/sourcing/admin/users/page.tsx` : badge violet "Superadmin" + intégration PromoteSuperadminButton + roleToFr étendue.*
+  *- `tests/unit/schema/inference.test.ts` : assertions enum membership_role mises à jour.*
+  *Décision technique : table `user_notifications` (et non `notifications`) pour éviter la collision BDD avec la table du module intégrations (migration 0001).*
+
+---
+
 ## 2026-05-26 — Worker Playwright v1.0.0 — scrapers PLACE + Francmarchés (Alex)
 
 - **2026-05-26 · G6 · Alex (dev) · feat/cotraitant-sharing — Worker Playwright v1.0.0 : scrapers PLACE et Francmarchés câblés dans le Fly.io worker.**

@@ -2,10 +2,17 @@ import { redirect } from "next/navigation";
 
 import type { User } from "@supabase/supabase-js";
 
-import { isAdmin, toUserProfile, type UserMetadata, type UserProfile } from "@/lib/auth/types";
+import {
+  isAdmin,
+  isSuperAdmin,
+  toUserProfile,
+  type UserMetadata,
+  type UserProfile,
+} from "@/lib/auth/types";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { InviteUserDialog } from "./InviteUserDialog";
+import { PromoteSuperadminButton } from "./PromoteSuperadminButton";
 import { RegeneratePasswordButton } from "./RegeneratePasswordButton";
 import { ToggleRoleButton } from "./ToggleRoleButton";
 
@@ -86,6 +93,8 @@ export default async function AdminUsersPage() {
   // `profile.id` est l'UUID de l'acteur connecté — transmis aux lignes pour
   // bloquer l'auto-rétrogradation côté UI (le guard serveur reste la protection réelle).
   const currentUserId = profile.id;
+  // Indique si le viewer est superadmin — détermine l'affichage du bouton de promotion.
+  const viewerIsSuperAdmin = isSuperAdmin(profile);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -125,7 +134,14 @@ export default async function AdminUsersPage() {
                 </td>
               </tr>
             ) : (
-              users.map((u) => <UserRow key={u.id} user={u} currentUserId={currentUserId} />)
+              users.map((u) => (
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  currentUserId={currentUserId}
+                  viewerIsSuperAdmin={viewerIsSuperAdmin}
+                />
+              ))
             )}
           </tbody>
         </table>
@@ -145,7 +161,15 @@ function Th({ children }: { children: React.ReactNode }) {
   );
 }
 
-function UserRow({ user, currentUserId }: { user: UserProfile; currentUserId: string }) {
+function UserRow({
+  user,
+  currentUserId,
+  viewerIsSuperAdmin,
+}: {
+  user: UserProfile;
+  currentUserId: string;
+  viewerIsSuperAdmin: boolean;
+}) {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
 
   const isExpired =
@@ -169,19 +193,40 @@ function UserRow({ user, currentUserId }: { user: UserProfile; currentUserId: st
 
   // Logique d'affichage de la colonne Actions :
   //   - Provisoire (mustChangePassword) → RegeneratePasswordButton uniquement
-  //   - Actif non-viewer                → ToggleRoleButton
-  //   - Actif viewer                    → tiret (pas de modification de rôle viewer en MVP)
+  //   - Actif non-viewer, non-superadmin → ToggleRoleButton + PromoteSuperadminButton (si viewer=superadmin)
+  //   - Actif superadmin                 → PromoteSuperadminButton (rétrogradation vers admin)
+  //   - Actif viewer                     → tiret (pas de modification de rôle viewer en MVP)
   const renderActions = () => {
     if (user.mustChangePassword) {
       return <RegeneratePasswordButton userId={user.id} email={user.email} />;
     }
-    if (user.role === "admin" || user.role === "user") {
+    if (user.role === "superadmin") {
+      // Un superadmin ne peut être rétrogradé que par un autre superadmin
       return (
-        <ToggleRoleButton
+        <PromoteSuperadminButton
           targetUserId={user.id}
           currentRole={user.role}
           isSelf={user.id === currentUserId}
+          viewerIsSuperAdmin={viewerIsSuperAdmin}
         />
+      );
+    }
+    if (user.role === "admin" || user.role === "user") {
+      return (
+        <div className="flex flex-col gap-1.5">
+          <ToggleRoleButton
+            targetUserId={user.id}
+            currentRole={user.role}
+            isSelf={user.id === currentUserId}
+          />
+          {/* Bouton promotion superadmin — visible uniquement si viewer=superadmin et cible=admin */}
+          <PromoteSuperadminButton
+            targetUserId={user.id}
+            currentRole={user.role}
+            isSelf={user.id === currentUserId}
+            viewerIsSuperAdmin={viewerIsSuperAdmin}
+          />
+        </div>
       );
     }
     // Viewer — pas de bouton en MVP
@@ -193,7 +238,12 @@ function UserRow({ user, currentUserId }: { user: UserProfile; currentUserId: st
       <td className="px-3 py-2.5 font-mono text-xs text-ink">{user.email}</td>
       <td className="px-3 py-2.5 text-sm text-ink">{fullName}</td>
       <td className="px-3 py-2.5">
-        <span className="inline-flex rounded-xs bg-paper-3 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-2">
+        <span
+          className={[
+            "inline-flex rounded-xs px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
+            user.role === "superadmin" ? "bg-violet-100 text-violet-700" : "bg-paper-3 text-ink-2",
+          ].join(" ")}
+        >
           {roleLabel}
         </span>
       </td>
@@ -216,6 +266,8 @@ function UserRow({ user, currentUserId }: { user: UserProfile; currentUserId: st
 
 function roleToFr(role: UserProfile["role"]): string {
   switch (role) {
+    case "superadmin":
+      return "Superadmin";
     case "admin":
       return "Admin";
     case "user":

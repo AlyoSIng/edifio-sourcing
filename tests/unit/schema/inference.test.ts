@@ -77,7 +77,8 @@ describe("schema Drizzle v1 — inférence de types", () => {
 
   it("memberships : $inferSelect inclut role typé enum membership_role", () => {
     type Row = typeof memberships.$inferSelect;
-    expectTypeOf<Row["role"]>().toEqualTypeOf<"admin" | "user" | "viewer">();
+    // Extension 2026-05-27 : ajout de 'superadmin' (rôle éditeur edifio — Board 2026-05-27).
+    expectTypeOf<Row["role"]>().toEqualTypeOf<"admin" | "user" | "viewer" | "superadmin">();
   });
 
   it("search_profiles : keywords typé SearchProfileKeywords (jsonb)", () => {
@@ -268,7 +269,10 @@ describe("schema Drizzle v1 — inférence de types", () => {
       | "architect_export"
     >();
     // actor_role est nullable (snapshot)
-    expectTypeOf<Row["actorRole"]>().toEqualTypeOf<"admin" | "user" | "viewer" | null>();
+    // Extension 2026-05-27 : ajout de 'superadmin' (rôle éditeur edifio).
+    expectTypeOf<Row["actorRole"]>().toEqualTypeOf<
+      "admin" | "user" | "viewer" | "superadmin" | null
+    >();
   });
 
   it("learning_events : event_type enum learning_event_type", () => {

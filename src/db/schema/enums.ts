@@ -28,11 +28,15 @@ export const subscriptionTier = pgEnum("subscription_tier", ["sourcing", "cotrai
 
 /**
  * membership_role — rôle d'un user dans une organisation.
- * admin : full access (admin pages, audit logs, gestion membres)
- * user  : usage standard (sélection AO, sollicitation archis, dossier)
- * viewer: lecture seule
+ * superadmin : rôle éditeur edifio — réservé à contact@edifio.fr et
+ *              steissier@alyosingenierie.fr. Inclut tous les droits admin
+ *              + accès au module /sourcing/superadmin (support, news, formations,
+ *              tests guidés, contenu app). Décision Board 2026-05-27.
+ * admin      : full access (admin pages, audit logs, gestion membres)
+ * user       : usage standard (sélection AO, sollicitation archis, dossier)
+ * viewer     : lecture seule
  */
-export const membershipRole = pgEnum("membership_role", ["admin", "user", "viewer"]);
+export const membershipRole = pgEnum("membership_role", ["admin", "user", "viewer", "superadmin"]);
 
 /**
  * platform_code — plateforme source d'un AO public BTP.

@@ -231,8 +231,9 @@ export interface AuditLogDataLogin {
 export interface AuditLogDataMembershipChange {
   target_user_id: string;
   target_email: string;
-  from_role?: "admin" | "user" | "viewer";
-  to_role?: "admin" | "user" | "viewer";
+  /** Extension 2026-05-27 : ajout de 'superadmin' (rôle éditeur edifio). */
+  from_role?: "admin" | "user" | "viewer" | "superadmin";
+  to_role?: "admin" | "user" | "viewer" | "superadmin";
   /**
    * `regenerate_provisional` ajouté 2026-05-20 par [DEV Alex],
    * **validé CTO Sophie 2026-05-20** via

@@ -49,7 +49,7 @@ import { isItemActive, NAV_ITEMS, type NavItem } from "./nav-items";
  */
 interface SidebarMobileDrawerProps {
   /** Rôle de l'utilisateur connecté pour filtrer `adminOnly`. */
-  role: "admin" | "user" | "viewer";
+  role: "admin" | "user" | "viewer" | "superadmin";
 }
 
 /** Sélecteur des éléments focusables — pour focus-trap maison. */
@@ -65,7 +65,8 @@ const FOCUSABLE_SELECTOR = [
 export function SidebarMobileDrawer({ role }: SidebarMobileDrawerProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname() ?? "/sourcing/ao-du-jour";
-  const isAdmin = role === "admin";
+  // Le superadmin bénéficie également de l'accès aux items adminOnly.
+  const isAdmin = role === "admin" || role === "superadmin";
 
   const drawerRef = useRef<HTMLElement | null>(null);
   const hamburgerRef = useRef<HTMLButtonElement | null>(null);

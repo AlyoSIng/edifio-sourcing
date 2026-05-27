@@ -68,7 +68,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return jsonError(400, "Adresse email invalide.");
     }
     if (!isAuthorizedEmail(email)) {
-      return jsonError(400, "L'email doit appartenir au domaine @alyosingenierie.fr.");
+      return jsonError(
+        400,
+        "L'email doit appartenir au domaine @alyosingenierie.fr ou @edifio.fr.",
+      );
     }
     if (!firstName || !lastName) {
       return jsonError(400, "Prénom et nom requis.");

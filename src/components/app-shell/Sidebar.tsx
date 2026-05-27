@@ -26,12 +26,13 @@ import { isItemActive, NAV_ITEMS, type NavItem } from "./nav-items";
  */
 interface SidebarProps {
   /** Rôle de l'utilisateur connecté pour filtrer `adminOnly`. */
-  role: "admin" | "user" | "viewer";
+  role: "admin" | "user" | "viewer" | "superadmin";
 }
 
 export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname() ?? "/sourcing/ao-du-jour";
-  const isAdmin = role === "admin";
+  // Le superadmin bénéficie également de l'accès aux items adminOnly.
+  const isAdmin = role === "admin" || role === "superadmin";
 
   return (
     <aside

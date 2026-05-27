@@ -134,6 +134,13 @@
       "when": 1748995680000,
       "tag": "0018_rls_cotraitants_be",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1748995800000,
+      "tag": "0019_superadmin_module",
+      "breakpoints": true
     }
   ]
 }

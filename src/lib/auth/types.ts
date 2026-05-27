@@ -12,8 +12,16 @@
  */
 import type { User } from "@supabase/supabase-js";
 
-/** Rôles applicatifs — match strict des valeurs en BDD. */
-export type Role = "admin" | "user" | "viewer";
+/**
+ * Rôles applicatifs — match strict des valeurs en BDD.
+ * - superadmin : éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
+ *                Inclut tous les droits admin + accès /sourcing/superadmin.
+ *                Décision Board 2026-05-27.
+ * - admin      : full access AlyoS (admin pages, audit, gestion membres)
+ * - user       : usage standard
+ * - viewer     : lecture seule
+ */
+export type Role = "admin" | "user" | "viewer" | "superadmin";
 
 /**
  * Shape attendue de `auth.users.user_metadata`. Toutes les propriétés
@@ -85,9 +93,23 @@ export function toUserProfile(user: User): UserProfile {
   };
 }
 
-/** Type guard : l'utilisateur a-t-il le rôle admin ? */
+/**
+ * Type guard : l'utilisateur a-t-il le rôle admin ?
+ * Note : un superadmin N'est PAS considéré "admin" par cette garde seule —
+ * utiliser `isAdmin(p) || isSuperAdmin(p)` pour les ressources admin standard.
+ */
 export function isAdmin(profile: UserProfile): boolean {
   return profile.role === "admin";
+}
+
+/**
+ * Type guard : l'utilisateur a-t-il le rôle superadmin ?
+ * Le superadmin est l'éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
+ * Il dispose de tous les droits admin + accès exclusif à /sourcing/superadmin.
+ * Décision Board 2026-05-27.
+ */
+export function isSuperAdmin(profile: UserProfile): boolean {
+  return profile.role === "superadmin";
 }
 
 /** Type guard : l'utilisateur doit-il changer son mot de passe au prochain login ? */

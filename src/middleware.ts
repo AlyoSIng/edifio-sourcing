@@ -7,9 +7,15 @@ import {
   isProtectedApiRoute,
   isProtectedUiRoute,
   isPublicRoute,
+  isSuperAdminRoute,
   RESET_PASSWORD_PATH,
 } from "@/lib/auth/routes";
-import { isProvisionalPasswordExpired, mustChangePassword, toUserProfile } from "@/lib/auth/types";
+import {
+  isProvisionalPasswordExpired,
+  isSuperAdmin,
+  mustChangePassword,
+  toUserProfile,
+} from "@/lib/auth/types";
 
 /**
  * Middleware racine — garde de domaine `@alyosingenierie.fr` + gates
@@ -207,7 +213,8 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     }
 
     // ---------- 7. Gate admin ----------
-    if (isAdminRoute(pathname) && profile.role !== "admin") {
+    // Un superadmin peut également accéder aux routes admin (son rôle est supérieur).
+    if (isAdminRoute(pathname) && profile.role !== "admin" && !isSuperAdmin(profile)) {
       if (isProtectedApiRoute(pathname)) {
         return new NextResponse(
           JSON.stringify({
@@ -223,7 +230,25 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       return NextResponse.redirect(fallback);
     }
 
-    // ---------- 8. Accès autorisé ----------
+    // ---------- 8. Gate superadmin ----------
+    // Réservé à l'éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
+    // Décision Board 2026-05-27.
+    if (isSuperAdminRoute(pathname) && !isSuperAdmin(profile)) {
+      if (isProtectedApiRoute(pathname)) {
+        return new NextResponse(
+          JSON.stringify({
+            error: "forbidden_role",
+            message: "Réservé aux superadministrateurs.",
+          }),
+          { status: 403, headers: { "content-type": "application/json" } },
+        );
+      }
+      const fallback = new URL("/sourcing/ao-du-jour", req.url);
+      fallback.searchParams.set("error", "forbidden");
+      return NextResponse.redirect(fallback);
+    }
+
+    // ---------- 9. Accès autorisé ----------
     return supabaseResponse;
   } catch (err) {
     console.error("[middleware:unhandled]", {

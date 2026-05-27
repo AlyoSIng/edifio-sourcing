@@ -41,6 +41,16 @@ export const PROTECTED_API_PREFIX = "/api/protected" as const;
 /** Préfixe des routes API admin — exige role admin. */
 export const ADMIN_API_PREFIX = "/api/admin" as const;
 
+/**
+ * Préfixe des routes UI superadmin — exige role superadmin.
+ * Réservé à l'éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
+ * Décision Board 2026-05-27.
+ */
+export const SUPERADMIN_PREFIX = "/sourcing/superadmin" as const;
+
+/** Préfixe des routes API superadmin — exige role superadmin. */
+export const SUPERADMIN_API_PREFIX = "/api/superadmin" as const;
+
 /** Path exact de la page reset-password (utilisé pour le branchement middleware). */
 export const RESET_PASSWORD_PATH = "/reset-password" as const;
 
@@ -89,7 +99,11 @@ export function isProtectedUiRoute(pathname: string): boolean {
  * Détermine la forme de la réponse en cas de refus (JSON vs redirect).
  */
 export function isProtectedApiRoute(pathname: string): boolean {
-  return pathname.startsWith(PROTECTED_API_PREFIX) || pathname.startsWith(ADMIN_API_PREFIX);
+  return (
+    pathname.startsWith(PROTECTED_API_PREFIX) ||
+    pathname.startsWith(ADMIN_API_PREFIX) ||
+    pathname.startsWith(SUPERADMIN_API_PREFIX)
+  );
 }
 
 /**
@@ -97,7 +111,20 @@ export function isProtectedApiRoute(pathname: string): boolean {
  * ensemble des routes protégées (UI ou API) qui ne change pas la nature de
  * la réponse côté middleware (UI redirect / API JSON 403) — la décision se
  * fait après celle sur l'authentification + domaine.
+ *
+ * Note : les routes superadmin NE sont PAS incluses ici — elles ont leur propre
+ * garde (`isSuperAdminRoute`). Un superadmin peut accéder aux routes admin
+ * mais un admin ne peut pas accéder aux routes superadmin.
  */
 export function isAdminRoute(pathname: string): boolean {
   return pathname.startsWith(ADMIN_PREFIX) || pathname.startsWith(ADMIN_API_PREFIX);
+}
+
+/**
+ * Retourne `true` si le pathname requiert le rôle `superadmin`.
+ * Réservé à l'éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
+ * Décision Board 2026-05-27.
+ */
+export function isSuperAdminRoute(pathname: string): boolean {
+  return pathname.startsWith(SUPERADMIN_PREFIX) || pathname.startsWith(SUPERADMIN_API_PREFIX);
 }
