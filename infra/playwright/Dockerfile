@@ -17,9 +17,12 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 
 # Étape dépendances (cache friendly).
-# pnpm-workspace.yaml contient la liste onlyBuiltDependencies (pnpm 11+).
-COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
-RUN pnpm install --prod=false --frozen-lockfile=false
+# --ignore-scripts : aucun build script natif requis dans ce sous-projet
+# (fastify, playwright navigateurs pré-installés dans l'image de base, tsx).
+# Évite la friction pnpm-workspace.yaml allowBuilds / onlyBuiltDependencies
+# entre pnpm 9 (container) et pnpm 11 (machine dev).
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --prod=false --frozen-lockfile=false --ignore-scripts
 
 # Étape code source.
 COPY tsconfig.json ./
