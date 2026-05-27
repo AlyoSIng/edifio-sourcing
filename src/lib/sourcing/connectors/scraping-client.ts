@@ -14,7 +14,15 @@
  *  - SCRAPER_TRIGGER_SECRET — Bearer token partagé worker ↔ webhook Next.js
  */
 
-export type ScrapingPlatform = "place" | "francmarches";
+export type ScrapingPlatform =
+  | "place"
+  | "francmarches"
+  | "marchespublicsinfo"
+  | "mpe76"
+  | "marchesonline"
+  | "marchespublicsnormandie"
+  | "maregionsud"
+  | "departement13";
 
 export interface ScrapingJobRequest {
   platform: ScrapingPlatform;
