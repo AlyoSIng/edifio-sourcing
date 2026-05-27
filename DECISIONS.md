@@ -60,6 +60,24 @@
 
 ---
 
+## 2026-05-27 — Scrapers régionaux Playwright + Fly.io deploy (Alex + Yann)
+
+- **2026-05-27 · G6 · Alex (dev) + Yann (ps_operator) · feat — 6 nouveaux scrapers Playwright plateformes régionales (PR #80).**
+  *Extension `ScrapingPlatform` de 2 à 8 valeurs : `place`, `francmarches`, `marchespublicsinfo`, `mpe76`, `marchesonline`, `marchespublicsnormandie`, `maregionsud`, `departement13`.*
+  *6 nouveaux fichiers scrapers dans `infra/playwright/src/scrapers/` — pattern `francmarches.ts` (sélecteurs dégradés, jitter 100-300 ms, pagination, timeout global). Portails Xdemat (maregionsud, departement13) : extraction `ConsultationRef` depuis URL params, timeout 120 s, filtrage par `lastRunAt`.*
+  *`worker.ts` : `VALID_PLATFORMS` Set + `isValidPlatform()` généralisé + switch à 8 branches + `estimatedDuration` mis à jour.*
+  *`scraping-client.ts` (Vercel) synchronisé : même union type 8 plateformes (commit `4c289c4`).*
+  *Sélecteurs best-effort — à affiner après premier run réel sur chaque plateforme.*
+
+- **2026-05-27 · G6 · Yann (ps_operator) · fix — Dockerfile playwright `--ignore-scripts` (commit `e73f12a`).**
+  *Contexte : Fly.io cloud builder utilisait pnpm 11 (`npm install -g pnpm@latest`) sur le contexte root → `[ERR_PNPM_IGNORED_BUILDS]` sur sharp/unrs-resolver (allowBuilds pnpm 11 non compris par le container pnpm 9).*
+  *Fix : suppression `COPY pnpm-workspace.yaml` + ajout `--ignore-scripts` au `pnpm install` du Dockerfile `infra/playwright/`. Le sous-projet playwright n'a aucun binaire natif à compiler.*
+
+- **2026-05-27 · G6 · Steve (Board) · ops — Fly.io déploiement worker Playwright.**
+  *Première mise en production du worker `edifio-playwright-worker` sur Fly.io EU (cdg). App créée + 2 machines HA déployées. URL : `https://edifio-playwright-worker.fly.dev/`. Image : 764 MB (playwright:v1.49.1-jammy). Secrets injectés via `fly secrets set`.*
+
+---
+
 ## 2026-05-27 — Bouton DCE + AO manuel (Alex)
 
 - **2026-05-27 · G6 · Alex (dev) · feat — bouton téléchargement DCE BOAMP : exposition `tender.dce_url` existant.**
