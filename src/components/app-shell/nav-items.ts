@@ -62,7 +62,7 @@ export interface NavSection {
  * pas de logique conditionnelle dans `Sidebar`.
  *
  * Mise à jour feat/nav-email-v3 (Nadia, 2026-05-26) :
- *  - Section "Sourcing" : AO du jour / Sélectionnés / Différés
+ *  - Section "Sourcing" : AO du jour / Sélectionnés / Reportés
  *  - Section "Pilotage" : Cotraitance / Mandataire / Conception-Réalisation (comingSoon)
  *  - Section "Contacts" : Architectes / Bureaux d'Études (comingSoon) / Entreprises (comingSoon)
  *  - Section "Configuration" : inchangée (adminOnly)
@@ -85,10 +85,10 @@ export const NAV_ITEMS: NavSection[] = [
         matchPrefix: "/sourcing/selectionnes",
       },
       {
-        href: "/sourcing/differes",
-        label: "Différés",
+        href: "/sourcing/reportes",
+        label: "Reportés",
         icon: "clock",
-        matchPrefix: "/sourcing/differes",
+        matchPrefix: "/sourcing/reportes",
       },
     ],
   },

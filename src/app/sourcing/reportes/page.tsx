@@ -11,11 +11,11 @@ import { getTendersDeferred } from "@/lib/sourcing/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata = {
-  title: "Différés — edifio Sourcing",
+  title: "Reportés — edifio Sourcing",
 };
 
 /**
- * Page « Différés » — AOs mis en attente par l'utilisateur (deferred_until
+ * Page « Reportés » — AOs mis en attente par l'utilisateur (deferred_until
  * IS NOT NULL AND deferred_until > now()), triés par date de retour croissante.
  *
  * Server Component force-dynamic.
@@ -23,13 +23,13 @@ export const metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default async function DifferesPage() {
+export default async function ReportesPage() {
   // Auth check défensif.
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/sourcing/differes");
+  if (!user) redirect("/login?next=/sourcing/reportes");
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
 
@@ -39,7 +39,7 @@ export default async function DifferesPage() {
   try {
     deferredTenders = await getTendersDeferred(ALYOS_ORG_ID, db);
   } catch (err) {
-    console.error("[differes:fetch-failed]", err);
+    console.error("[reportes:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
   }
 
@@ -51,16 +51,16 @@ export default async function DifferesPage() {
       <header className="mb-6">
         <span className="pill-eyebrow">AOs mis en attente</span>
         <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
-          Différés
+          Reportés
         </h1>
         <p className="mt-1 text-sm text-muted">
           {fetchError ? (
             "Erreur de chargement — voir détail ci-dessous."
           ) : totalCount === 0 ? (
-            "Aucun AO différé pour le moment."
+            "Aucun AO reporté pour le moment."
           ) : (
             <>
-              {totalCount} AO différé{totalCount > 1 ? "s" : ""} — triés par date de retour.
+              {totalCount} AO reporté{totalCount > 1 ? "s" : ""} — triés par date de retour.
             </>
           )}
         </p>
@@ -70,7 +70,7 @@ export default async function DifferesPage() {
       {fetchError ? (
         <ErrorBanner message={fetchError} />
       ) : totalCount === 0 ? (
-        <EmptyStateDifferes />
+        <EmptyStateReportes />
       ) : (
         <ul className="flex flex-col gap-3.5">
           {deferredTenders.map((tender) => (
@@ -79,7 +79,7 @@ export default async function DifferesPage() {
                 tender={tender}
                 cta={
                   <>
-                    {/* Badge « Différé jusqu'au [date] » */}
+                    {/* Badge « Reporté jusqu'au [date] » */}
                     {tender.deferredUntil ? (
                       <DeferredBadge deferredUntil={tender.deferredUntil} />
                     ) : null}
@@ -107,7 +107,7 @@ export default async function DifferesPage() {
 
 /**
  * Badge amber indiquant la date à laquelle l'AO reviendra dans le digest.
- * Format : « Différé jusqu'au 28 mai »
+ * Format : « Reporté jusqu'au 28 mai »
  */
 function DeferredBadge({ deferredUntil }: { deferredUntil: Date }) {
   const label = new Intl.DateTimeFormat("fr-FR", {
@@ -117,24 +117,24 @@ function DeferredBadge({ deferredUntil }: { deferredUntil: Date }) {
 
   return (
     <span className="self-end rounded-full bg-amber-100 px-2 py-0.5 text-right text-[11px] font-semibold text-amber-700">
-      Différé jusqu&apos;au {label}
+      Reporté jusqu&apos;au {label}
     </span>
   );
 }
 
-function EmptyStateDifferes() {
+function EmptyStateReportes() {
   return (
     <div role="status" className="rounded-md border border-line bg-white px-6 py-12 text-center">
       <div className="mb-3 text-4xl opacity-40" aria-hidden>
         ⏸
       </div>
-      <h2 className="font-display text-lg font-semibold text-ink">Aucun AO différé</h2>
+      <h2 className="font-display text-lg font-semibold text-ink">Aucun AO reporté</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted">
         Utilisez le bouton « Reporter » sur un AO depuis{" "}
         <Link href="/sourcing/ao-du-jour" className="text-brand-red underline underline-offset-2">
           AO du jour
         </Link>{" "}
-        pour différer un AO.
+        pour reporter un AO.
       </p>
     </div>
   );

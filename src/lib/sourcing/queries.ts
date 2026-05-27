@@ -356,7 +356,7 @@ export async function getTendersSolo(
 }
 
 // ============================================================================
-// 5. getTendersDeferred — liste « Différés »
+// 5. getTendersDeferred — liste « Reportés »
 // ============================================================================
 
 /**
