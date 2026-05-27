@@ -191,6 +191,7 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
               <InfoField label="Email" value={architect.email} isEmail />
               <InfoField label="Téléphone" value={architect.phone} />
               <InfoField label="Site web" value={architect.website} isUrl />
+              <InfoField label="SIRET" value={architect.siret} />
               <InfoField label="SIREN" value={architect.siren} />
               <InfoField
                 label="Ville"

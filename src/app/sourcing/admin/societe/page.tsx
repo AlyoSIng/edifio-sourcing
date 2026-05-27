@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { loadOrgProfile } from "./actions";
+import { loadOrgProfile, loadOrgSiret } from "./actions";
 import { OrgProfileForm } from "./OrgProfileForm";
 
 export const metadata = {
@@ -32,11 +32,12 @@ export default async function SocietePage() {
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
-  // 2. Chargement profil org (try/catch dans loadOrgProfile)
+  // 2. Chargement profil org et SIRET (try/catch dans les helpers)
   let orgProfile = null;
+  let orgSiret: string | null = null;
   let fetchError: string | null = null;
   try {
-    orgProfile = await loadOrgProfile();
+    [orgProfile, orgSiret] = await Promise.all([loadOrgProfile(), loadOrgSiret()]);
   } catch (err) {
     console.error("[societe:fetch:fail]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -67,7 +68,7 @@ export default async function SocietePage() {
         </div>
       ) : (
         <div className="rounded-md border border-line bg-white p-6">
-          <OrgProfileForm initial={orgProfile} />
+          <OrgProfileForm initial={orgProfile} initialSiret={orgSiret} />
         </div>
       )}
     </div>

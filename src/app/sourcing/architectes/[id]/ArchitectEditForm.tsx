@@ -57,6 +57,7 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
   const [phone, setPhone] = useState(architect.phone ?? "");
   const [website, setWebsite] = useState(architect.website ?? "");
   const [siren, setSiren] = useState(architect.siren ?? "");
+  const [siret, setSiret] = useState(architect.siret ?? "");
   const [zip, setZip] = useState(architect.zip ?? "");
   const [city, setCity] = useState(architect.city ?? "");
   const [notes, setNotes] = useState(architect.notes ?? "");
@@ -106,6 +107,13 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
     const budgetMinValue = budgetMin ? parseInt(budgetMin, 10) : null;
     const budgetMaxValue = budgetMax ? parseInt(budgetMax, 10) : null;
 
+    // Validation SIRET : si renseigné, doit être 14 chiffres
+    const siretValue = siret.trim() || null;
+    if (siretValue !== null && !/^\d{14}$/.test(siretValue)) {
+      setEditError("Le SIRET doit comporter exactement 14 chiffres.");
+      return;
+    }
+
     startEditTransition(async () => {
       const result = await upsertArchitect(
         {
@@ -114,6 +122,7 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
           email: email.trim() || null,
           phone: phone.trim() || null,
           website: website.trim() || null,
+          siret: siretValue,
           siren: siren.trim() || null,
           zip: zip.trim() || null,
           city: city.trim() || null,
@@ -269,11 +278,26 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
             </div>
           </div>
 
-          {/* SIREN + CP + Ville */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* SIRET + SIREN */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="siret" className="block text-xs font-medium text-ink">
+                SIRET (14 chiffres){" "}
+                <span className="text-xs font-normal text-muted">optionnel</span>
+              </label>
+              <input
+                id="siret"
+                type="text"
+                value={siret}
+                onChange={(e) => setSiret(e.target.value)}
+                maxLength={14}
+                placeholder="ex : 12345678901234"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
             <div>
               <label htmlFor="siren" className="block text-xs font-medium text-ink">
-                SIREN (9 chiffres)
+                SIREN (9 chiffres) <span className="text-xs font-normal text-muted">matching</span>
               </label>
               <input
                 id="siren"
@@ -284,6 +308,10 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
                 className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
               />
             </div>
+          </div>
+
+          {/* CP + Ville */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="zip" className="block text-xs font-medium text-ink">
                 Code postal
