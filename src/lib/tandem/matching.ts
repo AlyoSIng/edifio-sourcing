@@ -308,15 +308,36 @@ export const NEIGHBORING_DEPARTMENTS: Record<string, string[]> = {
 /**
  * Extrait le département (chaîne 2 chars FR métropole, 3 chars DOM/Corse).
  * Sources possibles, par ordre de priorité :
- *  1. `tender.rawData?.record?.departement` (BOAMP — fiable)
- *  2. Premier nombre 2-3 chars en début de `tender.buyer` (heuristique)
+ *  1. `tender.rawData?.record?.code_departement` (BOAMP réel — tableau ["74"])
+ *  2. `tender.rawData?.record?.departement` (variante ancienne)
  *  3. Code postal 5 chars dans `tender.buyer` → 2 premiers digits
  *
+ * Padding : codes à 1 chiffre ("6") → LPAD "06" (aligne sur référentiel ISO).
  * Retourne `null` si aucune source ne donne un département valide.
  */
 export function extractDepartment(tender: Pick<Tender, "buyer" | "rawData">): string | null {
-  // 1. rawData BOAMP
-  const raw = tender.rawData as { record?: { departement?: unknown } } | null | undefined;
+  // 1. rawData BOAMP — champ réel "code_departement" (tableau) ou "departement" (legacy)
+  const raw = tender.rawData as
+    | { record?: { code_departement?: unknown; departement?: unknown } }
+    | null
+    | undefined;
+
+  const padDept = (val: string): string => {
+    const t = val.trim().toUpperCase();
+    return t.length === 1 ? t.padStart(2, "0") : t;
+  };
+
+  // code_departement : peut être un tableau ["74"] ou une chaîne "74"
+  const rawCd = raw?.record?.code_departement;
+  if (Array.isArray(rawCd) && rawCd.length > 0) {
+    const first = String(rawCd[0]).trim();
+    if (/^(\d{1,3}|2[AB])$/i.test(first)) return padDept(first);
+  }
+  if (typeof rawCd === "string" && /^(\d{1,3}|2[AB])$/i.test(rawCd.trim())) {
+    return padDept(rawCd);
+  }
+
+  // departement : legacy BOAMP
   const rawDept = raw?.record?.departement;
   if (typeof rawDept === "string" && /^(\d{2,3}|2[AB])$/i.test(rawDept.trim())) {
     return rawDept.trim().toUpperCase();

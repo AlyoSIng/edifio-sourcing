@@ -7,11 +7,21 @@
  *  - À l'ingest dans `insert.ts` (calcul à la création + mise à jour idempotente)
  *  - Dans `scripts/backfill-departments.ts` (rétroactivement sur lignes existantes)
  *
+ * Règle de résolution département (ordre strict) :
+ *   1. `rawData.record.code_departement` (BOAMP réel — tableau ["74"])
+ *   2. `rawData.record.departement` (variante legacy)
+ *   3. Dérivé du CP extrait via `extractDepartment()` de matching.ts
+ *
  * Règle de résolution CP (ordre strict) :
  *   1. CP lieu d'exécution dans rawData.record (plusieurs chemins BOAMP)
  *   2. CP acheteur / MOA dans rawData.record (plusieurs chemins BOAMP)
  *   3. Regex /\b(\d{5})\b/ dans le champ buyer
  *   4. null (→ affiche "CP non précisé" côté UI)
+ *
+ * Note terrain 2026-05-27 : les AOs BOAMP en prod stockent le département
+ * dans `code_departement` (array), pas dans `departement`. Le CP n'est pas
+ * présent dans le payload Opendatasoft — `postalCode` restera null pour
+ * la majorité des AOs sauf si le champ buyer contient un CP explicite.
  *
  * Département dérivé : réutilise `extractDepartment()` de `matching.ts`
  * (valide pour record.departement + fallback buyer). On NE recrée PAS la logique.
