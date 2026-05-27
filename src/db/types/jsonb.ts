@@ -73,8 +73,11 @@ export interface SearchProfileKeywords {
  * pas ici. Garder un typage large à la frontière entrée est un choix assumé.
  */
 export interface TenderRawData {
-  /** Plateforme source — clef discriminante pour parser ultérieurement */
-  platform_code: "boamp" | "place" | "francmarches" | "mp_info";
+  /**
+   * Plateforme source — clef discriminante pour parser ultérieurement.
+   * `prive` : consultation manuelle saisie par un admin AlyoS (migration 0023).
+   */
+  platform_code: "boamp" | "place" | "francmarches" | "mp_info" | "prive";
   /** Payload brut tel que reçu de la plateforme — opaque côté DB */
   record: Record<string, unknown>;
   /** Timestamp ISO de capture côté connecteur */

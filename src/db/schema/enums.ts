@@ -41,8 +41,16 @@ export const membershipRole = pgEnum("membership_role", ["admin", "user", "viewe
 /**
  * platform_code — plateforme source d'un AO public BTP.
  * 4 plateformes intégrées au MVP (cf. spec module_sourcing_engine_v1).
+ * `prive` : consultations privées / gré à gré créées manuellement par l'utilisateur
+ *           (ajouté migration 0023 — feat/boamp-dce-ao-manuel 2026-05-27).
  */
-export const platformCode = pgEnum("platform_code", ["boamp", "place", "francmarches", "mp_info"]);
+export const platformCode = pgEnum("platform_code", [
+  "boamp",
+  "place",
+  "francmarches",
+  "mp_info",
+  "prive",
+]);
 
 /**
  * auth_type — type d'authentification du connecteur plateforme.
