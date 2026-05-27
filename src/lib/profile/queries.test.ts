@@ -31,6 +31,8 @@ const SAMPLE_PROFILE: SearchProfile = {
   id: PROFILE_ID,
   organizationId: ORG_ALYOS,
   name: "Profil AlyoS BTP - sourcing principal",
+  isDefault: true,
+  displayOrder: 0,
   keywords: {
     positive: ["btp", "renovation"],
     negative: ["informatique"],

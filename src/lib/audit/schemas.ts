@@ -193,7 +193,7 @@ const membershipChangeSchema = z.object({
 const searchProfileChangeSchema = z.object({
   profile_id: z.string().regex(UUID_SHAPE, { message: "profile_id doit être un UUID" }),
   profile_name: z.string().min(1, { message: "profile_name ne peut pas être vide" }),
-  operation: z.enum(["create", "update", "delete", "activate", "deactivate"]),
+  operation: z.enum(["create", "update", "delete", "activate", "deactivate", "set_default"]),
   diff: z.record(z.string(), z.tuple([z.unknown(), z.unknown()])).optional(),
 });
 
