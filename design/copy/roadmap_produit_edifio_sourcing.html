@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>edifio Sourcing — Roadmap produit</title>
+<style>
+  :root { --paper:#FFFFFF; --paper-alt:#FAFAF8; --ink:#1A1A1A; --ink-muted:#5C5C5C; --line:#E5E5E5; --alyos-red:#C8002A; --pill-bg:#FFE5EA; --pill-fg:#C8002A; --positive:#2D8659; --warning:#B5781C; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:"Inter",-apple-system,BlinkMacSystemFont,sans-serif; font-size:11pt; line-height:1.5; }
+  body { max-width:210mm; margin:0 auto; padding:22mm 18mm; }
+  h1,h2,h3 { font-family:"Space Grotesk","Inter",sans-serif; letter-spacing:-0.02em; }
+  h1 { font-size:30pt; margin:0 0 0.1em; border-bottom:3px solid var(--alyos-red); padding-bottom:0.2em; }
+  h1 .accent { color:var(--alyos-red); }
+  .meta { color:var(--ink-muted); font-size:10pt; margin:0.4em 0 1.5em; }
+  h2 { font-size:15pt; margin:1.4em 0 0.5em; }
+  .pill { display:inline-block; background:var(--pill-bg); color:var(--pill-fg); padding:3px 10px; border-radius:20px; font-size:9pt; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }
+  .col { border:1px solid var(--line); border-radius:8px; padding:4px 16px 12px; margin:0.8em 0; }
+  .col.now { border-left:5px solid var(--positive); }
+  .col.next { border-left:5px solid var(--warning); }
+  .col.later { border-left:5px solid var(--ink-muted); }
+  .col h2 { display:flex; align-items:center; gap:10px; }
+  .badge { font-size:8.5pt; font-weight:700; color:#fff; padding:2px 9px; border-radius:5px; text-transform:uppercase; letter-spacing:0.05em; }
+  .badge.now { background:var(--positive); }
+  .badge.next { background:var(--warning); }
+  .badge.later { background:var(--ink-muted); }
+  ul { margin:0.4em 0 0.6em; padding-left:1.3em; }
+  li { margin-bottom:0.35em; }
+  li b { font-weight:600; }
+  .done { color:var(--positive); font-weight:700; }
+  .footer-note { margin-top:2.2em; padding-top:1em; border-top:1px solid var(--line); color:var(--ink-muted); font-size:9pt; font-style:italic; }
+  @media print { body { padding:14mm 12mm; } .col { page-break-inside:avoid; } }
+</style>
+</head>
+<body>
+
+<span class="pill">Roadmap produit · AlyoS Ingénierie</span>
+<h1>edifio <span class="accent">Sourcing</span> — Roadmap</h1>
+<p class="meta">Vue Now / Next / Later · MAJ 2026-05-27 · Statut : MVP (Gate 6) en production interne AlyoS.</p>
+
+<div class="col now">
+  <h2><span class="badge now">Now — livré / en cours</span></h2>
+  <ul>
+    <li><span class="done">✓</span> <b>Détection quotidienne des AO</b> (source BOAMP) + scoring de pertinence.</li>
+    <li><span class="done">✓</span> <b>AO du jour</b> : file priorisée, report / écartement des annonces non traitées.</li>
+    <li><span class="done">✓</span> <b>Trois façons de répondre</b> : Mandataire, Cotraitance (shortlist d'architectes scorés, scoring géo départemental + effectif cabinet) et Conception-Réalisation (groupement MOE + réalisateur).</li>
+    <li><span class="done">✓</span> <b>Bibliothèque cotraitants</b> + <b>coffre documentaire BET</b> (12 pièces, alertes d'expiration).</li>
+    <li><span class="done">✓</span> <b>CRM Contacts</b> : Architectes / Bureaux d'Études / Entreprises-Majors + enrichissement Pappers.</li>
+    <li><span class="done">✓</span> <b>Espace utilisateur</b> : actualités, support, formations, tests guidés, FAQ, démo.</li>
+    <li><span class="done">✓</span> <b>Console superadmin</b> : support, tests guidés, news, plaquette, roadmap, étude de marché.</li>
+    <li>⏳ <b>AO par département</b> : affichage du code postal + tri / filtre par département et jours avant clôture.</li>
+    <li>⏳ <b>Brief d'opportunité IA</b> et contenu d'onboarding (vidéo démo, formations, FAQ).</li>
+  </ul>
+</div>
+
+<div class="col next">
+  <h2><span class="badge next">Next — prochaines semaines</span></h2>
+  <ul>
+    <li><b>Durcissement sécurité</b> : RLS FORCE sur l'ensemble des tables, audit trail complet (RGPD).</li>
+    <li><b>Observabilité</b> : alertes sur la collecte automatique (échec / 0 annonce) et monitoring.</li>
+    <li><b>Sources élargies</b> : connecteurs PLACE et Francmarchés en complément du BOAMP.</li>
+    <li><b>Règlement de consultation (RC)</b> isolé et extraction des pièces du DCE.</li>
+    <li><b>Finalisation UI</b> alignée sur le design system edifio.</li>
+  </ul>
+</div>
+
+<div class="col later">
+  <h2><span class="badge later">Later — Phase 2</span></h2>
+  <ul>
+    <li><b>Ouverture commerciale</b> multi-tenant (clients externes), facturation.</li>
+    <li><b>Console « edifio Admin » unifiée</b> Sourcing + Suivi (vue client 360°, base contacts partagée).</li>
+    <li><b>Flywheel cross-app</b> : passerelles de prospects entre edifio Sourcing, Suivi et ACT.</li>
+    <li><b>Multi-cotraitants</b> par appel d'offres (au-delà d'un cotraitant unique).</li>
+    <li><b>Export PDF</b> des shortlists et dossiers de candidature.</li>
+    <li><b>Studio IA avancé</b> : aide à la rédaction du mémoire technique.</li>
+  </ul>
+</div>
+
+<div class="footer-note">
+  Roadmap indicative — édité par AlyoS Ingénierie. Les priorités « Next » et « Later » peuvent évoluer selon les retours d'usage et les décisions du Board. v1 — 2026-05-27.
+</div>
+
+</body>
+</html>

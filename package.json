@@ -30,6 +30,7 @@
     "db:seed:faq": "tsx src/db/seed/seed-faq.ts",
     "db:seed:prod": "tsx src/db/seed/prod.ts",
     "db:reset": "tsx src/db/seed/reset.ts",
+    "db:backfill:postal-code": "tsx src/db/seed/backfill-postal-code.ts",
     "db:fetch-boamp": "tsx src/db/seed/fetch-boamp-fixture.ts",
     "db:dry-run": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/db-dry-run.ps1",
     "prepare": "husky"

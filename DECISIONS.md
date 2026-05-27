@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-05-27 — Journal __drizzle_migrations prod — hashes 0023 + 0024 (Steve / MCP Supabase)
+
+- **2026-05-27 · G6 · Steve (Board) · ops — Enregistrement migrations 0023 et 0024 dans `drizzle.__drizzle_migrations`.**
+  *Contexte : migrations 0023 (`add_siret`) et 0024 (`platform_prive`) avaient été appliquées directement via Supabase MCP SQL mais sans passer par `drizzle-kit migrate` → absentes du journal Drizzle.*
+  *Hashes SHA-256 calculés via `Get-FileHash` PowerShell et insérés via Supabase MCP :*
+  *- `0023_add_siret.sql` → `3039289b9a73fc714e5c9871b8cbdb8ea6ad659ba806f22850f9f5b331073f3d` (created_at 1748996040000)*
+  *- `0024_platform_prive.sql` → `9a1e979430bafdb7c58296306fd7ae46b9a7b8b1958400568df9246d8f55f405` (created_at 1748996100000)*
+  *Journal prod maintenant à jour — `drizzle-kit migrate` idempotent possible sans risque de re-jeu.*
+
+---
+
+## 2026-05-27 — AO par département — script backfill + UI tri/filtre (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — Chantier Board Priority 1 : filtres AO par département + script backfill `postal_code`.**
+  *Constat terrain : le payload Opendatasoft v2.1 ne contient pas de CP 5 chiffres dans les champs structurés standards. `tenders.department` est rempli (107/107 via `code_departement[0]`). `tenders.postal_code` reste vide — le CP n'est pas extractible des payloads actuels.*
+  *UI tri/filtre (déjà implémentée) : `TenderFilterToolbar.tsx` — sélecteur de tri (score / département / clôture) + multi-select département + fenêtre clôture. `getTendersOfTheDay` accepte `sort`, `departments`, `closingDays`. `ao-du-jour/page.tsx` lit les searchParams et les transmet.*
+  *Script backfill créé : `src/db/seed/backfill-postal-code.ts` — réutilise `derivePostalCodeAndDepartment()`, batch de 200, idempotent (WHERE IS NULL), log ligne par ligne + bilan. Steve lance `pnpm db:backfill:postal-code` dans sa session.*
+  *Attente réaliste : taux de mise à jour proche de 0 sur les 107 AOs prod actuels (pas de CP dans payload Opendatasoft) — script gardera sa valeur pour les futurs AOs et d'éventuels payloads enrichis.*
+  *Ajout `package.json` : `"db:backfill:postal-code": "tsx src/db/seed/backfill-postal-code.ts"`.*
+
+---
+
 ## 2026-05-27 — Bouton DCE + AO manuel (Alex)
 
 - **2026-05-27 · G6 · Alex (dev) · feat — bouton téléchargement DCE BOAMP : exposition `tender.dce_url` existant.**
