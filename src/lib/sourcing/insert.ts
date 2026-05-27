@@ -50,6 +50,7 @@ import type { db as defaultDb } from "@/db/client";
 import { platforms } from "@/db/schema/config";
 import { tenders } from "@/db/schema/tenders";
 
+import { derivePostalCodeAndDepartment } from "./derive-department";
 import type { NormalizedTender } from "./types";
 
 /**
@@ -123,6 +124,10 @@ export async function insertTender(
 ): Promise<InsertTenderResult> {
   const platformId = await resolvePlatformId(client, tender.platformCode);
 
+  // Dérive le code postal et le département depuis rawData BOAMP + buyer.
+  // Cf. src/lib/sourcing/derive-department.ts pour la règle de résolution.
+  const { postalCode, department } = derivePostalCodeAndDepartment(tender.rawData, tender.buyer);
+
   // Statut initial à la création : 'sourced' (cf. enum tender_status).
   // À l'UPDATE on ne touche pas à status — c'est l'intérêt du onConflictDoUpdate
   // ciblé sur (raw_data, updated_at) uniquement.
@@ -145,13 +150,19 @@ export async function insertTender(
       score: opts.score.toString(),
       status: "sourced",
       matchingProfileId: opts.profileId,
+      postalCode,
+      department,
     })
     .onConflictDoUpdate({
       target: [tenders.organizationId, tenders.externalRef, tenders.platformId],
-      // IMPORTANT : on ne met à jour QUE raw_data + updated_at. Voir JSDoc
-      // ci-dessus + handoff Cowork si désaccord.
+      // IMPORTANT : on ne met à jour QUE raw_data + postal_code + department
+      // + updated_at. Voir JSDoc ci-dessus + handoff Cowork si désaccord.
+      // postal_code et department sont mis à jour car le rawData peut évoluer
+      // (amende BOAMP avec nouvelle adresse lieu d'exécution).
       set: {
         rawData: sql.raw("EXCLUDED.raw_data"),
+        postalCode: sql.raw("EXCLUDED.postal_code"),
+        department: sql.raw("EXCLUDED.department"),
         updatedAt: sql`now()`,
       },
     })

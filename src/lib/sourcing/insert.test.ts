@@ -239,7 +239,10 @@ describe("insertTender — onConflictDoUpdate (politique re-source)", () => {
     expect(insertCapture.onConflictTarget as unknown[]).toHaveLength(3);
   });
 
-  it("set ne touche QUE raw_data + updated_at (préserve score/status/matchingProfileId)", async () => {
+  it("set ne touche QUE raw_data + postal_code + department + updated_at (préserve score/status/matchingProfileId)", async () => {
+    // Politique re-source (migration 0020) : on met à jour raw_data, postal_code
+    // et department (le rawData peut évoluer — amende BOAMP avec nouvelle adresse),
+    // ainsi que updated_at. Les champs métier (score, status, etc.) sont préservés.
     const now = new Date();
     const { db, insertCapture } = buildFakeDb(
       [{ id: PLATFORM_BOAMP_ID }],
@@ -252,7 +255,7 @@ describe("insertTender — onConflictDoUpdate (politique re-source)", () => {
     );
 
     const setKeys = Object.keys(insertCapture.onConflictSet ?? {});
-    expect(setKeys.sort()).toEqual(["rawData", "updatedAt"]);
+    expect(setKeys.sort()).toEqual(["department", "postalCode", "rawData", "updatedAt"]);
     // Les champs métier ne doivent PAS être mis à jour
     expect(setKeys).not.toContain("score");
     expect(setKeys).not.toContain("status");

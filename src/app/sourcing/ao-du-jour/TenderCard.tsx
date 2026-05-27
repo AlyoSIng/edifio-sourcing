@@ -26,12 +26,10 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
   const deadlineLabel = formatDeadline(tender.deadline);
   const daysToDeadline = daysUntil(tender.deadline);
   const deadlineTone = deadlineToneFromDays(daysToDeadline);
+  const deadlineBg = deadlineBgFromDays(daysToDeadline);
 
   // Brief AO extrait du rawData BOAMP (description / objet / libelle)
   const brief = extractBrief(tender.rawData);
-
-  // Département / code postal extrait du rawData, fallback sur buyer
-  const dept = extractDeptFromTender(tender.rawData, tender.buyer);
 
   return (
     <article className="grid grid-cols-1 gap-4 rounded-md border border-line bg-white p-4 transition hover:shadow-card sm:grid-cols-[64px_1fr_auto] sm:items-start">
@@ -46,7 +44,14 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
           <span>{tender.buyer}</span>
           <span className="font-mono">CPV {mainCpv}</span>
           <span className="font-mono">Réf. {tender.externalRef}</span>
-          {dept ? <span className="font-mono">Dépt. {dept}</span> : null}
+          {/* Badge département / CP — lu depuis la colonne DB (migration 0020) */}
+          {tender.department ? (
+            <span className="inline-flex items-center rounded-sm bg-paper-2 px-1.5 py-0.5 font-mono text-[10px] text-ink-2">
+              {tender.postalCode ? `${tender.postalCode} · ` : ""}Dept.&nbsp;{tender.department}
+            </span>
+          ) : (
+            <span className="text-[10px] text-muted">CP non précisé</span>
+          )}
           <span
             className="rounded-xs bg-paper-2 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-2"
             aria-label="Plateforme source"
@@ -90,13 +95,12 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
       </div>
 
       <div className="flex flex-col items-stretch gap-1.5 sm:min-w-[140px]">
+        {/* Badge deadline coloré : rouge <7j, orange 7-15j, vert >15j */}
         <span
-          className={`text-right font-mono text-[11px] ${deadlineTone}`}
+          className={`inline-flex items-center justify-end rounded-sm px-1.5 py-0.5 text-right font-mono text-[10px] ${deadlineBg} ${deadlineTone}`}
           aria-label={`Date limite de remise des offres : ${deadlineLabel}`}
         >
-          {daysToDeadline !== null
-            ? `Clôture J-${daysToDeadline} · ${deadlineLabel}`
-            : `Clôture ${deadlineLabel}`}
+          {daysToDeadline !== null ? `J-${daysToDeadline}` : deadlineLabel}
         </span>
         <TenderCardActions
           tenderId={tender.id}
@@ -175,16 +179,31 @@ function daysUntil(deadline: Date | null): number | null {
 }
 
 /**
- * Couleur du libellé deadline selon l'urgence :
- *   - ≤ 7 jours → warn
- *   - 8-14 jours → ink-2 (texte normal)
- *   - > 14 jours → muted
+ * Couleur du texte deadline selon l'urgence (spec Board) :
+ *   - < 7 jours  → rouge brand-red
+ *   - ≤ 15 jours → orange
+ *   - > 15 jours → vert
+ *   - null       → muted
  */
 function deadlineToneFromDays(days: number | null): string {
   if (days === null) return "text-muted";
-  if (days <= 7) return "text-warn";
-  if (days <= 14) return "text-ink-2";
-  return "text-muted";
+  if (days < 7) return "text-[#c8002a] font-semibold";
+  if (days <= 15) return "text-[#d97706]";
+  return "text-[#16a34a]";
+}
+
+/**
+ * Couleur de fond du badge deadline selon l'urgence (spec Board) :
+ *   - < 7 jours  → bg-red-50
+ *   - ≤ 15 jours → bg-amber-50
+ *   - > 15 jours → bg-green-50
+ *   - null       → fond transparent
+ */
+function deadlineBgFromDays(days: number | null): string {
+  if (days === null) return "";
+  if (days < 7) return "bg-red-50";
+  if (days <= 15) return "bg-amber-50";
+  return "bg-green-50";
 }
 
 /**
@@ -203,34 +222,4 @@ function extractBrief(rawData: TenderOfTheDay["rawData"]): string | null {
     (typeof rec.libelle === "string" ? rec.libelle : null);
   if (!text) return null;
   return text.length > 320 ? text.slice(0, 317) + "…" : text;
-}
-
-/**
- * Extrait le département (2 caractères) depuis le rawData ou le champ buyer.
- *
- * Stratégie :
- *   1. Priorité rawData BOAMP : champ `record.departement` s'il est une string
- *      non vide (ex. "75", "2A", "974").
- *   2. Fallback : regex code postal 5 chiffres dans le champ `buyer`
- *      (ex. "Mairie de Paris, 75001 Paris" → "75").
- *      Cas Corse : CP "20xxx" → "2A" si xxx < 200, "2B" sinon.
- *
- * Retourne `null` si aucune info départementale trouvable.
- */
-function extractDeptFromTender(rawData: TenderOfTheDay["rawData"], buyer: string): string | null {
-  // 1. Priorité rawData BOAMP
-  if (rawData?.record) {
-    const rec = rawData.record as Record<string, unknown>;
-    if (typeof rec.departement === "string" && rec.departement) return rec.departement;
-  }
-  // 2. Fallback : code postal dans buyer
-  const match = buyer.match(/\b([0-9]{5})\b/);
-  if (!match) return null;
-  const cp = match[1]!;
-  // Cas Corse (CP commençant par "20")
-  if (cp.startsWith("20")) {
-    const sub = parseInt(cp.slice(2), 10);
-    return sub < 200 ? "2A" : "2B";
-  }
-  return cp.slice(0, 2);
 }

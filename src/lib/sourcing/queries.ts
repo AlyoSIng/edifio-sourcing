@@ -28,7 +28,7 @@
  * `Page()` appelle effectivement le helper.
  */
 
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql, lte } from "drizzle-orm";
 
 import type { db as defaultDb } from "@/db/client";
 import { platforms, searchProfiles } from "@/db/schema/config";
@@ -94,6 +94,33 @@ export interface TenderOfTheDay {
    * la prop `isExcluded` de `TenderCardActions` (utile si vue « AO exclus »).
    */
   excludedAt: Date | null;
+  /** Code postal du lieu d'exécution (dérivé au scraping, backfillé). null = non renseigné. */
+  postalCode: string | null;
+  /** Département (2-3 chars). null = non dérivable. */
+  department: string | null;
+}
+
+// ============================================================================
+// Types tri + filtres « AO du jour »
+// ============================================================================
+
+/** Tri de la liste AO du jour. */
+export type TenderSortOrder = "score" | "department" | "deadline";
+
+/** Filtres + tri de la liste AO du jour. */
+export interface TenderAoDuJourOptions {
+  /** Tri (défaut : "score"). */
+  sort?: TenderSortOrder;
+  /**
+   * Filtre département multi-select. `[]` ou omis = tous les départements.
+   * Valeurs : codes comme "75", "2A", "971".
+   */
+  departments?: string[];
+  /**
+   * Fenêtre de clôture : N jours max avant deadline. `null` ou omis = tous.
+   * Ex. `7` → deadline ≤ now() + 7 days.
+   */
+  closingDays?: 7 | 15 | 30 | null;
 }
 
 // ============================================================================
@@ -128,7 +155,51 @@ export interface TenderOfTheDay {
 export async function getTendersOfTheDay(
   organizationId: string,
   client: DrizzleClient,
+  options?: TenderAoDuJourOptions,
 ): Promise<TenderOfTheDay[]> {
+  const { sort = "score", departments = [], closingDays = null } = options ?? {};
+
+  // Filtres statiques (tenant + workflow)
+  const baseConditions = [
+    eq(tenders.organizationId, organizationId),
+    eq(tenders.status, "sourced"),
+    or(isNull(tenders.deadline), gt(tenders.deadline, sql`now()`)),
+    // PR n°5 (Arbitrage Board B 2026-05-21) : exclure les AO différés
+    // dont la date butoir n'est pas encore passée. Un AO sans différé
+    // (deferred_until IS NULL) reste visible, ce qui couvre 100 % du
+    // stock cron normal. À expiration, l'AO réapparait automatiquement
+    // dans le digest.
+    or(isNull(tenders.deferredUntil), lt(tenders.deferredUntil, sql`now()`)),
+    // Migration 0013 : masquer les AO exclus par l'utilisateur.
+    // excluded_at IS NULL = AO visible (comportement par défaut).
+    isNull(tenders.excludedAt),
+  ] as const;
+
+  // Filtre département multi-select (optionnel)
+  const deptCondition =
+    departments.length > 0 ? inArray(tenders.department, departments) : undefined;
+
+  // Filtre fenêtre de clôture (valeur typée 7|15|30 — pas de string libre)
+  const closingCondition =
+    closingDays != null
+      ? lte(tenders.deadline, sql`now() + interval '${sql.raw(String(closingDays))} days'`)
+      : undefined;
+
+  const whereClause = and(
+    ...baseConditions,
+    ...(deptCondition ? [deptCondition] : []),
+    ...(closingCondition ? [closingCondition] : []),
+  );
+
+  // ORDER BY selon le tri demandé
+  const orderByClause =
+    sort === "department"
+      ? [sql`${tenders.department} ASC NULLS LAST`, sql`${tenders.score} DESC NULLS LAST`]
+      : sort === "deadline"
+        ? [sql`${tenders.deadline} ASC NULLS LAST`]
+        : // "score" (défaut) — comportement initial aligné sur l'index partiel
+          [sql`${tenders.score} DESC NULLS LAST`, desc(tenders.createdAt)];
+
   const rows = await client
     .select({
       id: tenders.id,
@@ -145,29 +216,16 @@ export async function getTendersOfTheDay(
       dceUrl: tenders.dceUrl,
       rawData: tenders.rawData,
       excludedAt: tenders.excludedAt,
+      postalCode: tenders.postalCode,
+      department: tenders.department,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
-    .where(
-      and(
-        eq(tenders.organizationId, organizationId),
-        eq(tenders.status, "sourced"),
-        or(isNull(tenders.deadline), gt(tenders.deadline, sql`now()`)),
-        // PR n°5 (Arbitrage Board B 2026-05-21) : exclure les AO différés
-        // dont la date butoir n'est pas encore passée. Un AO sans différé
-        // (deferred_until IS NULL) reste visible, ce qui couvre 100 % du
-        // stock cron normal. À expiration, l'AO réapparait automatiquement
-        // dans le digest.
-        or(isNull(tenders.deferredUntil), lt(tenders.deferredUntil, sql`now()`)),
-        // Migration 0013 : masquer les AO exclus par l'utilisateur.
-        // excluded_at IS NULL = AO visible (comportement par défaut).
-        isNull(tenders.excludedAt),
-      ),
-    )
+    .where(whereClause)
     // NULLS LAST sur score (postgres-js + Drizzle : on passe par `sql` brut
     // pour `NULLS LAST` car l'helper `desc()` n'a pas d'option NULL ordering
     // expressif côté Drizzle 0.39).
-    .orderBy(sql`${tenders.score} DESC NULLS LAST`, desc(tenders.createdAt))
+    .orderBy(...orderByClause)
     .limit(50);
 
   // Le typage de `rows` est déjà conforme à `TenderOfTheDay[]` grâce à la
@@ -333,6 +391,8 @@ export async function getTendersDeferred(
       dceUrl: tenders.dceUrl,
       rawData: tenders.rawData,
       excludedAt: tenders.excludedAt,
+      postalCode: tenders.postalCode,
+      department: tenders.department,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))

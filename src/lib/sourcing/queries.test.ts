@@ -23,7 +23,7 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import type { DrizzleClient, TenderOfTheDay } from "./queries";
+import type { DrizzleClient, TenderAoDuJourOptions, TenderOfTheDay } from "./queries";
 import { getActiveSearchProfileName, getTendersOfTheDay } from "./queries";
 
 /**
@@ -62,6 +62,8 @@ const tenderRow1: TenderOfTheDay = {
   dceUrl: null,
   rawData: null,
   excludedAt: null,
+  postalCode: "42000",
+  department: "42",
 };
 
 const tenderRow2: TenderOfTheDay = {
@@ -79,6 +81,8 @@ const tenderRow2: TenderOfTheDay = {
   dceUrl: null,
   rawData: null,
   excludedAt: null,
+  postalCode: "69007",
+  department: "69",
 };
 
 const tenderRow3: TenderOfTheDay = {
@@ -96,6 +100,8 @@ const tenderRow3: TenderOfTheDay = {
   dceUrl: null,
   rawData: null,
   excludedAt: null,
+  postalCode: null,
+  department: null,
 };
 
 /**
@@ -120,6 +126,8 @@ const tenderRow4PreviouslyDeferred: TenderOfTheDay = {
   dceUrl: null,
   rawData: null,
   excludedAt: null,
+  postalCode: null,
+  department: null,
 };
 
 // ----------------------------------------------------------------------------
@@ -336,6 +344,112 @@ describe("getTendersOfTheDay", () => {
     } as unknown as DrizzleClient;
 
     await expect(getTendersOfTheDay(ORG_ALYOS, fakeDb)).rejects.toThrow("DATABASE_URL is not set");
+  });
+
+  it("expose postalCode et department dans la projection (migration 0020)", async () => {
+    const { db } = buildFakeDb<TenderOfTheDay>([tenderRow1, tenderRow2, tenderRow3]);
+
+    const result = await getTendersOfTheDay(ORG_ALYOS, db);
+
+    expect(result[0]?.postalCode).toBe("42000");
+    expect(result[0]?.department).toBe("42");
+    expect(result[1]?.postalCode).toBe("69007");
+    expect(result[1]?.department).toBe("69");
+    // Ligne sans CP/dept → null (pas d'erreur, null explicite)
+    expect(result[2]?.postalCode).toBeNull();
+    expect(result[2]?.department).toBeNull();
+  });
+});
+
+// ----------------------------------------------------------------------------
+// getTendersOfTheDay — sort/filter (TenderAoDuJourOptions)
+// ----------------------------------------------------------------------------
+
+describe("getTendersOfTheDay — sort/filter", () => {
+  /**
+   * Verrou structural : tri "department" génère ORDER BY avec le champ
+   * `department`. On sérialise le premier orderBy arg via PgDialect pour
+   * vérifier que "department" apparaît dans le SQL.
+   */
+  it("tri 'department' — orderBy contient 'department'", async () => {
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([tenderRow1, tenderRow2]);
+
+    const options: TenderAoDuJourOptions = { sort: "department" };
+    await getTendersOfTheDay(ORG_ALYOS, db, options);
+
+    expect(capture.orderByArgs).toBeDefined();
+    // 2 args pour le tri department : department ASC NULLS LAST + score DESC NULLS LAST
+    expect(capture.orderByArgs).toHaveLength(2);
+    const firstArg = capture.orderByArgs![0];
+    const serialized = sqlOf(firstArg);
+    expect(serialized).toMatch(/department/i);
+  });
+
+  it("tri 'deadline' — orderBy contient 'deadline' et 1 seul arg", async () => {
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([tenderRow1]);
+
+    await getTendersOfTheDay(ORG_ALYOS, db, { sort: "deadline" });
+
+    expect(capture.orderByArgs).toHaveLength(1);
+    const serialized = sqlOf(capture.orderByArgs![0]);
+    expect(serialized).toMatch(/deadline/i);
+  });
+
+  it("tri 'score' (défaut) — 2 args orderBy (score DESC + createdAt DESC)", async () => {
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([tenderRow1]);
+
+    // Sans options — sort par défaut = score
+    await getTendersOfTheDay(ORG_ALYOS, db);
+
+    expect(capture.orderByArgs).toHaveLength(2);
+    const firstArg = sqlOf(capture.orderByArgs![0]);
+    expect(firstArg).toMatch(/score/i);
+  });
+
+  it("filtre departments — WHERE contient la condition inArray", async () => {
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([tenderRow1]);
+
+    await getTendersOfTheDay(ORG_ALYOS, db, { departments: ["42", "69"] });
+
+    expect(capture.whereExpr).toBeDefined();
+    const sql = sqlOf(capture.whereExpr);
+    // inArray génère "department" = any($N) ou IN ($N, $M)
+    expect(sql).toMatch(/department/i);
+  });
+
+  it("filtre departments vide — WHERE ne contient PAS de filtre department", async () => {
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([tenderRow1, tenderRow2, tenderRow3]);
+
+    await getTendersOfTheDay(ORG_ALYOS, db, { departments: [] });
+
+    expect(capture.whereExpr).toBeDefined();
+    const sql = sqlOf(capture.whereExpr);
+    // Pas de filtre department quand la liste est vide
+    expect(sql).not.toMatch(/\bdepartment\b.*=.*\$\d+/);
+  });
+
+  it("filtre closingDays — WHERE contient la condition lte sur deadline", async () => {
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([tenderRow1]);
+
+    await getTendersOfTheDay(ORG_ALYOS, db, { closingDays: 7 });
+
+    expect(capture.whereExpr).toBeDefined();
+    const sql = sqlOf(capture.whereExpr);
+    // lte sur deadline : deadline <= now() + interval
+    expect(sql).toMatch(/deadline/i);
+    expect(sql).toMatch(/7 days/i);
+  });
+
+  it("sans closingDays — pas de filtre deadline supplémentaire lte", async () => {
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([]);
+
+    await getTendersOfTheDay(ORG_ALYOS, db, { closingDays: null });
+
+    expect(capture.whereExpr).toBeDefined();
+    const sql = sqlOf(capture.whereExpr);
+    // Filtre deadline IS NULL OR > now() est présent (standard), mais PAS
+    // le lte interval — on vérifie l'absence de "interval"
+    expect(sql).not.toMatch(/interval/i);
   });
 });
 

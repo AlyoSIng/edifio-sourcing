@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { db } from "@/db/client";
-import { getActiveSearchProfileName, getTendersOfTheDay } from "@/lib/sourcing/queries";
+import {
+  getActiveSearchProfileName,
+  getTendersOfTheDay,
+  type TenderSortOrder,
+} from "@/lib/sourcing/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { EmptyState } from "./EmptyState";
@@ -11,6 +15,7 @@ import { ErrorBanner } from "./ErrorBanner";
 import { formatTodayLongFr } from "./format";
 import { TenderActionsErrorToast } from "./TenderActionsErrorToast";
 import { TenderCard } from "./TenderCard";
+import { TenderFilterToolbar } from "./TenderFilterToolbar";
 
 export const metadata = {
   title: "AO du jour — edifio Sourcing",
@@ -50,7 +55,11 @@ export const dynamic = "force-dynamic";
  *    la largeur, conforme M-A (la grille 3 colonnes de la PR n°4 n'est pas
  *    dans la maquette définitive).
  */
-export default async function AoDuJourPage() {
+export default async function AoDuJourPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
   // Auth check défensif (le middleware a normalement déjà filtré).
   const supabase = createSupabaseServerClient();
   const {
@@ -58,6 +67,24 @@ export default async function AoDuJourPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/ao-du-jour");
   const profile = toUserProfile(user);
+
+  // -------------------------------------------------------------------------
+  // Parsing des searchParams (tri + filtres)
+  // -------------------------------------------------------------------------
+  const rawSort = String(searchParams.sort ?? "score");
+  const sort: TenderSortOrder = (["score", "department", "deadline"] as const).includes(
+    rawSort as TenderSortOrder,
+  )
+    ? (rawSort as TenderSortOrder)
+    : "score";
+
+  const rawDepts = searchParams.dept;
+  const departments = Array.isArray(rawDepts) ? rawDepts : rawDepts ? [rawDepts] : [];
+
+  const rawClosing = Number(searchParams.closing);
+  const closingDays: 7 | 15 | 30 | null = ([7, 15, 30] as const).includes(rawClosing as never)
+    ? (rawClosing as 7 | 15 | 30)
+    : null;
 
   // -------------------------------------------------------------------------
   // Résilience runtime (hotfix PR #22, Board 2026-05-21) — INCHANGÉ
@@ -72,7 +99,7 @@ export default async function AoDuJourPage() {
   let fetchError: string | null = null;
   try {
     [tenders, profileName] = await Promise.all([
-      getTendersOfTheDay(ALYOS_ORG_ID, db),
+      getTendersOfTheDay(ALYOS_ORG_ID, db, { sort, departments, closingDays }),
       getActiveSearchProfileName(ALYOS_ORG_ID, db),
     ]);
   } catch (err) {
@@ -84,7 +111,13 @@ export default async function AoDuJourPage() {
   const todayLabel = formatTodayLongFr();
   const tendersCount = tenders.length;
   const highScoreCount = tenders.filter((t) => Number(t.score ?? "0") >= 75).length;
-  const closingSoonCount = tenders.filter((t) => isClosingSoon(t.deadline)).length;
+  // KPI "Clôture ≤ 15 j" — aligné avec les nouveaux filtres (était < 10 j avant)
+  const closingSoonCount = tenders.filter((t) => isClosingSoon(t.deadline, 15)).length;
+
+  // Départements disponibles dans le backlog courant (pour le multi-select)
+  const availableDepts = [
+    ...new Set(tenders.map((t) => t.department).filter(Boolean)),
+  ].sort() as string[];
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -108,7 +141,13 @@ export default async function AoDuJourPage() {
                   · profil&nbsp;: <span className="text-ink">{profileName}</span>
                 </>
               ) : null}
-              , triés par score de pertinence.
+              , triés par{" "}
+              {sort === "department"
+                ? "département"
+                : sort === "deadline"
+                  ? "clôture imminente"
+                  : "score de pertinence"}
+              .
             </>
           )}
         </p>
@@ -119,8 +158,18 @@ export default async function AoDuJourPage() {
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <KpiCard label="Nouveaux AO sourcés" value={tendersCount} accent />
           <KpiCard label="Score élevé (≥ 75)" value={highScoreCount} />
-          <KpiCard label="Clôture < 10 jours" value={closingSoonCount} />
+          <KpiCard label="Clôture ≤ 15 jours" value={closingSoonCount} />
         </div>
+      ) : null}
+
+      {/* Toolbar filtres — visible uniquement si pas d'erreur de chargement */}
+      {!fetchError ? (
+        <TenderFilterToolbar
+          availableDepts={availableDepts}
+          currentSort={sort}
+          currentDepts={departments}
+          currentClosingDays={closingDays}
+        />
       ) : null}
 
       {/* Toast erreur server action (PR n°5) — toujours monté côté Client. */}
@@ -145,16 +194,16 @@ export default async function AoDuJourPage() {
 }
 
 /**
- * Compte un AO comme « clôture < 10 jours » si sa deadline tombe dans les 10
+ * Compte un AO comme « clôture ≤ N jours » si sa deadline tombe dans les N
  * jours à venir. Null = pas de clôture renseignée, ne compte pas.
+ * Défaut : 15 jours (aligné avec les filtres UI — était 10 jours avant).
  */
-function isClosingSoon(deadline: Date | null): boolean {
+function isClosingSoon(deadline: Date | null, days = 15): boolean {
   if (!deadline) return false;
   const now = Date.now();
   const diffMs = deadline.getTime() - now;
   if (diffMs < 0) return false;
-  const tenDaysMs = 10 * 24 * 3600 * 1000;
-  return diffMs <= tenDaysMs;
+  return diffMs <= days * 24 * 3600 * 1000;
 }
 
 /**

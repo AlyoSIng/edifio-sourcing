@@ -90,6 +90,18 @@ export const tenders = pgTable(
      * Nullable par défaut : un AO neuf n'est jamais exclu.
      */
     excludedAt: timestamp("excluded_at", { withTimezone: true }),
+    /**
+     * Code postal du lieu d'exécution (à défaut CP MOA, à défaut null).
+     * Dérivé au scraping/ingest via derivePostalCodeAndDepartment().
+     * Backfillé pour les lignes existantes via scripts/backfill-departments.ts.
+     */
+    postalCode: text("postal_code"),
+    /**
+     * Département (2 à 3 chars : "75", "2A", "971").
+     * Dérivé du CP retenu ou de rawData.record.departement (BOAMP).
+     * Index idx_tenders_department pour les filtres fréquents.
+     */
+    department: text("department"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -141,6 +153,13 @@ export const tenders = pgTable(
     excludedAtIdx: index("idx_tenders_excluded_at")
       .on(table.excludedAt)
       .where(sql`${table.excludedAt} IS NOT NULL`),
+    /**
+     * Index sur department — utilisé pour les filtres fréquents « AO du jour »
+     * (filtre multi-select département) et pour le tri `department ASC`.
+     * Non partiel : les lignes NULL (CP non renseigné) restent indexées pour
+     * accélérer le tri `NULLS LAST`.
+     */
+    departmentIdx: index("idx_tenders_department").on(table.department),
   }),
 );
 
