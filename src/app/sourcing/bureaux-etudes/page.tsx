@@ -7,6 +7,7 @@ import type { BureauEtudes } from "@/db/schema/bureaux-etudes";
 
 import { CsvImportModal } from "@/components/contacts/CsvImportModal";
 import { fetchBEPage } from "./actions";
+import { DeleteBEButton } from "./DeleteBEButton";
 import { DuplicateBEManager } from "./DuplicateBEManager";
 import { detectBEDuplicatesAction } from "./duplicate-be-actions";
 import type { DuplicateBEGroup } from "./duplicate-be-actions";
@@ -267,12 +268,15 @@ function BERow({ be, isAdmin: adminUser }: { be: BureauEtudes; isAdmin: boolean 
       <td className="px-4 py-2.5 text-xs text-ink-2">{budgetText}</td>
       {adminUser ? (
         <td className="px-4 py-2.5">
-          <a
-            href={`/sourcing/bureaux-etudes/${be.id}`}
-            className="focus:ring-brand-red/40 text-xs text-muted hover:text-ink focus:outline-none focus:ring-2"
-          >
-            Éditer
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href={`/sourcing/bureaux-etudes/${be.id}`}
+              className="focus:ring-brand-red/40 text-xs text-muted hover:text-ink focus:outline-none focus:ring-2"
+            >
+              Éditer
+            </a>
+            <DeleteBEButton beId={be.id} cabinet={be.cabinet} />
+          </div>
         </td>
       ) : null}
     </tr>

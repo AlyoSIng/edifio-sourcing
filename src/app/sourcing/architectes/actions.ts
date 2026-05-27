@@ -24,6 +24,7 @@ import { and, count, eq, ilike, or, sql } from "drizzle-orm";
 
 import { db as defaultDb } from "@/db/client";
 import { architects } from "@/db/schema/architects";
+import { architectResponses, matchProposals } from "@/db/schema/selections";
 import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
@@ -927,6 +928,116 @@ export async function enrichSingleArchitectFromPappers(
     return { ok: true, updated: true, changes, summary };
   } catch (err) {
     console.error("[architects-actions:enrich-single:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ============================================================================
+// 7. deleteArchitectAction — suppression hard (admin uniquement)
+// ============================================================================
+
+export type DeleteArchitectResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error:
+        | "not_authenticated"
+        | "forbidden_domain"
+        | "forbidden_role"
+        | "invalid_input"
+        | "not_found"
+        | "has_active_solicitations"
+        | "internal_error";
+    };
+
+/**
+ * Supprime définitivement un architecte du tenant AlyoS.
+ *
+ * Guards métier :
+ *  - UUID valide
+ *  - Admin uniquement
+ *  - Aucune sollicitation `architect_responses` avec status `pending`
+ *  - Aucune proposition `match_proposals` avec status `proposed` ou `accepted`
+ *
+ * Audit A17 `architect_edit` avec `operation: 'delete'` après suppression.
+ *
+ * @param architectId — UUID de l'architecte à supprimer
+ */
+export async function deleteArchitectAction(
+  architectId: string,
+  dbClient: DrizzleClient = defaultDb,
+): Promise<DeleteArchitectResult> {
+  const authClient = createSupabaseServerClient();
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+  const { profile } = authResult;
+
+  // 2. Vérification rôle admin
+  if (!isAdmin(profile)) {
+    return { ok: false, error: "forbidden_role" };
+  }
+
+  // 3. Validation UUID
+  if (!UUID_SHAPE.test(architectId)) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  try {
+    // 4. Guard : sollicitations en cours (architect_responses status = 'pending')
+    const pendingResponses = await dbClient
+      .select({ total: count() })
+      .from(architectResponses)
+      .where(
+        and(
+          eq(architectResponses.architectId, architectId),
+          eq(architectResponses.status, "pending"),
+        ),
+      );
+
+    if ((pendingResponses[0]?.total ?? 0) > 0) {
+      return { ok: false, error: "has_active_solicitations" };
+    }
+
+    // 5. Guard : propositions de matching liées
+    // `match_proposals` n'a pas de colonne `status` dans le schéma V1 —
+    // on bloque préventivement si des propositions existent (ON DELETE CASCADE
+    // gérera la suppression automatique mais on préfère lever l'erreur pour
+    // que l'admin soit conscient de l'impact).
+    const linkedProposals = await dbClient
+      .select({ total: count() })
+      .from(matchProposals)
+      .where(eq(matchProposals.architectId, architectId));
+
+    if ((linkedProposals[0]?.total ?? 0) > 0) {
+      return { ok: false, error: "has_active_solicitations" };
+    }
+
+    // 6. DELETE tenant-scoped
+    const deleted = await dbClient
+      .delete(architects)
+      .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+      .returning({ id: architects.id });
+
+    if (!deleted[0]) {
+      return { ok: false, error: "not_found" };
+    }
+
+    // 7. Audit A17 architect_edit avec operation = 'delete' (best-effort)
+    await audit({
+      action: "architect_edit",
+      subjectType: "architect",
+      subjectId: architectId,
+      data: {
+        operation: "delete",
+        architect_id: architectId,
+      },
+    });
+
+    return { ok: true };
+  } catch (err) {
+    console.error("[architects-actions:delete:fail]", err);
     return { ok: false, error: "internal_error" };
   }
 }

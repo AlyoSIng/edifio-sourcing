@@ -808,3 +808,85 @@ export async function enrichSingleBEFromPappers(beId: string): Promise<EnrichSin
     return { ok: false, error: "internal_error" };
   }
 }
+
+// ============================================================================
+// deleteBEAction — suppression hard (admin uniquement)
+// ============================================================================
+
+export type DeleteBEResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error:
+        | "not_authenticated"
+        | "forbidden_domain"
+        | "forbidden_role"
+        | "invalid_input"
+        | "not_found"
+        | "internal_error";
+    };
+
+/**
+ * Supprime définitivement un bureau d'études du tenant AlyoS.
+ *
+ * Guards :
+ *  - UUID valide
+ *  - Admin uniquement (domaine @alyosingenierie.fr)
+ *  - Filtre tenant `ALYOS_ORG_ID` sur le DELETE
+ *
+ * Note : pas de guard `has_active_solicitations` — la table `be_responses`
+ * n'existe pas encore (Phase 2 Tandem BE).
+ *
+ * Audit `architect_edit` avec `operation: 'delete'` après suppression.
+ *
+ * @param beId — UUID du bureau d'études à supprimer
+ */
+export async function deleteBEAction(
+  beId: string,
+  dbClient: DrizzleClient = defaultDb,
+): Promise<DeleteBEResult> {
+  const authClient = createSupabaseServerClient();
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+  const { profile } = authResult;
+
+  // 2. Vérification rôle admin
+  if (!isAdmin(profile)) {
+    return { ok: false, error: "forbidden_role" };
+  }
+
+  // 3. Validation UUID
+  if (!UUID_SHAPE.test(beId)) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  try {
+    // 4. DELETE tenant-scoped
+    const deleted = await dbClient
+      .delete(bureauEtudes)
+      .where(and(eq(bureauEtudes.id, beId), eq(bureauEtudes.organizationId, ALYOS_ORG_ID)))
+      .returning({ id: bureauEtudes.id });
+
+    if (!deleted[0]) {
+      return { ok: false, error: "not_found" };
+    }
+
+    // 5. Audit (best-effort)
+    await audit({
+      action: "architect_edit",
+      subjectType: "architect",
+      subjectId: beId,
+      data: {
+        operation: "delete",
+        be_id: beId,
+      },
+    });
+
+    return { ok: true };
+  } catch (err) {
+    console.error("[be-actions:delete:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}

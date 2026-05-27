@@ -6,6 +6,7 @@ import type { Architect } from "@/db/schema/architects";
 
 import { fetchArchitectsPage } from "./actions";
 import { CsvImportButton } from "./CsvImportButton";
+import { DeleteArchitectButton } from "./DeleteArchitectButton";
 import { PappersEnrichButton } from "./PappersEnrichButton";
 import { DuplicateManager } from "./DuplicateManager";
 import { detectArchitectDuplicatesAction } from "./duplicate-actions";
@@ -400,12 +401,15 @@ function ArchitectRow({
       </td>
       {adminUser ? (
         <td className="px-4 py-2.5">
-          <a
-            href={`/sourcing/architectes/${archi.id}`}
-            className="focus:ring-brand-red/40 text-xs text-muted hover:text-ink focus:outline-none focus:ring-2"
-          >
-            Éditer
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href={`/sourcing/architectes/${archi.id}`}
+              className="focus:ring-brand-red/40 text-xs text-muted hover:text-ink focus:outline-none focus:ring-2"
+            >
+              Éditer
+            </a>
+            <DeleteArchitectButton architectId={archi.id} cabinet={archi.cabinet} />
+          </div>
         </td>
       ) : null}
     </tr>
