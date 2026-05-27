@@ -92,7 +92,10 @@ describe("schema Drizzle v1 — inférence de types", () => {
 
   it("platforms : code typé enum platform_code", () => {
     type Row = typeof platforms.$inferSelect;
-    expectTypeOf<Row["code"]>().toEqualTypeOf<"boamp" | "place" | "francmarches" | "mp_info">();
+    // `prive` ajouté migration 0023 (feat/boamp-dce-ao-manuel 2026-05-27)
+    expectTypeOf<Row["code"]>().toEqualTypeOf<
+      "boamp" | "place" | "francmarches" | "mp_info" | "prive"
+    >();
     expectTypeOf<Row["authType"]>().toEqualTypeOf<
       "api_key" | "oauth" | "login_password" | "none"
     >();

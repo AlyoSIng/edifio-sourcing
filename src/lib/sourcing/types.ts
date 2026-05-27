@@ -28,15 +28,18 @@ import type { TenderRawData } from "@/db/types/jsonb";
 // ============================================================================
 
 /**
- * Code des 4 plateformes intégrées au MVP (cf. enum Postgres `platform_code`
+ * Code des plateformes intégrées (cf. enum Postgres `platform_code`
  * dans `src/db/schema/enums.ts`).
  *
  * Volontairement aligné string-pour-string sur l'enum Postgres pour pouvoir
  * être utilisé tel quel côté `tenders.platform_id` (résolution via
  * `platforms.code`) ainsi que dans le champ discriminant
  * `tenders.raw_data.platform_code`.
+ *
+ * `prive` : consultations privées / gré à gré créées manuellement
+ *           (ajouté migration 0023 — feat/boamp-dce-ao-manuel 2026-05-27).
  */
-export type PlatformCode = "boamp" | "place" | "francmarches" | "mp_info";
+export type PlatformCode = "boamp" | "place" | "francmarches" | "mp_info" | "prive";
 
 // ============================================================================
 // 2. BoampApiRecord — record brut Opendatasoft (BOAMP)
