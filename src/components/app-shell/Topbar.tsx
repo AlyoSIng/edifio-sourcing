@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { UserProfile } from "@/lib/auth/types";
 
 import { SidebarMobileDrawer } from "./SidebarMobileDrawer";
@@ -39,12 +41,14 @@ export function Topbar({ user }: TopbarProps) {
           <p className="text-xs font-medium text-ink">{fullName}</p>
           <p className="font-mono text-[10px] uppercase tracking-wider text-muted">{user.role}</p>
         </div>
-        <span
-          className="grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-semibold text-white"
-          aria-hidden
+        <Link
+          href="/sourcing/profil"
+          className="hover:bg-ink/80 grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-semibold text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
+          title="Mon profil"
+          aria-label="Accéder à mon profil"
         >
           {initials}
-        </span>
+        </Link>
         <SignOutButton />
       </div>
     </header>

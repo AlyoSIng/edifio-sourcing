@@ -33,6 +33,7 @@ export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname() ?? "/sourcing/ao-du-jour";
   // Le superadmin bénéficie également de l'accès aux items adminOnly.
   const isAdmin = role === "admin" || role === "superadmin";
+  const isSuperAdmin = role === "superadmin";
 
   return (
     <aside
@@ -70,7 +71,9 @@ export function Sidebar({ role }: SidebarProps) {
 
         <nav className="flex-1 overflow-y-auto">
           {NAV_ITEMS.map((section) => {
-            const visible = section.items.filter((it) => !it.adminOnly || isAdmin);
+            const visible = section.items.filter(
+              (it) => (!it.adminOnly || isAdmin) && (!it.superadminOnly || isSuperAdmin),
+            );
             if (visible.length === 0) return null;
             return (
               <div key={section.title} className="mb-1">

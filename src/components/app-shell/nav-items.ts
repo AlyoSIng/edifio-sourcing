@@ -40,8 +40,10 @@ export interface NavItem {
    * comme `/sourcing/admin/users/[id]/security`.
    */
   matchPrefix?: string;
-  /** Si vrai, l'item n'est rendu que pour les utilisateurs `role === "admin"`. */
+  /** Si vrai, l'item n'est rendu que pour les utilisateurs `role === "admin"` ou `"superadmin"`. */
   adminOnly?: boolean;
+  /** Si vrai, l'item n'est rendu que pour le rôle `"superadmin"` exclusivement. */
+  superadminOnly?: boolean;
   /**
    * Optionnel : item désactivé visuellement (placeholder MVP). Utile pour
    * pré-câbler les liens Tandem en attendant l'implémentation Nadia.
@@ -140,6 +142,24 @@ export const NAV_ITEMS: NavSection[] = [
         label: "Entreprises/Majors",
         icon: "hard-hat",
         matchPrefix: "/sourcing/entreprises",
+      },
+    ],
+  },
+  {
+    title: "Mon espace",
+    items: [
+      {
+        href: "/sourcing/profil",
+        label: "Mon profil",
+        icon: "users",
+        matchPrefix: "/sourcing/profil",
+      },
+      {
+        href: "/sourcing/superadmin",
+        label: "Superadmin",
+        icon: "sliders",
+        matchPrefix: "/sourcing/superadmin",
+        superadminOnly: true,
       },
     ],
   },
