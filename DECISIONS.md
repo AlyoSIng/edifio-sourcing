@@ -2,6 +2,26 @@
 
 ---
 
+## 2026-05-27 — Renommage vocabulaire UI Solo→Mandataire / Tandem→Cotraitance (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — labels UI alignés sur vocabulaire métier définitif (commit `717f3da`).**
+  *Décision Board 2026-05-27 : Solo devient Mandataire, Tandem devient Cotraitance dans toutes les surfaces visibles.*
+  *Identifiants internes inchangés (`selected_solo`, `getTendersSolo`, `isTandem`, `/reponse-solo`, etc.).*
+  *6 fichiers modifiés : `FaqAccordion.tsx` (catégorie tandem → "Cotraitance", ajout "Compte"), `selectionnes/page.tsx` (badge "Co-traitant" → "Cotraitance"), `dossier/page.tsx` (eyebrow "Co-traitant" → "Cotraitance"), `LandingSpotlight.tsx` ("Mode Solo ou Tandem" → "Mode Mandataire ou Cotraitance"), `reponse-solo/page.tsx` (empty state), `template-resolver.ts` (sujet + corps email).*
+
+---
+
+## 2026-05-27 — Seed contenu prod : FAQ, formations, market_study_url, prompt ao_brief (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — données initiales insérées en prod via Supabase MCP.**
+  *Storage : bucket `public-content` créé (public), `etude-marche-v5.html` (24 KB) + `guide-utilisateur.html` (15 KB) uploadés.*
+  *`app_content.market_study_url` → `https://loogmtltwkhvczdiurqs.supabase.co/storage/v1/object/public/public-content/etude-marche-v5.html`.*
+  *`faq_items` : 16 items insérés (4 catégories : general, sourcing, cotraitance, compte) depuis `content-fixture.ts`.*
+  *`formations` : 4 items insérés (url=NULL — vidéos à héberger ultérieurement par le Board).*
+  *`ai_prompts` : prompt P13 `ao_brief` (id `bbbbbbbb-…000d`, sonnet-4-6, v1) inséré — catalogue complet 13/13.*
+
+---
+
 ## 2026-05-27 — Bloc C — audit_action +3 valeurs + helper withTenantContext (Alex)
 
 - **2026-05-27 · G6 · Alex (dev) · feat — Bloc C : audit A20/A21/A22 + helper FORCE RLS.**
