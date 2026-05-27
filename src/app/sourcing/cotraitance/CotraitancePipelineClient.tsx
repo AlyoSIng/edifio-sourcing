@@ -90,6 +90,48 @@ function TenderStatusBadge({ status }: { status: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Badge relance J+3
+// ---------------------------------------------------------------------------
+
+/**
+ * Badge indiquant l'état de relance automatique J+3.
+ *
+ * - Rouge  "Relance requise"  : statut pending, > 3 jours, relance pas encore envoyée
+ * - Orange "Relancé"          : statut pending, > 3 jours, relance déjà envoyée par le cron
+ *
+ * Ne s'affiche que si `isOverdue = true`.
+ */
+function RelanceBadge({
+  isOverdue,
+  followupSentAt,
+}: {
+  isOverdue: boolean;
+  followupSentAt: Date | null;
+}) {
+  if (!isOverdue) return null;
+
+  if (followupSentAt) {
+    return (
+      <span
+        className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+        title={`Relancé le ${formatDate(new Date(followupSentAt))}`}
+      >
+        Relancé
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
+      title="Aucune réponse depuis plus de 3 jours — relance automatique en attente"
+    >
+      En attente +3j
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Badges réponse architecte
 // ---------------------------------------------------------------------------
 
@@ -200,6 +242,7 @@ function PipelineCard({ entry }: { entry: PipelineEntry }) {
               <span className="font-medium text-ink">{s.architect.cabinet}</span>
               <span className="text-muted">rang {s.rank}</span>
               <ResponseBadge status={s.responseStatus} />
+              <RelanceBadge isOverdue={s.isOverdue} followupSentAt={s.followupSentAt} />
             </div>
           ))}
         </div>

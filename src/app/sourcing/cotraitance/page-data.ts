@@ -52,6 +52,17 @@ export interface PipelineEntry {
     respondedAt: Date | null;
     /** Date de création du match_proposal — approximation de la date de sollicitation. */
     solicitedAt: Date;
+    /**
+     * Timestamp de la relance J+3 envoyée par le cron, null si pas encore relancé.
+     * Source : `architect_responses.followup_sent_at`.
+     */
+    followupSentAt: Date | null;
+    /**
+     * true si la sollicitation est en statut `pending` ET que `solicitedAt` date
+     * de plus de 3 jours (calculé côté serveur pour cohérence).
+     * Utilisé par l'UI pour afficher le badge « Relance J+3 ».
+     */
+    isOverdue: boolean;
   }>;
 }
 
@@ -150,12 +161,14 @@ export async function loadCotraitancePipelineData(
       .orderBy(matchProposals.tenderId, matchProposals.rank);
 
     // 2b. architect_responses — map (tenderId, architectId) → réponse
+    //     Inclut `followupSentAt` pour le badge J+3 dans l'UI.
     const responseRows = await db
       .select({
         tenderId: architectResponses.tenderId,
         architectId: architectResponses.architectId,
         status: architectResponses.status,
         respondedAt: architectResponses.respondedAt,
+        followupSentAt: architectResponses.followupSentAt,
       })
       .from(architectResponses)
       .where(
@@ -168,13 +181,21 @@ export async function loadCotraitancePipelineData(
     // Clé composite tenderId::architectId → réponse
     const responseMap = new Map<
       string,
-      { status: "pending" | "accepted" | "declined" | "info_requested"; respondedAt: Date | null }
+      {
+        status: "pending" | "accepted" | "declined" | "info_requested";
+        respondedAt: Date | null;
+        followupSentAt: Date | null;
+      }
     >(
       responseRows.map((r) => [
         `${r.tenderId}::${r.architectId}`,
-        { status: r.status, respondedAt: r.respondedAt },
+        { status: r.status, respondedAt: r.respondedAt, followupSentAt: r.followupSentAt },
       ]),
     );
+
+    /** Seuil J+3 en millisecondes — identique au cron (src/lib/tandem/followup-cron.ts). */
+    const OVERDUE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
 
     // -----------------------------------------------------------------------
     // 3. Assemblage : Map<tenderId, PipelineEntry>
@@ -208,6 +229,12 @@ export async function loadCotraitancePipelineData(
       const responseKey = `${p.tenderId}::${p.architect.id}`;
       const response = responseMap.get(responseKey) ?? null;
 
+      // Calcul "en retard J+3" : statut pending + sollicitation vieille de > 3 jours.
+      // On utilise `solicitedAt` (match_proposals.created_at) comme référence de
+      // la date de sollicitation — identique à la logique du cron.
+      const ageMs = now - p.solicitedAt.getTime();
+      const isOverdue = response?.status === "pending" && ageMs >= OVERDUE_THRESHOLD_MS;
+
       entry.solicitations.push({
         rank: p.rank,
         score: parseFloat(p.score as unknown as string),
@@ -220,6 +247,8 @@ export async function loadCotraitancePipelineData(
         responseStatus: response?.status ?? null,
         respondedAt: response?.respondedAt ?? null,
         solicitedAt: p.solicitedAt,
+        followupSentAt: response?.followupSentAt ?? null,
+        isOverdue,
       });
     }
 
