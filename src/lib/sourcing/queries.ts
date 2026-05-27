@@ -31,6 +31,7 @@
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql, lte } from "drizzle-orm";
 
 import type { db as defaultDb } from "@/db/client";
+import { tenderBriefs } from "@/db/schema/ai";
 import { platforms, searchProfiles } from "@/db/schema/config";
 import { tenders } from "@/db/schema/tenders";
 
@@ -98,6 +99,12 @@ export interface TenderOfTheDay {
   postalCode: string | null;
   /** Département (2-3 chars). null = non dérivable. */
   department: string | null;
+  /**
+   * Brief IA généré à la demande (null si jamais généré).
+   * Lu depuis tender_briefs WHERE is_active = true via `getActiveBriefForTender`.
+   * Chargé séparément pour ne pas complexifier la query principale.
+   */
+  activeBrief: string | null;
 }
 
 // ============================================================================
@@ -231,7 +238,8 @@ export async function getTendersOfTheDay(
   // Le typage de `rows` est déjà conforme à `TenderOfTheDay[]` grâce à la
   // selection explicite — pas de transformation supplémentaire nécessaire.
   // `platforms.code` est l'enum strict `PlatformCode` côté schéma Drizzle.
-  return rows;
+  // `activeBrief` est null ici — chargé séparément via getActiveBriefForTender.
+  return rows.map((r) => ({ ...r, activeBrief: null }));
 }
 
 // ============================================================================
@@ -294,7 +302,7 @@ export async function getTendersSelected(
   // Le statut issu de Drizzle est le type enum Postgres broad — on le rétrécit
   // via `as` après avoir filtré IN sur les 2 valeurs cibles. TypeScript seul
   // ne peut pas inférer la restriction ; le WHERE IN garantit la validité.
-  return rows as TenderSelected[];
+  return rows.map((r) => ({ ...r, activeBrief: null })) as TenderSelected[];
 }
 
 // ============================================================================
@@ -344,7 +352,7 @@ export async function getTendersSolo(
     .orderBy(sql`${tenders.deadline} ASC NULLS LAST`)
     .limit(100);
 
-  return rows as TenderSelected[];
+  return rows.map((r) => ({ ...r, activeBrief: null })) as TenderSelected[];
 }
 
 // ============================================================================
@@ -406,11 +414,45 @@ export async function getTendersDeferred(
     .orderBy(asc(tenders.deferredUntil))
     .limit(100);
 
-  return rows;
+  return rows.map((r) => ({ ...r, activeBrief: null }));
 }
 
 // ============================================================================
-// 6. getActiveSearchProfileName — nom du profil actif (header UI)
+// 6. getActiveBriefForTender — brief IA actif pour un AO
+// ============================================================================
+
+/**
+ * Retourne le texte du brief IA actif pour un AO, ou `null` si aucun.
+ *
+ * Chargement séparé de `getTendersOfTheDay` pour éviter de complexifier
+ * le SELECT principal avec un LATERAL JOIN sur un schéma Drizzle strict.
+ *
+ * @param tenderId       UUID du tender
+ * @param organizationId UUID du tenant courant
+ * @param client         Instance Drizzle (mock-friendly)
+ */
+export async function getActiveBriefForTender(
+  tenderId: string,
+  organizationId: string,
+  client: DrizzleClient,
+): Promise<string | null> {
+  const rows = await client
+    .select({ content: tenderBriefs.content })
+    .from(tenderBriefs)
+    .where(
+      and(
+        eq(tenderBriefs.tenderId, tenderId),
+        eq(tenderBriefs.organizationId, organizationId),
+        eq(tenderBriefs.isActive, true),
+      ),
+    )
+    .limit(1);
+
+  return rows[0]?.content ?? null;
+}
+
+// ============================================================================
+// 7. getActiveSearchProfileName — nom du profil actif (header UI)
 // ============================================================================
 
 /**

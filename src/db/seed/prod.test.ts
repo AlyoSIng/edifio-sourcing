@@ -255,13 +255,13 @@ describe("runSeedProd -- les 5 tables autorisees sont seedees", () => {
     expect(platValues.find((p) => p.code === "boamp")?.id).toBe(PROD_PLATFORM_IDS.boamp);
   });
 
-  it("ai_prompts seede contient 12 lignes (catalogue v1 P1-P12)", async () => {
+  it("ai_prompts seede contient 13 lignes (catalogue v1 P1-P13)", async () => {
     await runSeedProd({ NODE_ENV: "production", DATABASE_URL: "postgres://prod-host:5432/db" }, []);
 
     const promptCall = insertCalls.find((c) => c.tableRef === aiPrompts);
     expect(promptCall).toBeDefined();
     expect(Array.isArray(promptCall?.values)).toBe(true);
-    expect((promptCall?.values as unknown[]).length).toBe(12);
+    expect((promptCall?.values as unknown[]).length).toBe(13);
   });
 
   it("search_profiles seede 1 ligne active avec organizationId=ORG_A_ID, cpvCodes contient '45000000'", async () => {

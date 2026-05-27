@@ -1,5 +1,6 @@
 import type { TenderOfTheDay } from "@/lib/sourcing/queries";
 
+import { BriefGenerator } from "./BriefGenerator";
 import { formatAmount, formatDeadline } from "./format";
 import { TenderCardActions } from "./TenderCardActions";
 
@@ -13,7 +14,8 @@ import { TenderCardActions } from "./TenderCardActions";
  *   - Grid 3 colonnes : [score ring 64px] [main] [actions 132px+]
  *   - Score ring SVG inline avec dasharray dynamique (cf. helper plus bas)
  *   - Couleur du ring dérivée du score (≥75 brand-red, 50-74 warn, <50 line-2)
- *   - Brief AO (3-4 lignes) extrait de rawData BOAMP (record.description / objet)
+ *   - Brief AO : brief IA actif (tender_briefs) en priorité, sinon brief BOAMP
+ *     statique (rawData). Bouton « Générer le brief » toujours disponible.
  *   - Département extrait de rawData, fallback regex code postal dans buyer
  *   - Liens « Consulter l'avis » + « Accéder au DCE / RC » si disponibles
  *
@@ -28,8 +30,10 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
   const deadlineTone = deadlineToneFromDays(daysToDeadline);
   const deadlineBg = deadlineBgFromDays(daysToDeadline);
 
-  // Brief AO extrait du rawData BOAMP (description / objet / libelle)
-  const brief = extractBrief(tender.rawData);
+  // Brief affiché : brief IA actif en priorité, sinon brief BOAMP statique
+  const aiBrief = tender.activeBrief;
+  const boampBrief = extractBrief(tender.rawData);
+  const displayBrief = aiBrief ?? boampBrief;
 
   return (
     <article className="grid grid-cols-1 gap-4 rounded-md border border-line bg-white p-4 transition hover:shadow-card sm:grid-cols-[64px_1fr_auto] sm:items-start">
@@ -60,8 +64,20 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
           </span>
         </div>
 
-        {/* Brief AO — extrait de rawData (BOAMP: record.description / record.objet) */}
-        {brief ? <p className="mt-2 line-clamp-3 text-xs text-ink-2">{brief}</p> : null}
+        {/* Brief AO — IA actif si disponible (avec badge), sinon BOAMP statique */}
+        {displayBrief ? (
+          <div className="mt-2">
+            <p className="line-clamp-3 text-xs text-ink-2">{displayBrief}</p>
+            {aiBrief ? (
+              <span className="mt-0.5 inline-flex items-center rounded-full bg-violet-50 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-violet-600">
+                IA
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Bouton Générer le brief (Client Component discret) */}
+        <BriefGenerator tenderId={tender.id} hasBrief={aiBrief !== null} />
 
         <p className="mt-2 text-xs text-ink-2">
           Estimation <span className="font-medium">{formatAmount(tender.amount)}</span>

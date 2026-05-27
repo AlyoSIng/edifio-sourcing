@@ -1,10 +1,12 @@
 /**
  * Dashboard Superadmin — edifio Sourcing
  *
- * 6 cartes de navigation vers les sous-modules :
+ * 8 cartes de navigation vers les sous-modules :
  *   - Support       : gestion des tickets utilisateurs
  *   - Actualités    : publication des news produit
  *   - Tests guidés  : création et suivi des QCM formations
+ *   - Formations    : CRUD des fiches formations (vidéo, doc, lien externe)
+ *   - FAQ           : CRUD des questions fréquentes
  *   - Étude marché  : contenu (PDF, liens)
  *   - Plaquette     : upload PDF plaquette commerciale (Supabase Storage)
  *   - Roadmap       : upload PDF roadmap produit (Supabase Storage)
@@ -46,6 +48,18 @@ const CARDS: DashboardCard[] = [
     label: "Tests guidés",
     description: "Créer et gérer les QCM liés aux formations.",
     icon: "🧪",
+  },
+  {
+    href: "/sourcing/superadmin/formations",
+    label: "Formations",
+    description: "Gérer les fiches formations visibles dans l'espace utilisateur.",
+    icon: "🎓",
+  },
+  {
+    href: "/sourcing/superadmin/faq",
+    label: "FAQ",
+    description: "Gérer les questions fréquentes visibles dans l'espace utilisateur.",
+    icon: "❓",
   },
   {
     href: "/sourcing/superadmin/market-study",

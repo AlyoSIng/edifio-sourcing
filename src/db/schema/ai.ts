@@ -1,11 +1,16 @@
 /**
- * Tables ai_prompts + ai_runs — IA Claude (Sonnet + Haiku).
+ * Tables ai_prompts + ai_runs + tender_briefs — IA Claude (Sonnet + Haiku).
  *
  * Source de vérité : `specs/schema_v1.sql` §7 + `specs/ai_prompts_v1.md`.
  *
  * Gate 5 directive : prompts versionnés en BDD, JAMAIS en dur dans le code.
  * Tout `ai_run` référence la version exacte du prompt utilisée pour
  * traçabilité (notamment lorsque le prompt est dépublié — la version reste).
+ *
+ * `tender_briefs` : briefs IA générés à la demande pour les AO (bouton
+ * « Générer le brief »). 1 brief actif par AO (isActive = true), historique
+ * conservé. Réf : SPEC_ADDENDUM_260524_AO_DU_JOUR_REPORT_ET_BRIEF.md §Exigence 2.
+ * Migration : src/db/migrations/0022_tender_briefs.sql.
  */
 
 import { sql } from "drizzle-orm";
@@ -26,6 +31,8 @@ import type { AiRunOutput } from "../types/jsonb";
 import { aiModel } from "./enums";
 import { organizations } from "./organizations";
 import { tenders } from "./tenders";
+
+// ─── ai_prompts ───────────────────────────────────────────────────────────────
 
 export const aiPrompts = pgTable(
   "ai_prompts",
@@ -56,6 +63,8 @@ export const aiPrompts = pgTable(
 
 export type AiPrompt = typeof aiPrompts.$inferSelect;
 export type NewAiPrompt = typeof aiPrompts.$inferInsert;
+
+// ─── ai_runs ──────────────────────────────────────────────────────────────────
 
 export const aiRuns = pgTable(
   "ai_runs",
@@ -93,3 +102,38 @@ export const aiRuns = pgTable(
 
 export type AiRun = typeof aiRuns.$inferSelect;
 export type NewAiRun = typeof aiRuns.$inferInsert;
+
+// ─── tender_briefs ────────────────────────────────────────────────────────────
+
+/**
+ * Briefs IA générés à la demande pour les AO (bouton « Générer le brief »).
+ * 1 brief actif par AO (isActive = true), historique conservé.
+ * Réf : SPEC_ADDENDUM_260524_AO_DU_JOUR_REPORT_ET_BRIEF.md §Exigence 2.
+ */
+export const tenderBriefs = pgTable(
+  "tender_briefs",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`uuid_generate_v4()`),
+    tenderId: uuid("tender_id")
+      .notNull()
+      .references(() => tenders.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    aiRunId: uuid("ai_run_id").references(() => aiRuns.id, { onDelete: "set null" }),
+    /** Texte du brief — 3-4 lignes, factuel, provenance rawData. */
+    content: text("content").notNull(),
+    /** false = version archivée. Seul 1 brief par tender peut avoir isActive = true. */
+    isActive: boolean("is_active").notNull().default(true),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenderActiveIdx: index("idx_tender_briefs_tender_active").on(table.tenderId, table.isActive),
+    orgIdx: index("idx_tender_briefs_org").on(table.organizationId),
+  }),
+);
+
+export type TenderBrief = typeof tenderBriefs.$inferSelect;
+export type NewTenderBrief = typeof tenderBriefs.$inferInsert;

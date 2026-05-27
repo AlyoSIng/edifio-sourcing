@@ -86,5 +86,12 @@ exports[`AI_PROMPTS_V1_CATALOG — snapshot (verrou versioning) > snapshot confo
     "name": "accroche_memo_intro",
     "version": 1,
   },
+  {
+    "active": true,
+    "id": "bbbbbbbb-0000-0000-0000-00000000000d",
+    "model": "sonnet-4-6",
+    "name": "ao_brief",
+    "version": 1,
+  },
 ]
 `;

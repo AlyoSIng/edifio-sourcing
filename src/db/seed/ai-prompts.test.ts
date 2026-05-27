@@ -1,15 +1,15 @@
 /**
- * Tests catalogue AI prompts v1 (P1-P12) — edifio Sourcing.
+ * Tests catalogue AI prompts v1 (P1-P13) — edifio Sourcing.
  *
  * Source : `src/db/seed/data/ai-prompts.ts` (chargé statiquement, pas
  * d'accès BDD).
  *
- * Étape 6/7 PR #2. Garde-fous :
- *  - Cardinalité : 12 prompts P1-P12 exactement
- *  - Nommage : 12 `name` distincts, alignés `specs/ai_prompts_v1.md`
+ * Étape 6/7 PR #2 + F.7 (P13 ao_brief). Garde-fous :
+ *  - Cardinalité : 13 prompts P1-P13 exactement
+ *  - Nommage : 13 `name` distincts, alignés `specs/ai_prompts_v1.md`
  *  - Version : toutes à 1 (livraison initiale)
  *  - active : tous à true (livraison initiale)
- *  - Modèle : P1-P3 = sonnet-4-6, P4-P12 = haiku-4-5 (cf. stratégie Gate 2 4/A)
+ *  - Modèle : P1-P3 + P13 = sonnet-4-6, P4-P12 = haiku-4-5 (cf. stratégie Gate 2 4/A)
  *  - UUID : pattern déterministe `bbbbbbbb-0000-0000-0000-0000000000XX` (hex)
  *  - Snapshot : verrouille toute modification (toute évolution passe par
  *    revue CTO + bump de version dans le fichier source — voir spec §Politique
@@ -33,20 +33,22 @@ const EXPECTED_NAMES = [
   "library_piece_match",
   "attestation_expiry_alert_text",
   "accroche_memo_intro",
+  "ao_brief",
 ] as const;
 
 const SONNET_PROMPTS = new Set([
   "rc_analysis_full",
   "memo_technique_generation",
   "cerfa_field_inference",
+  "ao_brief",
 ]);
 
 describe("AI_PROMPTS_V1_CATALOG — cardinalité + nommage", () => {
-  it("contient exactement 12 prompts (P1-P12)", () => {
-    expect(AI_PROMPTS_V1_CATALOG).toHaveLength(12);
+  it("contient exactement 13 prompts (P1-P13)", () => {
+    expect(AI_PROMPTS_V1_CATALOG).toHaveLength(13);
   });
 
-  it("les 12 noms correspondent à ai_prompts_v1.md", () => {
+  it("les 13 noms correspondent à ai_prompts_v1.md", () => {
     const names = AI_PROMPTS_V1_CATALOG.map((p) => p.name);
     expect(names).toEqual(EXPECTED_NAMES);
   });
@@ -77,9 +79,9 @@ describe("AI_PROMPTS_V1_CATALOG — versions et activation", () => {
 });
 
 describe("AI_PROMPTS_V1_CATALOG — choix modèles (Gate 2 stratégie 4/A)", () => {
-  it("P1-P3 utilisent sonnet-4-6 (tâches longues / structurées)", () => {
+  it("P1-P3 + P13 utilisent sonnet-4-6 (tâches longues / structurées)", () => {
     for (const p of AI_PROMPTS_V1_CATALOG) {
-      if (SONNET_PROMPTS.has(p.name)) {
+      if (SONNET_PROMPTS.has(p.name as string)) {
         expect(p.model).toBe("sonnet-4-6");
       }
     }
@@ -87,7 +89,7 @@ describe("AI_PROMPTS_V1_CATALOG — choix modèles (Gate 2 stratégie 4/A)", () 
 
   it("P4-P12 utilisent haiku-4-5 (tâches courtes / pré-classification)", () => {
     for (const p of AI_PROMPTS_V1_CATALOG) {
-      if (!SONNET_PROMPTS.has(p.name)) {
+      if (!SONNET_PROMPTS.has(p.name as string)) {
         expect(p.model).toBe("haiku-4-5");
       }
     }
@@ -118,13 +120,21 @@ describe("AI_PROMPTS_V1_CATALOG — contenu requis (system + user template + zod
     }
   });
 
-  it("chaque prompt a un outputSchemaZod non vide (sérialisation Zod)", () => {
-    for (const p of AI_PROMPTS_V1_CATALOG) {
+  it("chaque prompt structuré a un outputSchemaZod non vide (sérialisation Zod)", () => {
+    // P13 (ao_brief) retourne du texte libre — outputSchemaZod intentionnellement null.
+    const promptsWithSchema = AI_PROMPTS_V1_CATALOG.filter((p) => p.name !== "ao_brief");
+    for (const p of promptsWithSchema) {
       expect(p.outputSchemaZod).toBeDefined();
       expect((p.outputSchemaZod ?? "").length).toBeGreaterThan(0);
       // Sanity-check : le source TS doit au moins contenir `z.object`.
       expect(p.outputSchemaZod).toMatch(/z\.object/);
     }
+  });
+
+  it("ao_brief a outputSchemaZod null (sortie texte libre)", () => {
+    const aoBrief = AI_PROMPTS_V1_CATALOG.find((p) => p.name === "ao_brief");
+    expect(aoBrief).toBeDefined();
+    expect(aoBrief?.outputSchemaZod).toBeNull();
   });
 });
 

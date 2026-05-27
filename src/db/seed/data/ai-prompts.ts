@@ -356,11 +356,37 @@ export const AI_PROMPTS_V1_CATALOG: AiPromptSeed[] = [
     outputSchemaZod: ACCROCHE_MEMO_ZOD,
     active: true,
   },
+
+  // ----- P13 : ao_brief (sonnet-4-6) ----------------------------------------
+  // Brief court (3-4 lignes) généré à la demande via le bouton « Générer le brief »
+  // sur la TenderCard. Réf : SPEC_ADDENDUM_260524_AO_DU_JOUR_REPORT_ET_BRIEF.md §Exigence 2.
+  {
+    id: "bbbbbbbb-0000-0000-0000-00000000000d",
+    name: "ao_brief",
+    version: 1,
+    model: "sonnet-4-6",
+    systemPrompt:
+      "Tu es un assistant d'analyse d'appels d'offres publics français pour une " +
+      "agence d'architecture (AlyoS Ingénierie). Tu génères des briefs synthétiques, " +
+      "factuels et utiles. Tu n'inventes jamais d'information : si une donnée est " +
+      "absente, tu l'indiques explicitement. Réponds toujours en français.",
+    userPromptTemplate:
+      "Rédige un brief de 3 à 4 lignes pour cet appel d'offres :\n\n" +
+      "<<AO_CONTEXT>>\n\n" +
+      "Format attendu :\n" +
+      "- Ligne 1 : objet du marché et maître d'ouvrage\n" +
+      "- Ligne 2 : périmètre et lots principaux\n" +
+      '- Ligne 3 : montant estimé et date de clôture (si disponibles, sinon "non précisé")\n' +
+      "- Ligne 4 : signal d'adéquation avec une agence d'architecture (oui/potentiel/faible)\n\n" +
+      'Sois factuel. Si une information manque, écris "non précisé".',
+    outputSchemaZod: null,
+    active: true,
+  },
 ];
 
-/** Sanity-check à l'import : on doit avoir exactement 12 prompts. */
-if (AI_PROMPTS_V1_CATALOG.length !== 12) {
+/** Sanity-check à l'import : on doit avoir exactement 13 prompts (P1-P12 + P13 ao_brief). */
+if (AI_PROMPTS_V1_CATALOG.length !== 13) {
   throw new Error(
-    `[ai-prompts seed] catalogue attendu = 12 prompts, observé = ${AI_PROMPTS_V1_CATALOG.length}`,
+    `[ai-prompts seed] catalogue attendu = 13 prompts, observé = ${AI_PROMPTS_V1_CATALOG.length}`,
   );
 }
