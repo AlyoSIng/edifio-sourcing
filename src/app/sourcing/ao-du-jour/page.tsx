@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
@@ -170,6 +171,30 @@ export default async function AoDuJourPage({
           currentDepts={departments}
           currentClosingDays={closingDays}
         />
+      ) : null}
+
+      {/* Bouton "Ajouter un AO" — admins uniquement, consultation privée / gré à gré */}
+      {isAdmin(profile) && !fetchError ? (
+        <div className="mb-3 flex justify-end">
+          <Link
+            href="/sourcing/ao/nouveau"
+            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5 shrink-0"
+              aria-hidden
+            >
+              <path d="M8 3v10M3 8h10" />
+            </svg>
+            Ajouter un AO
+          </Link>
+        </div>
       ) : null}
 
       {/* Toast erreur server action (PR n°5) — toujours monté côté Client. */}
