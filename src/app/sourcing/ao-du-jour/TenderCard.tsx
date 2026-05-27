@@ -113,7 +113,7 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
       <div className="flex flex-col items-stretch gap-1.5 sm:min-w-[140px]">
         {/* Badge deadline coloré : rouge <7j, orange 7-15j, vert >15j */}
         <span
-          className={`inline-flex items-center justify-end rounded-sm px-1.5 py-0.5 text-right font-mono text-[10px] ${deadlineBg} ${deadlineTone}`}
+          className={`inline-flex items-center justify-end rounded-sm px-1.5 py-0.5 text-right font-mono text-base font-bold ${deadlineBg} ${deadlineTone}`}
           aria-label={`Date limite de remise des offres : ${deadlineLabel}`}
         >
           {daysToDeadline !== null ? `J-${daysToDeadline}` : deadlineLabel}
