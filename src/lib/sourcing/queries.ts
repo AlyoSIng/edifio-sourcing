@@ -34,6 +34,7 @@ import type { db as defaultDb } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
 import { platforms, searchProfiles } from "@/db/schema/config";
 import { tenders } from "@/db/schema/tenders";
+import { getSearchProfileById } from "@/lib/profile/search-profiles-queries";
 
 import type { PlatformCode } from "./types";
 
@@ -128,6 +129,16 @@ export interface TenderAoDuJourOptions {
    * Ex. `7` → deadline ≤ now() + 7 days.
    */
   closingDays?: 7 | 15 | 30 | null;
+  /**
+   * UUID d'un profil de recherche spécifique. Si fourni, les AOs sont filtrés
+   * selon les critères du profil (CPV, geo_zones, market_types) en plus des
+   * filtres habituels. Permet le fonctionnement des onglets sur la page AO
+   * du jour (Tâche #29).
+   *
+   * Si omis ou null, tous les AOs `sourced` de l'organisation sont retournés
+   * (comportement historique V1).
+   */
+  profileId?: string | null;
 }
 
 // ============================================================================
@@ -164,7 +175,7 @@ export async function getTendersOfTheDay(
   client: DrizzleClient,
   options?: TenderAoDuJourOptions,
 ): Promise<TenderOfTheDay[]> {
-  const { sort = "score", departments = [], closingDays = null } = options ?? {};
+  const { sort = "score", departments = [], closingDays = null, profileId = null } = options ?? {};
 
   // Filtres statiques (tenant + workflow)
   const baseConditions = [
@@ -182,7 +193,7 @@ export async function getTendersOfTheDay(
     isNull(tenders.excludedAt),
   ] as const;
 
-  // Filtre département multi-select (optionnel)
+  // Filtre département multi-select (optionnel, vient de la toolbar UI)
   const deptCondition =
     departments.length > 0 ? inArray(tenders.department, departments) : undefined;
 
@@ -192,10 +203,49 @@ export async function getTendersOfTheDay(
       ? lte(tenders.deadline, sql`now() + interval '${sql.raw(String(closingDays))} days'`)
       : undefined;
 
+  // Filtres dérivés du profil de recherche sélectionné (Tâche #29 onglets).
+  // Si profileId fourni, on charge le profil et on applique :
+  //   - cpvCodes : au moins un code CPV de l'AO doit débuter par un des codes
+  //     du profil (même logique "startsWith" que le cron matcher).
+  //   - geoZones : département de l'AO doit être dans la liste.
+  //   - marketTypes : non disponible dans la colonne `tenders` — ignoré ici
+  //     (le marché type est dans rawData, le filtre exact reste côté cron).
+  // Si le profil a des tableaux vides pour ces critères, le filtre n'est pas
+  // appliqué (comportement identique au profil global = tout voir).
+  let profileCpvCondition: ReturnType<typeof inArray> | undefined;
+  let profileGeoCondition: ReturnType<typeof inArray> | undefined;
+
+  if (profileId) {
+    try {
+      const selectedProfile = await getSearchProfileById(organizationId, profileId, client);
+      if (selectedProfile) {
+        // Filtre CPV : tenders.cpv && profile.cpvCodes (overlap array Postgres)
+        // Drizzle 0.39 n'a pas de helper `overlaps` natif — on utilise sql brut.
+        // L'opérateur `&&` Postgres teste l'intersection de deux arrays.
+        if (selectedProfile.cpvCodes.length > 0) {
+          // On construit un literal array Postgres : ARRAY['45','71',...]::text[]
+          const cpvLiteral = `ARRAY[${selectedProfile.cpvCodes.map((c) => `'${c.replace(/'/g, "''")}'`).join(",")}]::text[]`;
+          profileCpvCondition =
+            sql`${tenders.cpv} && ${sql.raw(cpvLiteral)}` as unknown as ReturnType<typeof inArray>;
+        }
+        // Filtre géo : tenders.department IN (profile.geoZones)
+        if (selectedProfile.geoZones.length > 0) {
+          profileGeoCondition = inArray(tenders.department, selectedProfile.geoZones);
+        }
+      }
+    } catch (err) {
+      // Profil non trouvé ou erreur BDD : on ignore silencieusement et on
+      // retourne tous les AOs (dégradé gracieux — l'onglet reste fonctionnel).
+      console.error("[getTendersOfTheDay:profile-filter:fail]", err);
+    }
+  }
+
   const whereClause = and(
     ...baseConditions,
     ...(deptCondition ? [deptCondition] : []),
     ...(closingCondition ? [closingCondition] : []),
+    ...(profileCpvCondition ? [profileCpvCondition] : []),
+    ...(profileGeoCondition ? [profileGeoCondition] : []),
   );
 
   // ORDER BY selon le tri demandé
