@@ -11,6 +11,7 @@ import { BE_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
 import { listBeDocuments } from "../actions";
 import { BEDocumentsSection } from "./BEDocumentsSection";
 import { BEEditForm } from "./BEEditForm";
+import { PappersEnrichSingleButton } from "./PappersEnrichSingleButton";
 
 /**
  * Page fiche Bureau d'Études — Server Component.
@@ -135,6 +136,11 @@ export default async function BEFichePage({ params }: { params: { id: string } }
                 value={[be.zip, be.city].filter(Boolean).join(" ") || null}
               />
             </dl>
+            {adminUser ? (
+              <div className="mt-3">
+                <PappersEnrichSingleButton beId={be.id} />
+              </div>
+            ) : null}
           </section>
 
           {/* Profil matching */}

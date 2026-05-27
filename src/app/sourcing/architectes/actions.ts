@@ -745,3 +745,188 @@ export async function enrichArchitectsFromPappers(params: {
     total,
   };
 }
+
+// ============================================================================
+// 6. enrichSingleArchitectFromPappers — enrichissement unitaire (admin)
+// ============================================================================
+
+export type EnrichSingleResult =
+  | {
+      ok: true;
+      updated: boolean;
+      /** Champs effectivement mis à jour (pour affichage UI). */
+      changes: {
+        siren?: string;
+        headcount?: number;
+        annualRevenue?: number;
+      };
+      /** Message résumé à afficher (ex: "SIREN 123456789 · Effectif 14 · CA 450 000 €"). */
+      summary: string;
+    }
+  | {
+      ok: false;
+      error:
+        | "not_authenticated"
+        | "forbidden_domain"
+        | "forbidden_role"
+        | "invalid_input"
+        | "not_found"
+        | "pappers_unavailable"
+        | "internal_error";
+    };
+
+/**
+ * Enrichit la fiche d'un seul architecte depuis l'API Pappers.
+ *
+ * Stratégie identique à `enrichArchitectsFromPappers` mais pour un UUID unique :
+ *  1. SIREN direct si renseigné
+ *  2. Sinon recherche par nom cabinet (score ≥ 0.6 + NAF 711x)
+ * Ne met à jour que les champs NULL (préserve les corrections manuelles).
+ * Audit `architect_edit` après modification.
+ *
+ * @param architectId UUID de l'architecte à enrichir
+ */
+export async function enrichSingleArchitectFromPappers(
+  architectId: string,
+): Promise<EnrichSingleResult> {
+  const authClient = createSupabaseServerClient();
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+  const { profile } = authResult;
+
+  // 2. Vérification rôle admin
+  if (!isAdmin(profile)) {
+    return { ok: false, error: "forbidden_role" };
+  }
+
+  // 3. Validation UUID
+  if (!UUID_SHAPE.test(architectId)) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  // 4. Vérification clé API Pappers
+  const apiKey = process.env.PAPPERS_API_KEY;
+  if (!apiKey) {
+    console.error("[pappers-enrich-single] PAPPERS_API_KEY manquante.");
+    return { ok: false, error: "pappers_unavailable" };
+  }
+
+  try {
+    // 5. Récupération de l'architecte (filtré tenant)
+    const rows = await defaultDb
+      .select()
+      .from(architects)
+      .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+      .limit(1);
+
+    const arch = rows[0];
+    if (!arch) return { ok: false, error: "not_found" };
+
+    // 6. Appel Pappers (même logique que le bulk)
+    let foundSiren: string | null = null;
+    let pappers: { tranche_effectif_salarie?: string; chiffre_affaires?: number } | null = null;
+
+    if (arch.siren) {
+      // Stratégie 1 : lookup direct par SIREN
+      const result = await getPappersBySiren(arch.siren, apiKey);
+      if (result) {
+        foundSiren = arch.siren;
+        pappers = result;
+      }
+    } else if (arch.cabinet) {
+      // Stratégie 2 : recherche par nom cabinet
+      const searchResult = await searchPappersByName(arch.cabinet, apiKey);
+      const resultats = searchResult?.resultats_entreprises ?? [];
+
+      if (resultats.length === 1 && resultats[0]) {
+        const hit = resultats[0];
+        const score = hit.score ?? 0;
+        const codeNaf = hit.siege?.code_naf ?? "";
+
+        if (score >= 0.6 && codeNaf.startsWith("711")) {
+          foundSiren = hit.siren;
+          const detail = await getPappersBySiren(foundSiren, apiKey);
+          if (detail) {
+            pappers = detail;
+          }
+        }
+      }
+    }
+
+    // 7. Aucune donnée Pappers trouvée
+    if (!pappers && !foundSiren) {
+      return {
+        ok: true,
+        updated: false,
+        changes: {},
+        summary: "Aucune donnée trouvée dans Pappers.",
+      };
+    }
+
+    // 8. Calcul des champs à mettre à jour (uniquement NULL)
+    const newHeadcount = pappers ? mapTrancheToHeadcount(pappers.tranche_effectif_salarie) : null;
+    const newAnnualRevenue = pappers?.chiffre_affaires ?? null;
+
+    const needsUpdate =
+      (arch.siren === null && foundSiren !== null) ||
+      (arch.headcount === null && newHeadcount !== null) ||
+      (arch.annualRevenue === null && newAnnualRevenue !== null);
+
+    if (!needsUpdate) {
+      return {
+        ok: true,
+        updated: false,
+        changes: {},
+        summary: "Fiche déjà complète.",
+      };
+    }
+
+    // 9. Construction des changements effectifs
+    const changes: { siren?: string; headcount?: number; annualRevenue?: number } = {};
+    if (arch.siren === null && foundSiren !== null) changes.siren = foundSiren;
+    if (arch.headcount === null && newHeadcount !== null) changes.headcount = newHeadcount;
+    if (arch.annualRevenue === null && newAnnualRevenue !== null)
+      changes.annualRevenue = newAnnualRevenue;
+
+    // 10. UPDATE BDD
+    await defaultDb
+      .update(architects)
+      .set({
+        siren: arch.siren ?? foundSiren,
+        headcount: arch.headcount ?? newHeadcount,
+        annualRevenue: arch.annualRevenue ?? newAnnualRevenue,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(architects.id, arch.id), eq(architects.organizationId, ALYOS_ORG_ID)));
+
+    // 11. Audit A17 architect_edit (best-effort)
+    await audit({
+      action: "architect_edit",
+      subjectType: "architect",
+      subjectId: arch.id,
+      data: {
+        operation: "update",
+        architect_id: arch.id,
+        cabinet: arch.cabinet,
+        enriched_fields: Object.keys(changes),
+        source: "pappers_single",
+      },
+    });
+
+    // 12. Construction du résumé lisible
+    const summaryParts: string[] = [];
+    if (changes.siren) summaryParts.push(`SIREN ${changes.siren}`);
+    if (changes.headcount !== undefined)
+      summaryParts.push(`Effectif ${changes.headcount.toLocaleString("fr-FR")}`);
+    if (changes.annualRevenue !== undefined)
+      summaryParts.push(`CA ${changes.annualRevenue.toLocaleString("fr-FR")} €`);
+    const summary = summaryParts.join(" · ");
+
+    return { ok: true, updated: true, changes, summary };
+  } catch (err) {
+    console.error("[architects-actions:enrich-single:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}

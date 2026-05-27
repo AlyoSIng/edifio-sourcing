@@ -10,6 +10,7 @@ import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { ArchitectEditForm } from "./ArchitectEditForm";
+import { PappersEnrichSingleButton } from "./PappersEnrichSingleButton";
 
 /**
  * Page fiche architecte — Server Component.
@@ -196,6 +197,11 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
                 value={[architect.zip, architect.city].filter(Boolean).join(" ") || null}
               />
             </dl>
+            {adminUser ? (
+              <div className="mt-3">
+                <PappersEnrichSingleButton architectId={architect.id} />
+              </div>
+            ) : null}
           </section>
 
           {/* Spécialités et zones géo */}

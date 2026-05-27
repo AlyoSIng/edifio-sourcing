@@ -20,9 +20,15 @@ import { revalidatePath } from "next/cache";
 import { db as defaultDb } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { beDocuments, type BeDocument, type BeDocumentKind } from "@/db/schema/be-documents";
+import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import {
+  getPappersBySiren,
+  mapTrancheToHeadcount,
+  searchPappersByName,
+} from "@/lib/pappers/client";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import type { BureauEtudes, NewBureauEtudes } from "@/db/schema/bureaux-etudes";
 
@@ -616,5 +622,189 @@ export async function listBeDocuments(
   } catch (err) {
     console.error("[be-actions:list-docs:fail]", err);
     return [];
+  }
+}
+
+// ============================================================================
+// 8. enrichSingleBEFromPappers — enrichissement unitaire (admin)
+// ============================================================================
+
+/**
+ * Résultat de l'enrichissement unitaire Pappers (architecte ou BE).
+ * Note : le schema BE n'a pas de colonne `annualRevenue` — seuls `siren`
+ * et `headcount` sont enrichis.
+ */
+export type EnrichSingleResult =
+  | {
+      ok: true;
+      updated: boolean;
+      /** Champs effectivement mis à jour (pour affichage UI). */
+      changes: {
+        siren?: string;
+        headcount?: number;
+      };
+      /** Message résumé à afficher (ex: "SIREN 123456789 · Effectif 14"). */
+      summary: string;
+    }
+  | {
+      ok: false;
+      error:
+        | "not_authenticated"
+        | "forbidden_domain"
+        | "forbidden_role"
+        | "invalid_input"
+        | "not_found"
+        | "pappers_unavailable"
+        | "internal_error";
+    };
+
+/**
+ * Enrichit la fiche d'un seul bureau d'études depuis l'API Pappers.
+ *
+ * Stratégie identique à la moulinette bulk architectes :
+ *  1. SIREN direct si renseigné
+ *  2. Sinon recherche par nom cabinet (score ≥ 0.6 + NAF 711x)
+ * Ne met à jour que les champs NULL (préserve les corrections manuelles).
+ * Audit `architect_edit` après modification (action commune fiches partenaires).
+ *
+ * Note : le schema BE n'expose pas de colonne `annualRevenue` — seuls
+ * `siren` et `headcount` sont enrichis.
+ *
+ * @param beId UUID du bureau d'études à enrichir
+ */
+export async function enrichSingleBEFromPappers(beId: string): Promise<EnrichSingleResult> {
+  const authClient = createSupabaseServerClient();
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+  const { profile } = authResult;
+
+  // 2. Vérification rôle admin
+  if (!isAdmin(profile)) {
+    return { ok: false, error: "forbidden_role" };
+  }
+
+  // 3. Validation UUID
+  if (!UUID_SHAPE.test(beId)) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  // 4. Vérification clé API Pappers
+  const apiKey = process.env.PAPPERS_API_KEY;
+  if (!apiKey) {
+    console.error("[pappers-enrich-single-be] PAPPERS_API_KEY manquante.");
+    return { ok: false, error: "pappers_unavailable" };
+  }
+
+  try {
+    // 5. Récupération du BE (filtré tenant)
+    const rows = await defaultDb
+      .select()
+      .from(bureauEtudes)
+      .where(and(eq(bureauEtudes.id, beId), eq(bureauEtudes.organizationId, ALYOS_ORG_ID)))
+      .limit(1);
+
+    const be = rows[0];
+    if (!be) return { ok: false, error: "not_found" };
+
+    // 6. Appel Pappers (même logique que le bulk architectes)
+    let foundSiren: string | null = null;
+    let pappers: { tranche_effectif_salarie?: string; chiffre_affaires?: number } | null = null;
+
+    if (be.siren) {
+      // Stratégie 1 : lookup direct par SIREN
+      const result = await getPappersBySiren(be.siren, apiKey);
+      if (result) {
+        foundSiren = be.siren;
+        pappers = result;
+      }
+    } else if (be.cabinet) {
+      // Stratégie 2 : recherche par nom cabinet
+      const searchResult = await searchPappersByName(be.cabinet, apiKey);
+      const resultats = searchResult?.resultats_entreprises ?? [];
+
+      if (resultats.length === 1 && resultats[0]) {
+        const hit = resultats[0];
+        const score = hit.score ?? 0;
+        const codeNaf = hit.siege?.code_naf ?? "";
+
+        // Retenir si score suffisant ET activité ingénierie/architecture (NAF 711x)
+        if (score >= 0.6 && codeNaf.startsWith("711")) {
+          foundSiren = hit.siren;
+          const detail = await getPappersBySiren(foundSiren, apiKey);
+          if (detail) {
+            pappers = detail;
+          }
+        }
+      }
+    }
+
+    // 7. Aucune donnée Pappers trouvée
+    if (!pappers && !foundSiren) {
+      return {
+        ok: true,
+        updated: false,
+        changes: {},
+        summary: "Aucune donnée trouvée dans Pappers.",
+      };
+    }
+
+    // 8. Calcul des champs à mettre à jour (uniquement NULL)
+    const newHeadcount = pappers ? mapTrancheToHeadcount(pappers.tranche_effectif_salarie) : null;
+
+    const needsUpdate =
+      (be.siren === null && foundSiren !== null) ||
+      (be.headcount === null && newHeadcount !== null);
+
+    if (!needsUpdate) {
+      return {
+        ok: true,
+        updated: false,
+        changes: {},
+        summary: "Fiche déjà complète.",
+      };
+    }
+
+    // 9. Construction des changements effectifs
+    const changes: { siren?: string; headcount?: number } = {};
+    if (be.siren === null && foundSiren !== null) changes.siren = foundSiren;
+    if (be.headcount === null && newHeadcount !== null) changes.headcount = newHeadcount;
+
+    // 10. UPDATE BDD
+    await defaultDb
+      .update(bureauEtudes)
+      .set({
+        siren: be.siren ?? foundSiren,
+        headcount: be.headcount ?? newHeadcount,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(bureauEtudes.id, be.id), eq(bureauEtudes.organizationId, ALYOS_ORG_ID)));
+
+    // 11. Audit (best-effort)
+    await audit({
+      action: "architect_edit",
+      subjectType: "architect",
+      subjectId: be.id,
+      data: {
+        operation: "update",
+        be_id: be.id,
+        cabinet: be.cabinet,
+        enriched_fields: Object.keys(changes),
+        source: "pappers_single",
+      },
+    });
+
+    // 12. Construction du résumé lisible
+    const summaryParts: string[] = [];
+    if (changes.siren) summaryParts.push(`SIREN ${changes.siren}`);
+    if (changes.headcount !== undefined)
+      summaryParts.push(`Effectif ${changes.headcount.toLocaleString("fr-FR")}`);
+    const summary = summaryParts.join(" · ");
+
+    return { ok: true, updated: true, changes, summary };
+  } catch (err) {
+    console.error("[be-actions:enrich-single:fail]", err);
+    return { ok: false, error: "internal_error" };
   }
 }
