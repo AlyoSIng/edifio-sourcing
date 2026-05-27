@@ -94,12 +94,15 @@ export function toUserProfile(user: User): UserProfile {
 }
 
 /**
- * Type guard : l'utilisateur a-t-il le rôle admin ?
- * Note : un superadmin N'est PAS considéré "admin" par cette garde seule —
- * utiliser `isAdmin(p) || isSuperAdmin(p)` pour les ressources admin standard.
+ * Type guard : l'utilisateur a-t-il les privilèges admin ?
+ * Retourne `true` pour les rôles `admin` ET `superadmin` (superadmin ⊃ admin).
+ * Utiliser `isSuperAdmin(p)` pour les vérifications exclusivement superadmin
+ * (ex. accès à /sourcing/superadmin).
+ * Décision 2026-05-27 : aligné sur le middleware Gate 7 qui laisse déjà
+ * passer les superadmins sur toutes les routes admin.
  */
 export function isAdmin(profile: UserProfile): boolean {
-  return profile.role === "admin";
+  return profile.role === "admin" || profile.role === "superadmin";
 }
 
 /**
