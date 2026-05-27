@@ -176,6 +176,13 @@
       "when": 1748996100000,
       "tag": "0024_platform_prive",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1748996160000,
+      "tag": "0025_search_profiles_multi",
+      "breakpoints": true
     }
   ]
 }

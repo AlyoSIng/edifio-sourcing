@@ -2,6 +2,29 @@
 
 ---
 
+## 2026-05-27 — PR #78 — Relance badge J+3 Cotraitance (Alex)
+
+- **2026-05-27 · G6 · Alex (dev) · feat — badge relance archi non-réponse J+3 (PR #78).**
+  *Analyse préalable : le cron `followup-cron.ts` et la colonne `architect_responses.followup_sent_at` étaient déjà complets — aucune migration nécessaire.*
+  *Ajout : champs `followupSentAt` et `isOverdue` dans `page-data.ts` (isOverdue = pending + âge >= 3 jours). Composant `RelanceBadge` dans `CotraitancePipelineClient.tsx` : badge rouge "En attente +3j" (pas encore relancé), badge orange "Relancé" (cron déjà passé). 6 tests Vitest créés dans `page-data.test.ts`.*
+
+---
+
+## 2026-05-27 — PR #79 — Multi profils de recherche + onglets AO du jour (Nadia)
+
+- **2026-05-27 · G6 · Nadia (dev_tandem) · feat — multi search profiles + onglets AO du jour (PR #79).**
+  *Migration 0025 : ajout colonnes `is_default BOOLEAN` et `display_order INTEGER` sur `search_profiles` ; promotion automatique du profil actif le plus ancien en `is_default = true` (idempotent).*
+  *Écrit manuellement (drizzle-kit generate indisponible — conflit esbuild arm64/x64 Windows) — pattern cohérent avec 0022-0024.*
+  *`search-profiles-queries.ts` : 7 fonctions Drizzle (list, get, create, update, delete avec guard last_active, setDefault).*
+  *`search-profiles-actions.ts` : 5 Server Actions (auth + Zod + audit A3 + revalidatePath).*
+  *Admin UI `/sourcing/admin/search-profiles/` : liste + création/édition inline + badges défaut/inactif.*
+  *`ProfileTabs.tsx` : onglets nav par profil actif, searchParam `?profile=<uuid>`.*
+  *`ao-du-jour/page.tsx` : charge les profils, résout l'onglet actif, passe `profileId` à `getTendersOfTheDay`.*
+  *`queries.ts` : `profileId` optionnel → filtre CPV (overlap array Postgres) + geo zones.*
+  *Point produit : formulaire édition inline pré-remplit uniquement `name` + `marketTypes` — mots-clés complets en PR amélioration si besoin.*
+
+---
+
 ## 2026-05-27 — Validations Board : buckets Supabase + SLA support + fix pnpm 11 Docker
 
 - **2026-05-27 · G6 · Steve (Board) · validation — Buckets Supabase Storage validés par CTO Sophie.**
