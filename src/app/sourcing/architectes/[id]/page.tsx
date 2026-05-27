@@ -333,7 +333,10 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
               <h2 id="edit-heading" className="mb-4 text-sm font-semibold text-ink">
                 Modifier la fiche
               </h2>
-              <ArchitectEditForm architect={architect} />
+              <ArchitectEditForm
+                architect={architect}
+                initialPastCollabs={architect.pastCollabsCount}
+              />
             </section>
           ) : null}
         </div>

@@ -13,6 +13,7 @@
  *  - Édition des spécialités via checkboxes (liste ARCHITECT_SPECIALTY_CODES).
  *  - Édition des zones géo en CSV text (départements séparés par virgule).
  *  - Édition budget min / max (€ HT, optionnels).
+ *  - Édition `pastCollabsCount` (collaborations passées — saisie manuelle admin).
  *  - Toggle RGPD opposition (section dédiée, distinct des champs ordinaires).
  *  - Validation client-side minimaliste (cabinet non vide).
  *  - Soumission via Server Action `upsertArchitect` + `setRgpdOpposition`.
@@ -24,7 +25,6 @@
  *  - `solicitable` : dérivé automatiquement (GENERATED ALWAYS AS).
  *  - `headcount`, `companySize`, `companyCreatedAt` : enrichissement externe.
  *  - `odooExternalId` : géré par import Odoo uniquement.
- *  - `pastCollabsCount` : incrémenté automatiquement par l'app.
  */
 
 import { useTransition, useState } from "react";
@@ -39,9 +39,11 @@ import { upsertArchitect, setRgpdOpposition } from "../actions";
 interface ArchitectEditFormProps {
   /** Architecte courant — pré-remplit le formulaire. */
   architect: Architect;
+  /** Nombre de collaborations passées — pré-remplit le champ dédié. */
+  initialPastCollabs?: number;
 }
 
-export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
+export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEditFormProps) {
   const router = useRouter();
   const [editPending, startEditTransition] = useTransition();
   const [rgpdPending, startRgpdTransition] = useTransition();
@@ -83,6 +85,11 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
 
   // CA annuel moyen — saisie manuelle (filtre éligibilité Tandem)
   const [annualRevenue, setAnnualRevenue] = useState(architect.annualRevenue?.toString() ?? "");
+
+  // Collaborations passées — saisie manuelle admin (signal historique matching)
+  const [pastCollabs, setPastCollabs] = useState<number>(
+    initialPastCollabs ?? architect.pastCollabsCount ?? 0,
+  );
 
   // -------------------------------------------------------------------------
   // Soumission formulaire principal
@@ -134,7 +141,7 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
           companySize: architect.companySize,
           companyCreatedAt: architect.companyCreatedAt,
           odooExternalId: architect.odooExternalId,
-          pastCollabsCount: architect.pastCollabsCount,
+          pastCollabsCount: pastCollabs,
         },
         architect.id,
       );
@@ -435,6 +442,19 @@ export function ArchitectEditForm({ architect }: ArchitectEditFormProps) {
                 className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
               />
             </div>
+          </div>
+
+          {/* Collaborations passées */}
+          <div>
+            <label className="text-xs font-medium text-muted">Collaborations passées</label>
+            <input
+              type="number"
+              min={0}
+              value={pastCollabs}
+              onChange={(e) => setPastCollabs(Number(e.target.value))}
+              className="mt-1 h-8 w-full rounded border border-line bg-white px-2 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand-red"
+            />
+            <p className="mt-0.5 text-[10px] text-muted">Nombre de fois cotraitants ensemble</p>
           </div>
 
           {/* Drapeaux */}

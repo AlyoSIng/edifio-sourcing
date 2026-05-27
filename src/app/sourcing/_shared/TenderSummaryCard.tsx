@@ -1,6 +1,6 @@
 /**
  * Carte AO simplifiée — Server Component partagé entre les pages
- * « Sélectionnés », « Différés » et « Réponse solo ».
+ * « Sélectionnés », « Reportés » et « Réponse solo ».
  *
  * Layout identique à `TenderCard` (score ring + titre + acheteur + CPV +
  * montant + deadline) mais SANS les boutons actions Sélectionner / Reporter /
