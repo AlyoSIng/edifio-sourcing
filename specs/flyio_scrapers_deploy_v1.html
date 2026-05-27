@@ -1,0 +1,1122 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fly.io Scrapers — Guide de déploiement — edifio Sourcing</title>
+    <style>
+      :root {
+        --red: #e63946;
+        --blue: #1d3557;
+        --light: #a8dadc;
+        --cream: #f1faee;
+        --gray: #457b9d;
+        --ink: #1a1a2e;
+        --muted: #5a6a7a;
+        --line: #e2e8f0;
+        --paper: #f8fafc;
+        --success: #16a34a;
+        --warn: #d97706;
+        --code-bg: #1e293b;
+        --code-fg: #e2e8f0;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          "Segoe UI",
+          system-ui,
+          -apple-system,
+          sans-serif;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--ink);
+        background: #fff;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 4rem;
+      }
+
+      /* Header */
+      .doc-header {
+        border-bottom: 3px solid var(--red);
+        padding-bottom: 1.5rem;
+        margin-bottom: 2.5rem;
+      }
+      .doc-header .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .doc-header .logo-dot {
+        width: 32px;
+        height: 32px;
+        background: var(--red);
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+      }
+      .doc-header .logo-dot svg {
+        width: 16px;
+        height: 20px;
+      }
+      .doc-header .brand {
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: var(--blue);
+      }
+      .doc-header .brand span {
+        color: var(--red);
+      }
+      .doc-header h1 {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--blue);
+        margin-bottom: 0.4rem;
+      }
+      .doc-header .meta {
+        font-size: 11px;
+        font-family: monospace;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      /* TOC */
+      .toc {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 2.5rem;
+      }
+      .toc h3 {
+        font-size: 11px;
+        font-family: monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-bottom: 0.75rem;
+      }
+      .toc ol {
+        list-style: none;
+        counter-reset: toc;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.2rem 0.5rem;
+      }
+      @media (max-width: 600px) {
+        .toc ol {
+          grid-template-columns: 1fr;
+        }
+      }
+      .toc li {
+        counter-increment: toc;
+      }
+      .toc a {
+        font-size: 13px;
+        color: var(--gray);
+        text-decoration: none;
+      }
+      .toc a::before {
+        content: counter(toc) ". ";
+        color: var(--red);
+        font-weight: 600;
+      }
+      .toc a:hover {
+        color: var(--red);
+      }
+
+      /* Sections */
+      section {
+        margin-bottom: 2.5rem;
+      }
+      h2 {
+        font-size: 19px;
+        font-weight: 700;
+        color: var(--blue);
+        border-left: 4px solid var(--red);
+        padding-left: 0.75rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      h2 .num {
+        background: var(--red);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 3px;
+        padding: 2px 6px;
+        font-family: monospace;
+      }
+      h3 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--blue);
+        margin: 1rem 0 0.4rem;
+      }
+      p {
+        margin-bottom: 0.6rem;
+        color: var(--ink);
+      }
+
+      /* Code blocks */
+      pre {
+        background: var(--code-bg);
+        color: var(--code-fg);
+        border-radius: 6px;
+        padding: 1rem 1.25rem;
+        overflow-x: auto;
+        font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+        font-size: 12.5px;
+        line-height: 1.55;
+        margin: 0.5rem 0 0.75rem;
+        position: relative;
+      }
+      code {
+        font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+        font-size: 12.5px;
+        background: #f1f5f9;
+        color: #c0392b;
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+      pre code {
+        background: none;
+        color: inherit;
+        padding: 0;
+      }
+      .cmt {
+        color: #64748b;
+      }
+      .kw {
+        color: #93c5fd;
+      }
+      .str {
+        color: #86efac;
+      }
+      .var {
+        color: #fde68a;
+      }
+      .fn {
+        color: #67e8f9;
+      }
+      .num {
+        color: #f9a8d4;
+      }
+
+      /* Callouts */
+      .callout {
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        margin: 0.75rem 0;
+        font-size: 13px;
+        border-left: 4px solid;
+      }
+      .callout-warn {
+        background: #fef9c3;
+        border-color: var(--warn);
+        color: #78350f;
+      }
+      .callout-info {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        color: #1e40af;
+      }
+      .callout-ok {
+        background: #f0fdf4;
+        border-color: var(--success);
+        color: #14532d;
+      }
+      .callout-red {
+        background: #fef2f2;
+        border-color: var(--red);
+        color: #7f1d1d;
+      }
+      .callout strong {
+        font-weight: 700;
+      }
+
+      /* Steps */
+      .steps {
+        list-style: none;
+        counter-reset: steps;
+      }
+      .steps li {
+        counter-increment: steps;
+        display: flex;
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+      }
+      .steps li::before {
+        content: counter(steps);
+        background: var(--blue);
+        color: #fff;
+        min-width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        margin-top: 2px;
+        flex-shrink: 0;
+      }
+
+      /* Tables */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin: 0.5rem 0 1rem;
+      }
+      th {
+        background: var(--blue);
+        color: #fff;
+        text-align: left;
+        padding: 7px 10px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      td {
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      tr:nth-child(even) td {
+        background: var(--paper);
+      }
+      .badge {
+        display: inline-block;
+        font-family: monospace;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .badge-red {
+        background: #fee2e2;
+        color: var(--red);
+      }
+      .badge-blue {
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+      .badge-ok {
+        background: #dcfce7;
+        color: var(--success);
+      }
+
+      /* Arch diagram */
+      .arch {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin: 0.75rem 0 1rem;
+        text-align: center;
+      }
+      .arch-flow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        font-size: 13px;
+      }
+      .arch-box {
+        background: var(--blue);
+        color: #fff;
+        padding: 0.4rem 0.9rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 12px;
+      }
+      .arch-box.red {
+        background: var(--red);
+      }
+      .arch-box.gray {
+        background: var(--muted);
+      }
+      .arch-arrow {
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .arch-label {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: monospace;
+      }
+
+      hr {
+        border: none;
+        border-top: 1px solid var(--line);
+        margin: 2rem 0;
+      }
+
+      .footer {
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+        font-size: 11px;
+        color: var(--muted);
+        font-family: monospace;
+        display: flex;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══════════════════════════════════════════════════════ HEADER -->
+    <div class="doc-header">
+      <div class="logo">
+        <div class="logo-dot">
+          <svg viewBox="0 0 20 24" fill="none">
+            <path
+              d="M10 0C16 0 20 4 20 10C20 17 10 24 10 24C10 24 0 17 0 10C0 4 4 0 10 0Z"
+              fill="white"
+            />
+            <circle cx="10" cy="10" r="4" fill="#E63946" />
+          </svg>
+        </div>
+        <div class="brand">edifio <span>Sourcing</span></div>
+      </div>
+      <h1>Guide de déploiement — Scrapers Fly.io</h1>
+      <div class="meta">
+        Référence : specs/flyio_scrapers_deploy_v1.html &nbsp;·&nbsp; Version 1.0 &nbsp;·&nbsp;
+        2026-05-27 &nbsp;·&nbsp; Destinataire : Board / Ops (Steve)
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ TOC -->
+    <div class="toc">
+      <h3>Sommaire</h3>
+      <ol>
+        <li><a href="#s1">Architecture globale</a></li>
+        <li><a href="#s2">Prérequis</a></li>
+        <li><a href="#s3">Créer le secret partagé</a></li>
+        <li><a href="#s4">Premier déploiement Fly.io</a></li>
+        <li><a href="#s5">Secrets de l'app Fly.io</a></li>
+        <li><a href="#s6">Variables Vercel côté Next.js</a></li>
+        <li><a href="#s7">Tester le worker</a></li>
+        <li><a href="#s8">Comptes scrapers (PLACE + FrancMarchés)</a></li>
+        <li><a href="#s9">Auto-stop et mise à l'échelle</a></li>
+        <li><a href="#s10">Déploiements suivants (update)</a></li>
+        <li><a href="#s11">Logs et monitoring</a></li>
+        <li><a href="#s12">Rotation des secrets</a></li>
+      </ol>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ S1 — ARCHI -->
+    <section id="s1">
+      <h2><span class="num">01</span> Architecture globale</h2>
+
+      <div class="arch">
+        <div class="arch-flow">
+          <div class="arch-box">
+            Cron Vercel<br /><span style="font-weight: 400; font-size: 10px"
+              >6h30 — Next.js API</span
+            >
+          </div>
+          <span class="arch-arrow">→</span>
+          <div>
+            <div class="arch-box red">
+              Worker Fly.io<br /><span style="font-weight: 400; font-size: 10px"
+                >edifio-playwright-worker</span
+              >
+            </div>
+            <div class="arch-label">POST /v1/scrape · Bearer secret</div>
+          </div>
+          <span class="arch-arrow">→</span>
+          <div>
+            <div class="arch-box gray">
+              PLACE / FrancMarchés<br /><span style="font-weight: 400; font-size: 10px"
+                >Playwright headless</span
+              >
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 0.75rem" class="arch-flow">
+          <div class="arch-box gray">Worker Fly.io</div>
+          <span class="arch-arrow">→</span>
+          <div>
+            <div class="arch-box red">
+              Webhook Vercel<br /><span style="font-weight: 400; font-size: 10px"
+                >/api/scraper/webhook</span
+              >
+            </div>
+            <div class="arch-label">POST résultats · Bearer même secret</div>
+          </div>
+          <span class="arch-arrow">→</span>
+          <div class="arch-box">
+            Supabase<br /><span style="font-weight: 400; font-size: 10px">INSERT tenders</span>
+          </div>
+        </div>
+      </div>
+
+      <p>Le worker Fly.io est un serveur <strong>Fastify + Playwright Chromium</strong> qui :</p>
+      <ul style="margin: 0.4rem 0 0.6rem 1.2rem; font-size: 13px">
+        <li>Reçoit un ordre de scraping de Vercel (<code>POST /v1/scrape</code>)</li>
+        <li>Répond <strong>immédiatement 202</strong> (non-bloquant pour Vercel)</li>
+        <li>Lance le scraping Playwright en arrière-plan (PLACE ou FrancMarchés)</li>
+        <li>Poste les AOs trouvés vers le webhook Vercel (<code>WEBHOOK_TARGET_URL</code>)</li>
+        <li>
+          Se met en veille automatiquement entre les runs (<strong>auto-stop Fly Machines</strong>)
+        </li>
+      </ul>
+
+      <div class="callout callout-warn">
+        <strong>Sécurité :</strong> Le header
+        <code>Authorization: Bearer &lt;SCRAPER_TRIGGER_SECRET&gt;</code> est la seule protection.
+        Ce secret doit être <strong>identique</strong> côté Vercel
+        (<code>SCRAPER_TRIGGER_SECRET</code>) et côté Fly.io (<code>fly secrets set</code>). Ne le
+        mets jamais dans le dépôt Git.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S2 — PRÉREQUIS -->
+    <section id="s2">
+      <h2><span class="num">02</span> Prérequis</h2>
+
+      <h3>Outils locaux</h3>
+      <pre><span class="cmt"># Installer le CLI Fly.io (PowerShell — une seule fois)</span>
+<span class="kw">iwr</span> https://fly.io/install.ps1 -useb | <span class="kw">iex</span>
+
+<span class="cmt"># Vérifier</span>
+fly version
+<span class="cmt"># → fly v0.3.x (expected)</span>
+
+<span class="cmt"># Se connecter à ton compte Fly.io</span>
+fly auth login
+<span class="cmt"># → ouvre le navigateur, confirme le login</span></pre>
+
+      <h3>Compte Fly.io</h3>
+      <ul style="margin: 0.4rem 0 0.6rem 1.2rem; font-size: 13px">
+        <li>
+          Compte créé sur <a href="https://fly.io" style="color: var(--red)">fly.io</a> (plan
+          <strong>Pay-as-you-go</strong> minimum)
+        </li>
+        <li>
+          Moyen de paiement ajouté (la VM <code>shared-cpu-2x 2 GB</code> coûte ~$0.0000128/s quand
+          active)
+        </li>
+        <li>
+          Avec auto-stop et une utilisation quotidienne, le coût réel est
+          <strong>~2–5 €/mois</strong>
+        </li>
+      </ul>
+
+      <h3>Docker</h3>
+      <p>
+        Docker Desktop doit être <strong>en cours d'exécution</strong> sur ta machine lors du
+        premier <code>fly deploy</code>. Fly CLI utilise Docker pour builder l'image localement.
+      </p>
+
+      <div class="callout callout-info">
+        <strong>Région :</strong> Le worker est configuré en région <code>cdg</code> (Paris CDG). Si
+        <code>cdg</code> est saturé, commenter/décommenter le fallback <code>fra</code> dans
+        <code>infra/playwright/fly.toml</code>.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S3 — SECRET -->
+    <section id="s3">
+      <h2><span class="num">03</span> Créer le secret partagé</h2>
+
+      <p>
+        Le <code>SCRAPER_TRIGGER_SECRET</code> doit être un token aléatoire fort (32+ chars).
+        Génère-le <strong>une seule fois</strong>, stocke-le dans ton gestionnaire de mots de passe,
+        puis utilise la <em>même valeur</em> sur Fly.io et Vercel.
+      </p>
+
+      <pre><span class="cmt"># Génère un secret fort (PowerShell)</span>
+<span class="fn">-join</span> ((1..32) | <span class="fn">ForEach-Object</span> { [char](<span class="fn">Get-Random</span> -Min 65 -Max 122) })
+
+<span class="cmt"># OU via Node.js (plus propre)</span>
+node -e <span class="str">"console.log(require('crypto').randomBytes(32).toString('hex'))"</span>
+<span class="cmt"># → ex: a3f8e2c1d9b74a6e... (64 chars hex)</span></pre>
+
+      <div class="callout callout-red">
+        <strong>Règle d'or :</strong> ce secret ne doit jamais apparaître dans un commit Git, dans
+        un message Slack/Teams, ou dans ce document en clair. Stocke-le dans ton gestionnaire de
+        mots de passe.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S4 — DÉPLOIEMENT -->
+    <section id="s4">
+      <h2><span class="num">04</span> Premier déploiement Fly.io</h2>
+
+      <div class="callout callout-warn">
+        <strong>Avant de déployer :</strong> Docker Desktop doit être démarré.
+      </div>
+
+      <h3>4.1 — Créer l'app (une seule fois)</h3>
+      <pre><span class="cmt"># Se positionner dans le dossier du worker</span>
+cd C:\Dev\edifio-sourcing\infra\playwright
+
+<span class="cmt"># Créer l'app Fly.io (nom dans fly.toml = edifio-playwright-worker)</span>
+fly apps create edifio-playwright-worker
+<span class="cmt"># → App 'edifio-playwright-worker' created in organization 'personal'</span></pre>
+
+      <div class="callout callout-info">
+        Si tu vois <em>"App already exists"</em>, c'est normal — passe directement au 4.2.
+      </div>
+
+      <h3>4.2 — Poser les secrets (voir §5 pour la liste complète)</h3>
+      <pre><span class="cmt"># Poser les secrets critiques AVANT le premier deploy</span>
+fly secrets set \
+  <span class="var">SUPABASE_URL</span>=<span class="str">"https://TON_PROJECT_REF.supabase.co"</span> \
+  <span class="var">SUPABASE_SERVICE_ROLE_KEY</span>=<span class="str">"eyJ..."</span> \
+  <span class="var">SCRAPER_TRIGGER_SECRET</span>=<span class="str">"ton_secret_genere_etape_3"</span> \
+  <span class="var">WEBHOOK_TARGET_URL</span>=<span class="str">"https://edifio-sourcing.vercel.app/api/scraper/webhook"</span>
+<span class="cmt"># → Les secrets sont chiffrés et stockés dans Fly.io Vault</span></pre>
+
+      <h3>4.3 — Premier build et déploiement</h3>
+      <pre><span class="cmt"># Depuis infra/playwright</span>
+fly deploy
+
+<span class="cmt"># Fly.io va :</span>
+<span class="cmt">#  1. Builder l'image Docker localement (Chromium ~800 MB, ~3-5 min)</span>
+<span class="cmt">#  2. Push l'image vers le registry Fly</span>
+<span class="cmt">#  3. Déployer 1 machine sur la région cdg</span>
+<span class="cmt">#  4. Attendre le health check /healthz</span>
+
+<span class="cmt"># Résultat attendu :</span>
+<span class="cmt"># --> v1 deployed successfully</span>
+<span class="cmt"># --> Monitoring deployment</span></pre>
+
+      <h3>4.4 — Vérifier le déploiement</h3>
+      <pre><span class="cmt"># Statut de l'app</span>
+fly status
+
+<span class="cmt"># Health check direct</span>
+fly curl /healthz
+<span class="cmt"># → {"status":"ok","version":"1.0.0","browser":"idle"}</span></pre>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S5 — SECRETS FLY -->
+    <section id="s5">
+      <h2><span class="num">05</span> Secrets de l'app Fly.io</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Variable</th>
+            <th>Description</th>
+            <th>Obligatoire</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SUPABASE_URL</code></td>
+            <td>URL du projet Supabase (sans trailing slash)</td>
+            <td><span class="badge badge-red">OUI</span></td>
+            <td>Supabase → Project Settings → API</td>
+          </tr>
+          <tr>
+            <td><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
+            <td>Clé service_role (accès complet, bypasse RLS)</td>
+            <td><span class="badge badge-red">OUI</span></td>
+            <td>Supabase → Project Settings → API</td>
+          </tr>
+          <tr>
+            <td><code>SCRAPER_TRIGGER_SECRET</code></td>
+            <td>Token Bearer partagé avec Vercel</td>
+            <td><span class="badge badge-red">OUI</span></td>
+            <td>Généré à l'étape §3</td>
+          </tr>
+          <tr>
+            <td><code>WEBHOOK_TARGET_URL</code></td>
+            <td>URL du webhook Vercel qui reçoit les résultats</td>
+            <td><span class="badge badge-red">OUI</span></td>
+            <td><code>https://&lt;ton-domaine&gt;/api/scraper/webhook</code></td>
+          </tr>
+          <tr>
+            <td><code>PLACE_USERNAME</code></td>
+            <td>Email du compte PLACE (marches-publics.gouv.fr)</td>
+            <td><span class="badge badge-blue">Si PLACE activé</span></td>
+            <td>Créer un compte sur marches-publics.gouv.fr</td>
+          </tr>
+          <tr>
+            <td><code>PLACE_PASSWORD</code></td>
+            <td>Mot de passe du compte PLACE</td>
+            <td><span class="badge badge-blue">Si PLACE activé</span></td>
+            <td>Idem</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Commande complète</h3>
+      <pre><span class="cmt"># Depuis infra/playwright — poser tous les secrets d'un coup</span>
+fly secrets set \
+  <span class="var">SUPABASE_URL</span>=<span class="str">"https://TON_REF.supabase.co"</span> \
+  <span class="var">SUPABASE_SERVICE_ROLE_KEY</span>=<span class="str">"eyJhbGciOiJIUzI1NiIs..."</span> \
+  <span class="var">SCRAPER_TRIGGER_SECRET</span>=<span class="str">"TON_SECRET_64_CHARS"</span> \
+  <span class="var">WEBHOOK_TARGET_URL</span>=<span class="str">"https://edifio-sourcing.vercel.app/api/scraper/webhook"</span> \
+  <span class="var">PLACE_USERNAME</span>=<span class="str">"steissier@alyosingenierie.fr"</span> \
+  <span class="var">PLACE_PASSWORD</span>=<span class="str">"TON_MDP_PLACE"</span>
+
+<span class="cmt"># Vérifier que les secrets sont posés (valeurs masquées)</span>
+fly secrets list
+<span class="cmt"># →  NAME                        DIGEST  CREATED AT</span>
+<span class="cmt">#    SCRAPER_TRIGGER_SECRET      xxxxx   ...</span>
+<span class="cmt">#    SUPABASE_URL                xxxxx   ...</span>
+<span class="cmt">#    SUPABASE_SERVICE_ROLE_KEY   xxxxx   ...</span>
+<span class="cmt">#    WEBHOOK_TARGET_URL          xxxxx   ...</span></pre>
+
+      <div class="callout callout-warn">
+        <strong>Redéploiement automatique :</strong> <code>fly secrets set</code> redémarre
+        automatiquement les machines. Ne pas paniquer si le déploiement se relance.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S6 — VERCEL -->
+    <section id="s6">
+      <h2><span class="num">06</span> Variables Vercel côté Next.js</h2>
+
+      <p>Sur Vercel → ton projet → <strong>Settings → Environment Variables</strong>, ajouter :</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Variable</th>
+            <th>Valeur</th>
+            <th>Env</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>SCRAPER_BASE_URL</code></td>
+            <td><code>https://edifio-playwright-worker.fly.dev</code></td>
+            <td>Production + Preview</td>
+          </tr>
+          <tr>
+            <td><code>SCRAPER_TRIGGER_SECRET</code></td>
+            <td>Le même secret qu'en §3 (identique à Fly.io)</td>
+            <td>Production + Preview</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-red">
+        <strong>Critique :</strong> <code>SCRAPER_TRIGGER_SECRET</code> doit être
+        <strong>exactement la même valeur</strong> côté Vercel et côté Fly.io. Une différence d'un
+        seul caractère (espace, guillemet) casse l'authentification.
+      </div>
+
+      <p>Le code Next.js qui déclenche le scraping lit ces deux variables :</p>
+      <pre><span class="cmt">// Dans l'API route /api/scraper/trigger (ou le cron Vercel)</span>
+<span class="kw">const</span> <span class="var">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`${process.env.SCRAPER_BASE_URL}/v1/scrape`</span>, {
+  method: <span class="str">'POST'</span>,
+  headers: {
+    <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>,
+    <span class="str">'Authorization'</span>: <span class="str">`Bearer ${process.env.SCRAPER_TRIGGER_SECRET}`</span>,
+  },
+  body: JSON.stringify({
+    platform: <span class="str">'place'</span>,
+    profileId: profile.id,
+    orgId: <span class="var">ALYOS_ORG_ID</span>,
+    webhookUrl: <span class="str">`${siteUrl}/api/scraper/webhook`</span>,
+    lastRunAt: lastRunAt.toISOString(),
+    profileFilters: { keywords: [...], geoZones: [...] },
+    credentials: {
+      username: process.env.<span class="var">PLACE_USERNAME</span>,
+      password: process.env.<span class="var">PLACE_PASSWORD</span>,
+    },
+  }),
+});</pre>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S7 — TEST -->
+    <section id="s7">
+      <h2><span class="num">07</span> Tester le worker</h2>
+
+      <h3>7.1 — Health check</h3>
+      <pre><span class="cmt"># Via fly curl (pas besoin d'auth sur /healthz)</span>
+fly curl /healthz
+<span class="cmt"># → {"status":"ok","version":"1.0.0","browser":"idle"}</span>
+
+<span class="cmt"># Ou via curl classique</span>
+curl https://edifio-playwright-worker.fly.dev/healthz</pre>
+
+      <h3>7.2 — Test d'authentification</h3>
+      <pre><span class="cmt"># Sans token → doit retourner 401</span>
+curl -X POST https://edifio-playwright-worker.fly.dev/v1/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"platform":"place"}'
+<span class="cmt"># → {"error":"unauthorized"}</span>
+
+<span class="cmt"># Avec mauvais token → 401</span>
+curl -X POST https://edifio-playwright-worker.fly.dev/v1/scrape \
+  -H "Authorization: Bearer MAUVAIS_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+<span class="cmt"># → {"error":"unauthorized"}</span></pre>
+
+      <h3>7.3 — Test complet (dry-run FrancMarchés)</h3>
+      <pre><span class="cmt"># Remplacer TON_SECRET et TON_WEBHOOK_URL par les vraies valeurs</span>
+curl -X POST https://edifio-playwright-worker.fly.dev/v1/scrape \
+  -H "Authorization: Bearer TON_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "francmarches",
+    "profileId": "test-profile-id",
+    "orgId": "ALYOS_ORG_ID_DEPUIS_DB",
+    "webhookUrl": "https://edifio-sourcing.vercel.app/api/scraper/webhook",
+    "lastRunAt": "2026-01-01T00:00:00Z"
+  }'
+<span class="cmt"># → 202 {"runId":"uuid","estimatedDuration":90}</span>
+<span class="cmt"># Le worker répond immédiatement, le scraping est asynchrone</span>
+<span class="cmt"># Vérifier les logs pour suivre la progression (§11)</span></pre>
+
+      <h3>7.4 — Vérifier le redémarrage automatique</h3>
+      <pre><span class="cmt"># Lister les machines</span>
+fly machines list
+<span class="cmt"># → ID  State    Region  Image     Created</span>
+<span class="cmt">#    xxx started  cdg     ...       ...</span>
+
+<span class="cmt"># Attendre ~5 min sans requête → machine passe en 'stopped'</span>
+fly machines list
+<span class="cmt"># → ID  State    Region</span>
+<span class="cmt">#    xxx stopped  cdg    ← auto-stop actif</span>
+
+<span class="cmt"># Envoyer une requête → la machine redémarre automatiquement en ~3s</span></pre>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S8 — COMPTES -->
+    <section id="s8">
+      <h2><span class="num">08</span> Comptes scrapers (PLACE + FrancMarchés)</h2>
+
+      <h3>8.1 — PLACE (marches-publics.gouv.fr)</h3>
+      <ol class="steps">
+        <li>Aller sur <strong>https://www.marches-publics.gouv.fr</strong></li>
+        <li>
+          Créer un compte avec l'email <code>steissier@alyosingenierie.fr</code> (ou un email dédié)
+        </li>
+        <li>Compléter le profil entreprise AlyoS Ingénierie</li>
+        <li>Confirmer l'email</li>
+        <li>
+          Poser les variables sur Fly.io :
+          <code>fly secrets set PLACE_USERNAME="..." PLACE_PASSWORD="..."</code>
+        </li>
+      </ol>
+
+      <div class="callout callout-info">
+        Le scraper PLACE (<code>infra/playwright/src/scrapers/place.ts</code>) fait une connexion
+        Playwright sur la plateforme PLACE et scrape les AOs selon les filtres du profil de
+        recherche (mots-clés + zones géographiques).
+      </div>
+
+      <h3>8.2 — FrancMarchés</h3>
+      <p>
+        FrancMarchés ne nécessite <strong>pas de compte</strong> pour le scraping public. Le scraper
+        accède directement aux AOs publics filtrés par mots-clés et zones. Pas de credentials à
+        configurer.
+      </p>
+
+      <div class="callout callout-ok">
+        <strong>Recommandation :</strong> Commencer par FrancMarchés (sans compte) pour valider le
+        pipeline end-to-end, puis activer PLACE une fois le compte créé.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S9 — AUTO-STOP -->
+    <section id="s9">
+      <h2><span class="num">09</span> Auto-stop et mise à l'échelle</h2>
+
+      <p>Configuration actuelle dans <code>infra/playwright/fly.toml</code> :</p>
+
+      <pre><span class="kw">[http_service]</span>
+  <span class="var">auto_stop_machines</span>  = <span class="str">"stop"</span>   <span class="cmt"># S'éteint après ~5 min d'inactivité</span>
+  <span class="var">auto_start_machines</span> = <span class="kw">true</span>    <span class="cmt"># Redémarre à la première requête (~3s)</span>
+  <span class="var">min_machines_running</span> = <span class="num">0</span>      <span class="cmt"># 0 = peut s'éteindre complètement</span>
+
+<span class="kw">[[vm]]</span>
+  <span class="var">size</span>    = <span class="str">"shared-cpu-2x"</span>  <span class="cmt"># 2 vCPU partagés</span>
+  <span class="var">memory</span>  = <span class="str">"2gb"</span>           <span class="cmt"># 2 GB RAM (Chromium en a besoin)</span>
+  <span class="var">cpu_kind</span> = <span class="str">"shared"</span>
+  <span class="var">cpus</span>    = <span class="num">2</span></pre>
+
+      <p><strong>Comportement :</strong></p>
+      <ul style="margin: 0.4rem 0 0.6rem 1.2rem; font-size: 13px">
+        <li>La machine est stoppée entre les runs → coût minimal</li>
+        <li>Au premier appel POST /v1/scrape, Fly.io redémarre la machine en ~3 secondes</li>
+        <li>
+          Le code gère ce délai : Vercel a un timeout de 60s sur son API route de déclenchement
+        </li>
+        <li>
+          Si deux scraping simultanés : la concurrence soft_limit=20 / hard_limit=50 laisse la place
+        </li>
+      </ul>
+
+      <h3>Estimation de coût mensuel</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Scénario</th>
+            <th>Fréquence</th>
+            <th>Durée/run</th>
+            <th>Coût/mois</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1 plateforme (FrancMarchés)</td>
+            <td>1×/jour</td>
+            <td>~90s</td>
+            <td>~0.50 €</td>
+          </tr>
+          <tr>
+            <td>2 plateformes (PLACE + FrancMarchés)</td>
+            <td>1×/jour</td>
+            <td>~3–4 min total</td>
+            <td>~1–2 €</td>
+          </tr>
+          <tr>
+            <td>Plusieurs profils</td>
+            <td>1×/jour</td>
+            <td>~10 min total</td>
+            <td>~3–5 €</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-ok">
+        Budget Fly.io prévu au Gate 6 : <strong>5–15 €/mois</strong> (scenario prod avec plusieurs
+        profils). La configuration auto-stop garantit de rester dans cette enveloppe.
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S10 — UPDATE -->
+    <section id="s10">
+      <h2><span class="num">10</span> Déploiements suivants (update)</h2>
+
+      <p>Après une modification du code scraper (<code>infra/playwright/src/</code>) :</p>
+
+      <pre><span class="cmt"># Depuis infra/playwright</span>
+cd C:\Dev\edifio-sourcing\infra\playwright
+
+<span class="cmt"># Rebuild et déploiement (zero-downtime rolling deploy)</span>
+fly deploy
+
+<span class="cmt"># Vérifier la version déployée</span>
+fly curl /healthz
+<span class="cmt"># → {"version":"1.0.1", ...}   ← version incrémentée dans worker.ts</span></pre>
+
+      <div class="callout callout-info">
+        <strong>Bonne pratique :</strong> Incrémenter <code>VERSION</code> dans
+        <code>infra/playwright/src/worker.ts</code> à chaque déploiement pour tracer les versions
+        dans <code>/healthz</code> et les logs.
+      </div>
+
+      <h3>Rollback</h3>
+      <pre><span class="cmt"># Lister les releases</span>
+fly releases list
+
+<span class="cmt"># Rollback vers la release précédente</span>
+fly deploy --image registry.fly.io/edifio-playwright-worker:&lt;sha-précédent&gt;</pre>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S11 — LOGS -->
+    <section id="s11">
+      <h2><span class="num">11</span> Logs et monitoring</h2>
+
+      <h3>Logs temps réel</h3>
+      <pre><span class="cmt"># Suivre les logs en direct</span>
+fly logs
+
+<span class="cmt"># Filtrer par niveau (info, warn, error)</span>
+fly logs | grep <span class="str">"\[worker\]"</span>
+
+<span class="cmt"># Logs d'une machine spécifique</span>
+fly logs --machine &lt;machine-id&gt;</pre>
+
+      <h3>Messages clés à surveiller</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Message</th>
+            <th>Signification</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>[worker] job xxx démarré — plateforme: place</code></td>
+            <td>Scraping lancé</td>
+            <td><span class="badge badge-ok">Normal</span></td>
+          </tr>
+          <tr>
+            <td><code>[worker] job xxx terminé — N AOs en XXXms</code></td>
+            <td>Succès, N AOs trouvés</td>
+            <td><span class="badge badge-ok">Normal</span></td>
+          </tr>
+          <tr>
+            <td><code>[worker:webhook] résultats envoyés avec succès</code></td>
+            <td>Résultats transmis à Vercel</td>
+            <td><span class="badge badge-ok">Normal</span></td>
+          </tr>
+          <tr>
+            <td><code>[worker] job xxx échoué</code></td>
+            <td>Erreur scraping (timeout, sélecteur cassé…)</td>
+            <td><span class="badge badge-red">Investiguer</span></td>
+          </tr>
+          <tr>
+            <td><code>[worker:webhook] HTTP non-OK: 401</code></td>
+            <td>SCRAPER_TRIGGER_SECRET différent entre Fly et Vercel</td>
+            <td><span class="badge badge-red">Vérifier §6</span></td>
+          </tr>
+          <tr>
+            <td><code>[browser] lancement d'un nouveau browser</code></td>
+            <td>Premier scraping après auto-stop (normal)</td>
+            <td><span class="badge badge-ok">Normal</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Tableau de bord Fly.io</h3>
+      <p>
+        Accéder à
+        <a href="https://fly.io/apps/edifio-playwright-worker" style="color: var(--red)"
+          >https://fly.io/apps/edifio-playwright-worker</a
+        >
+        pour voir les métriques (CPU, RAM, requêtes) et l'historique des déploiements.
+      </p>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════ S12 — ROTATION -->
+    <section id="s12">
+      <h2><span class="num">12</span> Rotation des secrets</h2>
+
+      <p>En cas de fuite du <code>SCRAPER_TRIGGER_SECRET</code> (ou par rotation préventive) :</p>
+
+      <ol class="steps">
+        <li>Générer un nouveau secret (§3)</li>
+        <li>
+          Mettre à jour côté Fly.io :
+          <code>fly secrets set SCRAPER_TRIGGER_SECRET="NOUVEAU_SECRET"</code>
+        </li>
+        <li>
+          Mettre à jour côté Vercel : Settings → Environment Variables →
+          <code>SCRAPER_TRIGGER_SECRET</code>
+        </li>
+        <li>Redéployer Vercel (ou attendre le prochain redéploiement automatique)</li>
+        <li>Tester avec la commande §7.2</li>
+        <li>Tracer dans <code>DECISIONS.md</code> : date, raison, agent</li>
+      </ol>
+
+      <div class="callout callout-warn">
+        <strong>Ordre impératif :</strong> Mettre à jour Fly.io <em>avant</em> Vercel. Sinon il y a
+        une fenêtre où Vercel envoie l'ancien secret et le worker refuse les requêtes.
+      </div>
+
+      <h3>Rotation de SUPABASE_SERVICE_ROLE_KEY</h3>
+      <pre><span class="cmt"># Sur Fly.io</span>
+fly secrets set SUPABASE_SERVICE_ROLE_KEY="NOUVELLE_CLE"
+
+<span class="cmt"># Vérifier que le health check reste vert</span>
+fly curl /healthz</pre>
+    </section>
+
+    <hr />
+
+    <!-- CHECKLIST FINALE -->
+    <section>
+      <h2>✅ Checklist de mise en service</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Étape</th>
+            <th>Commande / Action</th>
+            <th>Validé</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CLI Fly.io installé</td>
+            <td><code>fly version</code></td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Compte Fly.io connecté</td>
+            <td><code>fly auth login</code></td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Docker Desktop démarré</td>
+            <td>Icône Docker dans la barre système</td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Secret généré et stocké</td>
+            <td>§3 — gestionnaire de mots de passe</td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>App créée</td>
+            <td><code>fly apps create edifio-playwright-worker</code></td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Secrets Fly.io posés</td>
+            <td><code>fly secrets set ...</code></td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Premier déploiement</td>
+            <td><code>fly deploy</code> depuis <code>infra/playwright</code></td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Health check vert</td>
+            <td><code>fly curl /healthz</code></td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Variables Vercel posées</td>
+            <td><code>SCRAPER_BASE_URL</code> + <code>SCRAPER_TRIGGER_SECRET</code></td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Test 401 (sans token)</td>
+            <td>§7.2</td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Test 202 (avec token)</td>
+            <td>§7.3 — FrancMarchés dry-run</td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Compte PLACE créé</td>
+            <td>§8.1 + <code>fly secrets set PLACE_*</code></td>
+            <td>☐</td>
+          </tr>
+          <tr>
+            <td>Auto-stop vérifié</td>
+            <td>§7.4 — machines list après 5 min</td>
+            <td>☐</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div class="footer">
+      <span>© AlyoS Ingénierie 2026 — Outil interne</span>
+      <span>specs/flyio_scrapers_deploy_v1.html · v1.0</span>
+    </div>
+  </body>
+</html>

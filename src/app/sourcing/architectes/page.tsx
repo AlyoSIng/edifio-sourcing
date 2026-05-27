@@ -7,6 +7,9 @@ import type { Architect } from "@/db/schema/architects";
 import { fetchArchitectsPage } from "./actions";
 import { CsvImportButton } from "./CsvImportButton";
 import { PappersEnrichButton } from "./PappersEnrichButton";
+import { DuplicateManager } from "./DuplicateManager";
+import { detectArchitectDuplicatesAction } from "./duplicate-actions";
+import type { DuplicateGroup } from "./duplicate-actions";
 
 export const metadata = {
   title: "Architectes — edifio Sourcing",
@@ -98,6 +101,17 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
   const totalPages = result?.totalPages ?? 1;
   const adminUser = isAdmin(profile);
 
+  // Détection des doublons — uniquement pour les admins, erreur absorbée
+  let duplicateGroups: DuplicateGroup[] = [];
+  if (adminUser) {
+    try {
+      duplicateGroups = await detectArchitectDuplicatesAction();
+    } catch (err) {
+      console.error("[architectes-page:duplicates-failed]", err);
+      // Pas bloquant : on affiche la page sans le bandeau doublons
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       {/* En-tête de page */}
@@ -126,6 +140,9 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
           </div>
         ) : null}
       </header>
+
+      {/* Bandeau doublons — visible admin uniquement, rendu côté client */}
+      {adminUser && <DuplicateManager duplicateGroups={duplicateGroups} />}
 
       {/* Barre de filtres */}
       <FilterBar

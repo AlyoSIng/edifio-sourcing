@@ -7,6 +7,9 @@ import type { BureauEtudes } from "@/db/schema/bureaux-etudes";
 
 import { CsvImportModal } from "@/components/contacts/CsvImportModal";
 import { fetchBEPage } from "./actions";
+import { DuplicateBEManager } from "./DuplicateBEManager";
+import { detectBEDuplicatesAction } from "./duplicate-be-actions";
+import type { DuplicateBEGroup } from "./duplicate-be-actions";
 
 export const metadata = {
   title: "Bureaux d'Études — edifio Sourcing",
@@ -58,6 +61,17 @@ export default async function BureauEtudesPage({ searchParams }: { searchParams:
   const totalPages = result?.totalPages ?? 1;
   const adminUser = isAdmin(profile);
 
+  // Détection des doublons — uniquement pour les admins, erreur absorbée
+  let duplicateGroups: DuplicateBEGroup[] = [];
+  if (adminUser) {
+    try {
+      duplicateGroups = await detectBEDuplicatesAction();
+    } catch (err) {
+      console.error("[bureaux-etudes-page:duplicates-failed]", err);
+      // Pas bloquant : on affiche la page sans le bandeau doublons
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       <header className="mb-6 flex items-end justify-between gap-4">
@@ -87,6 +101,9 @@ export default async function BureauEtudesPage({ searchParams }: { searchParams:
           </div>
         ) : null}
       </header>
+
+      {/* Bandeau doublons — visible admin uniquement, rendu côté client */}
+      {adminUser && <DuplicateBEManager duplicateGroups={duplicateGroups} />}
 
       <FilterBar search={search} specialty={specialty} />
 
