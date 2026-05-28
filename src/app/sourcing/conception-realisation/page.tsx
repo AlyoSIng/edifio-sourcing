@@ -1,25 +1,59 @@
 /**
- * Page stub Conception/Réalisation — edifio Sourcing
+ * Page Pipeline Conception/Réalisation — edifio Sourcing.
  *
- * Pipeline en cours de développement (Phase 2). Accessible depuis :
- *  - Le menu latéral « Conception/Réalisation »
- *  - La redirection après sélection mode C/R depuis la modale AO du jour
- *    (TenderCardActions → handleSelect("conception_realisation"))
+ * Server Component protégé (middleware `@alyosingenierie.fr` + `/sourcing/*`).
+ *
+ * Charge les données via `loadCrPipelineData()` et délègue l'affichage au
+ * Client Component `CrKanbanBoard`. Résilience runtime : si `result.ok === false`
+ * (DATABASE_URL absent en CI ou Supabase blip), affiche `<ErrorBanner>`.
+ *
+ * Source de vérité : `handoff/BRIEF_CHANTIER_260527.md` §Feature 1 Pipeline C/R
  */
 
-export const metadata = { title: "Conception/Réalisation — edifio Sourcing" };
+import { redirect } from "next/navigation";
 
-export default function ConceptionRealisationPage() {
+import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
+import { isAuthorizedEmail } from "@/lib/auth/domain";
+import { toUserProfile } from "@/lib/auth/types";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+import { CrKanbanBoard } from "./CrKanbanBoard";
+import { loadCrPipelineData } from "./page-data";
+
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata() {
+  return { title: "Conception/Réalisation — edifio Sourcing" };
+}
+
+export default async function ConceptionRealisationPage() {
+  // Auth check défensif — pattern aligné sur `/sourcing/ao-du-jour/page.tsx`
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login?next=/sourcing/conception-realisation");
+  const profile = toUserProfile(user);
+  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+
+  // Chargement pipeline C/R — résilience runtime (memory `feedback_nextjs_runtime_page_resilience`)
+  const result = await loadCrPipelineData(ALYOS_ORG_ID);
+
   return (
-    <div className="mx-auto max-w-6xl">
+    <main className="mx-auto max-w-6xl px-6 py-8">
       <header className="mb-6">
         <h1 className="font-display text-2xl font-bold tracking-tight text-ink">
           Conception / Réalisation
         </h1>
-        <p className="mt-2 text-sm text-muted">
-          Pipeline en cours de développement — disponible prochainement.
-        </p>
+        <p className="mt-2 text-sm text-muted">Pipeline de vos dossiers C/R</p>
       </header>
-    </div>
+
+      {result.ok === false ? (
+        <ErrorBanner message="Impossible de charger le pipeline Conception/Réalisation." />
+      ) : (
+        <CrKanbanBoard data={result.data} />
+      )}
+    </main>
   );
 }

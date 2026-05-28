@@ -65,17 +65,28 @@ SELECT bag_eq(
   'les 13 noms de prompts (P1-P13) sont presents'
 );
 
--- ---- 4. Toutes les versions = 1 ------------------------------------------
+-- ---- 4. Aucun prompt n'a plus d'une version active simultanement ----------
+--
+-- Invariant metier : quand un prompt est mis a jour (ex: rc_analysis_full v1
+-- -> v2 pour ajouter competences_demandees), l'ancienne version passe active=false.
+-- On verifie que COUNT(name) = COUNT(DISTINCT name) sur les lignes actives.
 SELECT is(
-  (SELECT COUNT(DISTINCT version)::int FROM ai_prompts WHERE active = TRUE),
-  1,
-  'toutes les versions actives sont egales (1, livraison initiale)'
+  (SELECT COUNT(*)::int FROM (
+    SELECT name
+      FROM ai_prompts
+     WHERE active = TRUE
+     GROUP BY name
+    HAVING COUNT(*) > 1
+  ) dup),
+  0,
+  'aucun prompt n''a plus d''une version active simultanement'
 );
 
+-- ---- 5. Version max = 2 (rc_analysis_full passe en v2 — competences_demandees) -
 SELECT is(
   (SELECT MAX(version)::int FROM ai_prompts WHERE active = TRUE),
-  1,
-  'version max = 1'
+  2,
+  'version max = 2 (rc_analysis_full v2 + competences_demandees)'
 );
 
 -- ---- 5. Repartition des modeles (Gate 2 strategie 4/A) -------------------

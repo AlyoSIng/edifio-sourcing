@@ -76,6 +76,11 @@ const RC_ANALYSIS_ZOD = `z.object({
     description: z.string(),
     provenance: z.object({ page: z.number(), citation: z.string() }),
   })),
+  competences_demandees: z.array(z.object({
+    competence: z.string(),
+    niveau: z.string().nullable().optional(),
+    provenance: z.object({ page: z.number(), citation: z.string() }),
+  })).optional().default([]),
   alertes: z.array(z.string()),
 })`;
 
@@ -148,18 +153,22 @@ const ACCROCHE_MEMO_ZOD = `z.object({
 // ============================================================================
 
 export const AI_PROMPTS_V1_CATALOG: AiPromptSeed[] = [
-  // ----- P1 : rc_analysis_full (sonnet-4-6) ---------------------------------
+  // ----- P1 : rc_analysis_full (sonnet-4-6) — v2 (ajout competences_demandees) ---
   {
     id: "bbbbbbbb-0000-0000-0000-000000000001",
     name: "rc_analysis_full",
-    version: 1,
+    version: 2,
     model: "sonnet-4-6",
     systemPrompt:
       "Tu es un assistant expert en marchés publics français du BTP. Tu lis le " +
       "Règlement de Consultation (RC) d'un appel d'offres et tu en extrais une " +
       "structure JSON normalisée. Chaque champ extrait doit comporter sa " +
       "provenance (page + citation courte). Tu ne hallucines jamais : si une " +
-      'information est absente, tu marques `"non_trouve"`.',
+      'information est absente, tu marques `"non_trouve"`. ' +
+      'Pour le champ "competences_demandees" : liste toutes les compétences et ' +
+      "qualifications exigées dans le RC (tableau d'objets {competence, niveau, provenance}). " +
+      'Le niveau peut être : "exigée", "souhaitée", "appréciée" ou null si non précisé. ' +
+      "Si aucune compétence n'est mentionnée dans le RC, retourne un tableau vide [].",
     userPromptTemplate:
       "Voici le RC complet d'un AO. Extrais la structure JSON conformément au " +
       "schéma fourni. Cite la page et un extrait littéral pour chaque champ. " +

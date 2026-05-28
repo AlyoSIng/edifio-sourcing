@@ -82,6 +82,19 @@ export const rcAnalysisSchema = z.object({
     }),
   ),
 
+  /** Compétences et qualifications exigées par le RC */
+  competences_demandees: z
+    .array(
+      z.object({
+        competence: z.string().min(1),
+        /** "exigée" | "souhaitée" | "appréciée" | null si non précisé */
+        niveau: z.string().nullable().optional(),
+        provenance: provenanceSchema,
+      }),
+    )
+    .optional()
+    .default([]),
+
   /**
    * Alertes générées par le modèle (ex. délai très court, exigences inhabituelles,
    * informations absentes du document, etc.).
