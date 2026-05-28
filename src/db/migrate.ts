@@ -8,8 +8,19 @@
  * Sequencement :
  *   1. Lit `src/db/setup/extensions.sql` et l'execute via `sql.unsafe(...)`
  *      (idempotent grace aux `CREATE EXTENSION IF NOT EXISTS`).
- *   2. Enchaine avec `migrate(db, { migrationsFolder: 'src/db/migrations' })`
- *      qui applique 0000_init -> 0001_schema_v1 -> 0002_rls -> 0003_fk_supabase.
+ *   2. Enchaine avec `runMigrationsPerTransaction()` (migrator custom) qui
+ *      applique chaque migration dans sa propre transaction, en pre-executant
+ *      les `ALTER TYPE ... ADD VALUE` hors transaction (contrainte PostgreSQL :
+ *      la nouvelle valeur enum n'est pas visible dans la meme TX que l'ADD VALUE).
+ *
+ * Pourquoi un migrator custom au lieu de `migrate()` drizzle :
+ *   Le migrator drizzle-orm@0.39 enveloppe TOUTES les migrations dans une seule
+ *   transaction globale (`session.transaction(...)`). PostgreSQL 12+ autorise
+ *   `ADD VALUE` dans une transaction mais la nouvelle valeur enum n'est PAS
+ *   visible pour les operations DML (INSERT/UPDATE) dans la meme transaction.
+ *   => Erreur : "unsafe use of new value of enum type" (cf. bug CI fix/enum-platform-code-ci).
+ *   Solution : `splitAddValueStatements()` isole les `ADD VALUE` et les execute
+ *   via `sql.unsafe()` (hors transaction) avant le reste de la migration.
  *
  * En prod Supabase managed, les extensions sont deja activees cote infra : la
  * pre-amorce est neutre (no-op idempotent). En dev local + CI, c'est elle qui
@@ -29,16 +40,15 @@
  *
  * Testabilite : les gardes pures sont extraites en fonctions exportees
  * (`assertDatabaseUrl`, `resolveDbConfig`, `isPgBouncerPooler`,
- * `buildUrlFromParts`) -- testees dans tests/unit/db/migrate.test.ts. Le
- * `main()` n'est execute QUE quand le module est lance directement (pattern
- * Node.js `import.meta.url`-based entry guard).
+ * `buildUrlFromParts`, `splitAddValueStatements`) -- testees dans
+ * tests/unit/db/migrate.test.ts. Le `main()` n'est execute QUE quand le module
+ * est lance directement (pattern Node.js `import.meta.url`-based entry guard).
  */
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 import postgres from "postgres";
 
 /**
@@ -144,6 +154,130 @@ export function buildUrlFromParts(cfg: {
   return `postgresql://${cfg.user}:${encodedPwd}@${cfg.host}:${cfg.port}/${cfg.database}?sslmode=require`;
 }
 
+/**
+ * Separe les statements SQL d'une migration en deux groupes :
+ *   - `addValueStmts` : statements contenant `ALTER TYPE ... ADD VALUE`
+ *     (doivent etre executes HORS transaction sous PostgreSQL 12+ pour que
+ *     la nouvelle valeur enum soit visible dans les DML de la meme session).
+ *   - `otherStmts`   : tous les autres statements (DDL + DML).
+ *
+ * Contrainte PostgreSQL : `ADD VALUE` dans une transaction est accepte mais la
+ * nouvelle valeur n'est pas visible pour INSERT/UPDATE dans la meme transaction
+ * => "unsafe use of new value of enum type". En executant les ADD VALUE via
+ * `sql.unsafe()` avant d'ouvrir la transaction, on contourne cette limite.
+ *
+ * Exportee pour testabilite.
+ *
+ * @param stmts - Tableau de statements SQL (tel que produit par readMigrationFiles,
+ *                apres split sur `--> statement-breakpoint`).
+ */
+export function splitAddValueStatements(stmts: string[]): {
+  addValueStmts: string[];
+  otherStmts: string[];
+} {
+  const addValueRegex = /ALTER\s+TYPE\s+\S+\s+ADD\s+VALUE/i;
+  const addValueStmts: string[] = [];
+  const otherStmts: string[] = [];
+
+  for (const stmt of stmts) {
+    if (addValueRegex.test(stmt)) {
+      addValueStmts.push(stmt);
+    } else {
+      otherStmts.push(stmt);
+    }
+  }
+
+  return { addValueStmts, otherStmts };
+}
+
+/**
+ * Migrator custom qui remplace `migrate()` de drizzle-orm pour corriger
+ * l'incompatibilite entre `ALTER TYPE ... ADD VALUE` et la transaction globale
+ * du migrator officiel.
+ *
+ * Comportement :
+ *   1. Cree le schema + table `drizzle.__drizzle_migrations` si absents.
+ *   2. Recupere la derniere migration appliquee.
+ *   3. Pour chaque migration non encore jouee (folderMillis > lastDbMigration) :
+ *      a. Execute les statements `ADD VALUE` via `sql.unsafe()` (hors TX).
+ *      b. Ouvre une transaction par migration pour le reste des statements.
+ *      c. Dans la transaction, execute les autres statements puis enregistre
+ *         le hash dans `drizzle.__drizzle_migrations`.
+ *
+ * Cette approche garantit :
+ *   - Les ADD VALUE sont commis avant l'ouverture de la TX => valeur visible.
+ *   - L'atomicite DDL/DML par migration (une migration = une TX).
+ *   - La compatibilite avec le journal drizzle (meme schema de table, meme hash).
+ *
+ * Exportee pour testabilite (integration tests avec vraie connexion).
+ *
+ * @param sql       - Connexion postgres-js (max: 1, prepare: false).
+ * @param migrationsFolder - Chemin absolu vers le dossier des migrations.
+ */
+export async function runMigrationsPerTransaction(
+  sql: ReturnType<typeof postgres>,
+  migrationsFolder: string,
+): Promise<void> {
+  const MIGRATIONS_SCHEMA = "drizzle";
+  const MIGRATIONS_TABLE = "__drizzle_migrations";
+
+  // Cree le schema et la table de journal Drizzle si absents (idempotent).
+  await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS "${MIGRATIONS_SCHEMA}"`);
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" (
+      id SERIAL PRIMARY KEY,
+      hash text NOT NULL,
+      created_at bigint
+    )
+  `);
+
+  // Recupere la derniere migration appliquee (tri DESC limit 1 -- meme logique que drizzle).
+  // sql.unsafe() pour les noms de schema/table fixes (pas d'injection possible -- constantes).
+  const rows = await sql.unsafe<{ created_at: string }[]>(
+    `SELECT created_at FROM "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" ORDER BY created_at DESC LIMIT 1`,
+  );
+  const lastAppliedTs: number = rows.length > 0 && rows[0] ? Number(rows[0].created_at) : 0;
+
+  // Lit les fichiers de migration via l'API publique drizzle (respect du journal + hash).
+  const migrations = readMigrationFiles({ migrationsFolder });
+
+  for (const migration of migrations) {
+    // Ignore les migrations deja jouees (meme logique que le migrator officiel).
+    if (migration.folderMillis <= lastAppliedTs) {
+      continue;
+    }
+
+    const { addValueStmts, otherStmts } = splitAddValueStatements(migration.sql);
+
+    // a. ADD VALUE hors transaction -- DOIT etre commis avant l'ouverture de la TX.
+    // PostgreSQL 12+ accepte ADD VALUE dans une TX, mais la nouvelle valeur n'est
+    // PAS visible pour les DML (INSERT/UPDATE) dans la meme TX. En executant hors TX,
+    // la valeur est visible des que la commande retourne.
+    for (const stmt of addValueStmts) {
+      await sql.unsafe(stmt);
+    }
+
+    // b. Reste de la migration dans une transaction atomique par migration.
+    // sql.begin() ouvre BEGIN ... COMMIT (avec ROLLBACK automatique si erreur).
+    await sql.begin(async (tx) => {
+      for (const stmt of otherStmts) {
+        await tx.unsafe(stmt);
+      }
+
+      // Enregistrement dans le journal Drizzle (hash SHA-256 du contenu brut du fichier,
+      // tel que calcule par readMigrationFiles -- meme schema que le migrator officiel).
+      await tx.unsafe(
+        `INSERT INTO "${MIGRATIONS_SCHEMA}"."${MIGRATIONS_TABLE}" (hash, created_at) VALUES ($1, $2)`,
+        [migration.hash, String(migration.folderMillis)],
+      );
+    });
+
+    console.log(
+      `[migrate] [OK] Migration appliquee : ${migration.folderMillis} (hash ${migration.hash.substring(0, 12)}...)`,
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const cfg = resolveDbConfig();
 
@@ -179,12 +313,15 @@ async function main(): Promise<void> {
     await sql.unsafe(extensionsSQL);
     console.log("[migrate] [OK] Extensions Postgres posees (uuid-ossp, pgcrypto, pg_trgm).");
 
-    // 2. Migrations Drizzle (0000 -> 0001 -> 0002 -> 0003).
-    const db = drizzle(sql);
-    await migrate(db, {
-      migrationsFolder: resolve(process.cwd(), "src/db/migrations"),
-    });
-    console.log("[migrate] [OK] Migrations Drizzle appliquees.");
+    // 2. Migrations Drizzle via migrator custom (une TX par migration).
+    // Pourquoi pas `migrate(db, ...)` officiel : le migrator drizzle-orm@0.39
+    // enveloppe TOUTES les migrations dans une seule transaction globale, ce qui
+    // rend les valeurs ajoutees par `ALTER TYPE ... ADD VALUE` invisibles pour les
+    // DML (INSERT/UPDATE) dans la meme transaction. Notre migrator custom execute
+    // les ADD VALUE hors TX puis le reste dans une TX par migration.
+    const migrationsFolder = resolve(process.cwd(), "src/db/migrations");
+    await runMigrationsPerTransaction(sql, migrationsFolder);
+    console.log("[migrate] [OK] Migrations appliquees (migrator custom per-TX).");
   } finally {
     await sql.end();
   }

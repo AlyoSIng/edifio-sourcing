@@ -2,6 +2,18 @@
 
 ---
 
+## 2026-05-28 — fix(ci): migrator custom per-TX pour ALTER TYPE ADD VALUE (Alex)
+
+- **2026-05-28 · G6 · Alex (dev) · fix — migrator custom `runMigrationsPerTransaction` dans `src/db/migrate.ts`.**
+  *Bug CI `ci-db-rls` : `PostgresError: unsafe use of new value "prive" of enum type platform_code`.*
+  *Cause racine : le migrator drizzle-orm@0.39 exécute TOUTES les migrations dans une seule transaction globale (`session.transaction()`). PostgreSQL 12+ accepte `ALTER TYPE ADD VALUE` dans une transaction mais la nouvelle valeur enum n'est PAS visible pour les DML (INSERT/UPDATE) dans la même transaction. La migration 0024 contient ADD VALUE + INSERT dans la même TX => erreur.*
+  *Solution : remplacement de `migrate()` drizzle par `runMigrationsPerTransaction()` custom dans `main()`. Ce migrator custom (1) exécute les statements `ADD VALUE` via `sql.unsafe()` hors transaction (idempotent, IF NOT EXISTS déjà présent), (2) ouvre une transaction par migration pour tous les autres statements, (3) enregistre le hash dans `drizzle.__drizzle_migrations` de façon compatible avec le journal drizzle officiel.*
+  *Fonction pure `splitAddValueStatements()` exportée et couverte par 9 tests unitaires supplémentaires. Suite Vitest : 897 tests verts (dont 30 dans migrate.test.ts). TypeScript propre.*
+  *Fichiers modifiés : `src/db/migrate.ts` uniquement (aucun fichier `.sql` touché — les hashes prod restent valides).*
+  *Branche : `fix/enum-platform-code-ci`.*
+
+---
+
 ## 2026-05-27 — Bucket Supabase Storage `be-docs` — action manuelle requise (Alex)
 
 - **2026-05-27 · G6 · Alex (dev) · infra-doc — Bucket `be-docs` Supabase Storage.**
