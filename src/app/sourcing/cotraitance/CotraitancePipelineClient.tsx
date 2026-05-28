@@ -286,9 +286,9 @@ export function CotraitancePipelineClient({ entries }: Props) {
   if (entries.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-line py-16 text-center">
-        <p className="text-base font-medium text-ink">Aucun AO Tandem en cours</p>
+        <p className="text-base font-medium text-ink">Aucun AO en Cotraitance en cours</p>
         <p className="mt-1 text-sm text-muted">
-          Sélectionnez un AO en mode Tandem depuis la page AO du jour.
+          Sélectionnez un AO en Cotraitance depuis la page AO du jour.
         </p>
       </div>
     );
