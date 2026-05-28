@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-05-28 — PR #85 — Brief IA sur page détail AO + fix activeBrief null + vocab (Alex)
+
+- **2026-05-28 · G6 · Alex (dev) · fix+feat — brief IA affiché sur la page de détail `/sourcing/ao/[id]` (PR #85).**
+  *Bug : `getTendersOfTheDay` retournait toujours `activeBrief: null` — les briefs générés n'apparaissaient jamais sur les cartes AO. Fix : LEFT JOIN `tender_briefs WHERE is_active = true` dans la requête principale (plus de N+1 — un seul aller-retour BDD).*
+  *Feature : section « Brief IA » ajoutée sur la page `/sourcing/ao/[id]` avec le composant `BriefGenerator` (bouton Générer/Regénérer).*
+  *Vocabulaire Board 2026-05-27 : remplacement des derniers « Tandem »/« Solo » dans les strings UI (`TenderCardActions.tsx`, `TandemShortlistClient.tsx`, `cotraitant/page.tsx`, `CotraitancePipelineClient.tsx`).*
+  *Tests : `queries.test.ts` étendu — mock builder étendu pour chaîne `.leftJoin()`, test propagation `activeBrief`.*
+  *TypeScript propre (tsc --noEmit 0 erreur). Branche : `feat/brief-detail-vocab`.*
+
+---
+
+## 2026-05-28 — fix(migrations): timestamps journal 0025/0026/0027 corrigés (Alex + Yann)
+
+- **2026-05-28 · G6 · Alex (dev) + Yann (ps_operator) · fix — bug silencieux du migrator custom sur migrations 0025-0027.**
+  *Cause racine : migrations 0010-0024 ont `when = 1748xxx` dans `_journal.json`, migrations 0000-0009 ont `when = 1779xxx`. Le migrator compare `folderMillis` au `MAX(created_at)` de `drizzle.__drizzle_migrations`. Si 0009 (`when = 1779730999354`) était la dernière entrée, toutes les migrations 0010-0027 (`when = 1748xxx < 1779xxx`) étaient silencieusement skippées.*
+  *Fix : timestamps 0025/0026/0027 mis à `1779731000000 / 1779731001000 / 1779731002000` (> 0009). Migrations 0010-0024 déjà dans `__drizzle_migrations` prod (appliquées manuellement ou via déploiement antérieur — vérification via Supabase MCP : 28/28 hashes présents).*
+  *Confirmé prod : `SELECT COUNT(*) FROM drizzle.__drizzle_migrations` = 28 (= journal 28 entrées).*
+
+---
+
+## 2026-05-28 — PR #83 — Pipeline C/R Kanban + brief AO v2 + RC compétences (Alex)
+
+- **2026-05-28 · G6 · Alex (dev) · feat — pipeline Conception-Réalisation + améliorations brief AO (PR #83).**
+  *Module C/R : `CrKanbanBoard.tsx` (colonnes statuts pipeline, drag-drop préparé Phase 2), `page-data.ts` (requêtes pipeline CR), `page.tsx` (écran `/sourcing/conception-realisation`).*
+  *RC display : `RcAnalysisCard.tsx` — affichage structuré de l'analyse RC (`pieces_demandees`, `echeances`, `criteres_jugement`, `competences_demandees`, alertes). Lecture depuis `tender_events` WHERE `event_type = 'rc_analyzed'`.*
+  *`rc_analysis_full` v2 : champ `competences_demandees` ajouté au schéma JSON (`[{competence, niveau, provenance}]`). Seed `001_ai_prompts.sql` mis à jour (v1 désactivée, v2 insérée).*
+  *alerte visite : badge orange sur la page détail AO si `echeances` contient type `"visite"`.*
+  *Tests pgTAP `06_ai_prompts_seed.sql` mis à jour : invariant sémantique (aucun prompt > 1 version active simultanément), `MAX(version) = 2`.*
+  *Nav item « Conception-Réalisation » ajouté dans `nav-items.ts`.*
+  *Branche `feat/cr-brief-v2-rc` mergée le 2026-05-28.*
+
+---
+
 ## 2026-05-28 — feat(shortlist): criteres de short-list paramétrables (Nadia)
 
 - **2026-05-28 · G6 · Nadia (dev) · feat — module Tandem, table `shortlist_criteria` + page admin.**
