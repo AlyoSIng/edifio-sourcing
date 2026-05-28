@@ -7,7 +7,7 @@ exports[`AI_PROMPTS_V1_CATALOG — snapshot (verrou versioning) > snapshot confo
     "id": "bbbbbbbb-0000-0000-0000-000000000001",
     "model": "sonnet-4-6",
     "name": "rc_analysis_full",
-    "version": 1,
+    "version": 2,
   },
   {
     "active": true,
