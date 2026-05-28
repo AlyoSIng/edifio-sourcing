@@ -79,5 +79,20 @@
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css,md,html,yml,yaml}": "prettier --check",
     "*.{ts,tsx,js,jsx}": "eslint --max-warnings 0"
+  },
+  "optionalDependencies": {
+    "@esbuild/win32-arm64": "0.28.0"
+  },
+  "pnpm": {
+    "supportedArchitectures": {
+      "os": [
+        "current"
+      ],
+      "cpu": [
+        "current",
+        "x64",
+        "arm64"
+      ]
+    }
   }
 }
