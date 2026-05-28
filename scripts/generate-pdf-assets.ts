@@ -63,6 +63,11 @@ const ASSETS: PdfAsset[] = [
     bucketPath: "onboarding/roadmap_edifio_sourcing.pdf",
     label: "roadmap_pdf_url",
   },
+  {
+    htmlPath: path.join(REPO_ROOT, "design", "copy", "etude_marche_v4.html"),
+    bucketPath: "onboarding/etude_marche_edifio_sourcing.pdf",
+    label: "market_study_url",
+  },
 ];
 
 const BUCKET = "app-assets";
