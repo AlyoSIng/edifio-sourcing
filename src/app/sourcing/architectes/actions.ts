@@ -268,26 +268,24 @@ export async function upsertArchitect(
 
     if (id) {
       // Mise à jour — on exclut les colonnes dérivées et les timestamps auto
-      const rows = await dbClient
-        .update(architects)
-        .set({
-          ...input,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(architects.id, id), eq(architects.organizationId, ALYOS_ORG_ID)))
-        .returning();
+      const rows = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+        client
+          .update(architects)
+          .set({ ...input, updatedAt: new Date() })
+          .where(and(eq(architects.id, id), eq(architects.organizationId, ALYOS_ORG_ID)))
+          .returning(),
+      );
 
       if (!rows[0]) return { ok: false, error: "not_found" as const };
       result = rows[0];
     } else {
       // Création
-      const rows = await dbClient
-        .insert(architects)
-        .values({
-          ...input,
-          organizationId: ALYOS_ORG_ID,
-        })
-        .returning();
+      const rows = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+        client
+          .insert(architects)
+          .values({ ...input, organizationId: ALYOS_ORG_ID })
+          .returning(),
+      );
 
       if (!rows[0]) throw new Error("INSERT architects returned no row");
       result = rows[0];
@@ -373,6 +371,12 @@ export async function importArchitectsFromCsv(formData: FormData): Promise<Impor
   let imported = 0;
   let updated = 0;
   const errors: string[] = [];
+
+  // Défense-en-profondeur Phase 2 : contexte tenant pour FORCE RLS
+  // (postgres/service_role bypassent RLS → no-op actuel, effectif dès Phase 2)
+  await defaultDb.execute(
+    sql`SELECT set_config('app.current_organization_id', ${ALYOS_ORG_ID}, true)`,
+  );
 
   for (let i = 0; i < dataLines.length; i++) {
     const line = dataLines[i];
@@ -541,18 +545,20 @@ export async function setRgpdOpposition(
 
   try {
     // 4. Mise à jour atomique : rgpd_opposition + rgpd_opposition_date + active
-    const rows = await dbClient
-      .update(architects)
-      .set({
-        rgpdOpposition: oppose,
-        // Si opposition posée : date = now(). Si levée : date remise à NULL.
-        rgpdOppositionDate: oppose ? new Date() : null,
-        // L'opposition désactive l'architecte (retire du matching), la levée le réactive.
-        active: !oppose,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
-      .returning();
+    const rows = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+      client
+        .update(architects)
+        .set({
+          rgpdOpposition: oppose,
+          // Si opposition posée : date = now(). Si levée : date remise à NULL.
+          rgpdOppositionDate: oppose ? new Date() : null,
+          // L'opposition désactive l'architecte (retire du matching), la levée le réactive.
+          active: !oppose,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+        .returning(),
+    );
 
     if (!rows[0]) return { ok: false, error: "not_found" };
     const updated = rows[0];
@@ -644,6 +650,11 @@ export async function enrichArchitectsFromPappers(params: {
   }
 
   const orgFilter = eq(architects.organizationId, ALYOS_ORG_ID);
+
+  // Défense-en-profondeur Phase 2 : contexte tenant pour FORCE RLS
+  await defaultDb.execute(
+    sql`SELECT set_config('app.current_organization_id', ${ALYOS_ORG_ID}, true)`,
+  );
 
   // Récupération du total et du batch en parallèle
   const [batch, totalRows] = await Promise.all([
@@ -819,6 +830,11 @@ export async function enrichSingleArchitectFromPappers(
   }
 
   try {
+    // Défense-en-profondeur Phase 2 : contexte tenant pour FORCE RLS
+    await defaultDb.execute(
+      sql`SELECT set_config('app.current_organization_id', ${ALYOS_ORG_ID}, true)`,
+    );
+
     // 5. Récupération de l'architecte (filtré tenant)
     const rows = await defaultDb
       .select()
@@ -1019,10 +1035,12 @@ export async function deleteArchitectAction(
     }
 
     // 6. DELETE tenant-scoped
-    const deleted = await dbClient
-      .delete(architects)
-      .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
-      .returning({ id: architects.id });
+    const deleted = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+      client
+        .delete(architects)
+        .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+        .returning({ id: architects.id }),
+    );
 
     if (!deleted[0]) {
       return { ok: false, error: "not_found" };
