@@ -10,7 +10,8 @@
  *   npx tsx scripts/backfill-departments.ts --force   # traite TOUTES les lignes
  *   npx tsx scripts/backfill-departments.ts --force --commit
  *
- * Prérequis : DATABASE_URL dans .env.local (connexion directe port 5432).
+ * Prérequis : DATABASE_URL dans .env.local OU variables PG* (PGHOST, PGPORT, PGUSER,
+ *             PGPASSWORD, PGDATABASE) posées dans la session shell avant lancement.
  *
  * Ce script utilise le driver `postgres` directement (pas Drizzle) pour éviter
  * d'avoir besoin du schéma Drizzle compilé. Les colonnes postal_code et
@@ -25,15 +26,34 @@ import { derivePostalCodeAndDepartment } from "../src/lib/sourcing/derive-depart
 import type { TenderRawData } from "../src/db/types/jsonb";
 
 // ---------------------------------------------------------------------------
-// Chargement .env.local (même mécanisme que Next.js)
+// Résolution de la config DB (DATABASE_URL OU variables PG*)
 // ---------------------------------------------------------------------------
 loadEnvConfig(process.cwd());
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error("[backfill-departments] ERROR: DATABASE_URL absent — ajouter au .env.local");
+function resolveDbUrl(): string {
+  const url = process.env.DATABASE_URL;
+  if (url) return url;
+
+  const host = process.env.PGHOST;
+  const port = process.env.PGPORT ?? "5432";
+  const user = process.env.PGUSER ?? "postgres";
+  const password = process.env.PGPASSWORD ?? "";
+  const database = process.env.PGDATABASE ?? "postgres";
+
+  if (host) {
+    const encodedPassword = encodeURIComponent(password);
+    return `postgresql://${user}:${encodedPassword}@${host}:${port}/${database}`;
+  }
+
+  console.error(
+    "[backfill-departments] ERROR: ni DATABASE_URL ni PGHOST définis.\n" +
+      "  Option 1 : $env:DATABASE_URL = 'postgresql://postgres:pass@host:5432/postgres'\n" +
+      "  Option 2 : $env:PGHOST='host'; $env:PGUSER='postgres'; $env:PGPASSWORD='pass'",
+  );
   process.exit(1);
 }
+
+const DATABASE_URL = resolveDbUrl();
 
 // ---------------------------------------------------------------------------
 // Arguments CLI
