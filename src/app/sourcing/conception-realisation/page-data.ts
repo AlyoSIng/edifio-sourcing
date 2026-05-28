@@ -74,18 +74,6 @@ export async function loadCrPipelineData(
     // -----------------------------------------------------------------------
     // 1. Récupérer les sélections en mode conception_realisation non annulées
     // -----------------------------------------------------------------------
-    const selectionRows = await client
-      .select({ tenderId: selections.tenderId })
-      .from(selections)
-      .where(
-        and(
-          eq(selections.organizationId, organizationId),
-          eq(selections.mode, "conception_realisation"),
-        ),
-      );
-
-    // Filtre côté app : exclure les sélections annulées (cancelledAt IS NULL)
-    // Note : on charge le cancelledAt via le schema selection
     const activeSels = await client
       .select({
         tenderId: selections.tenderId,
@@ -108,9 +96,6 @@ export async function loadCrPipelineData(
         data: { a_analyser: [], rc_analysee: [], dossier_en_cours: [], soumis: [] },
       };
     }
-
-    // Supprime la requête initiale inutilisée (on garde seulement activeSels)
-    void selectionRows;
 
     // -----------------------------------------------------------------------
     // 2. Charger les tenders correspondants

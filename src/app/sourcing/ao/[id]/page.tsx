@@ -174,9 +174,13 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
       .orderBy(desc(tenderEvents.occurredAt))
       .limit(1);
     if (evRows[0]?.data) {
-      const payload = (evRows[0].data as Record<string, unknown>).payload;
-      if (payload) {
-        const parsed = rcAnalysisSchema.safeParse(payload);
+      // Structure écrite par analyzeRcAction : { extra: { rc_analysis: RcAnalysis, ... } }
+      const extra = (evRows[0].data as Record<string, unknown>).extra as
+        | Record<string, unknown>
+        | undefined;
+      const rcAnalysisRaw = extra?.rc_analysis;
+      if (rcAnalysisRaw) {
+        const parsed = rcAnalysisSchema.safeParse(rcAnalysisRaw);
         if (parsed.success) rcAnalysis = parsed.data;
       }
     }
