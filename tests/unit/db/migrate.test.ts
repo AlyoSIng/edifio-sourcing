@@ -22,6 +22,7 @@ import {
   buildUrlFromParts,
   isPgBouncerPooler,
   resolveDbConfig,
+  splitAddValueStatements,
 } from "@/db/migrate";
 
 describe("src/db/migrate -- assertDatabaseUrl", () => {
@@ -226,5 +227,80 @@ describe("src/db/migrate -- buildUrlFromParts", () => {
     });
     const parsed = new URL(url);
     expect(parsed.searchParams.get("sslmode")).toBe("require");
+  });
+});
+
+describe("src/db/migrate -- splitAddValueStatements", () => {
+  it("retourne listes vides pour un tableau vide", () => {
+    const { addValueStmts, otherStmts } = splitAddValueStatements([]);
+    expect(addValueStmts).toEqual([]);
+    expect(otherStmts).toEqual([]);
+  });
+
+  it("classe un ADD VALUE simple dans addValueStmts", () => {
+    const stmt = `ALTER TYPE "public"."platform_code" ADD VALUE IF NOT EXISTS 'prive'`;
+    const { addValueStmts, otherStmts } = splitAddValueStatements([stmt]);
+    expect(addValueStmts).toEqual([stmt]);
+    expect(otherStmts).toEqual([]);
+  });
+
+  it("classe un INSERT INTO dans otherStmts", () => {
+    const stmt = `INSERT INTO "platforms" ("code") VALUES ('prive') ON CONFLICT ("code") DO NOTHING`;
+    const { addValueStmts, otherStmts } = splitAddValueStatements([stmt]);
+    expect(addValueStmts).toEqual([]);
+    expect(otherStmts).toEqual([stmt]);
+  });
+
+  it("separe correctement ADD VALUE + INSERT (cas migration 0024)", () => {
+    const addValueStmt = `ALTER TYPE "public"."platform_code" ADD VALUE IF NOT EXISTS 'prive'`;
+    const insertStmt = `INSERT INTO "platforms" ("code", "display_name", "auth_type", "base_url", "enabled") VALUES ('prive', 'Consultation privée', 'none', '', true) ON CONFLICT ("code") DO NOTHING`;
+    const { addValueStmts, otherStmts } = splitAddValueStatements([addValueStmt, insertStmt]);
+    expect(addValueStmts).toEqual([addValueStmt]);
+    expect(otherStmts).toEqual([insertStmt]);
+  });
+
+  it("detecte ADD VALUE sans IF NOT EXISTS", () => {
+    const stmt = `ALTER TYPE "selection_mode" ADD VALUE 'conception_realisation'`;
+    const { addValueStmts } = splitAddValueStatements([stmt]);
+    expect(addValueStmts).toEqual([stmt]);
+  });
+
+  it("detecte ADD VALUE meme avec commentaires avant (statement multiligne)", () => {
+    const stmt = `-- Ajoute la valeur\nALTER TYPE "public"."audit_action" ADD VALUE IF NOT EXISTS 'tender_defer'`;
+    const { addValueStmts, otherStmts } = splitAddValueStatements([stmt]);
+    expect(addValueStmts).toEqual([stmt]);
+    expect(otherStmts).toEqual([]);
+  });
+
+  it("ne classe PAS un CREATE TABLE dans addValueStmts", () => {
+    const stmt = `CREATE TABLE IF NOT EXISTS "platforms" ("id" uuid PRIMARY KEY)`;
+    const { addValueStmts, otherStmts } = splitAddValueStatements([stmt]);
+    expect(addValueStmts).toEqual([]);
+    expect(otherStmts).toEqual([stmt]);
+  });
+
+  it("gere plusieurs ADD VALUE dans la meme migration (cas 0004 : 2 ADD VALUE + DDL)", () => {
+    const av1 = `ALTER TYPE "public"."audit_action" ADD VALUE IF NOT EXISTS 'tender_defer'`;
+    const av2 = `ALTER TYPE "public"."audit_action" ADD VALUE IF NOT EXISTS 'tender_reject'`;
+    const ddl = `ALTER TABLE "tenders" ADD COLUMN "deferred_until" timestamp with time zone`;
+    const other = `CREATE INDEX "idx_tenders_deferred" ON "tenders" USING btree ("deferred_until")`;
+    const { addValueStmts, otherStmts } = splitAddValueStatements([av1, ddl, av2, other]);
+    expect(addValueStmts).toEqual([av1, av2]);
+    expect(otherStmts).toEqual([ddl, other]);
+  });
+
+  it("est insensible a la casse (ALTER TYPE ... add value)", () => {
+    const stmt = `alter type "public"."platform_code" add value 'test'`;
+    const { addValueStmts } = splitAddValueStatements([stmt]);
+    expect(addValueStmts).toEqual([stmt]);
+  });
+
+  it("preserve l'ordre des otherStmts (ordre d'execution garanti)", () => {
+    const av = `ALTER TYPE "public"."platform_code" ADD VALUE IF NOT EXISTS 'prive'`;
+    const s1 = `CREATE TABLE "a" ("id" uuid)`;
+    const s2 = `CREATE INDEX "idx_a" ON "a" ("id")`;
+    const s3 = `INSERT INTO "a" ("id") VALUES (gen_random_uuid())`;
+    const { otherStmts } = splitAddValueStatements([s1, av, s2, s3]);
+    expect(otherStmts).toEqual([s1, s2, s3]);
   });
 });
