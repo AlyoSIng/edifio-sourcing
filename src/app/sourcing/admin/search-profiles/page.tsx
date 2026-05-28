@@ -65,7 +65,8 @@ export default async function SearchProfilesPage() {
     };
   } catch (err) {
     console.error("[admin-search-profiles:fetch:fail]", err);
-    fetchError = err instanceof Error ? err.message : String(err);
+    // NB : on ne passe PAS le message brut à l'UI (fuite d'info DB — cf. DECISIONS.md sécurité).
+    fetchError = "Erreur base de données — réessayez dans quelques instants.";
   }
 
   return (

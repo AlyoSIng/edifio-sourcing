@@ -54,7 +54,8 @@ export default async function BibliothequeAdminPage() {
       .orderBy(presentationLibrary.kind, presentationLibrary.createdAt);
   } catch (err) {
     console.error("[bibliotheque:fetch:fail]", err);
-    fetchError = err instanceof Error ? err.message : String(err);
+    // NB : message brut non transmis à l'UI (fuite d'info DB en prod).
+    fetchError = "db-error";
   }
 
   return (
@@ -71,7 +72,15 @@ export default async function BibliothequeAdminPage() {
       </header>
 
       {/* Erreur chargement BDD */}
-      {fetchError ? <ErrorBanner message={fetchError} /> : <LibraryClient entries={items} />}
+      {fetchError ? (
+        <ErrorBanner
+          message={fetchError}
+          title="Bibliothèque indisponible"
+          description="Impossible de charger les documents. Réessayez dans quelques instants — si le problème persiste, contactez l'administrateur."
+        />
+      ) : (
+        <LibraryClient entries={items} />
+      )}
     </div>
   );
 }
