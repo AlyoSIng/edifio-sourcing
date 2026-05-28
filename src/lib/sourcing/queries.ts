@@ -102,8 +102,8 @@ export interface TenderOfTheDay {
   department: string | null;
   /**
    * Brief IA généré à la demande (null si jamais généré).
-   * Lu depuis tender_briefs WHERE is_active = true via `getActiveBriefForTender`.
-   * Chargé séparément pour ne pas complexifier la query principale.
+   * Lu depuis tender_briefs WHERE is_active = true via LEFT JOIN dans
+   * `getTendersOfTheDay` — un seul aller-retour BDD, pas de N+1.
    */
   activeBrief: string | null;
 }
@@ -275,9 +275,16 @@ export async function getTendersOfTheDay(
       excludedAt: tenders.excludedAt,
       postalCode: tenders.postalCode,
       department: tenders.department,
+      // Brief IA actif — chargé en un seul JOIN pour éviter N+1.
+      // null si aucun brief n'a encore été généré pour cet AO.
+      activeBrief: tenderBriefs.content,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
+    .leftJoin(
+      tenderBriefs,
+      and(eq(tenderBriefs.tenderId, tenders.id), eq(tenderBriefs.isActive, true)),
+    )
     .where(whereClause)
     // NULLS LAST sur score (postgres-js + Drizzle : on passe par `sql` brut
     // pour `NULLS LAST` car l'helper `desc()` n'a pas d'option NULL ordering
@@ -286,10 +293,9 @@ export async function getTendersOfTheDay(
     .limit(50);
 
   // Le typage de `rows` est déjà conforme à `TenderOfTheDay[]` grâce à la
-  // selection explicite — pas de transformation supplémentaire nécessaire.
+  // selection explicite — `activeBrief` est null si aucun brief actif (LEFT JOIN).
   // `platforms.code` est l'enum strict `PlatformCode` côté schéma Drizzle.
-  // `activeBrief` est null ici — chargé séparément via getActiveBriefForTender.
-  return rows.map((r) => ({ ...r, activeBrief: null }));
+  return rows;
 }
 
 // ============================================================================

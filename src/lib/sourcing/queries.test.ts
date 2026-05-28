@@ -143,6 +143,8 @@ interface SelectCapture {
   fromTable?: unknown;
   joinTable?: unknown;
   joinCondition?: unknown;
+  leftJoinTable?: unknown;
+  leftJoinCondition?: unknown;
   whereExpr?: unknown;
   orderByArgs?: unknown[];
   limitN?: number;
@@ -150,11 +152,12 @@ interface SelectCapture {
 
 /**
  * Construit un faux client Drizzle qui retourne `rows` pour la chaîne
- * `.select().from().innerJoin?().where().orderBy().limit()`.
+ * `.select().from().innerJoin?().leftJoin?().where().orderBy().limit()`.
  *
  * Cas couverts :
- *  - chaîne AVEC `.innerJoin()` (getTendersOfTheDay)
- *  - chaîne SANS `.innerJoin()` (getActiveSearchProfileName)
+ *  - chaîne AVEC `.innerJoin()` puis `.leftJoin()` (getTendersOfTheDay — briefs)
+ *  - chaîne AVEC `.innerJoin()` seul (autres fonctions)
+ *  - chaîne SANS jointure (getActiveSearchProfileName)
  */
 function buildFakeDb<TRow>(rows: TRow[]): { db: DrizzleClient; capture: SelectCapture } {
   const capture: SelectCapture = {};
@@ -178,6 +181,20 @@ function buildFakeDb<TRow>(rows: TRow[]): { db: DrizzleClient; capture: SelectCa
     },
   };
 
+  // Niveau après innerJoin : supporte leftJoin optionnel puis where
+  const afterInnerJoin = {
+    leftJoin: (leftJoinTable: unknown, leftJoinCondition: unknown) => {
+      capture.leftJoinTable = leftJoinTable;
+      capture.leftJoinCondition = leftJoinCondition;
+      return whereThenOrderBy;
+    },
+    // Fallback direct where (chaîne sans leftJoin)
+    where: (expr: unknown) => {
+      capture.whereExpr = expr;
+      return orderByThenLimit;
+    },
+  };
+
   const fakeDb = {
     select: (selection: Record<string, unknown>) => {
       capture.selection = selection;
@@ -189,7 +206,7 @@ function buildFakeDb<TRow>(rows: TRow[]): { db: DrizzleClient; capture: SelectCa
             innerJoin: (joinTable: unknown, joinCondition: unknown) => {
               capture.joinTable = joinTable;
               capture.joinCondition = joinCondition;
-              return whereThenOrderBy;
+              return afterInnerJoin;
             },
             // Variante sans jointure (search_profiles seul)
             where: (expr: unknown) => {
@@ -362,6 +379,36 @@ describe("getTendersOfTheDay", () => {
     // Ligne sans CP/dept → null (pas d'erreur, null explicite)
     expect(result[2]?.postalCode).toBeNull();
     expect(result[2]?.department).toBeNull();
+  });
+
+  /**
+   * Bug fix — LEFT JOIN tenderBriefs (migration 0022).
+   *
+   * `getTendersOfTheDay` doit charger le brief actif en une seule requête
+   * via LEFT JOIN (plus de `.map((r) => ({ ...r, activeBrief: null }))`).
+   * On vérifie que :
+   *  1. le mock capture bien le leftJoin (présence de la chaîne fluide)
+   *  2. `activeBrief` non null est propagé tel quel depuis la projection
+   *  3. `activeBrief` null reste null (AO sans brief)
+   */
+  it("charge activeBrief via LEFT JOIN — propagé depuis la projection", async () => {
+    const rowWithBrief: TenderOfTheDay = {
+      ...tenderRow1,
+      activeBrief: "Ce marché porte sur la rénovation thermique d'une école.",
+    };
+    const rowWithoutBrief: TenderOfTheDay = { ...tenderRow2, activeBrief: null };
+
+    const { db, capture } = buildFakeDb<TenderOfTheDay>([rowWithBrief, rowWithoutBrief]);
+
+    const result = await getTendersOfTheDay(ORG_ALYOS, db);
+
+    // Le leftJoin a bien été appelé (chaîne fluide complète)
+    expect(capture.leftJoinTable).toBeDefined();
+    expect(capture.leftJoinCondition).toBeDefined();
+
+    // Propagation directe — pas d'écrasement par null
+    expect(result[0]?.activeBrief).toBe("Ce marché porte sur la rénovation thermique d'une école.");
+    expect(result[1]?.activeBrief).toBeNull();
   });
 });
 

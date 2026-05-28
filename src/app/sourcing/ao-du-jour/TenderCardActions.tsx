@@ -207,7 +207,7 @@ export function TenderCardActions({
           type="button"
           onClick={() => setShowSoloTandemModal(true)}
           disabled={isPending}
-          title="Bascule l'AO en pipeline. Vous choisirez ensuite Solo ou Tandem."
+          title="Bascule l'AO en pipeline. Vous choisirez ensuite Mandataire ou Cotraitance."
           className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-brand-red px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x2713;</span>

@@ -115,7 +115,7 @@ export default async function TandemCotraitantPage({ params }: PageProps) {
             ← Retour short-list
           </a>
         </nav>
-        <span className="pill-eyebrow">Cotraitance — Tandem</span>
+        <span className="pill-eyebrow">Cotraitance</span>
         <h1 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
           Cotraitant
         </h1>

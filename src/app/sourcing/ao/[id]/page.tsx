@@ -25,11 +25,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 
+import { BriefGenerator } from "@/app/sourcing/ao-du-jour/BriefGenerator";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { db } from "@/db/client";
+import { tenderBriefs } from "@/db/schema/ai";
 import { platforms } from "@/db/schema/config";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
@@ -130,9 +132,15 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
         rawData: tenders.rawData,
         createdAt: tenders.createdAt,
         platformCode: platforms.code,
+        // Brief IA actif — LEFT JOIN pour éviter un aller-retour BDD supplémentaire.
+        activeBrief: tenderBriefs.content,
       })
       .from(tenders)
       .innerJoin(platforms, eq(tenders.platformId, platforms.id))
+      .leftJoin(
+        tenderBriefs,
+        and(eq(tenderBriefs.tenderId, tenders.id), eq(tenderBriefs.isActive, true)),
+      )
       .where(and(eq(tenders.id, params.id), eq(tenders.organizationId, ALYOS_ORG_ID)))
       .limit(1);
 
@@ -285,6 +293,21 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
             </section>
           )}
 
+          {/* Brief IA — chargé via LEFT JOIN tender_briefs (is_active = true) */}
+          <section className="rounded-md border border-line bg-white p-5">
+            <h2 className="mb-3 font-display text-sm font-semibold uppercase tracking-wider text-muted">
+              Brief IA
+            </h2>
+            {tender.activeBrief ? (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-ink-2">
+                {tender.activeBrief}
+              </p>
+            ) : (
+              <p className="text-sm text-muted">Aucun brief généré.</p>
+            )}
+            <BriefGenerator tenderId={tender.id} hasBrief={tender.activeBrief !== null} />
+          </section>
+
           {/* Analyse RC — affichée uniquement si un événement rc_analyzed existe */}
           {rcAnalysis && <RcAnalysisCard analysis={rcAnalysis} tenderId={tender.id} />}
         </div>
@@ -401,6 +424,8 @@ type TenderRow = {
   rawData: import("@/db/types/jsonb").TenderRawData | null;
   createdAt: Date;
   platformCode: string;
+  /** Brief IA actif (null si jamais généré). */
+  activeBrief: string | null;
 };
 
 // ============================================================================

@@ -313,7 +313,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         </div>
         <p>
           Aucun architecte solicitable ne correspond à cet AO. Ajoute un architecte depuis
-          l&rsquo;administration pour activer le mode Tandem.
+          l&rsquo;administration pour activer le mode Cotraitance.
         </p>
       </div>
     );
