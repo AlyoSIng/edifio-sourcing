@@ -190,13 +190,6 @@
       "when": 1748996161000,
       "tag": "0026_platform_prive_seed",
       "breakpoints": true
-    },
-    {
-      "idx": 27,
-      "version": "7",
-      "when": 1748996162000,
-      "tag": "0027_shortlist_criteria",
-      "breakpoints": true
     }
   ]
 }
