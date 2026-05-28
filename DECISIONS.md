@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-05-28 — Fix FORCE RLS `architects` dans `fetchArchitectsPage` (PR #86)
+
+**Agent** : Alex (`dev`)
+**Fichier modifié** : `src/app/sourcing/architectes/actions.ts`
+
+**Problème** : la table `architects` a `relforcerowsecurity = true` depuis migration
+0002. La fonction `fetchArchitectsPage` utilisait le client Drizzle brut sans appeler
+`withTenantContext()`. `app.current_organization_id` n'était jamais positionné →
+Postgres FORCE RLS bloquait toutes les lignes → la page affichait "Annuaire indisponible".
+
+**Fix** : wrapping des requêtes SELECT + COUNT dans
+`withTenantContext(ALYOS_ORG_ID, dbClient, ...)`. Le paramètre `dbClient` injectable
+pour les tests est conservé. Import `withTenantContext` ajouté.
+
+**Signalement** : 4 autres fonctions dans le même fichier (`importArchitectsFromCsv`,
+`enrichArchitectsFromPappers`, `enrichSingleArchitectFromPappers`, `upsertArchitect`
++ `setRgpdOpposition` + `deleteArchitectAction`) accèdent à `architects` avec `db`
+brut sans `withTenantContext`. À corriger en Phase 2 (pas critique : ces fonctions
+sont réservées admin et le flux d'authentification Supabase peut fournir le contexte).
+
+---
+
 ## 2026-05-28 — PR #85 — Brief IA sur page détail AO + fix activeBrief null + vocab (Alex)
 
 - **2026-05-28 · G6 · Alex (dev) · fix+feat — brief IA affiché sur la page de détail `/sourcing/ao/[id]` (PR #85).**
