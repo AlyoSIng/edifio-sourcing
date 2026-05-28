@@ -29,6 +29,7 @@ import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { withTenantContext } from "@/lib/db/with-tenant-context";
 import {
   getPappersBySiren,
   mapTrancheToHeadcount,
@@ -192,17 +193,20 @@ export async function fetchArchitectsPage(
 
   const where = and(...conditions);
 
-  // Requêtes parallèles : données + comptage total
-  const [rows, countRows] = await Promise.all([
-    dbClient
-      .select()
-      .from(architects)
-      .where(where)
-      .orderBy(architects.cabinet)
-      .limit(PAGE_SIZE)
-      .offset(offset),
-    dbClient.select({ total: count() }).from(architects).where(where),
-  ]);
+  // withTenantContext pose app.current_organization_id pour FORCE RLS
+  // (architects a relforcerowsecurity = true depuis migration 0002)
+  const [rows, countRows] = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+    Promise.all([
+      client
+        .select()
+        .from(architects)
+        .where(where)
+        .orderBy(architects.cabinet)
+        .limit(PAGE_SIZE)
+        .offset(offset),
+      client.select({ total: count() }).from(architects).where(where),
+    ]),
+  );
 
   const total = countRows[0]?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
