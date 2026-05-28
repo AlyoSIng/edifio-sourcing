@@ -193,7 +193,19 @@ export const FORMATIONS_FIXTURE = [
 // ---------- app_content (table app_content) ----------
 export const APP_CONTENT_FIXTURE = [
   { key: "demo_video_url", contentUrl: "TODO_URL" }, // 🔴 vidéo de démonstration (YouTube/mp4)
-  { key: "pitch_pdf_url", contentUrl: "TODO_URL" }, // plaquette commerciale (PDF Google Drive)
-  { key: "roadmap_pdf_url", contentUrl: "TODO_URL" }, // roadmap produit (PDF Google Drive)
-  { key: "market_study_url", contentUrl: "TODO_URL" }, // étude de marché v4 (URL hébergée)
+  {
+    key: "pitch_pdf_url",
+    contentUrl:
+      "https://loogmtltwkhvczdiurqs.supabase.co/storage/v1/object/public/app-assets/onboarding/plaquette_edifio_sourcing.pdf",
+  }, // généré le 2026-05-28 par scripts/generate-pdf-assets.ts
+  {
+    key: "roadmap_pdf_url",
+    contentUrl:
+      "https://loogmtltwkhvczdiurqs.supabase.co/storage/v1/object/public/app-assets/onboarding/roadmap_edifio_sourcing.pdf",
+  }, // généré le 2026-05-28 par scripts/generate-pdf-assets.ts
+  {
+    key: "market_study_url",
+    contentUrl:
+      "https://loogmtltwkhvczdiurqs.supabase.co/storage/v1/object/public/app-assets/onboarding/etude_marche_edifio_sourcing.pdf",
+  }, // étude de marché v4 — généré le 2026-05-28 par scripts/generate-pdf-assets.ts
 ];
