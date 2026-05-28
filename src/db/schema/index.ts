@@ -35,3 +35,4 @@ export * from "./sharing";
 export * from "./cotraitants";
 export * from "./be-documents";
 export * from "./superadmin";
+export * from "./shortlist";
