@@ -23,7 +23,7 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
@@ -31,8 +31,11 @@ import { toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { db } from "@/db/client";
 import { platforms } from "@/db/schema/config";
-import { tenders } from "@/db/schema/tenders";
+import { tenderEvents, tenders } from "@/db/schema/tenders";
+import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+import { RcAnalysisCard } from "./RcAnalysisCard";
 
 import { formatAmount, formatDeadline } from "@/app/sourcing/ao-du-jour/format";
 
@@ -155,6 +158,36 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
     );
   }
 
+  // Chargement de l'analyse RC si disponible — silently ignore les erreurs
+  let rcAnalysis: import("@/lib/ai/schemas").RcAnalysis | null = null;
+  try {
+    const evRows = await db
+      .select({ data: tenderEvents.data })
+      .from(tenderEvents)
+      .where(
+        and(
+          eq(tenderEvents.tenderId, params.id),
+          eq(tenderEvents.organizationId, ALYOS_ORG_ID),
+          eq(tenderEvents.eventType, "rc_analyzed"),
+        ),
+      )
+      .orderBy(desc(tenderEvents.occurredAt))
+      .limit(1);
+    if (evRows[0]?.data) {
+      // Structure écrite par analyzeRcAction : { extra: { rc_analysis: RcAnalysis, ... } }
+      const extra = (evRows[0].data as Record<string, unknown>).extra as
+        | Record<string, unknown>
+        | undefined;
+      const rcAnalysisRaw = extra?.rc_analysis;
+      if (rcAnalysisRaw) {
+        const parsed = rcAnalysisSchema.safeParse(rcAnalysisRaw);
+        if (parsed.success) rcAnalysis = parsed.data;
+      }
+    }
+  } catch {
+    // optionnel — silently ignore
+  }
+
   const scoreNum = tender.score ? Math.round(Number(tender.score)) : null;
   const deadlineLabel = formatDeadline(tender.deadline);
   const daysToDeadline = daysUntil(tender.deadline);
@@ -251,6 +284,9 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
               </p>
             </section>
           )}
+
+          {/* Analyse RC — affichée uniquement si un événement rc_analyzed existe */}
+          {rcAnalysis && <RcAnalysisCard analysis={rcAnalysis} tenderId={tender.id} />}
         </div>
 
         {/* Colonne latérale — actions */}

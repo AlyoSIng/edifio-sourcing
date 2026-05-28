@@ -64,16 +64,33 @@ describe("AI_PROMPTS_V1_CATALOG — cardinalité + nommage", () => {
   });
 });
 
+/** Map des versions courantes par nom de prompt. Mettre à jour à chaque bump. */
+const EXPECTED_VERSIONS: Record<string, number> = {
+  rc_analysis_full: 2, // v2 — ajout competences_demandees (2026-05-28)
+  memo_technique_generation: 1,
+  cerfa_field_inference: 1,
+  tender_scoring_complementary: 1,
+  architect_matching_rationale: 1,
+  email_subject_solicitation: 1,
+  email_subject_followup: 1,
+  tender_summary_short: 1,
+  decline_motif_categorize: 1,
+  library_piece_match: 1,
+  attestation_expiry_alert_text: 1,
+  accroche_memo_intro: 1,
+  ao_brief: 1,
+};
+
 describe("AI_PROMPTS_V1_CATALOG — versions et activation", () => {
-  it("toutes les versions = 1 (livraison initiale)", () => {
+  it("versions conformes à la map EXPECTED_VERSIONS", () => {
     for (const p of AI_PROMPTS_V1_CATALOG) {
-      expect(p.version).toBe(1);
+      expect(p.version, `version de ${p.name}`).toBe(EXPECTED_VERSIONS[p.name] ?? 1);
     }
   });
 
-  it("tous active=true (livraison initiale, anciennes versions inexistantes)", () => {
+  it("tous active=true (la v2 de rc_analysis_full remplace la v1 dans le catalogue courant)", () => {
     for (const p of AI_PROMPTS_V1_CATALOG) {
-      expect(p.active).toBe(true);
+      expect(p.active, `active de ${p.name}`).toBe(true);
     }
   });
 });
