@@ -135,8 +135,11 @@ SELECT is(
 SET LOCAL ROLE test_authenticated;
 SET LOCAL row_security = on;
 
--- Pas de set_config('request.jwt.claims') ici — contexte vide intentionnel.
-SELECT set_config('request.jwt.claims', '', true);
+-- JWT vide (objet JSON valide mais sans app_metadata.organization_id).
+-- current_setting(...)::jsonb #>> '{app_metadata,organization_id}' retourne NULL
+-- → current_organization_id() = NULL → policy USING = false → 0 lignes.
+-- NB : '' (chaine vide) n'est pas du JSON valide → erreur de cast jsonb.
+SELECT set_config('request.jwt.claims', '{}', true);
 
 SELECT is(
   (SELECT count(*)::int FROM shortlist_criteria),
@@ -218,7 +221,8 @@ SELECT is(
 SET LOCAL ROLE test_authenticated;
 SET LOCAL row_security = on;
 
-SELECT set_config('request.jwt.claims', '', true);
+-- Même pattern : JWT vide {} → auth.uid() = NULL → 0 lignes.
+SELECT set_config('request.jwt.claims', '{}', true);
 
 SELECT is(
   (SELECT count(*)::int FROM tender_briefs),
