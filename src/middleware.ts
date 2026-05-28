@@ -98,12 +98,19 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
           return req.cookies.getAll();
         },
         setAll(cookiesToSet) {
+          // COOKIE_DOMAIN (optionnel, serveur uniquement) — même règle que
+          // src/lib/supabase/server.ts : domaine parent `.alyosingenierie.fr`
+          // en prod pour SSO Phase 2. Si absent ou vide : comportement inchangé.
+          const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
           cookiesToSet.forEach(({ name, value }) => {
             req.cookies.set(name, value);
           });
           supabaseResponse = NextResponse.next({ request: req });
           cookiesToSet.forEach(({ name, value, options }) => {
-            supabaseResponse.cookies.set(name, value, options);
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              ...(cookieDomain ? { domain: cookieDomain } : {}),
+            });
           });
         },
       },

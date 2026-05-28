@@ -31,8 +31,16 @@ export function createSupabaseServerClient() {
         },
         setAll(cookiesToSet) {
           try {
+            // COOKIE_DOMAIN (optionnel, serveur uniquement) — permet de poser
+            // le cookie sur le domaine parent `.alyosingenierie.fr` en prod pour
+            // le SSO Phase 2 (sourcing. / suivi. / admin.alyosingenierie.fr).
+            // Si absent ou vide : comportement inchangé (cookie sur domaine courant).
+            const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
+              cookieStore.set(name, value, {
+                ...options,
+                ...(cookieDomain ? { domain: cookieDomain } : {}),
+              });
             });
           } catch {
             // Appel depuis un Server Component — Next 14 ne permet pas
