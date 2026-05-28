@@ -1781,3 +1781,17 @@ appliquée sur prod après Phase β. Pas de bug de code.
 - **PRs mergées** : #69 (bibliothèque cotraitants), #70 (shortlist top 10 + scoring géo), #71 (BE documents), #72 (effectif cabinets), #73 (CA éligibilité + import CSV), #74 (moulinette Pappers)
 - **Migrations prod** : 0015 (cotraitants), 0016 (be_documents), 0017 (annual_revenue) — toutes appliquées
 - **Données** : 2 127 architectes avec headcount, 682 avec annual_revenue (depuis export Odoo 3 805 lignes)
+
+---
+
+### 2026-05-28 — Diagnostic erreurs transitoires prod + défense FORCE RLS admin functions
+
+**Agent** : Alex (dev)  
+**Action** :  
+1. Analysé les logs Vercel (1h) : pages retournent HTTP 200, aucun `console.error` dans les logs serverless → erreurs transitoires confirmées (cold start / blip Supabase), PAS causées par PRs #85-89.  
+2. Confirmé via Supabase MCP : rôle `postgres` a `rolbypassrls=true` → FORCE RLS bypass → `withTenantContext` est défensif Phase 2 uniquement.  
+3. Confirmé migration 0028 absente en prod (indexée idx=28 dans journal, absente de `drizzle.__drizzle_migrations`). Non bloquante.  
+4. Ajouté `set_config` défensif dans `importArchitectsFromCsv`, `enrichArchitectsFromPappers`, `enrichSingleArchitectFromPappers` (PRs #86 n'avait couvert que 4/7 fonctions).  
+5. Créé `tests/rls/12_tender_briefs_constraints.sql` (7 assertions DDL).  
+6. Ajouté support PG* env vars dans `scripts/backfill-departments.ts`.  
+**Motif** : Complétion des tâches autorisées du sprint 2026-05-28. Défense-en-profondeur Phase 2.
