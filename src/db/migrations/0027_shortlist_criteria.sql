@@ -58,12 +58,12 @@ ALTER TABLE "shortlist_criteria" FORCE ROW LEVEL SECURITY;
 -- Lecture : membres de l'organisation
 CREATE POLICY "shortlist_criteria_select_org" ON "shortlist_criteria"
   FOR SELECT USING (
-    organization_id = current_setting('app.current_organization_id', true)::uuid
+    organization_id = current_organization_id()
   );
 
 -- Écriture (insert/update/delete) : admins uniquement
 -- Contrôle applicatif : la Server Action vérifie isAdmin() avant toute écriture.
 CREATE POLICY "shortlist_criteria_write_org" ON "shortlist_criteria"
   FOR ALL USING (
-    organization_id = current_setting('app.current_organization_id', true)::uuid
+    organization_id = current_organization_id()
   );

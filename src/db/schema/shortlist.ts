@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { organizations } from "./organizations";
 
@@ -60,7 +60,7 @@ export const shortlistCriteria = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    orgTargetUniq: index("idx_shortlist_criteria_org_target").on(
+    orgTargetUniq: uniqueIndex("idx_shortlist_criteria_org_target").on(
       table.organizationId,
       table.target,
     ),

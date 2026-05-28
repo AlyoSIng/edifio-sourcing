@@ -324,7 +324,7 @@ function TargetPanel({ target, label, initial }: TargetPanelProps) {
           }`}
         >
           {saveResult.ok ? (
-            "Critères enregistrés avec succes."
+            "Critères enregistrés avec succès."
           ) : (
             <>
               <strong className="mr-1 font-semibold">Erreur :</strong>

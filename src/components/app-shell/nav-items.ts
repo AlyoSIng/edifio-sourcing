@@ -196,7 +196,7 @@ export const NAV_ITEMS: NavSection[] = [
       },
       {
         href: "/sourcing/admin/shortlist",
-        label: "Short-list criteria",
+        label: "Critères short-list",
         icon: "sliders",
         matchPrefix: "/sourcing/admin/shortlist",
         adminOnly: true,
