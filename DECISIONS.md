@@ -2,6 +2,19 @@
 
 ---
 
+## 2026-05-28 — feat(shortlist): criteres de short-list paramétrables (Nadia)
+
+- **2026-05-28 · G6 · Nadia (dev) · feat — module Tandem, table `shortlist_criteria` + page admin.**
+  *Zone verte spec Tandem : critères de short-list paramétrables par organisation et par cible (architects / cotraitants / companies).*
+  *Fichiers créés : `src/db/schema/shortlist.ts`, `src/db/migrations/0027_shortlist_criteria.sql`, `src/app/sourcing/admin/shortlist/actions.ts`, `src/app/sourcing/admin/shortlist/ShortlistCriteriaForm.tsx`, `src/app/sourcing/admin/shortlist/page.tsx`.*
+  *Fichiers modifiés : `src/db/schema/index.ts` (export), `src/components/app-shell/nav-items.ts` (lien nav), `src/app/sourcing/architectes/page.tsx` (badge indicateur short-list active).*
+  *Contrainte unique `(organization_id, target)` dans la migration pour l'upsert ON CONFLICT DO UPDATE.*
+  *Migration écrite manuellement (drizzle-kit generate non disponible sur ARM64 Windows — esbuild x64/arm64 mismatch, connu).*
+  *Typecheck propre (tsc --noEmit 0 erreur). Filtrage automatique Phase 2.*
+  *Branche : `feat/shortlist-criteria`.*
+
+---
+
 ## 2026-05-28 — fix(ci): migrator custom per-TX pour ALTER TYPE ADD VALUE (Alex)
 
 - **2026-05-28 · G6 · Alex (dev) · fix — migrator custom `runMigrationsPerTransaction` dans `src/db/migrate.ts`.**

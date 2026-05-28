@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
+import { and, eq } from "drizzle-orm";
 
+import { db } from "@/db/client";
+import { shortlistCriteria } from "@/db/schema/shortlist";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Architect } from "@/db/schema/architects";
 
@@ -113,6 +117,25 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
     }
   }
 
+  // Critères de short-list actifs — indicateur visuel (Tandem Phase 1).
+  // Erreur absorbée : badge non bloquant si BDD indisponible.
+  let hasShortlistCriteria = false;
+  try {
+    const criteriaRows = await db
+      .select({ id: shortlistCriteria.id })
+      .from(shortlistCriteria)
+      .where(
+        and(
+          eq(shortlistCriteria.organizationId, ALYOS_ORG_ID),
+          eq(shortlistCriteria.target, "architects"),
+        ),
+      )
+      .limit(1);
+    hasShortlistCriteria = criteriaRows.length > 0;
+  } catch {
+    // Erreur absorbée — le badge n'est pas critique
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       {/* En-tête de page */}
@@ -133,6 +156,17 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
         </div>
         {adminUser ? (
           <div className="flex shrink-0 flex-wrap items-start gap-2">
+            {/* Badge critères short-list actifs — Tandem Phase 1 */}
+            {hasShortlistCriteria ? (
+              <a
+                href="/sourcing/admin/shortlist"
+                title="Critères de short-list configurés — cliquer pour modifier"
+                className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+              >
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                Short-list active
+              </a>
+            ) : null}
             <PappersEnrichButton />
             <CsvImportButton />
             <span className="inline-flex items-center rounded-md border border-line bg-white px-3 py-1.5 text-xs text-muted opacity-50">
