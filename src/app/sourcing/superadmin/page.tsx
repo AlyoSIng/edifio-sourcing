@@ -79,6 +79,12 @@ const CARDS: DashboardCard[] = [
     description: "Mettre à jour le PDF roadmap produit.",
     icon: "🗺️",
   },
+  {
+    href: "/sourcing/superadmin/organizations",
+    label: "Organisations",
+    description: "Gérer les organisations clientes et leurs membres.",
+    icon: "🏢",
+  },
 ];
 
 export default function SuperadminDashboardPage() {
