@@ -32,13 +32,21 @@ ALTER TABLE organizations
   ADD COLUMN IF NOT EXISTS font_family VARCHAR(50);
 
 -- Bucket Supabase Storage pour les logos d'organisation.
+-- Conditionnel : le schéma `storage` n'existe que sur Supabase (pas en CI Postgres vanilla).
 -- ON CONFLICT DO NOTHING : idempotent si déjà créé par le seed ou une migration précédente.
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'org-assets',
-  'org-assets',
-  true,
-  524288,
-  ARRAY['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
-)
-ON CONFLICT (id) DO NOTHING;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT FROM information_schema.schemata WHERE schema_name = 'storage'
+  ) THEN
+    INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    VALUES (
+      'org-assets',
+      'org-assets',
+      true,
+      524288,
+      ARRAY['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+    )
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $$;
