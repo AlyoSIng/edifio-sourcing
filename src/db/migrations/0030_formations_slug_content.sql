@@ -11,7 +11,13 @@
 -- La colonne url reste (nullable) pour un éventuel futur type='external'.
 -- Le champ type='doc' est la valeur pivot pour les guides intégrés.
 
-ALTER TABLE "formations" ADD COLUMN "slug" text;
-ALTER TABLE "formations" ADD COLUMN "content_md" text;
+ALTER TABLE "formations" ADD COLUMN IF NOT EXISTS "slug" text;
+ALTER TABLE "formations" ADD COLUMN IF NOT EXISTS "content_md" text;
 
-ALTER TABLE "formations" ADD CONSTRAINT "formations_slug_unique" UNIQUE("slug");
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'formations_slug_unique'
+  ) THEN
+    ALTER TABLE "formations" ADD CONSTRAINT "formations_slug_unique" UNIQUE("slug");
+  END IF;
+END $$;

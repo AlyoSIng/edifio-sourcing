@@ -10,4 +10,4 @@
 -- notice_type NULL = type non renseigné (PLACE scraper, prive, ancien BOAMP).
 -- Les lignes existantes resteront NULL jusqu'au prochain run cron (backfill passif).
 
-ALTER TABLE "tenders" ADD COLUMN "notice_type" text;
+ALTER TABLE "tenders" ADD COLUMN IF NOT EXISTS "notice_type" text;
