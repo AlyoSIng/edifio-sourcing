@@ -44,7 +44,7 @@ interface GuidedTestSeedRow {
 
 const GUIDED_TESTS: GuidedTestSeedRow[] = [
   {
-    id: "tb000001-0000-0000-0000-000000000001",
+    id: "ab000001-0000-0000-0000-000000000001",
     title: "Prise en main & navigation",
     formationId: "fb000001-0000-0000-0000-000000000001",
     displayOrder: 1,
@@ -152,7 +152,7 @@ const GUIDED_TESTS: GuidedTestSeedRow[] = [
     ],
   },
   {
-    id: "tb000001-0000-0000-0000-000000000002",
+    id: "ab000001-0000-0000-0000-000000000002",
     title: "Traitement des annonces quotidiennes",
     formationId: "fb000001-0000-0000-0000-000000000002",
     displayOrder: 2,
@@ -241,7 +241,7 @@ const GUIDED_TESTS: GuidedTestSeedRow[] = [
     ],
   },
   {
-    id: "tb000001-0000-0000-0000-000000000003",
+    id: "ab000001-0000-0000-0000-000000000003",
     title: "Cotraitance Tandem avec un architecte",
     formationId: "fb000001-0000-0000-0000-000000000003",
     displayOrder: 3,
@@ -331,7 +331,7 @@ const GUIDED_TESTS: GuidedTestSeedRow[] = [
     ],
   },
   {
-    id: "tb000001-0000-0000-0000-000000000004",
+    id: "ab000001-0000-0000-0000-000000000004",
     title: "Bibliothèque documentaire & coffre BET",
     formationId: "fb000001-0000-0000-0000-000000000004",
     displayOrder: 4,
