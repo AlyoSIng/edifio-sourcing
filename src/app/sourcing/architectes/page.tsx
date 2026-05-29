@@ -44,6 +44,7 @@ interface SearchParams {
   page?: string;
   search?: string;
   departement?: string;
+  implantation?: string;
   tutoiement?: string;
   solicitable?: string;
   rgpdOpposition?: string;
@@ -62,6 +63,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
   const search = searchParams.search?.trim() || undefined;
   const departement = searchParams.departement?.trim() || undefined;
+  const implantation = searchParams.implantation?.trim() || undefined;
   const tutoiement =
     searchParams.tutoiement === "true"
       ? true
@@ -92,6 +94,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
       page,
       search,
       departement,
+      implantation,
       tutoiement,
       solicitable,
       rgpdOpposition,
@@ -183,6 +186,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
       <FilterBar
         search={search}
         departement={departement}
+        implantation={implantation}
         tutoiement={tutoiement}
         solicitable={solicitable}
         rgpdOpposition={rgpdOpposition}
@@ -197,6 +201,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
             !!(
               search ||
               departement ||
+              implantation ||
               tutoiement !== undefined ||
               solicitable !== undefined ||
               rgpdOpposition !== undefined
@@ -212,6 +217,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
               totalPages={totalPages}
               search={search}
               departement={departement}
+              implantation={implantation}
               tutoiement={tutoiement}
               solicitable={solicitable}
               rgpdOpposition={rgpdOpposition}
@@ -221,6 +227,19 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
       )}
     </div>
   );
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Dérive le code département depuis un code postal FR (2 chars, ou 3 pour DOM). */
+function deptFromZip(zip: string | null | undefined): string | null {
+  if (!zip) return null;
+  const digits = zip.trim();
+  if (digits.startsWith("97") && digits.length >= 3) return digits.slice(0, 3);
+  if (digits.length >= 2) return digits.slice(0, 2);
+  return null;
 }
 
 // ============================================================================
@@ -234,12 +253,14 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
 function FilterBar({
   search,
   departement,
+  implantation,
   tutoiement,
   solicitable,
   rgpdOpposition,
 }: {
   search?: string;
   departement?: string;
+  implantation?: string;
   tutoiement?: boolean;
   solicitable?: boolean;
   rgpdOpposition?: boolean;
@@ -261,11 +282,19 @@ function FilterBar({
       />
       <input
         type="text"
+        name="implantation"
+        defaultValue={implantation ?? ""}
+        placeholder="Siège (ex. 75)"
+        className="focus:ring-brand-red/40 h-8 w-28 rounded-md border border-line bg-white px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2"
+        aria-label="Filtrer par département de siège"
+      />
+      <input
+        type="text"
         name="departement"
         defaultValue={departement ?? ""}
-        placeholder="Département (ex. 75)"
-        className="focus:ring-brand-red/40 h-8 w-28 rounded-md border border-line bg-white px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2"
-        aria-label="Filtrer par département"
+        placeholder="Dép. projets (ex. 75)"
+        className="focus:ring-brand-red/40 h-8 w-36 rounded-md border border-line bg-white px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2"
+        aria-label="Filtrer par département de projets"
       />
       {/* Filtres booléens */}
       <label className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1 text-xs text-ink">
@@ -336,7 +365,8 @@ function ArchitectsTable({
             <th className="px-4 py-2.5 text-left font-medium text-ink">Cabinet</th>
             <th className="px-4 py-2.5 text-left font-medium text-ink">Contact</th>
             <th className="px-4 py-2.5 text-left font-medium text-ink">Email</th>
-            <th className="px-4 py-2.5 text-left font-medium text-ink">Département</th>
+            <th className="px-4 py-2.5 text-left font-medium text-ink">Siège</th>
+            <th className="px-4 py-2.5 text-left font-medium text-ink">Dép. projets</th>
             <th className="px-4 py-2.5 text-left font-medium text-ink">Badges</th>
             {adminUser ? (
               <th className="px-4 py-2.5 text-left font-medium text-ink">
@@ -370,9 +400,6 @@ function ArchitectRow({
   architect: Architect;
   isAdmin: boolean;
 }) {
-  // Premier département de la liste geo_zones — indicatif, peut être vide
-  const mainDept = archi.geoZones[0] ?? "—";
-
   return (
     <tr className="hover:bg-surface/60 border-b border-line last:border-0">
       <td className="px-4 py-2.5 font-medium text-ink">
@@ -396,7 +423,27 @@ function ArchitectRow({
           <span className="text-muted">—</span>
         )}
       </td>
-      <td className="px-4 py-2.5 text-ink-2">{mainDept}</td>
+      {/* Siège — département dérivé du code postal */}
+      <td className="px-4 py-2.5 font-mono text-xs text-ink-2">
+        {deptFromZip(archi.zip) ?? <span className="text-muted">—</span>}
+      </td>
+      {/* Dép. projets — tous les geo_zones sous forme de badges */}
+      <td className="px-4 py-2.5">
+        {archi.geoZones.length === 0 ? (
+          <span className="text-muted">—</span>
+        ) : (
+          <div className="flex flex-wrap gap-0.5">
+            {archi.geoZones.map((dept) => (
+              <span
+                key={dept}
+                className="inline-flex items-center rounded-sm bg-paper-2 px-1 py-0.5 font-mono text-[10px] text-ink-2"
+              >
+                {dept}
+              </span>
+            ))}
+          </div>
+        )}
+      </td>
       <td className="px-4 py-2.5">
         <div className="flex flex-wrap gap-1">
           {archi.tutoiement ? (
@@ -456,6 +503,7 @@ function PaginationBar({
   totalPages,
   search,
   departement,
+  implantation,
   tutoiement,
   solicitable,
   rgpdOpposition,
@@ -464,6 +512,7 @@ function PaginationBar({
   totalPages: number;
   search?: string;
   departement?: string;
+  implantation?: string;
   tutoiement?: boolean;
   solicitable?: boolean;
   rgpdOpposition?: boolean;
@@ -474,6 +523,7 @@ function PaginationBar({
     params.set("page", String(p));
     if (search) params.set("search", search);
     if (departement) params.set("departement", departement);
+    if (implantation) params.set("implantation", implantation);
     if (tutoiement !== undefined) params.set("tutoiement", String(tutoiement));
     if (solicitable !== undefined) params.set("solicitable", String(solicitable));
     if (rgpdOpposition !== undefined) params.set("rgpdOpposition", String(rgpdOpposition));
