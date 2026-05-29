@@ -547,8 +547,10 @@ export async function duplicateSearchProfileAction(
       data: {
         profile_id: copy.id,
         profile_name: copy.name,
-        operation: "duplicate",
-        diff: { source_id: profileId },
+        // "create" : valeur la plus proche dans l'union audit (pas de "duplicate")
+        operation: "create",
+        // diff vide — la traçabilité source est dans profile_name "(copie)"
+        diff: {},
       },
     }).catch((e) => console.error("[search-profiles:duplicate:fail]", e));
 
