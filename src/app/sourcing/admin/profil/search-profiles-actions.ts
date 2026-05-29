@@ -37,6 +37,7 @@ import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import {
   createSearchProfile,
   deleteSearchProfile,
+  getSearchProfileById,
   listSearchProfiles,
   setDefaultSearchProfile,
   updateSearchProfileMulti,
@@ -71,7 +72,7 @@ export type ProfileActionResult =
       error: "profile_not_found" | "last_active_profile" | "internal_error";
     };
 
-/** Profil pour l'affichage liste — projection narrow. */
+/** Profil pour l'affichage liste — projection narrow + tableaux complets pour édition inline. */
 export interface SearchProfileListItem {
   id: string;
   name: string;
@@ -82,6 +83,10 @@ export interface SearchProfileListItem {
   keywordsNegativeCount: number;
   cpvCodesCount: number;
   geoZonesCount: number;
+  // Tableaux complets pour pré-remplissage du formulaire d'édition
+  keywords: { positive: string[]; negative: string[]; exact: string[] };
+  cpvCodes: string[];
+  geoZones: string[];
   marketTypes: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -220,6 +225,9 @@ export async function listSearchProfilesAction(
       keywordsNegativeCount: r.keywords.negative.length,
       cpvCodesCount: r.cpvCodes.length,
       geoZonesCount: r.geoZones.length,
+      keywords: r.keywords as { positive: string[]; negative: string[]; exact: string[] },
+      cpvCodes: r.cpvCodes,
+      geoZones: r.geoZones,
       marketTypes: r.marketTypes,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
@@ -487,6 +495,70 @@ export async function setDefaultProfileAction(
       return { ok: false, error: "profile_not_found" };
     }
     console.error("[search-profiles:set-default:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ============================================================================
+// duplicateSearchProfileAction
+// ============================================================================
+
+/**
+ * Duplique un profil de recherche (crée une copie avec le suffixe « (copie) »).
+ * Le nouveau profil n'est jamais le défaut.
+ *
+ * @param profileId UUID du profil source
+ * @param deps      Dépendances injectables pour les tests
+ */
+export async function duplicateSearchProfileAction(
+  profileId: string,
+  deps: ActionDeps = {},
+): Promise<ProfileActionResult> {
+  const dbInstance = deps.db ?? defaultDb;
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+
+  const authResult = await requireAlyosAdmin(authClient);
+  if (!authResult.ok) return authResult;
+
+  try {
+    const source = await getSearchProfileById(ALYOS_ORG_ID, profileId, dbInstance);
+    if (!source) return { ok: false, error: "profile_not_found" };
+
+    const copy = await createSearchProfile(
+      ALYOS_ORG_ID,
+      {
+        name: `${source.name} (copie)`,
+        isDefault: false,
+        displayOrder: source.displayOrder,
+        keywords: source.keywords as { positive: string[]; negative: string[]; exact: string[] },
+        cpvCodes: source.cpvCodes,
+        geoZones: source.geoZones,
+        marketTypes: source.marketTypes,
+        amountMin: source.amountMin,
+        amountMax: source.amountMax,
+      },
+      dbInstance,
+    );
+
+    await audit({
+      action: "search_profile_change",
+      subjectType: "search_profile",
+      subjectId: copy.id,
+      data: {
+        profile_id: copy.id,
+        profile_name: copy.name,
+        operation: "duplicate",
+        diff: { source_id: profileId },
+      },
+    }).catch((e) => console.error("[search-profiles:duplicate:fail]", e));
+
+    revalidatePath("/sourcing/admin/profil");
+    revalidatePath("/sourcing/admin/search-profiles");
+    revalidatePath("/sourcing/ao-du-jour");
+
+    return { ok: true, profileId: copy.id };
+  } catch (err) {
+    console.error("[search-profiles:duplicate:fail]", err);
     return { ok: false, error: "internal_error" };
   }
 }

@@ -23,6 +23,7 @@ import type { SearchProfileListItem } from "../profil/search-profiles-actions";
 import {
   createSearchProfileAction,
   deleteSearchProfileAction,
+  duplicateSearchProfileAction,
   setDefaultProfileAction,
   updateSearchProfileAction,
   type ProfileActionResult,
@@ -72,17 +73,13 @@ function emptyForm(): FormState {
 }
 
 function profileToForm(p: SearchProfileListItem): FormState {
-  // Les compteurs dans SearchProfileListItem ne suffisent pas pour pré-remplir
-  // le form d'édition. On revient aux valeurs via fullProfile passé en prop.
-  // Ici on expose uniquement name + marketTypes (les arrays chips nécessitent
-  // les valeurs complètes que la page Server Component doit passer).
   return {
     name: p.name,
-    positive: [],
-    negative: [],
-    exact: [],
-    cpvCodes: [],
-    geoZones: [],
+    positive: p.keywords.positive,
+    negative: p.keywords.negative,
+    exact: p.keywords.exact,
+    cpvCodes: p.cpvCodes,
+    geoZones: p.geoZones,
     marketTypes: (p.marketTypes as MarketType[]).filter((mt): mt is MarketType =>
       (MARKET_TYPES as readonly string[]).includes(mt),
     ),
@@ -183,6 +180,38 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
     });
   }
 
+  function handleDuplicate(profileId: string, name: string) {
+    setActionError(null);
+    startTransition(async () => {
+      const res = await duplicateSearchProfileAction(profileId);
+      if (!res.ok) {
+        setActionError(mapError(res));
+      } else {
+        // La revalidatePath côté serveur mettra à jour la liste ; on ajoute
+        // un item optimiste minimal pour feedback immédiat.
+        const newItem: SearchProfileListItem = {
+          id: res.profileId ?? "",
+          name: `${name} (copie)`,
+          isDefault: false,
+          displayOrder: 0,
+          active: true,
+          keywordsPositiveCount: 0,
+          keywordsNegativeCount: 0,
+          cpvCodesCount: 0,
+          geoZonesCount: 0,
+          keywords: { positive: [], negative: [], exact: [] },
+          cpvCodes: [],
+          geoZones: [],
+          marketTypes: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        setProfiles((prev) => [...prev, newItem]);
+        showSuccess(`Profil « ${name} » dupliqué en « ${name} (copie) ».`);
+      }
+    });
+  }
+
   function handleSubmitCreate(e: React.FormEvent) {
     e.preventDefault();
     setActionError(null);
@@ -208,6 +237,9 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
           keywordsNegativeCount: form.negative.length,
           cpvCodesCount: form.cpvCodes.length,
           geoZonesCount: form.geoZones.length,
+          keywords: { positive: form.positive, negative: form.negative, exact: form.exact },
+          cpvCodes: form.cpvCodes,
+          geoZones: form.geoZones,
           marketTypes: form.marketTypes,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -240,6 +272,13 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
                 ? {
                     ...p,
                     name: form.name,
+                    keywords: {
+                      positive: form.positive,
+                      negative: form.negative,
+                      exact: form.exact,
+                    },
+                    cpvCodes: form.cpvCodes,
+                    geoZones: form.geoZones,
                     marketTypes: form.marketTypes,
                     keywordsPositiveCount: form.positive.length,
                     keywordsNegativeCount: form.negative.length,
@@ -327,6 +366,14 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
                       className="rounded-sm border border-line px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
                     >
                       {mode === p.id ? "Annuler" : "Modifier"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleDuplicate(p.id, p.name)}
+                      className="rounded-sm border border-line px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
+                    >
+                      Dupliquer
                     </button>
                     <button
                       type="button"
