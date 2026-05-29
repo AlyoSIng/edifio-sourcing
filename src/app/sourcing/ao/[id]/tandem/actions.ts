@@ -99,6 +99,26 @@ interface ActionDeps {
   brevoClient?: BrevoClient;
 }
 
+/**
+ * Filtres optionnels de shortlist — appliqués avant `rankArchitects`.
+ * Permettent à l'utilisateur d'affiner la liste directement dans l'UI
+ * sans persister en BDD (session-only).
+ */
+export interface ShortlistMatchOptions {
+  /** Nombre max d'architectes à retourner (défaut 10, max 50). */
+  topN?: number;
+  /**
+   * Si non vide, restreint le pool d'architectes à ceux dont au moins
+   * une des `geoZones` figure dans cette liste (codes dép. ex. "83", "06").
+   */
+  overrideDepts?: string[];
+  /**
+   * Si non vide, restreint le pool aux architectes dont au moins un
+   * `specialtyCode` figure dans cette liste (codes ex. "sante", "logements_collectifs").
+   */
+  overrideSpecialties?: string[];
+}
+
 export type MatchActionResult =
   | { ok: true; matches: MatchScoreWithArchitect[] }
   | {
@@ -174,11 +194,11 @@ async function requireAlyosUser(
  * `persistMatchProposals` après réception des résultats).
  *
  * @param tenderId — UUID du tender (mode Tandem)
- * @param topN — nombre d'architectes à retourner (défaut 10)
+ * @param options — filtres optionnels (topN, overrideDepts, overrideSpecialties)
  */
 export async function matchArchitectsForTender(
   tenderId: string,
-  topN: number = 10,
+  options: ShortlistMatchOptions = {},
   deps: ActionDeps = {},
 ): Promise<MatchActionResult> {
   const db = deps.db ?? defaultDb;
@@ -190,6 +210,7 @@ export async function matchArchitectsForTender(
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
+  const topN = options.topN ?? 10;
   if (!Number.isInteger(topN) || topN < 1 || topN > 100) {
     return { ok: false, error: "invalid_input" };
   }
@@ -220,9 +241,32 @@ export async function matchArchitectsForTender(
       return { ok: true, matches: [] };
     }
 
+    // 4b. Pré-filtrage optionnel par département (overrideDepts)
+    let candidateArchitects = activeArchitects;
+    if (options.overrideDepts && options.overrideDepts.length > 0) {
+      const deptSet = new Set(options.overrideDepts.map((d) => d.trim()).filter(Boolean));
+      candidateArchitects = candidateArchitects.filter((a) =>
+        (a.geoZones ?? []).some((z) => deptSet.has(z)),
+      );
+    }
+
+    // 4c. Pré-filtrage optionnel par spécialité (overrideSpecialties)
+    if (options.overrideSpecialties && options.overrideSpecialties.length > 0) {
+      const specSet = new Set(options.overrideSpecialties);
+      candidateArchitects = candidateArchitects.filter((a) =>
+        (a.specialtyCodes ?? []).some((s) => specSet.has(s)),
+      );
+    }
+
+    if (candidateArchitects.length === 0) {
+      return { ok: true, matches: [] };
+    }
+
     // 5. Map sollicitations récentes (30 derniers jours) — pour scoring
     //    `availability`. On groupe par architectId depuis `architect_responses`
     //    créés ces 30 derniers jours.
+    //    Note : on tourne sur `activeArchitects` (tous) pour ne pas biaiser
+    //    les scores de disponibilité par le filtre overrideDepts/overrideSpecialties.
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const recentRows = await db
       .select({
@@ -241,6 +285,7 @@ export async function matchArchitectsForTender(
 
     // 6. Relevance learning : compte les acceptations passées par architecte.
     //    Bonus +3 par acceptation, capé à +15 (ne doit pas écraser les autres critères).
+    //    Note : même logique — on tourne sur `activeArchitects` (tous).
     const acceptedRows = await db
       .select({
         architectId: architectResponses.architectId,
@@ -256,15 +301,16 @@ export async function matchArchitectsForTender(
       .groupBy(architectResponses.architectId);
     const acceptedMap = new Map<string, number>(acceptedRows.map((r) => [r.architectId, r.count]));
 
-    // 7. Run matcher V1
+    // 7. Run matcher V1 — sur `candidateArchitects` (post-filtrage)
     const scores = rankArchitects(
       { title: tender.title, buyer: tender.buyer, rawData: tender.rawData, amount: tender.amount },
-      { architects: activeArchitects, recentSolicitationsByArchitect: recentMap },
+      { architects: candidateArchitects, recentSolicitationsByArchitect: recentMap },
       { topN },
     );
 
     // 8. Enrichit avec architect snapshot + fallback rationale + bonus acceptances
-    const archMap = new Map<string, Architect>(activeArchitects.map((a) => [a.id, a]));
+    //    `archMap` construit sur `candidateArchitects` (post-filtrage).
+    const archMap = new Map<string, Architect>(candidateArchitects.map((a) => [a.id, a]));
     const matches: MatchScoreWithArchitect[] = await Promise.all(
       scores.map(async (s) => {
         const a = archMap.get(s.architectId)!;

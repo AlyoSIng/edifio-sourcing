@@ -31,6 +31,7 @@ import {
   sendBulkArchitectSolicitation,
   type MatchScoreWithArchitect,
   type SearchArchitectsResult,
+  type ShortlistMatchOptions,
 } from "./actions";
 import { BrevoPreviewModal } from "./BrevoPreviewModal";
 import type { TandemShortlistData } from "./page-data";
@@ -38,6 +39,32 @@ import type { BrevoRegister } from "@/lib/brevo/template-picker";
 import type { ArchitectResponse } from "@/db/schema/selections";
 
 const PAGE_SIZE = 10;
+
+/** 16 codes spécialités du vocabulaire edifio (src/lib/tandem/matching.ts). */
+const SPECIALTY_CODES: Array<{ code: string; label: string }> = [
+  { code: "habitat_individuel", label: "Habitat individuel" },
+  { code: "logements_collectifs", label: "Logements collectifs" },
+  { code: "tertiaire", label: "Tertiaire / bureaux" },
+  { code: "commerces", label: "Commerces / hôtellerie" },
+  { code: "equipement_public", label: "Équipement public" },
+  { code: "sante", label: "Santé / EHPAD" },
+  { code: "petite_enfance", label: "Petite enfance" },
+  { code: "enseignement", label: "Enseignement" },
+  { code: "culture", label: "Culture" },
+  { code: "sport", label: "Sport" },
+  { code: "patrimoine", label: "Patrimoine" },
+  { code: "rehabilitation", label: "Réhabilitation / rénovation" },
+  { code: "industriel", label: "Industriel / logistique" },
+  { code: "amenagement_paysage", label: "Aménagement paysager" },
+  { code: "urbanisme", label: "Urbanisme" },
+  { code: "interieur", label: "Aménagement intérieur" },
+];
+
+interface ShortlistCriteria {
+  topN: number;
+  depts: string[]; // codes département ex. ["83", "06"]
+  specialties: string[]; // codes spécialité ex. ["sante", "logements_collectifs"]
+}
 
 interface Props {
   tenderId: string;
@@ -66,6 +93,20 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
+  // --- Critères de shortlist (affinement inline) ---
+  const [criteria, setCriteria] = useState<ShortlistCriteria>({
+    topN: 10,
+    depts: initialData.tender.department ? [initialData.tender.department] : [],
+    specialties: [],
+  });
+  const [criteriaOpen, setCriteriaOpen] = useState(false);
+  // État intermédiaire avant "Recalculer" (édition en cours)
+  const [draftCriteria, setDraftCriteria] = useState<ShortlistCriteria>({
+    topN: 10,
+    depts: initialData.tender.department ? [initialData.tender.department] : [],
+    specialties: [],
+  });
+
   // --- Sélection pour envoi groupé ---
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
@@ -90,7 +131,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     setLoading(true);
     setLoadError(null);
     void (async () => {
-      const result = await matchArchitectsForTender(tenderId, 10);
+      const result = await matchArchitectsForTender(tenderId, { topN: criteria.topN });
       if (cancelled) return;
       if (!result.ok) {
         setLoadError(mapErrorToFr(result.error));
@@ -123,6 +164,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- criteria.topN intentionnellement exclu : ce useEffect se déclenche uniquement au mount (pas de proposals) ; le bouton "Recalculer" gère les re-runs avec critères
   }, [initialData.proposals.length, tenderId]);
 
   // --- Handlers prévisualisation individuelle ---
@@ -274,6 +316,36 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     setShowSearch(false);
   }
 
+  // --- Handler "Recalculer la shortlist" ---
+  async function handleRecalculate() {
+    setCriteria(draftCriteria);
+    setLoading(true);
+    setLoadError(null);
+    const result = await matchArchitectsForTender(tenderId, {
+      topN: draftCriteria.topN,
+      overrideDepts: draftCriteria.depts.length > 0 ? draftCriteria.depts : undefined,
+      overrideSpecialties:
+        draftCriteria.specialties.length > 0 ? draftCriteria.specialties : undefined,
+    } satisfies ShortlistMatchOptions);
+    setLoading(false);
+    if (!result.ok) {
+      setLoadError(mapErrorToFr(result.error));
+      return;
+    }
+    const newRows: ArchitectRow[] = result.matches.map((m, idx) => ({
+      architectId: m.architectId,
+      rank: idx + 1,
+      score: m.score,
+      rationale: m.rationale,
+      architect: m.architect,
+      responseStatus: null,
+    }));
+    setRows(newRows);
+    setPage(0);
+    setChecked(new Set());
+    setCriteriaOpen(false);
+  }
+
   // --- Rendu ---
 
   if (loading) {
@@ -330,6 +402,132 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
 
   return (
     <>
+      {/* ── Panneau de critères ── */}
+      <div className="mb-4 rounded-md border border-line bg-white">
+        <button
+          type="button"
+          onClick={() => setCriteriaOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-ink hover:bg-paper-2"
+          aria-expanded={criteriaOpen}
+        >
+          <span className="flex items-center gap-2">
+            <span>Affiner la shortlist</span>
+            {/* résumé des critères actifs */}
+            {(criteria.depts.length > 0 ||
+              criteria.specialties.length > 0 ||
+              criteria.topN !== 10) && (
+              <span className="bg-brand-red/10 rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold text-brand-red">
+                {criteria.topN} archi
+                {criteria.depts.length > 0 ? ` · ${criteria.depts.join(", ")}` : ""}
+                {criteria.specialties.length > 0
+                  ? ` · ${criteria.specialties.length} spécialité(s)`
+                  : ""}
+              </span>
+            )}
+          </span>
+          <span className="text-xs text-muted" aria-hidden>
+            {criteriaOpen ? "▲" : "▼"}
+          </span>
+        </button>
+
+        {criteriaOpen && (
+          <div className="border-t border-line px-4 pb-4 pt-3">
+            <div className="grid gap-4 sm:grid-cols-3">
+              {/* Nb architectes */}
+              <div>
+                <label htmlFor="criteria-topn" className="mb-1 block text-xs font-medium text-ink">
+                  Nb d&apos;architectes
+                </label>
+                <input
+                  id="criteria-topn"
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={draftCriteria.topN}
+                  onChange={(e) => {
+                    const v = Math.max(1, Math.min(50, parseInt(e.target.value, 10) || 10));
+                    setDraftCriteria((prev) => ({ ...prev, topN: v }));
+                  }}
+                  className="w-full rounded border border-line bg-neutral-50 px-3 py-1.5 text-sm text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                />
+              </div>
+
+              {/* Départements */}
+              <div>
+                <label htmlFor="criteria-depts" className="mb-1 block text-xs font-medium text-ink">
+                  Départements <span className="font-normal text-muted">(séparés par virgule)</span>
+                </label>
+                <input
+                  id="criteria-depts"
+                  type="text"
+                  placeholder="ex. 83, 06, 13"
+                  value={draftCriteria.depts.join(", ")}
+                  onChange={(e) => {
+                    const depts = e.target.value
+                      .split(",")
+                      .map((d) => d.trim())
+                      .filter(Boolean);
+                    setDraftCriteria((prev) => ({ ...prev, depts }));
+                  }}
+                  className="w-full rounded border border-line bg-neutral-50 px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                />
+                <p className="mt-1 text-[10px] text-muted">Vide = tous les départements</p>
+              </div>
+
+              {/* Spécialités */}
+              <div>
+                <p className="mb-1 text-xs font-medium text-ink">
+                  Spécialités <span className="font-normal text-muted">(optionnel)</span>
+                </p>
+                <div className="flex max-h-32 flex-col gap-1 overflow-y-auto pr-1">
+                  {SPECIALTY_CODES.map(({ code, label }) => (
+                    <label key={code} className="flex cursor-pointer items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={draftCriteria.specialties.includes(code)}
+                        onChange={(e) => {
+                          setDraftCriteria((prev) => ({
+                            ...prev,
+                            specialties: e.target.checked
+                              ? [...prev.specialties, code]
+                              : prev.specialties.filter((s) => s !== code),
+                          }));
+                        }}
+                        className="h-3.5 w-3.5 rounded border-line accent-brand-red"
+                      />
+                      <span className="text-ink-2">{label}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="mt-1 text-[10px] text-muted">
+                  Aucune cochée = toutes les spécialités
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftCriteria(criteria);
+                  setCriteriaOpen(false);
+                }}
+                className="rounded-md border border-line px-3 py-1.5 text-sm text-ink-2 hover:bg-paper-2"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleRecalculate()}
+                className="rounded-md bg-brand-red px-4 py-1.5 text-sm font-semibold text-white hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red"
+              >
+                Recalculer la shortlist
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Barre d'action groupée */}
       <div className="mb-4 flex items-center justify-between gap-4 rounded-md border border-line bg-white px-4 py-3">
         <span className="text-sm text-ink-2">
