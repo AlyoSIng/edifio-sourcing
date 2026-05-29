@@ -6,6 +6,7 @@ import { shortlistCriteria } from "@/db/schema/shortlist";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import type { Architect } from "@/db/schema/architects";
 
 import { fetchArchitectsPage } from "./actions";
@@ -58,7 +59,16 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/architectes");
   const profile = toUserProfile(user);
-  const orgId = await getRequiredOrgId(user.id);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[architectes:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // Parsing des searchParams URL
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);

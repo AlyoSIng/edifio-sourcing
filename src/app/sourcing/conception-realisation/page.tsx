@@ -17,6 +17,7 @@ import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { CrKanbanBoard } from "./CrKanbanBoard";
 import { loadCrPipelineData } from "./page-data";
@@ -36,7 +37,16 @@ export default async function ConceptionRealisationPage() {
   if (!user) redirect("/login?next=/sourcing/conception-realisation");
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
-  const orgId = await getRequiredOrgId(user.id);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[conception-realisation:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // Chargement pipeline C/R — résilience runtime (memory `feedback_nextjs_runtime_page_resilience`)
   const result = await loadCrPipelineData(orgId);

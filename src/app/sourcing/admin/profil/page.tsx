@@ -7,6 +7,8 @@ import { getActiveSearchProfile } from "@/lib/profile/queries";
 import { MARKET_TYPES, type MarketType } from "@/lib/profile/schema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+
 import { ProfileForm, type ProfileFormInitialValues } from "./ProfileForm";
 
 export const metadata = {
@@ -47,7 +49,16 @@ export default async function AdminProfilPage() {
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
-  const orgId = await getRequiredOrgId(user.id);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[admin-profil:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // 2. Fetch profil actif — try/catch résilience (defense applicative)
   let activeProfile: Awaited<ReturnType<typeof getActiveSearchProfile>> = null;

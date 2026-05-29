@@ -36,6 +36,7 @@ import { platforms } from "@/db/schema/config";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { RcAnalysisCard } from "./RcAnalysisCard";
 
@@ -98,7 +99,16 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}`);
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
-  const orgId = await getRequiredOrgId(user.id);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[ao-detail:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // Validation UUID
   if (!UUID_SHAPE.test(params.id)) {

@@ -23,6 +23,7 @@ import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import {
   getTenderCotraitant,
@@ -52,7 +53,16 @@ export default async function TandemCotraitantPage({ params }: PageProps) {
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/tandem/cotraitant`);
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
-  const orgId = await getRequiredOrgId(user.id);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[ao-tandem-cotraitant:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   if (!UUID_SHAPE.test(params.id)) {
     return (

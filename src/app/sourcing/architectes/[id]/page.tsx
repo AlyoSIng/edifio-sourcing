@@ -8,6 +8,7 @@ import { tenders } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { ArchitectEditForm } from "./ArchitectEditForm";
 import { PappersEnrichSingleButton } from "./PappersEnrichSingleButton";
@@ -40,7 +41,17 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
   if (!user) redirect(`/login?next=/sourcing/architectes/${params.id}`);
   const profile = toUserProfile(user);
   const adminUser = isAdmin(profile);
-  const orgId = await getRequiredOrgId(user.id);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  // NB : ALYOS_ORG_ID déjà importé plus haut dans ce fichier.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[architecte-detail:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // Résilience runtime
   let architect: Awaited<ReturnType<typeof fetchArchitect>> | null = null;

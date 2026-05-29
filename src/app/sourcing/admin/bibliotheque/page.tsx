@@ -6,6 +6,7 @@ import { presentationLibrary } from "@/db/schema/library";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 
 import { LibraryClient } from "./LibraryClient";
@@ -42,7 +43,16 @@ export default async function BibliothequeAdminPage() {
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
-  const orgId = await getRequiredOrgId(user.id);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[admin-bibliotheque:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // 2. Chargement des documents (try/catch résilience — règle MEMORY)
   let items: PresentationLibraryItem[] = [];
