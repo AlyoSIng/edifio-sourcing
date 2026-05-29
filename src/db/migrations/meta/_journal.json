@@ -211,6 +211,13 @@
       "when": 1748996200000,
       "tag": "0029_tender_notice_type",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1748996300000,
+      "tag": "0030_formations_slug_content",
+      "breakpoints": true
     }
   ]
 }
