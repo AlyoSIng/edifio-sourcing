@@ -456,11 +456,21 @@ export async function getTendersSelected(
  *
  * @param organizationId — UUID du tenant courant
  * @param client         — instance Drizzle (mock-friendly)
+ * @param options        — filtres optionnels (keyword ilike sur titre + acheteur)
  */
 export async function getTendersSolo(
   organizationId: string,
   client: DrizzleClient,
+  options?: { keyword?: string | null },
 ): Promise<TenderSelected[]> {
+  const keyword = options?.keyword ?? null;
+
+  // Filtre keyword (ilike sur titre + acheteur — identique à getTendersOfTheDay)
+  const keywordCondition =
+    keyword && keyword.trim().length > 0
+      ? or(ilike(tenders.title, `%${keyword.trim()}%`), ilike(tenders.buyer, `%${keyword.trim()}%`))
+      : undefined;
+
   const rows = await client
     .select({
       id: tenders.id,
@@ -485,6 +495,7 @@ export async function getTendersSolo(
         eq(tenders.organizationId, organizationId),
         eq(tenders.status, "selected_solo"),
         or(isNull(tenders.deadline), gt(tenders.deadline, sql`now()`)),
+        keywordCondition,
       ),
     )
     .orderBy(sql`${tenders.deadline} ASC NULLS LAST`)
