@@ -9,6 +9,9 @@ import { isAdmin, toUserProfile, type Role, type UserMetadata } from "@/lib/auth
 import { sendWelcomeEmail } from "@/lib/email/send";
 import { getSiteUrl } from "@/lib/site-url";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
+import { db } from "@/db/client";
+import { users, memberships } from "@/db/schema/users";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 /**
  * POST /api/admin/users — création d'un nouveau collaborateur AlyoS par un admin.
@@ -108,6 +111,38 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
       console.error("[admin/users:createUser:fail]", { message: createErr?.message });
       return jsonError(500, "Impossible de créer le compte (Supabase).");
+    }
+
+    // ---------- 3b. Création public.users + membership ----------
+    // Indispensable pour que la FK audit_logs.actor_id → public.users.id
+    // ne rejette pas les futures insertions d'audit. Idempotent (onConflictDoNothing).
+    try {
+      await db
+        .insert(users)
+        .values({
+          id: created.user.id,
+          email,
+          firstname: firstName,
+          lastname: lastName,
+        })
+        .onConflictDoNothing();
+
+      await db
+        .insert(memberships)
+        .values({
+          organizationId: ALYOS_ORG_ID,
+          userId: created.user.id,
+          role,
+        })
+        .onConflictDoNothing();
+    } catch (dbErr) {
+      // Non-bloquant : le compte auth est créé, l'email partira quand même.
+      // L'admin peut corriger via un backfill si besoin. Log structuré.
+      console.error("[admin/users:db:fail]", {
+        user_id: created.user.id,
+        email,
+        message: dbErr instanceof Error ? dbErr.message : String(dbErr),
+      });
     }
 
     // ---------- 4. Email Resend ----------
