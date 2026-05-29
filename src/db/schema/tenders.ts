@@ -102,6 +102,14 @@ export const tenders = pgTable(
      * Index idx_tenders_department pour les filtres fréquents.
      */
     department: text("department"),
+    /**
+     * Type d'avis tel que fourni par la plateforme source.
+     * BOAMP Opendatasoft v2.1 : champ `nature` (ex. "Avis de marché",
+     * "Avis d'attribution de marché", "Avis de préinformation"…).
+     * Nullable : les plateformes scraper (PLACE, etc.) ne fournissent pas ce champ.
+     * Les avis d'attribution sont exclus du filtre getTendersOfTheDay côté app.
+     */
+    noticeType: text("notice_type"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

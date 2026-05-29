@@ -144,6 +144,7 @@ describe("RawTender / NormalizedTender — type compile-time", () => {
       visitDate: null,
       dceUrl: "https://www.exemple.test/dce/iTeTYfeNKnmS",
       sourceUrl: null,
+      noticeType: null,
       rawData: {
         platform_code: "boamp",
         record: record as unknown as Record<string, unknown>,

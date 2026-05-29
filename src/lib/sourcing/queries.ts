@@ -106,6 +106,13 @@ export interface TenderOfTheDay {
    * `getTendersOfTheDay` — un seul aller-retour BDD, pas de N+1.
    */
   activeBrief: string | null;
+  /**
+   * Type d'avis tel que fourni par la plateforme (ex. "Avis de marché",
+   * "Avis d'attribution de marché"). `null` si non renseigné.
+   * En pratique les avis d'attribution sont filtrés par getTendersOfTheDay
+   * et n'atteignent pas l'UI sauf si la colonne est NULL (backfill passif).
+   */
+  noticeType: string | null;
 }
 
 // ============================================================================
@@ -191,6 +198,10 @@ export async function getTendersOfTheDay(
     // Migration 0013 : masquer les AO exclus par l'utilisateur.
     // excluded_at IS NULL = AO visible (comportement par défaut).
     isNull(tenders.excludedAt),
+    // Filtre avis d'attribution : exclure les avis dont le type contient
+    // "attribution" (case-insensitive). Les lignes NULL (PLACE, prive, etc.,
+    // ou non encore backfillées) passent — on ne sait pas si elles sont à exclure.
+    or(isNull(tenders.noticeType), sql`lower(${tenders.noticeType}) NOT LIKE '%attribution%'`),
   ] as const;
 
   // Filtre département multi-select (optionnel, vient de la toolbar UI)
@@ -278,6 +289,7 @@ export async function getTendersOfTheDay(
       // Brief IA actif — chargé en un seul JOIN pour éviter N+1.
       // null si aucun brief n'a encore été généré pour cet AO.
       activeBrief: tenderBriefs.content,
+      noticeType: tenders.noticeType,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
@@ -342,6 +354,7 @@ export async function getTendersSelected(
       externalRef: tenders.externalRef,
       deferredUntil: tenders.deferredUntil,
       status: tenders.status,
+      noticeType: tenders.noticeType,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
@@ -395,6 +408,7 @@ export async function getTendersSolo(
       externalRef: tenders.externalRef,
       deferredUntil: tenders.deferredUntil,
       status: tenders.status,
+      noticeType: tenders.noticeType,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
@@ -457,6 +471,7 @@ export async function getTendersDeferred(
       excludedAt: tenders.excludedAt,
       postalCode: tenders.postalCode,
       department: tenders.department,
+      noticeType: tenders.noticeType,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))

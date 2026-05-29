@@ -152,6 +152,7 @@ export async function insertTender(
       matchingProfileId: opts.profileId,
       postalCode,
       department,
+      noticeType: tender.noticeType,
     })
     .onConflictDoUpdate({
       target: [tenders.organizationId, tenders.externalRef, tenders.platformId],
@@ -163,6 +164,7 @@ export async function insertTender(
         rawData: sql.raw("EXCLUDED.raw_data"),
         postalCode: sql.raw("EXCLUDED.postal_code"),
         department: sql.raw("EXCLUDED.department"),
+        noticeType: sql.raw("EXCLUDED.notice_type"),
         updatedAt: sql`now()`,
       },
     })

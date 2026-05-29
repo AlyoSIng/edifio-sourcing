@@ -221,6 +221,7 @@ function normalizeScraped(raw: RawTender): NormalizedTender {
     dceUrl,
     sourceUrl,
     rawData: raw.rawData,
+    noticeType: null,
   };
 }
 
@@ -294,6 +295,9 @@ export function normalize(raw: RawTender): NormalizedTender {
   // URL source canonique BOAMP — cf. spec §3.1
   const sourceUrl = `https://www.boamp.fr/avis/detail/${encodeURIComponent(raw.externalRef)}`;
 
+  // Type d'avis BOAMP : champ `nature` de l'API Opendatasoft v2.1.
+  const noticeType = (fields.nature as string | undefined) ?? null;
+
   return {
     externalRef: raw.externalRef,
     platformCode: raw.platformCode,
@@ -307,5 +311,6 @@ export function normalize(raw: RawTender): NormalizedTender {
     dceUrl,
     sourceUrl,
     rawData: raw.rawData,
+    noticeType,
   };
 }

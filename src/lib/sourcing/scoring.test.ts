@@ -38,6 +38,7 @@ function makeTender(overrides: Partial<NormalizedTender> = {}): NormalizedTender
     visitDate: null,
     dceUrl: null,
     sourceUrl: null,
+    noticeType: null,
     rawData: {
       platform_code: "boamp",
       record: {},
