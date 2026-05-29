@@ -140,10 +140,18 @@ export function GuidedTestPlayer({ test, previousSubmission }: GuidedTestPlayerP
         </div>
       )}
 
-      {/* Indicateur de progression */}
-      <p className="text-xs text-muted">
-        Étape {stepIndex + 1} sur {steps.length}
-      </p>
+      {/* Barre de progression */}
+      <div className="space-y-1">
+        <p className="text-xs text-muted">
+          Étape {stepIndex + 1} sur {steps.length}
+        </p>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
+          <div
+            className="h-full rounded-full bg-violet-600 transition-all duration-300"
+            style={{ width: `${Math.round(((stepIndex + 1) / steps.length) * 100)}%` }}
+          />
+        </div>
+      </div>
 
       <p className="text-sm font-medium text-ink">{currentStep.question}</p>
 
