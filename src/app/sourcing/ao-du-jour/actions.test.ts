@@ -35,6 +35,12 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+// Phase A multi-tenant : getRequiredOrgId fait un SELECT sur memberships.
+// En tests (pas de DATABASE_URL), on retourne ALYOS_ORG_ID directement.
+vi.mock("@/lib/auth/get-required-org-id", () => ({
+  getRequiredOrgId: async () => "11111111-1111-1111-1111-111111111111",
+}));
+
 // On mocke @/lib/supabase/server pour éviter qu'il essaie de lire
 // les cookies Next.js hors contexte request (tests vitest = node pur).
 vi.mock("@/lib/supabase/server", () => ({
