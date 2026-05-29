@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { listSearchProfiles } from "@/lib/profile/search-profiles-queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -37,6 +37,7 @@ export default async function SearchProfilesPage() {
 
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   let profiles: Awaited<ReturnType<typeof listSearchProfilesAction>> = {
     ok: true,
@@ -45,7 +46,7 @@ export default async function SearchProfilesPage() {
   let fetchError: string | null = null;
 
   try {
-    const rows = await listSearchProfiles(ALYOS_ORG_ID, db, true);
+    const rows = await listSearchProfiles(orgId, db, true);
     profiles = {
       ok: true,
       profiles: rows.map((r) => ({

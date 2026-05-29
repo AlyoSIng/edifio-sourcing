@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
 import { architectResponses, matchProposals } from "@/db/schema/selections";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { eq, inArray, sql } from "drizzle-orm";
@@ -42,13 +42,13 @@ export interface DuplicateGroup {
  *
  * @returns Tableau de groupes de doublons, vide si aucun doublon.
  */
-export async function detectArchitectDuplicatesAction(): Promise<DuplicateGroup[]> {
+export async function detectArchitectDuplicatesAction(orgId: string): Promise<DuplicateGroup[]> {
   // Requête 1 : trouver les clés qui ont au moins 2 occurrences + leurs ids
   const groupRows = await db.execute<{ key: string; ids: string[] }>(sql`
     SELECT lower(trim(cabinet)) AS key,
            array_agg(id::text ORDER BY created_at ASC) AS ids
     FROM architects
-    WHERE organization_id = ${ALYOS_ORG_ID}
+    WHERE organization_id = ${orgId}
     GROUP BY lower(trim(cabinet))
     HAVING count(*) > 1
   `);
@@ -110,7 +110,7 @@ export async function detectArchitectDuplicatesAction(): Promise<DuplicateGroup[
  *   1. Session valide.
  *   2. Rôle admin (isAdmin suffit — pas besoin superadmin).
  *   3. UUID v4 valide.
- *   4. L'architecte appartient bien à ALYOS_ORG_ID (pas de suppression cross-tenant).
+ *   4. L'architecte appartient bien à l'organisation courante (pas de suppression cross-tenant).
  *   5. Aucune `architect_response` active (statut « pending ») sur cet architecte.
  *   6. Aucun `match_proposal` actif sur cet architecte (présence = AO en cours).
  *
@@ -133,6 +133,8 @@ export async function deleteArchitectDuplicateAction(
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden" };
 
+  const orgId = await getRequiredOrgId(user.id);
+
   // Guard 3 — UUID v4 valide (regex stricte)
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   if (!UUID_REGEX.test(id)) return { ok: false, error: "invalid_id" };
@@ -145,7 +147,7 @@ export async function deleteArchitectDuplicateAction(
     .limit(1);
 
   if (!existing) return { ok: false, error: "not_found" };
-  if (existing.organizationId !== ALYOS_ORG_ID) return { ok: false, error: "forbidden" };
+  if (existing.organizationId !== orgId) return { ok: false, error: "forbidden" };
 
   // Guard 5 — aucune réponse active (pending) sur cet architecte
   const pendingResponses = await db

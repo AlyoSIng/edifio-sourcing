@@ -68,7 +68,7 @@ import {
 } from "@/lib/brevo/template-picker";
 import { resolveBrevoTemplate } from "@/lib/brevo/template-resolver";
 import { buildBrevoVariables } from "@/lib/brevo/variables";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { getSiteUrl } from "@/lib/site-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { extractDepartment, rankArchitects, type MatchScore } from "@/lib/tandem/matching";
@@ -172,7 +172,8 @@ const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}
 async function requireAlyosUser(
   authClient: AuthClientLike,
 ): Promise<
-  { ok: true; userId: string } | { ok: false; error: "not_authenticated" | "forbidden_domain" }
+  | { ok: true; userId: string; orgId: string }
+  | { ok: false; error: "not_authenticated" | "forbidden_domain" }
 > {
   const {
     data: { user },
@@ -180,7 +181,8 @@ async function requireAlyosUser(
   if (!user) return { ok: false, error: "not_authenticated" };
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
-  return { ok: true, userId: user.id };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId };
 }
 
 // ============================================================================
@@ -207,6 +209,7 @@ export async function matchArchitectsForTender(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId } = authResult;
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
@@ -220,7 +223,7 @@ export async function matchArchitectsForTender(
     const tenderRows = await db
       .select()
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
       .limit(1);
     const tender = tenderRows[0];
     if (!tender) return { ok: false, error: "tender_not_found" };
@@ -231,7 +234,7 @@ export async function matchArchitectsForTender(
       .from(architects)
       .where(
         and(
-          eq(architects.organizationId, ALYOS_ORG_ID),
+          eq(architects.organizationId, orgId),
           eq(architects.active, true),
           eq(architects.solicitable, true),
         ),
@@ -276,7 +279,7 @@ export async function matchArchitectsForTender(
       .from(architectResponses)
       .where(
         and(
-          eq(architectResponses.organizationId, ALYOS_ORG_ID),
+          eq(architectResponses.organizationId, orgId),
           gte(architectResponses.respondedAt, since),
         ),
       )
@@ -294,7 +297,7 @@ export async function matchArchitectsForTender(
       .from(architectResponses)
       .where(
         and(
-          eq(architectResponses.organizationId, ALYOS_ORG_ID),
+          eq(architectResponses.organizationId, orgId),
           eq(architectResponses.status, "accepted"),
         ),
       )
@@ -361,15 +364,19 @@ export async function matchArchitectsForTender(
 export async function persistMatchProposals(
   tenderId: string,
   matches: Array<{ architectId: string; score: number; rank: number; rationale: string }>,
-  deps: { db?: typeof defaultDb } = {},
+  deps: { db?: typeof defaultDb; authClient?: AuthClientLike } = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
   if (!Array.isArray(matches) || matches.length === 0) return { ok: true };
   const dbInstance = deps.db ?? defaultDb;
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return { ok: false, error: authResult.error };
+  const { orgId } = authResult;
   try {
     const rows = matches.map((m) => ({
       tenderId,
-      organizationId: ALYOS_ORG_ID,
+      organizationId: orgId,
       architectId: m.architectId,
       score: String(m.score),
       rank: m.rank,
@@ -450,7 +457,7 @@ export async function sendArchitectSolicitation(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { userId } = authResult;
+  const { userId, orgId } = authResult;
 
   // 2. Validation
   if (!UUID_SHAPE.test(tenderId) || !UUID_SHAPE.test(architectId)) {
@@ -475,7 +482,7 @@ export async function sendArchitectSolicitation(
     const tenderRows = await db
       .select()
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
       .limit(1);
     tender = tenderRows[0];
     if (!tender) return { ok: false, error: "tender_not_found" };
@@ -483,7 +490,7 @@ export async function sendArchitectSolicitation(
     const archRows = await db
       .select()
       .from(architects)
-      .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(architects.id, architectId), eq(architects.organizationId, orgId)))
       .limit(1);
     architect = archRows[0];
     if (!architect) return { ok: false, error: "architect_not_found" };
@@ -495,7 +502,7 @@ export async function sendArchitectSolicitation(
     architectToken = signArchitectToken({
       architectId,
       tenderId,
-      organizationId: ALYOS_ORG_ID,
+      organizationId: orgId,
     });
     tokenJti = architectToken.jti;
 
@@ -512,7 +519,7 @@ export async function sendArchitectSolicitation(
       .where(
         and(
           eq(architectOppositionTokens.architectId, architectId),
-          eq(architectOppositionTokens.organizationId, ALYOS_ORG_ID),
+          eq(architectOppositionTokens.organizationId, orgId),
         ),
       )
       .orderBy(sql`${architectOppositionTokens.createdAt} desc`)
@@ -533,7 +540,7 @@ export async function sendArchitectSolicitation(
       const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000);
       await db.insert(architectOppositionTokens).values({
         architectId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         jti: newJti,
         expiresAt,
       });
@@ -548,7 +555,7 @@ export async function sendArchitectSolicitation(
         .values({
           tenderId,
           architectId,
-          organizationId: ALYOS_ORG_ID,
+          organizationId: orgId,
           jwtId: architectToken.jti,
           expiresAt: architectToken.expiresAt,
         })
@@ -561,7 +568,7 @@ export async function sendArchitectSolicitation(
         .insert(matchProposals)
         .values({
           tenderId,
-          organizationId: ALYOS_ORG_ID,
+          organizationId: orgId,
           architectId,
           score: options.score.toFixed(2),
           rank: options.rank,
@@ -609,7 +616,7 @@ export async function sendArchitectSolicitation(
       } else {
         await tx.insert(architectResponses).values({
           tenderId,
-          organizationId: ALYOS_ORG_ID,
+          organizationId: orgId,
           architectId,
           status: "pending",
           tokenId: archTokenId,
@@ -623,7 +630,7 @@ export async function sendArchitectSolicitation(
         .where(
           and(
             eq(tenders.id, tenderId),
-            eq(tenders.organizationId, ALYOS_ORG_ID),
+            eq(tenders.organizationId, orgId),
             sql`${tenders.status} IN ('selected_tandem', 'awaiting_architect', 'architect_declined')`,
           ),
         );
@@ -646,7 +653,7 @@ export async function sendArchitectSolicitation(
   // retourne `brevo_send_failed` avant tout envoi.
   let resolvedTemplate: Awaited<ReturnType<typeof resolveBrevoTemplate>> | null = null;
   try {
-    resolvedTemplate = await resolveBrevoTemplate(templateName, ALYOS_ORG_ID, db);
+    resolvedTemplate = await resolveBrevoTemplate(templateName, orgId, db);
   } catch (err) {
     return {
       ok: false,
@@ -662,14 +669,14 @@ export async function sendArchitectSolicitation(
   let presentationSociete: string | undefined;
   let nomCommercial: string | undefined;
   try {
-    const orgRows = await withTenantContext(ALYOS_ORG_ID, db, (client) =>
+    const orgRows = await withTenantContext(orgId, db, (client) =>
       client
         .select({
           presentationBlock: organizationProfiles.presentationBlock,
           commercialName: organizationProfiles.commercialName,
         })
         .from(organizationProfiles)
-        .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+        .where(eq(organizationProfiles.organizationId, orgId))
         .limit(1),
     );
     const block = orgRows[0]?.presentationBlock;
@@ -746,7 +753,7 @@ export async function sendArchitectSolicitation(
     await db.insert(brevoMessages).values({
       tenderId,
       architectId,
-      organizationId: ALYOS_ORG_ID,
+      organizationId: orgId,
       templateName,
       register,
       brevoMessageId,
@@ -826,6 +833,7 @@ export async function searchArchitectsForShortlist(
   // Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId } = authResult;
 
   // Requête trop courte — retourne liste vide sans aller en BDD
   if (query.trim().length < 2) {
@@ -837,7 +845,7 @@ export async function searchArchitectsForShortlist(
 
     // Filtre : actif, solicitable, tenant, et hors des IDs déjà dans la short-list
     const conditions = [
-      eq(architects.organizationId, ALYOS_ORG_ID),
+      eq(architects.organizationId, orgId),
       eq(architects.active, true),
       eq(architects.solicitable, true),
       // Recherche cabinets OU contact (OR applicatif)

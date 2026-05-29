@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createTemplateResolver,
@@ -66,6 +66,7 @@ export default async function ModelesEmailPage({
 
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   // 2. Paramètres URL (canal actif + template actif)
   const params = searchParams ? await searchParams : {};
@@ -73,7 +74,7 @@ export default async function ModelesEmailPage({
   const activeKey = params?.template as TemplateKey | undefined;
 
   // 3. Chargement des templates (try/catch résilience)
-  const resolver = createTemplateResolver(db, ALYOS_ORG_ID);
+  const resolver = createTemplateResolver(db, orgId);
   const allKeys: TemplateKey[] = [...BREVO_KEYS, ...RESEND_KEYS];
 
   type TemplateData = {

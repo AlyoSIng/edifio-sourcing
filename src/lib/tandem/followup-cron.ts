@@ -45,6 +45,9 @@ import {
   templateNameFor,
 } from "@/lib/brevo/template-picker";
 import { buildBrevoVariables } from "@/lib/brevo/variables";
+// TODO Phase A : itérer sur toutes les organisations plutôt que ALYOS_ORG_ID en dur.
+// Pour l'instant le cron Tandem est mono-tenant (AlyoS uniquement).
+// Phase B supprimera cette dépendance quand le multi-tenant sera activé.
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { extractDepartment } from "@/lib/tandem/matching";
 import { getSiteUrl } from "@/lib/site-url";

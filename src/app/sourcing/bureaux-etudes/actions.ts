@@ -7,7 +7,7 @@
  *
  * Sécurité :
  *  - Auth check via `requireAlyosUser` (domaine @alyosingenierie.fr)
- *  - Filtre tenant explicite `ALYOS_ORG_ID` sur toutes les requêtes
+ *  - Filtre tenant explicite sur toutes les requêtes (orgId résolu via memberships)
  *  - Écriture (upsertBE, importBEFromCsv, upload/deleteBeDocument) : admin uniquement
  *
  * Créé dans feat/be-companies (Nadia, 2026-05-26).
@@ -24,6 +24,7 @@ import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import {
   getPappersBySiren,
   mapTrancheToHeadcount,
@@ -43,6 +44,8 @@ export interface FetchBEPageParams {
   search?: string;
   specialty?: string;
   implantation?: string;
+  /** UUID de l'organisation courante (résolu par la page appelante). */
+  orgId?: string;
 }
 
 export interface FetchBEPageResult {
@@ -98,7 +101,7 @@ interface AuthClientLike {
 async function requireAlyosUser(
   authClient: AuthClientLike,
 ): Promise<
-  | { ok: true; userId: string; profile: ReturnType<typeof toUserProfile> }
+  | { ok: true; userId: string; orgId: string; profile: ReturnType<typeof toUserProfile> }
   | { ok: false; error: "not_authenticated" | "forbidden_domain" }
 > {
   const {
@@ -107,7 +110,8 @@ async function requireAlyosUser(
   if (!user) return { ok: false, error: "not_authenticated" };
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
-  return { ok: true, userId: user.id, profile };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId, profile };
 }
 
 // ============================================================================
@@ -118,10 +122,11 @@ export async function fetchBEPage(
   params: FetchBEPageParams = {},
   dbClient: DrizzleClient = defaultDb,
 ): Promise<FetchBEPageResult> {
-  const { page = 1, search, specialty, implantation } = params;
+  const { page = 1, search, specialty, implantation, orgId: paramOrgId } = params;
+  const resolvedOrgId = paramOrgId ?? ALYOS_ORG_ID;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
-  const conditions = [eq(bureauEtudes.organizationId, ALYOS_ORG_ID)];
+  const conditions = [eq(bureauEtudes.organizationId, resolvedOrgId)];
 
   if (search && search.trim().length > 0) {
     const term = `%${search.trim()}%`;
@@ -180,7 +185,7 @@ export async function upsertBE(
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { profile } = authResult;
+  const { profile, orgId } = authResult;
 
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
@@ -199,7 +204,7 @@ export async function upsertBE(
       const rows = await dbClient
         .update(bureauEtudes)
         .set({ ...input, updatedAt: new Date() })
-        .where(and(eq(bureauEtudes.id, id), eq(bureauEtudes.organizationId, ALYOS_ORG_ID)))
+        .where(and(eq(bureauEtudes.id, id), eq(bureauEtudes.organizationId, orgId)))
         .returning();
 
       if (!rows[0]) return { ok: false, error: "not_found" };
@@ -207,7 +212,7 @@ export async function upsertBE(
     } else {
       const rows = await dbClient
         .insert(bureauEtudes)
-        .values({ ...input, organizationId: ALYOS_ORG_ID })
+        .values({ ...input, organizationId: orgId })
         .returning();
 
       if (!rows[0]) throw new Error("INSERT bureaux_etudes returned no row");
@@ -240,7 +245,7 @@ export async function importBEFromCsv(formData: FormData): Promise<ImportBEResul
   if (!authResult.ok) {
     return { imported: 0, updated: 0, errors: ["Non authentifié ou domaine non autorisé."] };
   }
-  const { profile } = authResult;
+  const { profile, orgId } = authResult;
 
   if (!isAdmin(profile)) {
     return { imported: 0, updated: 0, errors: ["Action réservée aux administrateurs."] };
@@ -309,7 +314,7 @@ export async function importBEFromCsv(formData: FormData): Promise<ImportBEResul
         const existing = await defaultDb
           .select({ id: bureauEtudes.id })
           .from(bureauEtudes)
-          .where(and(eq(bureauEtudes.organizationId, ALYOS_ORG_ID), eq(bureauEtudes.email, email)))
+          .where(and(eq(bureauEtudes.organizationId, orgId), eq(bureauEtudes.email, email)))
           .limit(1);
 
         if (existing[0]) {
@@ -331,15 +336,12 @@ export async function importBEFromCsv(formData: FormData): Promise<ImportBEResul
               updatedAt: new Date(),
             })
             .where(
-              and(
-                eq(bureauEtudes.id, existing[0].id),
-                eq(bureauEtudes.organizationId, ALYOS_ORG_ID),
-              ),
+              and(eq(bureauEtudes.id, existing[0].id), eq(bureauEtudes.organizationId, orgId)),
             );
           updated++;
         } else {
           await defaultDb.insert(bureauEtudes).values({
-            organizationId: ALYOS_ORG_ID,
+            organizationId: orgId,
             cabinet,
             email,
             phone,
@@ -359,7 +361,7 @@ export async function importBEFromCsv(formData: FormData): Promise<ImportBEResul
       } else {
         // Pas d'email → INSERT simple
         await defaultDb.insert(bureauEtudes).values({
-          organizationId: ALYOS_ORG_ID,
+          organizationId: orgId,
           cabinet,
           email: null,
           phone,
@@ -436,6 +438,7 @@ export async function uploadBeDocument(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: uploadOrgId } = authResult;
 
   if (!UUID_SHAPE.test(beId)) return { ok: false, error: "invalid_input" };
   if (!label.trim()) return { ok: false, error: "invalid_input" };
@@ -447,7 +450,7 @@ export async function uploadBeDocument(
     // Construction du chemin Storage
     const timestamp = Date.now();
     const sanitizedFilename = rawFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${ALYOS_ORG_ID}/${beId}/${timestamp}_${sanitizedFilename}`;
+    const storagePath = `${uploadOrgId}/${beId}/${timestamp}_${sanitizedFilename}`;
 
     // Upload vers Supabase Storage
     const supabaseAdmin = createSupabaseAdminClient();
@@ -468,7 +471,7 @@ export async function uploadBeDocument(
       .insert(beDocuments)
       .values({
         beId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: uploadOrgId,
         kind,
         label: label.trim(),
         storagePath,
@@ -521,6 +524,7 @@ export async function deleteBeDocument(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: deleteOrgId } = authResult;
 
   if (!UUID_SHAPE.test(documentId)) return { ok: false, error: "invalid_input" };
 
@@ -533,7 +537,7 @@ export async function deleteBeDocument(
         kind: beDocuments.kind,
       })
       .from(beDocuments)
-      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, deleteOrgId)))
       .limit(1);
 
     if (!docs[0]) return { ok: false, error: "not_found" };
@@ -554,7 +558,7 @@ export async function deleteBeDocument(
     // Suppression BDD
     await dbClient
       .delete(beDocuments)
-      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, ALYOS_ORG_ID)));
+      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, deleteOrgId)));
 
     // Audit A21 — library_doc_delete (best-effort, hors transaction)
     await audit({
@@ -596,6 +600,7 @@ export async function getBeDocumentUrl(
   const authClient = createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId: urlOrgId } = authResult;
 
   if (!UUID_SHAPE.test(documentId)) return { ok: false, error: "invalid_input" };
 
@@ -604,7 +609,7 @@ export async function getBeDocumentUrl(
     const docs = await dbClient
       .select({ storagePath: beDocuments.storagePath })
       .from(beDocuments)
-      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(beDocuments.id, documentId), eq(beDocuments.organizationId, urlOrgId)))
       .limit(1);
 
     if (!docs[0]) return { ok: false, error: "not_found" };
@@ -643,6 +648,7 @@ export async function listBeDocuments(
   const authClient = createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return [];
+  const { orgId: listOrgId } = authResult;
 
   if (!UUID_SHAPE.test(beId)) return [];
 
@@ -650,7 +656,7 @@ export async function listBeDocuments(
     const rows = await dbClient
       .select()
       .from(beDocuments)
-      .where(and(eq(beDocuments.beId, beId), eq(beDocuments.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(beDocuments.beId, beId), eq(beDocuments.organizationId, listOrgId)))
       .orderBy(beDocuments.uploadedAt);
 
     return rows;
@@ -713,7 +719,7 @@ export async function enrichSingleBEFromPappers(beId: string): Promise<EnrichSin
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { profile } = authResult;
+  const { profile, orgId: enrichOrgId } = authResult;
 
   // 2. Vérification rôle admin
   if (!isAdmin(profile)) {
@@ -737,7 +743,7 @@ export async function enrichSingleBEFromPappers(beId: string): Promise<EnrichSin
     const rows = await defaultDb
       .select()
       .from(bureauEtudes)
-      .where(and(eq(bureauEtudes.id, beId), eq(bureauEtudes.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(bureauEtudes.id, beId), eq(bureauEtudes.organizationId, enrichOrgId)))
       .limit(1);
 
     const be = rows[0];
@@ -814,7 +820,7 @@ export async function enrichSingleBEFromPappers(beId: string): Promise<EnrichSin
         headcount: be.headcount ?? newHeadcount,
         updatedAt: new Date(),
       })
-      .where(and(eq(bureauEtudes.id, be.id), eq(bureauEtudes.organizationId, ALYOS_ORG_ID)));
+      .where(and(eq(bureauEtudes.id, be.id), eq(bureauEtudes.organizationId, enrichOrgId)));
 
     // 11. Audit (best-effort)
     await audit({
@@ -867,7 +873,7 @@ export type DeleteBEResult =
  * Guards :
  *  - UUID valide
  *  - Admin uniquement (domaine @alyosingenierie.fr)
- *  - Filtre tenant `ALYOS_ORG_ID` sur le DELETE
+ *  - Filtre tenant sur le DELETE (orgId résolu via memberships)
  *
  * Note : pas de guard `has_active_solicitations` — la table `be_responses`
  * n'existe pas encore (Phase 2 Tandem BE).
@@ -885,7 +891,7 @@ export async function deleteBEAction(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { profile } = authResult;
+  const { profile, orgId: deleteBeOrgId } = authResult;
 
   // 2. Vérification rôle admin
   if (!isAdmin(profile)) {
@@ -901,7 +907,7 @@ export async function deleteBEAction(
     // 4. DELETE tenant-scoped
     const deleted = await dbClient
       .delete(bureauEtudes)
-      .where(and(eq(bureauEtudes.id, beId), eq(bureauEtudes.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(bureauEtudes.id, beId), eq(bureauEtudes.organizationId, deleteBeOrgId)))
       .returning({ id: bureauEtudes.id });
 
     if (!deleted[0]) {

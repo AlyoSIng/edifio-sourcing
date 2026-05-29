@@ -18,8 +18,8 @@
 import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { toUserProfile } from "@/lib/auth/types";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 
@@ -43,13 +43,14 @@ export default async function CotraitancePipelinePage() {
   if (!user) redirect("/login?next=/sourcing/cotraitance");
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   // Résilience runtime : try/catch absorbé sur l'I/O BDD.
   let loadResult: Awaited<ReturnType<typeof loadCotraitancePipelineData>> | null = null;
   let fetchError: string | null = null;
 
   try {
-    loadResult = await loadCotraitancePipelineData(ALYOS_ORG_ID);
+    loadResult = await loadCotraitancePipelineData(orgId);
   } catch (err) {
     console.error("[cotraitance-pipeline-page:unhandled]", err);
     fetchError = err instanceof Error ? err.message : String(err);

@@ -16,7 +16,7 @@
  *
  * Sécurité :
  *  - Auth check via `requireAlyosUser` (domaine @alyosingenierie.fr)
- *  - Filtre tenant explicite `ALYOS_ORG_ID` sur toutes les requêtes
+ *  - Filtre tenant explicite sur toutes les requêtes (orgId résolu via memberships)
  *  - Écriture : admin uniquement
  *  - `revalidatePath` après chaque mutation
  *
@@ -38,7 +38,7 @@ import {
 import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ============================================================================
@@ -98,7 +98,7 @@ interface AuthClientLike {
 async function requireAlyosUser(
   authClient: AuthClientLike,
 ): Promise<
-  | { ok: true; userId: string; profile: ReturnType<typeof toUserProfile> }
+  | { ok: true; userId: string; orgId: string; profile: ReturnType<typeof toUserProfile> }
   | { ok: false; error: "not_authenticated" | "forbidden_domain" }
 > {
   const {
@@ -107,7 +107,8 @@ async function requireAlyosUser(
   if (!user) return { ok: false, error: "not_authenticated" };
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
-  return { ok: true, userId: user.id, profile };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId, profile };
 }
 
 // ============================================================================
@@ -124,12 +125,13 @@ export async function listCotraitants(
   const authClient = createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return [];
+  const { orgId: listOrgId } = authResult;
 
   try {
     const rows = await dbClient
       .select()
       .from(cotraitants)
-      .where(and(eq(cotraitants.organizationId, ALYOS_ORG_ID), eq(cotraitants.active, true)))
+      .where(and(eq(cotraitants.organizationId, listOrgId), eq(cotraitants.active, true)))
       .orderBy(cotraitants.cabinet);
     return rows;
   } catch (err) {
@@ -154,6 +156,7 @@ export async function createCotraitant(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: createOrgId } = authResult;
 
   if (!data.cabinet || data.cabinet.trim().length === 0) {
     return { ok: false, error: "invalid_input" };
@@ -163,7 +166,7 @@ export async function createCotraitant(
     const rows = await dbClient
       .insert(cotraitants)
       .values({
-        organizationId: ALYOS_ORG_ID,
+        organizationId: createOrgId,
         cabinet: data.cabinet.trim(),
         contactName: data.contactName ?? null,
         email: data.email?.trim() ?? null,
@@ -203,6 +206,7 @@ export async function updateCotraitant(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: updateOrgId } = authResult;
 
   if (!UUID_SHAPE.test(id)) return { ok: false, error: "invalid_input" };
 
@@ -227,7 +231,7 @@ export async function updateCotraitant(
     const rows = await dbClient
       .update(cotraitants)
       .set(updateData)
-      .where(and(eq(cotraitants.id, id), eq(cotraitants.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(cotraitants.id, id), eq(cotraitants.organizationId, updateOrgId)))
       .returning({ id: cotraitants.id });
 
     if (!rows[0]) return { ok: false, error: "not_found" };
@@ -257,6 +261,7 @@ export async function deleteCotraitant(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: deleteOrgId } = authResult;
 
   if (!UUID_SHAPE.test(id)) return { ok: false, error: "invalid_input" };
 
@@ -264,7 +269,7 @@ export async function deleteCotraitant(
     const rows = await dbClient
       .update(cotraitants)
       .set({ active: false, updatedAt: new Date() })
-      .where(and(eq(cotraitants.id, id), eq(cotraitants.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(cotraitants.id, id), eq(cotraitants.organizationId, deleteOrgId)))
       .returning({ id: cotraitants.id });
 
     if (!rows[0]) return { ok: false, error: "not_found" };
@@ -295,6 +300,7 @@ export async function associateToTender(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: assocOrgId } = authResult;
 
   if (!UUID_SHAPE.test(tenderId) || !UUID_SHAPE.test(cotraitantId)) {
     return { ok: false, error: "invalid_input" };
@@ -304,7 +310,7 @@ export async function associateToTender(
     await dbClient.insert(tenderCotraitants).values({
       tenderId,
       cotraitantId,
-      organizationId: ALYOS_ORG_ID,
+      organizationId: assocOrgId,
     });
 
     revalidatePath(`/sourcing/ao/${tenderId}/tandem/cotraitant`);
@@ -334,6 +340,7 @@ export async function dissociateFromTender(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: dissocOrgId } = authResult;
 
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
 
@@ -343,7 +350,7 @@ export async function dissociateFromTender(
       .where(
         and(
           eq(tenderCotraitants.tenderId, tenderId),
-          eq(tenderCotraitants.organizationId, ALYOS_ORG_ID),
+          eq(tenderCotraitants.organizationId, dissocOrgId),
         ),
       )
       .returning({ id: tenderCotraitants.id });
@@ -381,6 +388,7 @@ export async function uploadCotraitantDocument(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: uploadDocOrgId } = authResult;
 
   if (!UUID_SHAPE.test(cotraitantId)) return { ok: false, error: "invalid_input" };
   if (tenderId !== null && !UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
@@ -393,7 +401,7 @@ export async function uploadCotraitantDocument(
     // Construction du chemin Storage
     const timestamp = Date.now();
     const sanitizedFilename = rawFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `${ALYOS_ORG_ID}/${cotraitantId}/${timestamp}_${sanitizedFilename}`;
+    const storagePath = `${uploadDocOrgId}/${cotraitantId}/${timestamp}_${sanitizedFilename}`;
 
     // Upload vers Supabase Storage
     const supabaseAdmin = createSupabaseAdminClient();
@@ -415,7 +423,7 @@ export async function uploadCotraitantDocument(
       .values({
         cotraitantId,
         tenderId: tenderId ?? undefined,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: uploadDocOrgId,
         kind,
         label: label.trim(),
         storagePath,
@@ -466,6 +474,7 @@ export async function deleteCotraitantDocument(
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
+  const { orgId: deleteDocOrgId } = authResult;
 
   if (!UUID_SHAPE.test(documentId)) return { ok: false, error: "invalid_input" };
 
@@ -482,7 +491,7 @@ export async function deleteCotraitantDocument(
       .where(
         and(
           eq(cotraitantDocuments.id, documentId),
-          eq(cotraitantDocuments.organizationId, ALYOS_ORG_ID),
+          eq(cotraitantDocuments.organizationId, deleteDocOrgId),
         ),
       )
       .limit(1);
@@ -508,7 +517,7 @@ export async function deleteCotraitantDocument(
       .where(
         and(
           eq(cotraitantDocuments.id, documentId),
-          eq(cotraitantDocuments.organizationId, ALYOS_ORG_ID),
+          eq(cotraitantDocuments.organizationId, deleteDocOrgId),
         ),
       );
 
@@ -551,6 +560,7 @@ export async function getDownloadUrl(
   const authClient = createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId: urlDocOrgId } = authResult;
 
   if (!UUID_SHAPE.test(documentId)) return { ok: false, error: "invalid_input" };
 
@@ -562,7 +572,7 @@ export async function getDownloadUrl(
       .where(
         and(
           eq(cotraitantDocuments.id, documentId),
-          eq(cotraitantDocuments.organizationId, ALYOS_ORG_ID),
+          eq(cotraitantDocuments.organizationId, urlDocOrgId),
         ),
       )
       .limit(1);
@@ -602,13 +612,14 @@ export async function listDocumentsForCotraitant(
   const authClient = createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return [];
+  const { orgId: listDocOrgId } = authResult;
 
   if (!UUID_SHAPE.test(cotraitantId)) return [];
 
   try {
     const conditions = [
       eq(cotraitantDocuments.cotraitantId, cotraitantId),
-      eq(cotraitantDocuments.organizationId, ALYOS_ORG_ID),
+      eq(cotraitantDocuments.organizationId, listDocOrgId),
     ];
 
     if (tenderId !== undefined && tenderId !== null) {
@@ -643,6 +654,7 @@ export async function getTenderCotraitant(
   const authClient = createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return null;
+  const { orgId: getTenderOrgId } = authResult;
 
   if (!UUID_SHAPE.test(tenderId)) return null;
 
@@ -657,7 +669,7 @@ export async function getTenderCotraitant(
       .where(
         and(
           eq(tenderCotraitants.tenderId, tenderId),
-          eq(tenderCotraitants.organizationId, ALYOS_ORG_ID),
+          eq(tenderCotraitants.organizationId, getTenderOrgId),
         ),
       )
       .limit(1);

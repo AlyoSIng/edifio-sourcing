@@ -38,7 +38,7 @@ import { db as defaultDb } from "@/db/client";
 import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import {
   getActiveSearchProfile,
   updateSearchProfile,
@@ -109,7 +109,7 @@ interface ActionDeps {
 async function requireAlyosAdmin(
   authClient: AuthClientLike,
 ): Promise<
-  | { ok: true; userId: string }
+  | { ok: true; userId: string; orgId: string }
   | Exclude<
       UpdateProfileResult,
       { ok: true } | { ok: false; error: "invalid_input" | "profile_not_found" | "internal_error" }
@@ -124,7 +124,8 @@ async function requireAlyosAdmin(
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
-  return { ok: true, userId: user.id };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId };
 }
 
 /**
@@ -223,6 +224,7 @@ export async function updateProfileAction(
   // 1. Auth + domaine + admin
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId } = authResult;
 
   // 2. Validation Zod côté serveur — JAMAIS trust client
   const parsed = searchProfileUpdateSchema.safeParse(input);
@@ -246,7 +248,7 @@ export async function updateProfileAction(
   // 3. Lookup profil actif AlyoS (le `profileId` ne vient PAS du client)
   let before: SearchProfile | null;
   try {
-    before = await getActiveSearchProfile(ALYOS_ORG_ID, dbInstance);
+    before = await getActiveSearchProfile(orgId, dbInstance);
   } catch (err) {
     console.error("[admin-profil:fetch-active:fail]", err);
     return { ok: false, error: "internal_error" };
@@ -258,7 +260,7 @@ export async function updateProfileAction(
   let after: SearchProfile;
   try {
     after = await updateSearchProfile(
-      ALYOS_ORG_ID,
+      orgId,
       before.id,
       {
         keywords: validated.keywords,

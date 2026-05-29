@@ -19,7 +19,7 @@ import { cotraitantShareItems, cotraitantShares } from "@/db/schema/sharing";
 import { presentationLibrary } from "@/db/schema/library";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { PartageClient } from "./PartageClient";
@@ -79,6 +79,7 @@ export default async function PartageCotraitantPage({ params }: { params: { id: 
   if (!isAuthorizedEmail(profile.email)) {
     redirect("/forbidden");
   }
+  const orgId = await getRequiredOrgId(user.id);
 
   if (!UUID_SHAPE.test(params.id)) {
     redirect("/sourcing/ao-du-jour");
@@ -99,7 +100,7 @@ export default async function PartageCotraitantPage({ params }: { params: { id: 
         storagePath: presentationLibrary.storagePath,
       })
       .from(presentationLibrary)
-      .where(eq(presentationLibrary.organizationId, ALYOS_ORG_ID))
+      .where(eq(presentationLibrary.organizationId, orgId))
       .orderBy(presentationLibrary.kind, presentationLibrary.name);
 
     libraryItems = libRows;
@@ -109,10 +110,7 @@ export default async function PartageCotraitantPage({ params }: { params: { id: 
       .select()
       .from(cotraitantShares)
       .where(
-        and(
-          eq(cotraitantShares.tenderId, params.id),
-          eq(cotraitantShares.organizationId, ALYOS_ORG_ID),
-        ),
+        and(eq(cotraitantShares.tenderId, params.id), eq(cotraitantShares.organizationId, orgId)),
       )
       .orderBy(desc(cotraitantShares.createdAt));
 

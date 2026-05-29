@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { shortlistCriteria } from "@/db/schema/shortlist";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Architect } from "@/db/schema/architects";
 
@@ -58,6 +58,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/architectes");
   const profile = toUserProfile(user);
+  const orgId = await getRequiredOrgId(user.id);
 
   // Parsing des searchParams URL
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
@@ -98,6 +99,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
       tutoiement,
       solicitable,
       rgpdOpposition,
+      orgId,
     });
   } catch (err) {
     console.error("[architectes-page:fetch-failed]", err);
@@ -113,7 +115,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
   let duplicateGroups: DuplicateGroup[] = [];
   if (adminUser) {
     try {
-      duplicateGroups = await detectArchitectDuplicatesAction();
+      duplicateGroups = await detectArchitectDuplicatesAction(orgId);
     } catch (err) {
       console.error("[architectes-page:duplicates-failed]", err);
       // Pas bloquant : on affiche la page sans le bandeau doublons
@@ -129,7 +131,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
       .from(shortlistCriteria)
       .where(
         and(
-          eq(shortlistCriteria.organizationId, ALYOS_ORG_ID),
+          eq(shortlistCriteria.organizationId, orgId),
           eq(shortlistCriteria.target, "architects"),
         ),
       )

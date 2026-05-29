@@ -5,7 +5,7 @@ import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { TenderSummaryCard } from "@/app/sourcing/_shared/TenderSummaryCard";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import { getTendersDeferred } from "@/lib/sourcing/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -32,12 +32,13 @@ export default async function ReportesPage() {
   if (!user) redirect("/login?next=/sourcing/reportes");
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   // Résilience runtime.
   let deferredTenders: Awaited<ReturnType<typeof getTendersDeferred>> = [];
   let fetchError: string | null = null;
   try {
-    deferredTenders = await getTendersDeferred(ALYOS_ORG_ID, db);
+    deferredTenders = await getTendersDeferred(orgId, db);
   } catch (err) {
     console.error("[reportes:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);

@@ -31,7 +31,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db as defaultDb } from "@/db/client";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   validateTemplateRgpd,
@@ -113,6 +113,8 @@ export async function saveTemplateAction(formData: FormData): Promise<SaveTempla
     return { ok: false, error: "forbidden_role" };
   }
 
+  const orgId = await getRequiredOrgId(user.id);
+
   // 2. Parse + validation Zod
   const parsed = saveTemplateSchema.safeParse({
     key: formData.get("key"),
@@ -145,13 +147,11 @@ export async function saveTemplateAction(formData: FormData): Promise<SaveTempla
     // On calcule la prochaine version en lisant la courante d'abord.
     // withTenantContext pose app.current_organization_id pour les tables
     // avec FORCE ROW LEVEL SECURITY (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md).
-    const existing = await withTenantContext(ALYOS_ORG_ID, defaultDb, (client) =>
+    const existing = await withTenantContext(orgId, defaultDb, (client) =>
       client
         .select({ version: messageTemplates.version })
         .from(messageTemplates)
-        .where(
-          and(eq(messageTemplates.organizationId, ALYOS_ORG_ID), eq(messageTemplates.key, key)),
-        )
+        .where(and(eq(messageTemplates.organizationId, orgId), eq(messageTemplates.key, key)))
         .limit(1),
     );
 
@@ -161,7 +161,7 @@ export async function saveTemplateAction(formData: FormData): Promise<SaveTempla
     await defaultDb
       .insert(messageTemplates)
       .values({
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         key,
         channel,
         subject,
@@ -187,7 +187,7 @@ export async function saveTemplateAction(formData: FormData): Promise<SaveTempla
     // migration ultérieure (identique au pattern `tender_defer` / `tender_reject`
     // ajoutés en migration 0004/0005). Cf. DECISIONS.md à mettre à jour.
     console.info(
-      `[audit:template_change] org=${ALYOS_ORG_ID} user=${user.email} key=${key} version=${nextVersion}`,
+      `[audit:template_change] org=${orgId} user=${user.email} key=${key} version=${nextVersion}`,
     );
 
     revalidatePath("/sourcing/admin/modeles-email");

@@ -3,14 +3,14 @@
  *
  * Server-side helper consommé par `page.tsx` (Server Component).
  * Charge :
- *   - le tender cible (filtre tenant explicite via `ALYOS_ORG_ID`)
+ *   - le tender cible (filtre tenant explicite via `orgId`)
  *   - le document RC le plus récent depuis `tender_documents` (kind = 'RC')
  *   - la dernière analyse RC depuis `tender_events` (eventType = 'rc_analyzed')
  *
  * Résilience runtime (memory `feedback_nextjs_runtime_page_resilience`) :
  *   try/catch absorbé → `{ ok: false, error }` pour éviter le 500 brutal.
  *
- * RLS / tenant : filtre `organizationId = ALYOS_ORG_ID` explicite sur chaque
+ * RLS / tenant : filtre `organizationId = orgId` explicite sur chaque
  * requête (defense in depth applicative, le rôle postgres bypass RLS).
  */
 
@@ -18,7 +18,6 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import type { RcAnalysis } from "@/lib/ai/schemas";
 
 // ---------------------------------------------------------------------------
@@ -62,8 +61,12 @@ export type LoadDossierResult =
  * Charge toutes les données nécessaires à la page dossier IA.
  *
  * @param tenderId UUID du tender (paramètre de route `[id]`)
+ * @param orgId    UUID de l'organisation courante (résolu via getRequiredOrgId)
  */
-export async function loadDossierPageData(tenderId: string): Promise<LoadDossierResult> {
+export async function loadDossierPageData(
+  tenderId: string,
+  orgId: string,
+): Promise<LoadDossierResult> {
   try {
     // 1. Charger le tender (filtre tenant)
     const [tender] = await db
@@ -76,7 +79,7 @@ export async function loadDossierPageData(tenderId: string): Promise<LoadDossier
         deadline: tenders.deadline,
       })
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
       .limit(1);
 
     if (!tender) {
@@ -97,7 +100,7 @@ export async function loadDossierPageData(tenderId: string): Promise<LoadDossier
       .where(
         and(
           eq(tenderDocuments.tenderId, tenderId),
-          eq(tenderDocuments.organizationId, ALYOS_ORG_ID),
+          eq(tenderDocuments.organizationId, orgId),
           eq(tenderDocuments.kind, "RC"),
         ),
       )
@@ -113,7 +116,7 @@ export async function loadDossierPageData(tenderId: string): Promise<LoadDossier
       .where(
         and(
           eq(tenderEvents.tenderId, tenderId),
-          eq(tenderEvents.organizationId, ALYOS_ORG_ID),
+          eq(tenderEvents.organizationId, orgId),
           eq(tenderEvents.eventType, "rc_analyzed"),
         ),
       )

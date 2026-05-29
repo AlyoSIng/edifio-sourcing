@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { COMPANY_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
 import type { Company } from "@/db/schema/companies";
@@ -39,6 +40,7 @@ export default async function EntreprisesPage({ searchParams }: { searchParams: 
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/entreprises");
   const profile = toUserProfile(user);
+  const orgId = await getRequiredOrgId(user.id);
 
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
   const search = searchParams.search?.trim() || undefined;
@@ -49,7 +51,7 @@ export default async function EntreprisesPage({ searchParams }: { searchParams: 
   let fetchError: string | null = null;
 
   try {
-    result = await fetchCompaniesPage({ page, search, specialty, implantation });
+    result = await fetchCompaniesPage({ page, search, specialty, implantation, orgId });
   } catch (err) {
     console.error("[entreprises-page:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);

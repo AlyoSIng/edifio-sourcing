@@ -21,7 +21,7 @@ import { tenders } from "@/db/schema/tenders";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import {
@@ -52,6 +52,7 @@ export default async function TandemCotraitantPage({ params }: PageProps) {
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/tandem/cotraitant`);
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   if (!UUID_SHAPE.test(params.id)) {
     return (
@@ -78,7 +79,7 @@ export default async function TandemCotraitantPage({ params }: PageProps) {
     const tenderRows = await db
       .select({ title: tenders.title, buyer: tenders.buyer })
       .from(tenders)
-      .where(and(eq(tenders.id, params.id), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, params.id), eq(tenders.organizationId, orgId)))
       .limit(1);
 
     tenderTitle = tenderRows[0]?.title ?? "";

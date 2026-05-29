@@ -10,7 +10,7 @@
  *
  * Sécurité :
  *   - Auth check obligatoire (defense in depth)
- *   - Filtre `organizationId = ALYOS_ORG_ID` sur tous les inserts
+ *   - Filtre `organizationId = orgId` sur tous les inserts
  *   - Validation des champs requis avant tout write
  *
  * Source de vérité : brief Board PR-C 2026-05-25.
@@ -24,7 +24,7 @@ import { db } from "@/db/client";
 import { responseFiles } from "@/db/schema/library";
 import { tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CerfaField } from "@/lib/dossier/cerfa-prefill";
 
@@ -99,7 +99,8 @@ async function getAuthenticatedUser() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  return { supabase, profile: toUserProfile(user) };
+  const orgId = await getRequiredOrgId(user.id);
+  return { supabase, profile: toUserProfile(user), orgId };
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +154,7 @@ export async function validateCerfa(
     const [tender] = await db
       .select({ id: tenders.id })
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)))
       .limit(1);
 
     if (!tender) return { ok: false, error: "tender_not_found" };
@@ -184,7 +185,7 @@ export async function validateCerfa(
 
     // 5. Upload Supabase Storage
     const filename = `${cerfaKind.toLowerCase()}_${Date.now()}.json`;
-    const storagePath = `${ALYOS_ORG_ID}/${tenderId}/cerfa/${filename}`;
+    const storagePath = `${auth.orgId}/${tenderId}/cerfa/${filename}`;
 
     // Storage admin : RLS bypass intentionnel — auth vérifiée L.133
     const supabaseAdmin = createSupabaseAdminClient();
@@ -205,7 +206,7 @@ export async function validateCerfa(
     try {
       await db.insert(responseFiles).values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: auth.orgId,
         kind: cerfaKind.toLowerCase(),
         name: label,
         storagePath,
@@ -248,8 +249,14 @@ export type ExistingCerfa = {
 /**
  * Charge les derniers fichiers DC1 et DC2 validés pour un tender.
  * Retourne null pour chaque kind absent.
+ *
+ * @param tenderId UUID du tender
+ * @param orgId    Organisation du tenant (résolu par l'appelant via getRequiredOrgId)
  */
-export async function loadExistingCerfa(tenderId: string): Promise<{
+export async function loadExistingCerfa(
+  tenderId: string,
+  orgId: string,
+): Promise<{
   dc1: ExistingCerfa | null;
   dc2: ExistingCerfa | null;
 }> {
@@ -271,7 +278,7 @@ export async function loadExistingCerfa(tenderId: string): Promise<{
     .where(
       and(
         eq(responseFiles.tenderId, tenderId),
-        eq(responseFiles.organizationId, ALYOS_ORG_ID),
+        eq(responseFiles.organizationId, orgId),
         inArray(responseFiles.kind, ["dc1", "dc2"]),
       ),
     )

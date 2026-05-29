@@ -5,7 +5,7 @@ import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { TenderSummaryCard } from "@/app/sourcing/_shared/TenderSummaryCard";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import { getTendersSolo } from "@/lib/sourcing/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -32,12 +32,13 @@ export default async function ReponseSoloPage() {
   if (!user) redirect("/login?next=/sourcing/reponse-solo");
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   // Résilience runtime.
   let soloTenders: Awaited<ReturnType<typeof getTendersSolo>> = [];
   let fetchError: string | null = null;
   try {
-    soloTenders = await getTendersSolo(ALYOS_ORG_ID, db);
+    soloTenders = await getTendersSolo(orgId, db);
   } catch (err) {
     console.error("[reponse-solo:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);

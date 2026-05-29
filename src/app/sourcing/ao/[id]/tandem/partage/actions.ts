@@ -19,7 +19,7 @@ import { db } from "@/db/client";
 import { cotraitantShareItems, cotraitantShares } from "@/db/schema/sharing";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -53,6 +53,7 @@ export async function createShareSession(
 
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  const orgId = await getRequiredOrgId(user.id);
 
   // Validation des champs
   const tenderId = formData.get("tenderId");
@@ -91,7 +92,7 @@ export async function createShareSession(
       .insert(cotraitantShares)
       .values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         contactName: contactName.trim(),
         contactEmail: contactEmail.trim(),
         expiresAt,
@@ -140,6 +141,7 @@ export async function revokeShare(shareId: string, tenderId: string): Promise<Ac
 
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  const revokeOrgId = await getRequiredOrgId(user.id);
 
   if (!UUID_SHAPE.test(shareId)) return { ok: false, error: "invalid_input" };
 
@@ -148,7 +150,7 @@ export async function revokeShare(shareId: string, tenderId: string): Promise<Ac
       .update(cotraitantShares)
       .set({ revokedAt: sql`now()` })
       .where(
-        and(eq(cotraitantShares.id, shareId), eq(cotraitantShares.organizationId, ALYOS_ORG_ID)),
+        and(eq(cotraitantShares.id, shareId), eq(cotraitantShares.organizationId, revokeOrgId)),
       );
 
     revalidatePath(`/sourcing/ao/${tenderId}/tandem/partage`);

@@ -5,7 +5,7 @@ import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { TenderSummaryCard } from "@/app/sourcing/_shared/TenderSummaryCard";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import { getTendersSelected } from "@/lib/sourcing/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -35,12 +35,13 @@ export default async function SelectionnesPage() {
   if (!user) redirect("/login?next=/sourcing/selectionnes");
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   // Résilience runtime : fetch encapsulé dans try/catch absorbé.
   let selectedTenders: Awaited<ReturnType<typeof getTendersSelected>> = [];
   let fetchError: string | null = null;
   try {
-    selectedTenders = await getTendersSelected(ALYOS_ORG_ID, db);
+    selectedTenders = await getTendersSelected(orgId, db);
   } catch (err) {
     console.error("[selectionnes:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);

@@ -27,6 +27,7 @@ import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 
 import { DossierClient } from "./DossierClient";
 import { loadDossierPageData } from "./page-data";
@@ -75,6 +76,7 @@ export default async function DossierPage({ params }: PageProps) {
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/dossier`);
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   // Validation UUID
   if (!UUID_SHAPE.test(params.id)) {
@@ -89,7 +91,7 @@ export default async function DossierPage({ params }: PageProps) {
   let loadResult: Awaited<ReturnType<typeof loadDossierPageData>> | null = null;
   let fetchError: string | null = null;
   try {
-    loadResult = await loadDossierPageData(params.id);
+    loadResult = await loadDossierPageData(params.id, orgId);
   } catch (err) {
     console.error("[dossier-page:unhandled]", err);
     fetchError = err instanceof Error ? err.message : String(err);

@@ -11,7 +11,7 @@ import { getSiteUrl } from "@/lib/site-url";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { db } from "@/db/client";
 import { users, memberships } from "@/db/schema/users";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 
 /**
  * POST /api/admin/users — création d'un nouveau collaborateur AlyoS par un admin.
@@ -116,7 +116,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // ---------- 3b. Création public.users + membership ----------
     // Indispensable pour que la FK audit_logs.actor_id → public.users.id
     // ne rejette pas les futures insertions d'audit. Idempotent (onConflictDoNothing).
+    // L'organisation du nouveau membre = celle de l'admin appelant (résolution dynamique).
     try {
+      const callerOrgId = await getRequiredOrgId(caller.id);
+
       await db
         .insert(users)
         .values({
@@ -130,7 +133,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       await db
         .insert(memberships)
         .values({
-          organizationId: ALYOS_ORG_ID,
+          organizationId: callerOrgId,
           userId: created.user.id,
           role,
         })

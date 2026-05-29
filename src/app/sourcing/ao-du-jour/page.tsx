@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import {
   getActiveSearchProfileName,
@@ -42,7 +42,7 @@ export const dynamic = "force-dynamic";
  * Périmètre fonctionnel (inchangé) :
  *  - Server Component
  *  - Auth check défensif
- *  - Filtre tenant explicite via `ALYOS_ORG_ID`
+ *  - Filtre tenant explicite via `orgId`
  *  - Liste verticale (un AO = une carte), tri par score serveur
  *  - Pattern de résilience runtime (hotfix PR #22) — try/catch absorbé
  *
@@ -70,6 +70,7 @@ export default async function AoDuJourPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/ao-du-jour");
   const profile = toUserProfile(user);
+  const orgId = await getRequiredOrgId(user.id);
 
   // -------------------------------------------------------------------------
   // Parsing des searchParams (tri + filtres + onglet profil — Tâche #29)
@@ -115,7 +116,7 @@ export default async function AoDuJourPage({
 
   try {
     // 1. Charger les profils actifs pour les onglets
-    const profileRows = await listSearchProfiles(ALYOS_ORG_ID, db);
+    const profileRows = await listSearchProfiles(orgId, db);
     activeProfiles = profileRows.map((p) => ({
       id: p.id,
       name: p.name,
@@ -135,7 +136,7 @@ export default async function AoDuJourPage({
 
     // 3. Charger les AOs et le nom du profil actif en parallèle
     [tenders, profileName] = await Promise.all([
-      getTendersOfTheDay(ALYOS_ORG_ID, db, {
+      getTendersOfTheDay(orgId, db, {
         sort,
         departments,
         closingDays,
@@ -144,7 +145,7 @@ export default async function AoDuJourPage({
         profileId: activeProfiles.length > 1 ? activeProfileId : null,
         keyword,
       }),
-      getActiveSearchProfileName(ALYOS_ORG_ID, db),
+      getActiveSearchProfileName(orgId, db),
     ]);
   } catch (err) {
     // TODO(Gate 8) : Sentry.captureException — cf. `src/lib/audit/index.ts`.

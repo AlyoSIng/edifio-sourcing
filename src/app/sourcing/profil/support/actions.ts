@@ -16,12 +16,12 @@
 import { db } from "@/db/client";
 import { supportTickets } from "@/db/schema/superadmin";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ─── Guard interne ────────────────────────────────────────────────────────────
 
-async function requireAlyosUser(): Promise<{ userId: string } | { error: string }> {
+async function requireAlyosUser(): Promise<{ userId: string; orgId: string } | { error: string }> {
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -30,7 +30,8 @@ async function requireAlyosUser(): Promise<{ userId: string } | { error: string 
   if (!user) return { error: "Non authentifié." };
   if (!isAuthorizedEmail(user.email)) return { error: "Domaine non autorisé." };
 
-  return { userId: user.id };
+  const orgId = await getRequiredOrgId(user.id);
+  return { userId: user.id, orgId };
 }
 
 // ─── createTicketAction ───────────────────────────────────────────────────────
@@ -40,7 +41,7 @@ async function requireAlyosUser(): Promise<{ userId: string } | { error: string 
  *
  * Effets :
  *   - Validation : subject max 200 chars, message max 5000 chars
- *   - INSERT dans `support_tickets` avec status 'open' et org_id ALYOS_ORG_ID
+ *   - INSERT dans `support_tickets` avec status 'open' et org_id résolu via getRequiredOrgId
  */
 export async function createTicketAction(
   subject: string,
@@ -48,7 +49,7 @@ export async function createTicketAction(
 ): Promise<{ ok: boolean; ticketId?: string; error?: string }> {
   const guard = await requireAlyosUser();
   if ("error" in guard) return { ok: false, error: guard.error };
-  const { userId } = guard;
+  const { userId, orgId } = guard;
 
   const trimSubject = subject?.trim() ?? "";
   const trimMessage = message?.trim() ?? "";
@@ -64,7 +65,7 @@ export async function createTicketAction(
     const [ticket] = await db
       .insert(supportTickets)
       .values({
-        orgId: ALYOS_ORG_ID,
+        orgId,
         userId,
         subject: trimSubject,
         message: trimMessage,

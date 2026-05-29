@@ -29,7 +29,7 @@ import { BriefGenerator } from "@/app/sourcing/ao-du-jour/BriefGenerator";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
 import { platforms } from "@/db/schema/config";
@@ -98,6 +98,7 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}`);
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  const orgId = await getRequiredOrgId(user.id);
 
   // Validation UUID
   if (!UUID_SHAPE.test(params.id)) {
@@ -141,7 +142,7 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
         tenderBriefs,
         and(eq(tenderBriefs.tenderId, tenders.id), eq(tenderBriefs.isActive, true)),
       )
-      .where(and(eq(tenders.id, params.id), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, params.id), eq(tenders.organizationId, orgId)))
       .limit(1);
 
     tender = rows[0] ?? null;
@@ -175,7 +176,7 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
       .where(
         and(
           eq(tenderEvents.tenderId, params.id),
-          eq(tenderEvents.organizationId, ALYOS_ORG_ID),
+          eq(tenderEvents.organizationId, orgId),
           eq(tenderEvents.eventType, "rc_analyzed"),
         ),
       )

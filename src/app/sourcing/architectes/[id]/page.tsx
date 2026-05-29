@@ -6,7 +6,7 @@ import { architects } from "@/db/schema/architects";
 import { architectResponses } from "@/db/schema/selections";
 import { tenders } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { ArchitectEditForm } from "./ArchitectEditForm";
@@ -40,13 +40,14 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
   if (!user) redirect(`/login?next=/sourcing/architectes/${params.id}`);
   const profile = toUserProfile(user);
   const adminUser = isAdmin(profile);
+  const orgId = await getRequiredOrgId(user.id);
 
   // Résilience runtime
   let architect: Awaited<ReturnType<typeof fetchArchitect>> | null = null;
   let fetchError: string | null = null;
 
   try {
-    architect = await fetchArchitect(params.id);
+    architect = await fetchArchitect(params.id, orgId);
   } catch (err) {
     console.error("[architecte-fiche:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -86,7 +87,7 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
         .where(
           and(
             eq(architectResponses.architectId, architect.id),
-            eq(architectResponses.organizationId, ALYOS_ORG_ID),
+            eq(architectResponses.organizationId, orgId),
           ),
         )
         .orderBy(desc(tenders.deadline));
@@ -354,7 +355,7 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
  * Récupère un architecte par son UUID, filtré sur le tenant AlyoS.
  * Retourne `null` si introuvable (pas d'erreur — 404 géré côté page).
  */
-async function fetchArchitect(id: string) {
+async function fetchArchitect(id: string, orgId: string) {
   // Validation UUID shape avant la requête
   const UUID_SHAPE =
     /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -363,7 +364,7 @@ async function fetchArchitect(id: string) {
   const rows = await db
     .select()
     .from(architects)
-    .where(and(eq(architects.id, id), eq(architects.organizationId, ALYOS_ORG_ID)))
+    .where(and(eq(architects.id, id), eq(architects.organizationId, orgId)))
     .limit(1);
 
   return rows[0] ?? null;

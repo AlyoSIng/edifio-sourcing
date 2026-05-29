@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { getActiveSearchProfile } from "@/lib/profile/queries";
 import { MARKET_TYPES, type MarketType } from "@/lib/profile/schema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -47,11 +47,13 @@ export default async function AdminProfilPage() {
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
-  // 2. Fetch profil actif AlyoS — try/catch résilience (defense applicative)
+  const orgId = await getRequiredOrgId(user.id);
+
+  // 2. Fetch profil actif — try/catch résilience (defense applicative)
   let activeProfile: Awaited<ReturnType<typeof getActiveSearchProfile>> = null;
   let fetchError: string | null = null;
   try {
-    activeProfile = await getActiveSearchProfile(ALYOS_ORG_ID, db);
+    activeProfile = await getActiveSearchProfile(orgId, db);
   } catch (err) {
     // TODO(Gate 8) : remplacer par Sentry.captureException — convention
     // alignée sur `src/lib/audit/index.ts` reportAuditFailure.

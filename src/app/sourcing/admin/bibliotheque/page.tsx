@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { presentationLibrary } from "@/db/schema/library";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 
@@ -42,6 +42,8 @@ export default async function BibliothequeAdminPage() {
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
+  const orgId = await getRequiredOrgId(user.id);
+
   // 2. Chargement des documents (try/catch résilience — règle MEMORY)
   let items: PresentationLibraryItem[] = [];
   let fetchError: string | null = null;
@@ -50,7 +52,7 @@ export default async function BibliothequeAdminPage() {
     items = await db
       .select()
       .from(presentationLibrary)
-      .where(eq(presentationLibrary.organizationId, ALYOS_ORG_ID))
+      .where(eq(presentationLibrary.organizationId, orgId))
       .orderBy(presentationLibrary.kind, presentationLibrary.createdAt);
   } catch (err) {
     console.error("[bibliotheque:fetch:fail]", err);

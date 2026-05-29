@@ -7,7 +7,7 @@
  *
  * Sécurité :
  *  - Auth check via `requireAlyosUser` (domaine @alyosingenierie.fr)
- *  - Filtre tenant explicite `ALYOS_ORG_ID` sur toutes les requêtes
+ *  - Filtre tenant explicite `orgId` sur toutes les requêtes
  *  - Écriture (upsertCompany, importCompanyFromCsv) : admin uniquement
  *
  * Créé dans feat/be-companies (Nadia, 2026-05-26).
@@ -20,6 +20,7 @@ import { companies } from "@/db/schema/companies";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Company, NewCompany } from "@/db/schema/companies";
 
@@ -34,6 +35,8 @@ export interface FetchCompaniesPageParams {
   search?: string;
   specialty?: string;
   implantation?: string;
+  /** UUID organisation courante. Fallback ALYOS_ORG_ID pour retro-compat. */
+  orgId?: string;
 }
 
 export interface FetchCompaniesPageResult {
@@ -88,7 +91,7 @@ interface AuthClientLike {
 async function requireAlyosUser(
   authClient: AuthClientLike,
 ): Promise<
-  | { ok: true; userId: string; profile: ReturnType<typeof toUserProfile> }
+  | { ok: true; userId: string; orgId: string; profile: ReturnType<typeof toUserProfile> }
   | { ok: false; error: "not_authenticated" | "forbidden_domain" }
 > {
   const {
@@ -97,7 +100,8 @@ async function requireAlyosUser(
   if (!user) return { ok: false, error: "not_authenticated" };
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
-  return { ok: true, userId: user.id, profile };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId, profile };
 }
 
 // ============================================================================
@@ -108,10 +112,11 @@ export async function fetchCompaniesPage(
   params: FetchCompaniesPageParams = {},
   dbClient: DrizzleClient = defaultDb,
 ): Promise<FetchCompaniesPageResult> {
-  const { page = 1, search, specialty, implantation } = params;
+  const { page = 1, search, specialty, implantation, orgId: paramOrgId } = params;
+  const resolvedOrgId = paramOrgId ?? ALYOS_ORG_ID;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
-  const conditions = [eq(companies.organizationId, ALYOS_ORG_ID)];
+  const conditions = [eq(companies.organizationId, resolvedOrgId)];
 
   if (search && search.trim().length > 0) {
     const term = `%${search.trim()}%`;
@@ -170,7 +175,7 @@ export async function upsertCompany(
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { profile } = authResult;
+  const { profile, orgId: upsertOrgId } = authResult;
 
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
@@ -189,7 +194,7 @@ export async function upsertCompany(
       const rows = await dbClient
         .update(companies)
         .set({ ...input, updatedAt: new Date() })
-        .where(and(eq(companies.id, id), eq(companies.organizationId, ALYOS_ORG_ID)))
+        .where(and(eq(companies.id, id), eq(companies.organizationId, upsertOrgId)))
         .returning();
 
       if (!rows[0]) return { ok: false, error: "not_found" };
@@ -197,7 +202,7 @@ export async function upsertCompany(
     } else {
       const rows = await dbClient
         .insert(companies)
-        .values({ ...input, organizationId: ALYOS_ORG_ID })
+        .values({ ...input, organizationId: upsertOrgId })
         .returning();
 
       if (!rows[0]) throw new Error("INSERT companies returned no row");
@@ -231,7 +236,7 @@ export async function importCompanyFromCsv(formData: FormData): Promise<ImportCo
   if (!authResult.ok) {
     return { imported: 0, updated: 0, errors: ["Non authentifié ou domaine non autorisé."] };
   }
-  const { profile } = authResult;
+  const { profile, orgId: importOrgId } = authResult;
 
   if (!isAdmin(profile)) {
     return { imported: 0, updated: 0, errors: ["Action réservée aux administrateurs."] };
@@ -298,14 +303,14 @@ export async function importCompanyFromCsv(formData: FormData): Promise<ImportCo
         const existing = await defaultDb
           .select({ id: companies.id })
           .from(companies)
-          .where(and(eq(companies.organizationId, ALYOS_ORG_ID), eq(companies.siren, siren)))
+          .where(and(eq(companies.organizationId, importOrgId), eq(companies.siren, siren)))
           .limit(1);
         existingId = existing[0]?.id ?? null;
       } else if (email) {
         const existing = await defaultDb
           .select({ id: companies.id })
           .from(companies)
-          .where(and(eq(companies.organizationId, ALYOS_ORG_ID), eq(companies.email, email)))
+          .where(and(eq(companies.organizationId, importOrgId), eq(companies.email, email)))
           .limit(1);
         existingId = existing[0]?.id ?? null;
       }
@@ -327,11 +332,11 @@ export async function importCompanyFromCsv(formData: FormData): Promise<ImportCo
             notes,
             updatedAt: new Date(),
           })
-          .where(and(eq(companies.id, existingId), eq(companies.organizationId, ALYOS_ORG_ID)));
+          .where(and(eq(companies.id, existingId), eq(companies.organizationId, importOrgId)));
         updated++;
       } else {
         await defaultDb.insert(companies).values({
-          organizationId: ALYOS_ORG_ID,
+          organizationId: importOrgId,
           name,
           email,
           phone,
