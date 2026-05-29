@@ -33,6 +33,7 @@ export interface FetchCompaniesPageParams {
   page?: number;
   search?: string;
   specialty?: string;
+  implantation?: string;
 }
 
 export interface FetchCompaniesPageResult {
@@ -107,7 +108,7 @@ export async function fetchCompaniesPage(
   params: FetchCompaniesPageParams = {},
   dbClient: DrizzleClient = defaultDb,
 ): Promise<FetchCompaniesPageResult> {
-  const { page = 1, search, specialty } = params;
+  const { page = 1, search, specialty, implantation } = params;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
   const conditions = [eq(companies.organizationId, ALYOS_ORG_ID)];
@@ -125,6 +126,10 @@ export async function fetchCompaniesPage(
 
   if (specialty && specialty.trim().length > 0) {
     conditions.push(sql`${companies.specialtyCodes} @> ARRAY[${specialty.trim()}]::text[]`);
+  }
+
+  if (implantation && implantation.trim().length > 0) {
+    conditions.push(ilike(companies.zip, `${implantation.trim()}%`));
   }
 
   const where = and(...conditions);

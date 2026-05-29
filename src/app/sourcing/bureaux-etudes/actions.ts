@@ -42,6 +42,7 @@ export interface FetchBEPageParams {
   page?: number;
   search?: string;
   specialty?: string;
+  implantation?: string;
 }
 
 export interface FetchBEPageResult {
@@ -117,7 +118,7 @@ export async function fetchBEPage(
   params: FetchBEPageParams = {},
   dbClient: DrizzleClient = defaultDb,
 ): Promise<FetchBEPageResult> {
-  const { page = 1, search, specialty } = params;
+  const { page = 1, search, specialty, implantation } = params;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
   const conditions = [eq(bureauEtudes.organizationId, ALYOS_ORG_ID)];
@@ -135,6 +136,10 @@ export async function fetchBEPage(
 
   if (specialty && specialty.trim().length > 0) {
     conditions.push(sql`${bureauEtudes.specialtyCodes} @> ARRAY[${specialty.trim()}]::text[]`);
+  }
+
+  if (implantation && implantation.trim().length > 0) {
+    conditions.push(ilike(bureauEtudes.zip, `${implantation.trim()}%`));
   }
 
   const where = and(...conditions);
