@@ -15,6 +15,8 @@
 
 import { useState } from "react";
 
+import { PipelineKeywordBar } from "@/app/sourcing/_shared/PipelineKeywordBar";
+
 import type { PipelineEntry } from "./page-data";
 
 // ---------------------------------------------------------------------------
@@ -281,6 +283,7 @@ interface Props {
 
 export function CotraitancePipelineClient({ entries }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("all");
+  const [keyword, setKeyword] = useState("");
 
   // État vide global (aucun AO en pipeline Tandem)
   if (entries.length === 0) {
@@ -294,12 +297,24 @@ export function CotraitancePipelineClient({ entries }: Props) {
     );
   }
 
-  // Filtrage côté client selon l'onglet actif
+  // Filtrage côté client selon l'onglet actif + mots-clés
   const allowedStatuses = TAB_STATUSES[activeTab];
-  const filtered = entries.filter((e) => allowedStatuses.includes(e.tender.status));
+  const filtered = entries.filter((e) => {
+    if (!allowedStatuses.includes(e.tender.status)) return false;
+    if (!keyword.trim()) return true;
+    const kw = keyword.toLowerCase();
+    return e.tender.title.toLowerCase().includes(kw) || e.tender.buyer.toLowerCase().includes(kw);
+  });
 
   return (
     <div>
+      {/* Barre de filtre keyword — mode local (données déjà en mémoire) */}
+      <PipelineKeywordBar
+        currentKeyword={keyword}
+        onSearch={(kw) => setKeyword(kw)}
+        onClear={() => setKeyword("")}
+      />
+
       {/* Tabs de filtre */}
       <div
         role="tablist"

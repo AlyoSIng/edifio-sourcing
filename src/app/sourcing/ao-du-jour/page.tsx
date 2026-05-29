@@ -5,6 +5,7 @@ import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import {
+  getActiveSearchProfileKeywords,
   getActiveSearchProfileName,
   getTendersOfTheDay,
   type TenderSortOrder,
@@ -119,6 +120,8 @@ export default async function AoDuJourPage({
   //     <ErrorBanner /> rendu. (c) Observabilité future Sentry Gate 8.
   let tenders: Awaited<ReturnType<typeof getTendersOfTheDay>> = [];
   let profileName: Awaited<ReturnType<typeof getActiveSearchProfileName>> = null;
+  /** Mots-clés positifs du profil actif — pour les badges matchedKeywords sur les cartes */
+  let positiveKeywords: string[] = [];
   let fetchError: string | null = null;
   /** Profils actifs pour les onglets (Tâche #29). Vide si erreur ou un seul. */
   let activeProfiles: Array<{ id: string; name: string; isDefault: boolean }> = [];
@@ -145,8 +148,8 @@ export default async function AoDuJourPage({
       activeProfileId = defaultProfile?.id ?? null;
     }
 
-    // 3. Charger les AOs et le nom du profil actif en parallèle
-    [tenders, profileName] = await Promise.all([
+    // 3. Charger les AOs, le nom du profil actif et les mots-clés positifs en parallèle
+    [tenders, profileName, positiveKeywords] = await Promise.all([
       getTendersOfTheDay(orgId, db, {
         sort,
         departments,
@@ -157,6 +160,7 @@ export default async function AoDuJourPage({
         keyword,
       }),
       getActiveSearchProfileName(orgId, db),
+      getActiveSearchProfileKeywords(orgId, activeProfileId, db),
     ]);
   } catch (err) {
     // TODO(Gate 8) : Sentry.captureException — cf. `src/lib/audit/index.ts`.
@@ -270,13 +274,32 @@ export default async function AoDuJourPage({
         <ul className="flex flex-col gap-3.5">
           {tenders.map((tender) => (
             <li key={tender.id}>
-              <TenderCard tender={tender} />
+              <TenderCard
+                tender={tender}
+                matchedKeywords={computeMatchedKeywords(tender, positiveKeywords)}
+              />
             </li>
           ))}
         </ul>
       )}
     </div>
   );
+}
+
+/**
+ * Calcule les mots-clés positifs du profil actif qui apparaissent dans le
+ * titre ou le nom de l'acheteur d'un AO.
+ *
+ * Recherche insensible à la casse. Retourne `[]` si `positiveKeywords` est vide.
+ * Utilisé pour les badges « ✓ mot-clé » sur les cartes TenderCard.
+ */
+function computeMatchedKeywords(
+  tender: Awaited<ReturnType<typeof getTendersOfTheDay>>[number],
+  positiveKeywords: string[],
+): string[] {
+  if (positiveKeywords.length === 0) return [];
+  const haystack = `${tender.title} ${tender.buyer}`.toLowerCase();
+  return positiveKeywords.filter((kw) => haystack.includes(kw.toLowerCase()));
 }
 
 /**

@@ -48,6 +48,7 @@ import type { db as defaultDb } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
 import { platforms, searchProfiles } from "@/db/schema/config";
 import { tenders } from "@/db/schema/tenders";
+import type { SearchProfileKeywords } from "@/db/types/jsonb";
 import { getSearchProfileById } from "@/lib/profile/search-profiles-queries";
 
 import type { PlatformCode } from "./types";
@@ -385,7 +386,15 @@ export interface TenderSelected extends TenderOfTheDay {
 export async function getTendersSelected(
   organizationId: string,
   client: DrizzleClient,
+  options?: { keyword?: string | null },
 ): Promise<TenderSelected[]> {
+  // Filtre mots-clés sur titre + maître d'ouvrage (même logique que getTendersOfTheDay)
+  const keyword = options?.keyword ?? null;
+  const keywordCondition =
+    keyword && keyword.trim().length > 0
+      ? or(ilike(tenders.title, `%${keyword.trim()}%`), ilike(tenders.buyer, `%${keyword.trim()}%`))
+      : undefined;
+
   const rows = await client
     .select({
       id: tenders.id,
@@ -410,6 +419,7 @@ export async function getTendersSelected(
         eq(tenders.organizationId, organizationId),
         inArray(tenders.status, ["selected_solo", "selected_tandem"]),
         or(isNull(tenders.deadline), gt(tenders.deadline, sql`now()`)),
+        keywordCondition,
       ),
     )
     .orderBy(sql`${tenders.deadline} ASC NULLS LAST`)
@@ -519,7 +529,15 @@ export async function getTendersSolo(
 export async function getTendersDeferred(
   organizationId: string,
   client: DrizzleClient,
+  options?: { keyword?: string | null },
 ): Promise<TenderOfTheDay[]> {
+  // Filtre mots-clés sur titre + maître d'ouvrage (même logique que getTendersOfTheDay)
+  const keyword = options?.keyword ?? null;
+  const keywordCondition =
+    keyword && keyword.trim().length > 0
+      ? or(ilike(tenders.title, `%${keyword.trim()}%`), ilike(tenders.buyer, `%${keyword.trim()}%`))
+      : undefined;
+
   const rows = await client
     .select({
       id: tenders.id,
@@ -549,6 +567,7 @@ export async function getTendersDeferred(
         eq(tenders.organizationId, organizationId),
         isNotNull(tenders.deferredUntil),
         gt(tenders.deferredUntil, sql`now()`),
+        keywordCondition,
       ),
     )
     .orderBy(asc(tenders.deferredUntil))
@@ -627,4 +646,56 @@ export async function getActiveSearchProfileName(
 
   const head = rows[0];
   return head ? head.name : null;
+}
+
+// ============================================================================
+// 8. getActiveSearchProfileKeywords — mots-clés positifs du profil actif
+// ============================================================================
+
+/**
+ * Retourne les mots-clés positifs du profil de recherche actif (ou d'un profil
+ * donné par son id). Utilisé pour afficher les badges « mots-clés matchés »
+ * sur les cartes AO du jour.
+ *
+ * Logique :
+ *  - Si `profileId` est fourni → lecture directe du profil par id
+ *  - Sinon → profil actif de l'organisation (premier par créatedAt ASC)
+ *
+ * Retourne `[]` si aucun profil trouvé ou si la liste positive est vide.
+ *
+ * @param organizationId — UUID du tenant courant
+ * @param profileId      — UUID du profil spécifique (null = profil par défaut)
+ * @param client         — instance Drizzle (mock-friendly)
+ */
+export async function getActiveSearchProfileKeywords(
+  organizationId: string,
+  profileId: string | null,
+  client: DrizzleClient,
+): Promise<string[]> {
+  let rows: Array<{ keywords: SearchProfileKeywords }>;
+
+  if (profileId) {
+    // Lecture directe par id — vérification tenant obligatoire
+    rows = await client
+      .select({ keywords: searchProfiles.keywords })
+      .from(searchProfiles)
+      .where(
+        and(eq(searchProfiles.id, profileId), eq(searchProfiles.organizationId, organizationId)),
+      )
+      .limit(1);
+  } else {
+    // Profil actif par défaut
+    rows = await client
+      .select({ keywords: searchProfiles.keywords })
+      .from(searchProfiles)
+      .where(
+        and(eq(searchProfiles.organizationId, organizationId), eq(searchProfiles.active, true)),
+      )
+      .orderBy(asc(searchProfiles.createdAt))
+      .limit(1);
+  }
+
+  const profile = rows[0];
+  if (!profile) return [];
+  return profile.keywords.positive ?? [];
 }

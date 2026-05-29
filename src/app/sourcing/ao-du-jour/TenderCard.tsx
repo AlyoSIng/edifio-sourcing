@@ -32,10 +32,16 @@ function noticeTypeLabel(raw: string): string {
  *     statique (rawData). Bouton « Générer le brief » toujours disponible.
  *   - Département extrait de rawData, fallback regex code postal dans buyer
  *   - Liens « Consulter l'avis » + « Accéder au DCE / RC » si disponibles
- *
- * Aucune touche aux données : signature `TenderCard({ tender })` inchangée.
+ *   - `matchedKeywords` : mots-clés positifs du profil actif qui matchent le
+ *     titre ou l'acheteur de l'AO — affichés en badges emerald sous les meta.
  */
-export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
+export function TenderCard({
+  tender,
+  matchedKeywords = [],
+}: {
+  tender: TenderOfTheDay;
+  matchedKeywords?: string[];
+}) {
   const mainCpv = tender.cpv[0] ?? "—";
   const platformLabel = tender.platformCode.toUpperCase();
   const scoreNum = tender.score ? Math.round(Number(tender.score)) : null;
@@ -108,6 +114,20 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
             {platformLabel}
           </span>
         </div>
+
+        {/* Badges mots-clés matchés — mots-clés positifs du profil actif présents dans titre/acheteur */}
+        {matchedKeywords.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {matchedKeywords.map((kw) => (
+              <span
+                key={kw}
+                className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200"
+              >
+                ✓ {kw}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         {/* Brief AO — IA actif si disponible (avec badge), sinon BOAMP statique */}
         {displayBrief ? (
