@@ -12,7 +12,7 @@
  */
 
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 import type { OrganizationOdooConfig } from "../types/jsonb";
 import { subscriptionTier } from "./enums";
@@ -35,6 +35,23 @@ export const organizations = pgTable(
      * DEFAULT 'studio' : AlyoS Ingénierie démarre sur le palier complet au MVP.
      */
     subscriptionTier: subscriptionTier("subscription_tier").notNull().default("studio"),
+    /**
+     * URL publique du logo organisation (bucket Supabase `org-assets`).
+     * Nullable : l'organisation utilise le logo edifio Sourcing par défaut.
+     */
+    logoUrl: text("logo_url"),
+    /**
+     * Couleur dominante de marque au format hexadécimal 6 chiffres (#RRGGBB).
+     * Override `--brand-red` et ses variantes dans le layout Sourcing.
+     * Nullable : utilise la couleur edifio par défaut (#ff0033).
+     */
+    primaryColor: varchar("primary_color", { length: 7 }),
+    /**
+     * Famille de police pour les titres (`--font-display`).
+     * Valeurs autorisées : space-grotesk | outfit | playfair-display | inter.
+     * Nullable : utilise Space Grotesk (défaut DS edifio).
+     */
+    fontFamily: varchar("font_family", { length: 50 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

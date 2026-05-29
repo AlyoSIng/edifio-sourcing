@@ -225,6 +225,13 @@
       "when": 1779731006000,
       "tag": "0031_tender_is_exclusive",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1779731007000,
+      "tag": "0032_org_branding",
+      "breakpoints": true
     }
   ]
 }

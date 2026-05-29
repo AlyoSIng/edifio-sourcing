@@ -201,6 +201,13 @@ export const NAV_ITEMS: NavSection[] = [
         matchPrefix: "/sourcing/admin/shortlist",
         adminOnly: true,
       },
+      {
+        href: "/sourcing/admin/settings",
+        label: "Personnalisation",
+        icon: "settings",
+        matchPrefix: "/sourcing/admin/settings",
+        adminOnly: true,
+      },
     ],
   },
   {

@@ -10,6 +10,13 @@ import "@fontsource/inter/700.css";
 import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/700.css";
 import "@fontsource/jetbrains-mono/400.css";
+// Polices additionnelles pour le branding organisation (feature Gate 6 — Personnalisation).
+// Chargées globalement pour être disponibles immédiatement quand --font-display est overridé.
+import "@fontsource/playfair-display/400.css";
+import "@fontsource/playfair-display/700.css";
+import "@fontsource/outfit/400.css";
+import "@fontsource/outfit/600.css";
+import "@fontsource/outfit/700.css";
 
 import "./globals.css";
 
