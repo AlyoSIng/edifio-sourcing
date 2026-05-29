@@ -40,6 +40,8 @@
     "@anthropic-ai/sdk": "^0.98.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/outfit": "^5.2.8",
+    "@fontsource/playfair-display": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
@@ -54,6 +56,8 @@
   "devDependencies": {
     "@commitlint/cli": "^21.0.0",
     "@commitlint/config-conventional": "^21.0.0",
+    "@esbuild/linux-x64": "^0.28.0",
+    "@esbuild/win32-arm64": "0.19.12",
     "@faker-js/faker": "10.0.0",
     "@next/env": "^16.2.6",
     "@playwright/test": "^1.59.1",
@@ -80,9 +84,6 @@
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css,md,html,yml,yaml}": "prettier --check",
     "*.{ts,tsx,js,jsx}": "eslint --max-warnings 0"
-  },
-  "optionalDependencies": {
-    "@esbuild/win32-arm64": "0.28.0"
   },
   "pnpm": {
     "supportedArchitectures": {

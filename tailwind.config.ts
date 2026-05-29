@@ -82,7 +82,10 @@ const config: Config = {
         // Familles auto-utilisées par <html class="font-sans"> et utilitaires Tailwind.
         // Cf. import des CSS fontsource dans src/app/layout.tsx.
         sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "Inter", "system-ui", "sans-serif"],
+        // Lit la CSS var `--font-display` définie dans globals.css (défaut : Space
+        // Grotesk). Le layout Sourcing peut l'overrider via une `<style>` inline
+        // injectée par `computeBrandingCss()` selon la police choisie par l'org.
+        display: ["var(--font-display)", { fontFeatureSettings: '"ss01"' }],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
 
