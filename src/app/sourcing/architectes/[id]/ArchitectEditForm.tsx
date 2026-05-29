@@ -54,7 +54,17 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
 
   // Champs du formulaire — données principales
   const [cabinet, setCabinet] = useState(architect.cabinet);
-  const [contactName, setContactName] = useState(architect.contactName ?? "");
+  // Prénom / Nom dérivés depuis contactName stocké en BDD ("Prénom Nom")
+  const [firstName, setFirstName] = useState(() => {
+    const name = architect.contactName ?? "";
+    const spaceIdx = name.indexOf(" ");
+    return spaceIdx >= 0 ? name.slice(0, spaceIdx) : name;
+  });
+  const [lastName, setLastName] = useState(() => {
+    const name = architect.contactName ?? "";
+    const spaceIdx = name.indexOf(" ");
+    return spaceIdx >= 0 ? name.slice(spaceIdx + 1) : "";
+  });
   const [email, setEmail] = useState(architect.email ?? "");
   const [phone, setPhone] = useState(architect.phone ?? "");
   const [website, setWebsite] = useState(architect.website ?? "");
@@ -125,7 +135,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
       const result = await upsertArchitect(
         {
           cabinet: cabinet.trim(),
-          contactName: contactName.trim() || null,
+          contactName: [firstName, lastName].filter(Boolean).join(" ") || null,
           email: email.trim() || null,
           phone: phone.trim() || null,
           website: website.trim() || null,
@@ -229,32 +239,42 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
             />
           </div>
 
-          {/* Contact + Email sur deux colonnes */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Prénom + Nom du contact sur deux colonnes */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="contactName" className="block text-xs font-medium text-ink">
-                Nom du contact
-              </label>
+              <label className="mb-1 block text-xs font-medium text-ink">Prénom</label>
               <input
-                id="contactName"
                 type="text"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Prénom du contact"
+                className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
             </div>
             <div>
-              <label htmlFor="email" className="block text-xs font-medium text-ink">
-                Email
-              </label>
+              <label className="mb-1 block text-xs font-medium text-ink">Nom</label>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Nom du contact"
+                className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
             </div>
+          </div>
+
+          {/* Email */}
+          <div>
+            <label htmlFor="email" className="block text-xs font-medium text-ink">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
           </div>
 
           {/* Téléphone + Site web */}

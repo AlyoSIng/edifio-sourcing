@@ -51,6 +51,8 @@ export interface FetchArchitectsPageParams {
   search?: string;
   /** Filtre sur département (contenu dans `geo_zones`). */
   departement?: string;
+  /** Filtre sur le début du code postal (siège du cabinet). */
+  implantation?: string;
   /** Filtre booléen `tutoiement`. */
   tutoiement?: boolean;
   /** Filtre booléen `solicitable`. */
@@ -157,7 +159,15 @@ export async function fetchArchitectsPage(
   params: FetchArchitectsPageParams = {},
   dbClient: DrizzleClient = defaultDb,
 ): Promise<FetchArchitectsPageResult> {
-  const { page = 1, search, departement, tutoiement, solicitable, rgpdOpposition } = params;
+  const {
+    page = 1,
+    search,
+    departement,
+    implantation,
+    tutoiement,
+    solicitable,
+    rgpdOpposition,
+  } = params;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
   // Construction dynamique des conditions WHERE
@@ -177,6 +187,11 @@ export async function fetchArchitectsPage(
   if (departement && departement.trim().length > 0) {
     // Filtre sur l'array geo_zones : contient le département donné
     conditions.push(sql`${architects.geoZones} @> ARRAY[${departement.trim()}]::text[]`);
+  }
+
+  if (implantation && implantation.trim().length > 0) {
+    // Filtre sur le début du zip (siège du cabinet)
+    conditions.push(ilike(architects.zip, `${implantation.trim()}%`));
   }
 
   if (tutoiement !== undefined) {
