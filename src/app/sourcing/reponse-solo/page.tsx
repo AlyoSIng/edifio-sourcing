@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
+import { PipelineKeywordBar } from "@/app/sourcing/_shared/PipelineKeywordBar";
 import { TenderSummaryCard } from "@/app/sourcing/_shared/TenderSummaryCard";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
@@ -24,7 +25,11 @@ export const metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default async function ReponseSoloPage() {
+export default async function ReponseSoloPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
   // Auth check défensif.
   const supabase = createSupabaseServerClient();
   const {
@@ -44,11 +49,15 @@ export default async function ReponseSoloPage() {
     orgId = ALYOS_ORG_ID;
   }
 
+  // Parsing du filtre keyword depuis les searchParams.
+  const keyword =
+    typeof searchParams.keyword === "string" ? searchParams.keyword.trim() || null : null;
+
   // Résilience runtime.
   let soloTenders: Awaited<ReturnType<typeof getTendersSolo>> = [];
   let fetchError: string | null = null;
   try {
-    soloTenders = await getTendersSolo(orgId, db);
+    soloTenders = await getTendersSolo(orgId, db, { keyword });
   } catch (err) {
     console.error("[reponse-solo:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -68,15 +77,26 @@ export default async function ReponseSoloPage() {
           {fetchError ? (
             "Erreur de chargement — voir détail ci-dessous."
           ) : totalCount === 0 ? (
-            "Aucun AO en mode Mandataire pour le moment."
+            keyword ? (
+              <>
+                Aucun dossier mandataire ne correspond au filtre&nbsp;: &laquo;&nbsp;{keyword}
+                &nbsp;&raquo;.
+              </>
+            ) : (
+              "Aucun AO en mode Mandataire pour le moment."
+            )
           ) : (
             <>
               {totalCount} dossier{totalCount > 1 ? "s" : ""} mandataire en cours — triés par date
               de clôture.
+              {keyword ? <> · filtre&nbsp;: &laquo;&nbsp;{keyword}&nbsp;&raquo;</> : null}
             </>
           )}
         </p>
       </header>
+
+      {/* Barre de filtre keyword — visible si pas d'erreur */}
+      {!fetchError && <PipelineKeywordBar currentKeyword={keyword ?? ""} />}
 
       {/* Contenu principal */}
       {fetchError ? (

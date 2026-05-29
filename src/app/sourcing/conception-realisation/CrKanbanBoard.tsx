@@ -15,7 +15,11 @@
  *   - `handoff/BRIEF_CHANTIER_260527.md` §Feature 1 Pipeline C/R
  */
 
+import { useState } from "react";
+
 import Link from "next/link";
+
+import { PipelineKeywordBar } from "@/app/sourcing/_shared/PipelineKeywordBar";
 
 import type { CrCard, CrKanbanData } from "./page-data";
 
@@ -186,6 +190,8 @@ interface Props {
 }
 
 export function CrKanbanBoard({ data }: Props) {
+  const [keyword, setKeyword] = useState("");
+
   const totalAos =
     data.a_analyser.length +
     data.rc_analysee.length +
@@ -203,11 +209,36 @@ export function CrKanbanBoard({ data }: Props) {
     );
   }
 
+  // Filtrage local par mots-clés : appliqué sur chaque colonne individuellement
+  function filterCards(cards: CrCard[]): CrCard[] {
+    if (!keyword.trim()) return cards;
+    const kw = keyword.toLowerCase();
+    return cards.filter(
+      (c) => c.title.toLowerCase().includes(kw) || c.buyer.toLowerCase().includes(kw),
+    );
+  }
+
+  const filteredData: CrKanbanData = {
+    a_analyser: filterCards(data.a_analyser),
+    rc_analysee: filterCards(data.rc_analysee),
+    dossier_en_cours: filterCards(data.dossier_en_cours),
+    soumis: filterCards(data.soumis),
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {COLUMNS.map((col) => (
-        <KanbanColumn key={col.key} config={col} cards={data[col.key]} />
-      ))}
+    <div>
+      {/* Barre de filtre keyword — mode local (données déjà en mémoire) */}
+      <PipelineKeywordBar
+        currentKeyword={keyword}
+        onSearch={(kw) => setKeyword(kw)}
+        onClear={() => setKeyword("")}
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {COLUMNS.map((col) => (
+          <KanbanColumn key={col.key} config={col} cards={filteredData[col.key]} />
+        ))}
+      </div>
     </div>
   );
 }

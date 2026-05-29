@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { TenderSummaryCard } from "@/app/sourcing/_shared/TenderSummaryCard";
+import { PipelineKeywordBar } from "@/app/sourcing/_shared/PipelineKeywordBar";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -24,7 +25,11 @@ export const metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default async function ReportesPage() {
+export default async function ReportesPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
   // Auth check défensif.
   const supabase = createSupabaseServerClient();
   const {
@@ -44,11 +49,15 @@ export default async function ReportesPage() {
     orgId = ALYOS_ORG_ID;
   }
 
+  // Parsing du filtre keyword depuis les searchParams.
+  const keyword =
+    typeof searchParams.keyword === "string" ? searchParams.keyword.trim() || null : null;
+
   // Résilience runtime.
   let deferredTenders: Awaited<ReturnType<typeof getTendersDeferred>> = [];
   let fetchError: string | null = null;
   try {
-    deferredTenders = await getTendersDeferred(orgId, db);
+    deferredTenders = await getTendersDeferred(orgId, db, { keyword });
   } catch (err) {
     console.error("[reportes:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -68,14 +77,24 @@ export default async function ReportesPage() {
           {fetchError ? (
             "Erreur de chargement — voir détail ci-dessous."
           ) : totalCount === 0 ? (
-            "Aucun AO reporté pour le moment."
+            keyword ? (
+              <>
+                Aucun AO reporté ne correspond au filtre&nbsp;: &laquo;&nbsp;{keyword}&nbsp;&raquo;.
+              </>
+            ) : (
+              "Aucun AO reporté pour le moment."
+            )
           ) : (
             <>
               {totalCount} AO reporté{totalCount > 1 ? "s" : ""} — triés par date de retour.
+              {keyword ? <> · filtre&nbsp;: &laquo;&nbsp;{keyword}&nbsp;&raquo;</> : null}
             </>
           )}
         </p>
       </header>
+
+      {/* Barre de filtre keyword — visible si pas d'erreur */}
+      {!fetchError ? <PipelineKeywordBar currentKeyword={keyword ?? ""} /> : null}
 
       {/* Contenu principal */}
       {fetchError ? (

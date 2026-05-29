@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { TenderSummaryCard } from "@/app/sourcing/_shared/TenderSummaryCard";
+import { PipelineKeywordBar } from "@/app/sourcing/_shared/PipelineKeywordBar";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -27,7 +28,11 @@ export const metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default async function SelectionnesPage() {
+export default async function SelectionnesPage({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
   // Auth check défensif (le middleware a normalement déjà filtré).
   const supabase = createSupabaseServerClient();
   const {
@@ -47,11 +52,15 @@ export default async function SelectionnesPage() {
     orgId = ALYOS_ORG_ID;
   }
 
+  // Parsing du filtre keyword depuis les searchParams.
+  const keyword =
+    typeof searchParams.keyword === "string" ? searchParams.keyword.trim() || null : null;
+
   // Résilience runtime : fetch encapsulé dans try/catch absorbé.
   let selectedTenders: Awaited<ReturnType<typeof getTendersSelected>> = [];
   let fetchError: string | null = null;
   try {
-    selectedTenders = await getTendersSelected(orgId, db);
+    selectedTenders = await getTendersSelected(orgId, db, { keyword });
   } catch (err) {
     console.error("[selectionnes:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -74,11 +83,19 @@ export default async function SelectionnesPage() {
           {fetchError ? (
             "Erreur de chargement — voir détail ci-dessous."
           ) : totalCount === 0 ? (
-            "Aucun AO sélectionné pour le moment."
+            keyword ? (
+              <>
+                Aucun AO sélectionné ne correspond au filtre&nbsp;: &laquo;&nbsp;{keyword}
+                &nbsp;&raquo;.
+              </>
+            ) : (
+              "Aucun AO sélectionné pour le moment."
+            )
           ) : (
             <>
               {totalCount} AO sélectionné{totalCount > 1 ? "s" : ""} — {soloCount} Mandataire,{" "}
               {tandemCount} Co-traitant. Triés par date de clôture.
+              {keyword ? <> · filtre&nbsp;: &laquo;&nbsp;{keyword}&nbsp;&raquo;</> : null}
             </>
           )}
         </p>
@@ -92,6 +109,9 @@ export default async function SelectionnesPage() {
           <KpiCard label="Co-traitant" value={tandemCount} />
         </div>
       ) : null}
+
+      {/* Barre de filtre keyword — visible si pas d'erreur */}
+      {!fetchError ? <PipelineKeywordBar currentKeyword={keyword ?? ""} /> : null}
 
       {/* Contenu principal */}
       {fetchError ? (
