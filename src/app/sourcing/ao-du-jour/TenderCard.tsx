@@ -83,6 +83,24 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
               {noticeTypeLabel(tender.noticeType)}
             </span>
           ) : null}
+          {/* Badge visite de site — visible si visit_date renseigné */}
+          {tender.visitDate ? (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700"
+              title={`Visite de site prévue le ${tender.visitDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}`}
+            >
+              Visite
+            </span>
+          ) : null}
+          {/* Badge exclusivité */}
+          {tender.isExclusive ? (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+              title="AO avec clause d'exclusivité"
+            >
+              Exclusif
+            </span>
+          ) : null}
           <span
             className="rounded-xs bg-paper-2 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-2"
             aria-label="Plateforme source"

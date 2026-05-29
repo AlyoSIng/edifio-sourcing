@@ -218,6 +218,13 @@
       "when": 1748996300000,
       "tag": "0030_formations_slug_content",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1748996400000,
+      "tag": "0031_tender_is_exclusive",
+      "breakpoints": true
     }
   ]
 }

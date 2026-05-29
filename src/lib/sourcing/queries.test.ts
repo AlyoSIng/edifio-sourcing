@@ -66,6 +66,8 @@ const tenderRow1: TenderOfTheDay = {
   department: "42",
   activeBrief: null,
   noticeType: null,
+  visitDate: null,
+  isExclusive: false,
 };
 
 const tenderRow2: TenderOfTheDay = {
@@ -87,6 +89,8 @@ const tenderRow2: TenderOfTheDay = {
   department: "69",
   activeBrief: null,
   noticeType: null,
+  visitDate: null,
+  isExclusive: false,
 };
 
 const tenderRow3: TenderOfTheDay = {
@@ -108,6 +112,8 @@ const tenderRow3: TenderOfTheDay = {
   department: null,
   activeBrief: null,
   noticeType: null,
+  visitDate: null,
+  isExclusive: false,
 };
 
 /**
@@ -136,6 +142,8 @@ const tenderRow4PreviouslyDeferred: TenderOfTheDay = {
   department: null,
   activeBrief: null,
   noticeType: null,
+  visitDate: null,
+  isExclusive: false,
 };
 
 // ----------------------------------------------------------------------------

@@ -110,6 +110,13 @@ export const tenders = pgTable(
      * Les avis d'attribution sont exclus du filtre getTendersOfTheDay côté app.
      */
     noticeType: text("notice_type"),
+    /**
+     * AO avec clause d'exclusivité (ex. sollicitation directe d'un MOA
+     * à AlyoS uniquement, marché réservé, négociation exclusive).
+     * Posé manuellement par un admin ou détecté à l'import.
+     * Default false.
+     */
+    isExclusive: boolean("is_exclusive").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

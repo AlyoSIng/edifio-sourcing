@@ -28,7 +28,21 @@
  * `Page()` appelle effectivement le helper.
  */
 
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql, lte } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+  sql,
+  lte,
+} from "drizzle-orm";
 
 import type { db as defaultDb } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
@@ -113,6 +127,16 @@ export interface TenderOfTheDay {
    * et n'atteignent pas l'UI sauf si la colonne est NULL (backfill passif).
    */
   noticeType: string | null;
+  /**
+   * Date de visite de site (si obligatoire — champ visit_date en BDD).
+   * null = pas de visite prévue ou non renseigné.
+   */
+  visitDate: Date | null;
+  /**
+   * AO avec clause d'exclusivité (migration 0031).
+   * true = sollicitation directe / marché réservé pour AlyoS.
+   */
+  isExclusive: boolean;
 }
 
 // ============================================================================
@@ -146,6 +170,12 @@ export interface TenderAoDuJourOptions {
    * (comportement historique V1).
    */
   profileId?: string | null;
+  /**
+   * Recherche texte libre sur le titre et le maître d'ouvrage.
+   * Utilisé pour filtrer les AOs par mots-clés depuis la toolbar.
+   * null ou '' = pas de filtre textuel.
+   */
+  keyword?: string | null;
 }
 
 // ============================================================================
@@ -182,7 +212,13 @@ export async function getTendersOfTheDay(
   client: DrizzleClient,
   options?: TenderAoDuJourOptions,
 ): Promise<TenderOfTheDay[]> {
-  const { sort = "score", departments = [], closingDays = null, profileId = null } = options ?? {};
+  const {
+    sort = "score",
+    departments = [],
+    closingDays = null,
+    profileId = null,
+    keyword = null,
+  } = options ?? {};
 
   // Filtres statiques (tenant + workflow)
   const baseConditions = [
@@ -207,6 +243,12 @@ export async function getTendersOfTheDay(
   // Filtre département multi-select (optionnel, vient de la toolbar UI)
   const deptCondition =
     departments.length > 0 ? inArray(tenders.department, departments) : undefined;
+
+  // Filtre mots-clés sur titre + maître d'ouvrage (ilike — utilise l'index GIN trigram)
+  const keywordCondition =
+    keyword && keyword.trim().length > 0
+      ? or(ilike(tenders.title, `%${keyword.trim()}%`), ilike(tenders.buyer, `%${keyword.trim()}%`))
+      : undefined;
 
   // Filtre fenêtre de clôture (valeur typée 7|15|30 — pas de string libre)
   const closingCondition =
@@ -254,6 +296,7 @@ export async function getTendersOfTheDay(
   const whereClause = and(
     ...baseConditions,
     ...(deptCondition ? [deptCondition] : []),
+    ...(keywordCondition ? [keywordCondition] : []),
     ...(closingCondition ? [closingCondition] : []),
     ...(profileCpvCondition ? [profileCpvCondition] : []),
     ...(profileGeoCondition ? [profileGeoCondition] : []),
@@ -290,6 +333,8 @@ export async function getTendersOfTheDay(
       // null si aucun brief n'a encore été généré pour cet AO.
       activeBrief: tenderBriefs.content,
       noticeType: tenders.noticeType,
+      visitDate: tenders.visitDate,
+      isExclusive: tenders.isExclusive,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
@@ -355,6 +400,8 @@ export async function getTendersSelected(
       deferredUntil: tenders.deferredUntil,
       status: tenders.status,
       noticeType: tenders.noticeType,
+      visitDate: tenders.visitDate,
+      isExclusive: tenders.isExclusive,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
@@ -371,7 +418,16 @@ export async function getTendersSelected(
   // Le statut issu de Drizzle est le type enum Postgres broad — on le rétrécit
   // via `as` après avoir filtré IN sur les 2 valeurs cibles. TypeScript seul
   // ne peut pas inférer la restriction ; le WHERE IN garantit la validité.
-  return rows.map((r) => ({ ...r, activeBrief: null })) as TenderSelected[];
+  return rows.map((r) => ({
+    ...r,
+    activeBrief: null,
+    sourceUrl: null,
+    dceUrl: null,
+    rawData: null,
+    excludedAt: null,
+    postalCode: null,
+    department: null,
+  })) as TenderSelected[];
 }
 
 // ============================================================================
@@ -409,6 +465,8 @@ export async function getTendersSolo(
       deferredUntil: tenders.deferredUntil,
       status: tenders.status,
       noticeType: tenders.noticeType,
+      visitDate: tenders.visitDate,
+      isExclusive: tenders.isExclusive,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
@@ -422,7 +480,16 @@ export async function getTendersSolo(
     .orderBy(sql`${tenders.deadline} ASC NULLS LAST`)
     .limit(100);
 
-  return rows.map((r) => ({ ...r, activeBrief: null })) as TenderSelected[];
+  return rows.map((r) => ({
+    ...r,
+    activeBrief: null,
+    sourceUrl: null,
+    dceUrl: null,
+    rawData: null,
+    excludedAt: null,
+    postalCode: null,
+    department: null,
+  })) as TenderSelected[];
 }
 
 // ============================================================================
@@ -472,6 +539,8 @@ export async function getTendersDeferred(
       postalCode: tenders.postalCode,
       department: tenders.department,
       noticeType: tenders.noticeType,
+      visitDate: tenders.visitDate,
+      isExclusive: tenders.isExclusive,
     })
     .from(tenders)
     .innerJoin(platforms, eq(tenders.platformId, platforms.id))
