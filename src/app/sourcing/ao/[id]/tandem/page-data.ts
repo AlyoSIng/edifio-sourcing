@@ -38,7 +38,16 @@ type DrizzleClient = typeof defaultDb;
 export interface TandemShortlistData {
   tender: Pick<
     Tender,
-    "id" | "title" | "buyer" | "deadline" | "amount" | "cpv" | "status" | "sourceUrl" | "dceUrl"
+    | "id"
+    | "title"
+    | "buyer"
+    | "deadline"
+    | "amount"
+    | "cpv"
+    | "status"
+    | "sourceUrl"
+    | "dceUrl"
+    | "department"
   >;
   /**
    * Snapshot des architectes proposés. Triés par rank ASC (1, 2, 3…).
@@ -99,6 +108,7 @@ export async function loadTandemShortlistData(
         status: tenders.status,
         sourceUrl: tenders.sourceUrl,
         dceUrl: tenders.dceUrl,
+        department: tenders.department,
       })
       .from(tenders)
       .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, organizationId)))

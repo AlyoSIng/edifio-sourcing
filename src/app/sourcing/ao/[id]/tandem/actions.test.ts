@@ -71,41 +71,61 @@ function authClientWith(user: { id: string; email: string } | null): AuthClientL
 
 describe("matchArchitectsForTender — invariants pré-BDD", () => {
   it("not_authenticated si pas de session", async () => {
-    const result = await matchArchitectsForTender(VALID_TENDER_ID, 3, {
-      authClient: authClientWith(null),
-    });
+    const result = await matchArchitectsForTender(
+      VALID_TENDER_ID,
+      { topN: 3 },
+      {
+        authClient: authClientWith(null),
+      },
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("not_authenticated");
   });
 
   it("forbidden_domain si email hors alyosingenierie.fr", async () => {
-    const result = await matchArchitectsForTender(VALID_TENDER_ID, 3, {
-      authClient: authClientWith({ id: "u1", email: "user@external.fr" }),
-    });
+    const result = await matchArchitectsForTender(
+      VALID_TENDER_ID,
+      { topN: 3 },
+      {
+        authClient: authClientWith({ id: "u1", email: "user@external.fr" }),
+      },
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("forbidden_domain");
   });
 
   it("invalid_input si tenderId mal formé", async () => {
-    const result = await matchArchitectsForTender("not-a-uuid", 3, {
-      authClient: authClientWith({ id: "u1", email: "nadia@alyosingenierie.fr" }),
-    });
+    const result = await matchArchitectsForTender(
+      "not-a-uuid",
+      { topN: 3 },
+      {
+        authClient: authClientWith({ id: "u1", email: "nadia@alyosingenierie.fr" }),
+      },
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("invalid_input");
   });
 
   it("invalid_input si topN < 1", async () => {
-    const result = await matchArchitectsForTender(VALID_TENDER_ID, 0, {
-      authClient: authClientWith({ id: "u1", email: "nadia@alyosingenierie.fr" }),
-    });
+    const result = await matchArchitectsForTender(
+      VALID_TENDER_ID,
+      { topN: 0 },
+      {
+        authClient: authClientWith({ id: "u1", email: "nadia@alyosingenierie.fr" }),
+      },
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("invalid_input");
   });
 
   it("invalid_input si topN > 100", async () => {
-    const result = await matchArchitectsForTender(VALID_TENDER_ID, 101, {
-      authClient: authClientWith({ id: "u1", email: "nadia@alyosingenierie.fr" }),
-    });
+    const result = await matchArchitectsForTender(
+      VALID_TENDER_ID,
+      { topN: 101 },
+      {
+        authClient: authClientWith({ id: "u1", email: "nadia@alyosingenierie.fr" }),
+      },
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("invalid_input");
   });
