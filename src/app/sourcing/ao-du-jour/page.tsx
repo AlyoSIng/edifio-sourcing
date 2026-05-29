@@ -89,6 +89,9 @@ export default async function AoDuJourPage({
     ? (rawClosing as 7 | 15 | 30)
     : null;
 
+  const keyword =
+    typeof searchParams.keyword === "string" ? searchParams.keyword.trim() || null : null;
+
   // Onglet profil : `?profile=<uuid>`. Si absent, on utilisera le profil par défaut.
   const rawProfile = searchParams.profile;
   const requestedProfileId =
@@ -139,6 +142,7 @@ export default async function AoDuJourPage({
         // Filtre par profil uniquement si plusieurs profils existent (Tâche #29).
         // Avec un seul profil, pas de filtre supplémentaire (comportement V1).
         profileId: activeProfiles.length > 1 ? activeProfileId : null,
+        keyword,
       }),
       getActiveSearchProfileName(ALYOS_ORG_ID, db),
     ]);
@@ -214,6 +218,7 @@ export default async function AoDuJourPage({
           currentSort={sort}
           currentDepts={departments}
           currentClosingDays={closingDays}
+          currentKeyword={keyword ?? ""}
         />
       ) : null}
 

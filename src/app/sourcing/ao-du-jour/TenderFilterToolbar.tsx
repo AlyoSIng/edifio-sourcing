@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import type { TenderSortOrder } from "@/lib/sourcing/queries";
@@ -11,6 +11,7 @@ interface TenderFilterToolbarProps {
   currentSort: TenderSortOrder;
   currentDepts: string[];
   currentClosingDays: 7 | 15 | 30 | null;
+  currentKeyword: string;
 }
 
 /**
@@ -34,6 +35,7 @@ export function TenderFilterToolbar({
   currentSort,
   currentDepts,
   currentClosingDays,
+  currentKeyword,
 }: TenderFilterToolbarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -62,6 +64,20 @@ export function TenderFilterToolbar({
     [searchParams],
   );
 
+  // État local du draft keyword (évite un push URL à chaque frappe)
+  const [keywordDraft, setKeywordDraft] = useState(currentKeyword);
+
+  const handleKeywordSearch = useCallback(() => {
+    const qs = buildParams({ keyword: keywordDraft.trim() || null });
+    router.push(`${pathname}${qs ? `?${qs}` : ""}`);
+  }, [buildParams, keywordDraft, pathname, router]);
+
+  const clearKeyword = useCallback(() => {
+    setKeywordDraft("");
+    const qs = buildParams({ keyword: null });
+    router.push(`${pathname}${qs ? `?${qs}` : ""}`);
+  }, [buildParams, pathname, router]);
+
   const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value as TenderSortOrder;
     const qs = buildParams({ sort: value === "score" ? null : value });
@@ -82,6 +98,43 @@ export function TenderFilterToolbar({
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-paper p-3 text-sm">
+      {/* Filtre mots-clés */}
+      <div className="flex items-center gap-1.5">
+        <label htmlFor="ao-keyword" className="text-xs text-muted">
+          Mots-clés&nbsp;:
+        </label>
+        <input
+          id="ao-keyword"
+          type="search"
+          value={keywordDraft}
+          onChange={(e) => setKeywordDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleKeywordSearch();
+          }}
+          placeholder="Titre ou acheteur…"
+          className="w-44 rounded-sm border border-line bg-white px-2 py-1 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand-red"
+          aria-label="Filtrer les AO par mots-clés"
+        />
+        <button
+          type="button"
+          onClick={handleKeywordSearch}
+          className="hover:bg-ink/80 rounded-sm bg-ink px-2 py-1 text-[11px] font-medium text-white"
+          aria-label="Lancer la recherche"
+        >
+          OK
+        </button>
+        {currentKeyword ? (
+          <button
+            type="button"
+            onClick={clearKeyword}
+            className="text-[10px] text-muted underline-offset-2 hover:underline"
+            aria-label="Effacer le filtre mots-clés"
+          >
+            Effacer
+          </button>
+        ) : null}
+      </div>
+
       {/* Tri */}
       <div className="flex items-center gap-1.5">
         <label htmlFor="ao-sort" className="text-xs text-muted">
