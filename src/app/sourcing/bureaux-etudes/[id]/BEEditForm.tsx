@@ -32,7 +32,16 @@ export function BEEditForm({ be }: BEEditFormProps) {
 
   // Champs
   const [cabinet, setCabinet] = useState(be.cabinet);
-  const [contactName, setContactName] = useState(be.contactName ?? "");
+  const [firstName, setFirstName] = useState(() => {
+    const name = be.contactName ?? "";
+    const spaceIdx = name.indexOf(" ");
+    return spaceIdx >= 0 ? name.slice(0, spaceIdx) : name;
+  });
+  const [lastName, setLastName] = useState(() => {
+    const name = be.contactName ?? "";
+    const spaceIdx = name.indexOf(" ");
+    return spaceIdx >= 0 ? name.slice(spaceIdx + 1) : "";
+  });
   const [email, setEmail] = useState(be.email ?? "");
   const [phone, setPhone] = useState(be.phone ?? "");
   const [website, setWebsite] = useState(be.website ?? "");
@@ -88,7 +97,7 @@ export function BEEditForm({ be }: BEEditFormProps) {
       const result = await upsertBE(
         {
           cabinet: cabinet.trim(),
-          contactName: contactName.trim() || null,
+          contactName: [firstName, lastName].filter(Boolean).join(" ") || null,
           email: email.trim() || null,
           phone: phone.trim() || null,
           website: website.trim() || null,
@@ -156,20 +165,35 @@ export function BEEditForm({ be }: BEEditFormProps) {
           />
         </div>
 
-        {/* Contact + Email */}
+        {/* Contact : Prénom + Nom */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="be-contact" className="block text-xs font-medium text-ink">
-              Nom du contact
+            <label htmlFor="be-firstname" className="block text-xs font-medium text-ink">
+              Prénom
             </label>
             <input
-              id="be-contact"
+              id="be-firstname"
               type="text"
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
             />
           </div>
+          <div>
+            <label htmlFor="be-lastname" className="block text-xs font-medium text-ink">
+              Nom
+            </label>
+            <input
+              id="be-lastname"
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
+          </div>
+        </div>
+        {/* Email */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="be-email" className="block text-xs font-medium text-ink">
               Email

@@ -33,6 +33,7 @@ interface SearchParams {
   page?: string;
   search?: string;
   specialty?: string;
+  implantation?: string;
 }
 
 export default async function BureauEtudesPage({ searchParams }: { searchParams: SearchParams }) {
@@ -46,12 +47,13 @@ export default async function BureauEtudesPage({ searchParams }: { searchParams:
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
   const search = searchParams.search?.trim() || undefined;
   const specialty = searchParams.specialty?.trim() || undefined;
+  const implantation = searchParams.implantation?.trim() || undefined;
 
   let result: Awaited<ReturnType<typeof fetchBEPage>> | null = null;
   let fetchError: string | null = null;
 
   try {
-    result = await fetchBEPage({ page, search, specialty });
+    result = await fetchBEPage({ page, search, specialty, implantation });
   } catch (err) {
     console.error("[bureaux-etudes-page:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -106,12 +108,12 @@ export default async function BureauEtudesPage({ searchParams }: { searchParams:
       {/* Bandeau doublons — visible admin uniquement, rendu côté client */}
       {adminUser && <DuplicateBEManager duplicateGroups={duplicateGroups} />}
 
-      <FilterBar search={search} specialty={specialty} />
+      <FilterBar search={search} specialty={specialty} implantation={implantation} />
 
       {fetchError ? (
         <ErrorBanner message={fetchError} />
       ) : bureaux.length === 0 ? (
-        <EmptyState hasFilters={!!(search || specialty)} />
+        <EmptyState hasFilters={!!(search || specialty || implantation)} />
       ) : (
         <>
           <BETable bureaux={bureaux} isAdmin={adminUser} />
@@ -121,6 +123,7 @@ export default async function BureauEtudesPage({ searchParams }: { searchParams:
               totalPages={totalPages}
               search={search}
               specialty={specialty}
+              implantation={implantation}
             />
           ) : null}
         </>
@@ -133,7 +136,24 @@ export default async function BureauEtudesPage({ searchParams }: { searchParams:
 // Composants internes
 // ============================================================================
 
-function FilterBar({ search, specialty }: { search?: string; specialty?: string }) {
+/** Dérive le code département depuis un code postal FR (2 chars, ou 3 pour DOM). */
+function deptFromZip(zip: string | null | undefined): string | null {
+  if (!zip) return null;
+  const digits = zip.trim();
+  if (digits.startsWith("97") && digits.length >= 3) return digits.slice(0, 3);
+  if (digits.length >= 2) return digits.slice(0, 2);
+  return null;
+}
+
+function FilterBar({
+  search,
+  specialty,
+  implantation,
+}: {
+  search?: string;
+  specialty?: string;
+  implantation?: string;
+}) {
   return (
     <form
       method="get"
@@ -148,6 +168,14 @@ function FilterBar({ search, specialty }: { search?: string; specialty?: string 
         placeholder="Recherche cabinet, contact, email…"
         className="focus:ring-brand-red/40 h-8 rounded-md border border-line bg-white px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2"
         aria-label="Rechercher"
+      />
+      <input
+        type="text"
+        name="implantation"
+        defaultValue={implantation ?? ""}
+        placeholder="Siège (ex. 75)"
+        className="focus:ring-brand-red/40 h-8 w-28 rounded-md border border-line bg-white px-3 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2"
+        aria-label="Filtrer par département de siège"
       />
       <select
         name="specialty"
@@ -187,7 +215,8 @@ function BETable({ bureaux, isAdmin: adminUser }: { bureaux: BureauEtudes[]; isA
             <th className="px-4 py-2.5 text-left font-medium text-ink">Cabinet</th>
             <th className="px-4 py-2.5 text-left font-medium text-ink">Email</th>
             <th className="px-4 py-2.5 text-left font-medium text-ink">Spécialités</th>
-            <th className="px-4 py-2.5 text-left font-medium text-ink">Zones géo</th>
+            <th className="px-4 py-2.5 text-left font-medium text-ink">Siège</th>
+            <th className="px-4 py-2.5 text-left font-medium text-ink">Dép. projets</th>
             <th className="px-4 py-2.5 text-left font-medium text-ink">Budget</th>
             {adminUser ? (
               <th className="px-4 py-2.5 text-left font-medium text-ink">
@@ -262,8 +291,26 @@ function BERow({ be, isAdmin: adminUser }: { be: BureauEtudes; isAdmin: boolean 
           <span className="text-muted">—</span>
         )}
       </td>
-      <td className="px-4 py-2.5 text-xs text-ink-2">
-        {be.geoZones.length > 0 ? be.geoZones.slice(0, 5).join(", ") : "—"}
+      {/* Siège — département dérivé du code postal */}
+      <td className="px-4 py-2.5 font-mono text-xs text-ink-2">
+        {deptFromZip(be.zip) ?? <span className="text-muted">—</span>}
+      </td>
+      {/* Dép. projets — tous les geo_zones sous forme de badges */}
+      <td className="px-4 py-2.5">
+        {be.geoZones.length === 0 ? (
+          <span className="text-muted">—</span>
+        ) : (
+          <div className="flex flex-wrap gap-0.5">
+            {be.geoZones.map((dept) => (
+              <span
+                key={dept}
+                className="inline-flex items-center rounded-sm bg-paper-2 px-1 py-0.5 font-mono text-[10px] text-ink-2"
+              >
+                {dept}
+              </span>
+            ))}
+          </div>
+        )}
       </td>
       <td className="px-4 py-2.5 text-xs text-ink-2">{budgetText}</td>
       {adminUser ? (
@@ -288,17 +335,20 @@ function PaginationBar({
   totalPages,
   search,
   specialty,
+  implantation,
 }: {
   page: number;
   totalPages: number;
   search?: string;
   specialty?: string;
+  implantation?: string;
 }) {
   const buildHref = (p: number) => {
     const params = new URLSearchParams();
     params.set("page", String(p));
     if (search) params.set("search", search);
     if (specialty) params.set("specialty", specialty);
+    if (implantation) params.set("implantation", implantation);
     return `/sourcing/bureaux-etudes?${params.toString()}`;
   };
 

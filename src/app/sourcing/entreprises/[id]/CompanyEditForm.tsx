@@ -32,7 +32,16 @@ export function CompanyEditForm({ company: co }: CompanyEditFormProps) {
   const [editSuccess, setEditSuccess] = useState(false);
 
   const [name, setName] = useState(co.name);
-  const [contactName, setContactName] = useState(co.contactName ?? "");
+  const [firstName, setFirstName] = useState(() => {
+    const name = co.contactName ?? "";
+    const spaceIdx = name.indexOf(" ");
+    return spaceIdx >= 0 ? name.slice(0, spaceIdx) : name;
+  });
+  const [lastName, setLastName] = useState(() => {
+    const name = co.contactName ?? "";
+    const spaceIdx = name.indexOf(" ");
+    return spaceIdx >= 0 ? name.slice(spaceIdx + 1) : "";
+  });
   const [email, setEmail] = useState(co.email ?? "");
   const [phone, setPhone] = useState(co.phone ?? "");
   const [website, setWebsite] = useState(co.website ?? "");
@@ -71,7 +80,7 @@ export function CompanyEditForm({ company: co }: CompanyEditFormProps) {
       const result = await upsertCompany(
         {
           name: name.trim(),
-          contactName: contactName.trim() || null,
+          contactName: [firstName, lastName].filter(Boolean).join(" ") || null,
           email: email.trim() || null,
           phone: phone.trim() || null,
           website: website.trim() || null,
@@ -135,17 +144,31 @@ export function CompanyEditForm({ company: co }: CompanyEditFormProps) {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="co-contact" className="block text-xs font-medium text-ink">
-              Nom du contact
+            <label htmlFor="co-firstname" className="block text-xs font-medium text-ink">
+              Prénom
             </label>
             <input
-              id="co-contact"
+              id="co-firstname"
               type="text"
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
             />
           </div>
+          <div>
+            <label htmlFor="co-lastname" className="block text-xs font-medium text-ink">
+              Nom
+            </label>
+            <input
+              id="co-lastname"
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="co-email" className="block text-xs font-medium text-ink">
               Email
