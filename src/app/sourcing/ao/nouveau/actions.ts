@@ -27,7 +27,7 @@ import { db } from "@/db/client";
 import { platforms } from "@/db/schema/config";
 import { tenders, tenderDocuments } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ============================================================================
@@ -106,6 +106,8 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
+  const orgId = await getRequiredOrgId(user.id);
+
   // 2. Extraction des champs
   const title = formData.get("title");
   const description = formData.get("description");
@@ -182,7 +184,7 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
     const fileExt = dceFile.name.split(".").pop()?.toLowerCase() ?? "bin";
     const sanitized = sanitizeFilename(dceFile.name);
     const fileUuid = newUuid();
-    dceStoragePath = `${ALYOS_ORG_ID}/${fileUuid}_${sanitized}`;
+    dceStoragePath = `${orgId}/${fileUuid}_${sanitized}`;
     dceFileName = dceFile.name;
     dceFileSizeBytes = dceFile.size;
     dceFileFormat = fileExt;
@@ -246,7 +248,7 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
   const tenderRows = await db
     .insert(tenders)
     .values({
-      organizationId: ALYOS_ORG_ID,
+      organizationId: orgId,
       externalRef,
       platformId,
       title: title.trim(),
@@ -271,7 +273,7 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
   if (dceStoragePath && dceFileName) {
     await db.insert(tenderDocuments).values({
       tenderId,
-      organizationId: ALYOS_ORG_ID,
+      organizationId: orgId,
       kind: "DCE",
       name: dceFileName,
       format: dceFileFormat,

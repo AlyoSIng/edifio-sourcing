@@ -24,8 +24,9 @@ import { organizationProfiles } from "@/db/schema/messaging";
 import { withTenantContext } from "@/lib/db/with-tenant-context";
 import { toUserProfile } from "@/lib/auth/types";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { buildDc1, buildDc2 } from "@/lib/dossier/cerfa-prefill";
 import { CerfaFormClient } from "./CerfaFormClient";
 import { loadExistingCerfa } from "./actions";
@@ -53,6 +54,16 @@ export default async function CerfaPage({ params }: PageProps) {
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/dossier/cerfa`);
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[dossier-cerfa:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // 2. Validation UUID
   if (!UUID_SHAPE.test(params.id)) {
@@ -76,7 +87,7 @@ export default async function CerfaPage({ params }: PageProps) {
         status: tenders.status,
       })
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
       .limit(1);
 
     if (!tender) {
@@ -94,7 +105,7 @@ export default async function CerfaPage({ params }: PageProps) {
       .where(
         and(
           eq(tenderEvents.tenderId, tenderId),
-          eq(tenderEvents.organizationId, ALYOS_ORG_ID),
+          eq(tenderEvents.organizationId, orgId),
           eq(tenderEvents.eventType, "rc_analyzed"),
         ),
       )
@@ -110,13 +121,13 @@ export default async function CerfaPage({ params }: PageProps) {
     const [org] = await db
       .select({ id: organizations.id, name: organizations.name, siren: organizations.siren })
       .from(organizations)
-      .where(eq(organizations.id, ALYOS_ORG_ID))
+      .where(eq(organizations.id, orgId))
       .limit(1);
 
     // 3d. Profil commercial AlyoS (nullable)
     // withTenantContext pose app.current_organization_id pour FORCE RLS
     // (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md + with-tenant-context.ts).
-    const [orgProfile] = await withTenantContext(ALYOS_ORG_ID, db, (client) =>
+    const [orgProfile] = await withTenantContext(orgId, db, (client) =>
       client
         .select({
           commercialName: organizationProfiles.commercialName,
@@ -125,12 +136,12 @@ export default async function CerfaPage({ params }: PageProps) {
           contactEmail: organizationProfiles.contactEmail,
         })
         .from(organizationProfiles)
-        .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+        .where(eq(organizationProfiles.organizationId, orgId))
         .limit(1),
     );
 
     // 3e. Fichiers CERFA existants (si déjà validés)
-    const { dc1: existingDc1, dc2: existingDc2 } = await loadExistingCerfa(tenderId);
+    const { dc1: existingDc1, dc2: existingDc2 } = await loadExistingCerfa(tenderId, orgId);
 
     // 4. isTandem : au MVP, seuls les AOs `architect_accepted` accèdent au dossier
     // donc isTandem est toujours true ici.

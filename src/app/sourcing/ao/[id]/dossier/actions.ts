@@ -13,7 +13,7 @@
  *
  * Sécurité :
  *   - Auth check sur chaque action (defense in depth)
- *   - Filtre `organizationId = ALYOS_ORG_ID` sur toutes les requêtes BDD
+ *   - Filtre `organizationId = orgId` sur toutes les requêtes BDD
  *   - PDF only, max 50 Mo pour l'upload manuel
  *   - AbortSignal.timeout(30 s) pour le fetch DCE
  *
@@ -33,7 +33,7 @@ import { db } from "@/db/client";
 import { auditLogs } from "@/db/schema/audit";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { analyzeRc } from "@/lib/ai/analyze-rc";
 import type { RcAnalysis } from "@/lib/ai/schemas";
@@ -142,7 +142,7 @@ function validateExternalUrl(rawUrl: string): "invalid_dce_url" | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Vérifie la session Supabase. Retourne le profile ou null si non authentifié.
+ * Vérifie la session Supabase. Retourne le profile et l'orgId ou null si non authentifié.
  * Un `user` ET `admin` peuvent préparer un dossier (arbitrage Board G2 §3/A).
  */
 async function getAuthenticatedProfile() {
@@ -152,7 +152,8 @@ async function getAuthenticatedProfile() {
   } = await supabase.auth.getUser();
 
   if (!user) return null;
-  return { supabase, profile: toUserProfile(user) };
+  const orgId = await getRequiredOrgId(user.id);
+  return { supabase, profile: toUserProfile(user), orgId };
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +179,7 @@ export async function downloadDceFromUrl(tenderId: string): Promise<DceActionRes
     const [tender] = await db
       .select({ dceUrl: tenders.dceUrl })
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)))
       .limit(1);
 
     if (!tender) return { ok: false, error: "tender_not_found" };
@@ -218,7 +219,7 @@ export async function downloadDceFromUrl(tenderId: string): Promise<DceActionRes
     const buffer = await response.arrayBuffer();
 
     // Upload Storage : chemin tenant-scoped
-    const storagePath = `${ALYOS_ORG_ID}/${tenderId}/${Date.now()}_RC.pdf`;
+    const storagePath = `${auth.orgId}/${tenderId}/${Date.now()}_RC.pdf`;
 
     // Storage admin : RLS bypass intentionnel — auth vérifiée L.175
     const supabaseAdmin = createSupabaseAdminClient();
@@ -238,7 +239,7 @@ export async function downloadDceFromUrl(tenderId: string): Promise<DceActionRes
     try {
       await db.insert(tenderDocuments).values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: auth.orgId,
         kind: "RC",
         name: "RC.pdf",
         format: "pdf",
@@ -304,14 +305,14 @@ export async function uploadDcePdf(tenderId: string, formData: FormData): Promis
     const [tender] = await db
       .select({ id: tenders.id })
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)))
       .limit(1);
 
     if (!tender) return { ok: false, error: "tender_not_found" };
 
     // Chemin Storage tenant-scoped (RLS policy)
     const safeFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-    const storagePath = `${ALYOS_ORG_ID}/${tenderId}/${Date.now()}_${safeFilename}`;
+    const storagePath = `${auth.orgId}/${tenderId}/${Date.now()}_${safeFilename}`;
 
     const fileBuffer = await file.arrayBuffer();
     // Storage admin : RLS bypass intentionnel — auth vérifiée L.282
@@ -332,7 +333,7 @@ export async function uploadDcePdf(tenderId: string, formData: FormData): Promis
     try {
       await db.insert(tenderDocuments).values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: auth.orgId,
         kind: "RC",
         name: file.name,
         format: "pdf",
@@ -396,7 +397,7 @@ export async function analyzeRcAction(
         and(
           eq(tenderDocuments.id, documentId),
           eq(tenderDocuments.tenderId, tenderId),
-          eq(tenderDocuments.organizationId, ALYOS_ORG_ID),
+          eq(tenderDocuments.organizationId, auth.orgId),
         ),
       )
       .limit(1);
@@ -438,7 +439,7 @@ export async function analyzeRcAction(
       rcText.length > MAX_RC_TEXT_LENGTH ? rcText.slice(0, MAX_RC_TEXT_LENGTH) : rcText;
 
     // Appel Claude Sonnet 4.6 via analyzeRc
-    const result = await analyzeRc(tenderId, truncated);
+    const result = await analyzeRc(tenderId, truncated, auth.orgId);
 
     if (!result.ok) {
       if (result.error === "prompt_not_seeded") {
@@ -456,7 +457,7 @@ export async function analyzeRcAction(
     // Insert audit log A7 — ai_run (traçabilité Gate 5 §7)
     try {
       await db.insert(auditLogs).values({
-        organizationId: ALYOS_ORG_ID,
+        organizationId: auth.orgId,
         actorId: auth.profile.id,
         actorEmail: auth.profile.email,
         actorRole: auth.profile.role as "admin" | "user" | "viewer",
@@ -484,7 +485,7 @@ export async function analyzeRcAction(
     try {
       await db.insert(tenderEvents).values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: auth.orgId,
         eventType: "rc_analyzed",
         data: {
           extra: {

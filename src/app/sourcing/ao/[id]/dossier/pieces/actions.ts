@@ -10,7 +10,7 @@
  * Sécurité :
  *   - Auth check obligatoire
  *   - UUID validation sur tenderId
- *   - Filtre tenant ALYOS_ORG_ID sur toutes les requêtes BDD
+ *   - Filtre tenant orgId sur toutes les requêtes BDD
  *   - Aucune donnée cliente utilisée pour les chemins Storage
  *
  * Source de vérité : brief Board PR-E 2026-05-26.
@@ -23,7 +23,7 @@ import { db } from "@/db/client";
 import { presentationLibrary, responseFiles } from "@/db/schema/library";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
@@ -97,6 +97,7 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
 
     if (!user) return { ok: false, error: "not_authenticated" };
     void toUserProfile(user); // vérifie que le user est bien formé
+    const orgId = await getRequiredOrgId(user.id);
 
     // 2. UUID validation
     if (!UUID_SHAPE.test(tenderId)) {
@@ -107,13 +108,13 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
     const [tender] = await db
       .select({ id: tenders.id })
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
       .limit(1);
 
     if (!tender) return { ok: false, error: "tender_not_found" };
 
     // 4. Charger DC1 + DC2 validés
-    const { dc1, dc2 } = await loadExistingCerfa(tenderId);
+    const { dc1, dc2 } = await loadExistingCerfa(tenderId, orgId);
 
     if (!dc1 && !dc2) {
       return { ok: false, error: "no_cerfa" };
@@ -126,7 +127,7 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
       .where(
         and(
           eq(tenderEvents.tenderId, tenderId),
-          eq(tenderEvents.organizationId, ALYOS_ORG_ID),
+          eq(tenderEvents.organizationId, orgId),
           eq(tenderEvents.eventType, "rc_analyzed"),
         ),
       )
@@ -137,7 +138,7 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
     const libraryItems = await db
       .select()
       .from(presentationLibrary)
-      .where(eq(presentationLibrary.organizationId, ALYOS_ORG_ID));
+      .where(eq(presentationLibrary.organizationId, orgId));
 
     // 5c. Matcher les pièces RC vs bibliothèque
     let pieceMatches: ReturnType<typeof matchPiecesWithLibrary> = [];
@@ -169,7 +170,7 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
 
     // 7. Upload ZIP vers Storage
     const timestamp = Date.now();
-    const storagePath = `${ALYOS_ORG_ID}/${tenderId}/dossier_${timestamp}.zip`;
+    const storagePath = `${orgId}/${tenderId}/dossier_${timestamp}.zip`;
 
     // Storage admin : RLS bypass intentionnel — auth vérifiée L.97
     const { error: storageError } = await supabaseAdmin.storage
@@ -200,7 +201,7 @@ export async function compileDossierAction(tenderId: string): Promise<CompileDos
     try {
       await db.insert(responseFiles).values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         kind: "dossier_zip",
         name: `Dossier compilé (${zipResult.fileCount} fichier${zipResult.fileCount > 1 ? "s" : ""})`,
         storagePath,

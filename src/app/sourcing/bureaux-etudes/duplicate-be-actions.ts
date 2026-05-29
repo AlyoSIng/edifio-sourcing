@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { eq, inArray, sql } from "drizzle-orm";
@@ -41,13 +41,13 @@ export interface DuplicateBEGroup {
  *
  * @returns Tableau de groupes de doublons, vide si aucun doublon.
  */
-export async function detectBEDuplicatesAction(): Promise<DuplicateBEGroup[]> {
+export async function detectBEDuplicatesAction(orgId: string): Promise<DuplicateBEGroup[]> {
   // Requête 1 : trouver les clés avec au moins 2 occurrences + leurs ids
   const groupRows = await db.execute<{ key: string; ids: string[] }>(sql`
     SELECT lower(trim(cabinet)) AS key,
            array_agg(id::text ORDER BY created_at ASC) AS ids
     FROM bureaux_etudes
-    WHERE organization_id = ${ALYOS_ORG_ID}
+    WHERE organization_id = ${orgId}
     GROUP BY lower(trim(cabinet))
     HAVING count(*) > 1
   `);
@@ -109,7 +109,7 @@ export async function detectBEDuplicatesAction(): Promise<DuplicateBEGroup[]> {
  *   1. Session valide.
  *   2. Rôle admin (isAdmin suffit).
  *   3. UUID v4 valide.
- *   4. Le BET appartient bien à ALYOS_ORG_ID (pas de suppression cross-tenant).
+ *   4. Le BET appartient bien à l'organisation courante (pas de suppression cross-tenant).
  *
  * Note : la table `bureaux_etudes` n'a pas encore de table de réponses / match_proposals
  * (les flows Tandem BET sont prévus Phase 2). Les documents `be_documents` ont
@@ -133,6 +133,8 @@ export async function deleteBEDuplicateAction(
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden" };
 
+  const orgId = await getRequiredOrgId(user.id);
+
   // Guard 3 — UUID v4 valide
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   if (!UUID_REGEX.test(id)) return { ok: false, error: "invalid_id" };
@@ -145,7 +147,7 @@ export async function deleteBEDuplicateAction(
     .limit(1);
 
   if (!existing) return { ok: false, error: "not_found" };
-  if (existing.organizationId !== ALYOS_ORG_ID) return { ok: false, error: "forbidden" };
+  if (existing.organizationId !== orgId) return { ok: false, error: "forbidden" };
 
   // Suppression effective (be_documents cascade automatiquement)
   await db.delete(bureauEtudes).where(eq(bureauEtudes.id, id));

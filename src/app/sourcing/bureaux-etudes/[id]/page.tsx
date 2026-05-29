@@ -4,8 +4,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { BE_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
 
 import { listBeDocuments } from "../actions";
@@ -43,6 +44,16 @@ export default async function BEFichePage({ params }: { params: { id: string } }
   if (!user) redirect(`/login?next=/sourcing/bureaux-etudes/${params.id}`);
   const profile = toUserProfile(user);
   const adminUser = isAdmin(profile);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[be-detail:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   let be: Awaited<ReturnType<typeof fetchBE>> | null = null;
   let fetchError: string | null = null;
@@ -50,7 +61,7 @@ export default async function BEFichePage({ params }: { params: { id: string } }
   let documents: Awaited<ReturnType<typeof listBeDocuments>> = [];
 
   try {
-    [be, documents] = await Promise.all([fetchBE(params.id), listBeDocuments(params.id)]);
+    [be, documents] = await Promise.all([fetchBE(params.id, orgId), listBeDocuments(params.id)]);
   } catch (err) {
     console.error("[be-fiche:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -239,13 +250,13 @@ export default async function BEFichePage({ params }: { params: { id: string } }
 // Helpers fetch
 // ============================================================================
 
-async function fetchBE(id: string) {
+async function fetchBE(id: string, orgId: string) {
   if (!UUID_SHAPE.test(id)) return null;
 
   const rows = await db
     .select()
     .from(bureauEtudes)
-    .where(and(eq(bureauEtudes.id, id), eq(bureauEtudes.organizationId, ALYOS_ORG_ID)))
+    .where(and(eq(bureauEtudes.id, id), eq(bureauEtudes.organizationId, orgId)))
     .limit(1);
 
   return rows[0] ?? null;

@@ -26,8 +26,9 @@ import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { presentationLibrary } from "@/db/schema/library";
 import { toUserProfile } from "@/lib/auth/types";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { PiecesClient } from "./PiecesClient";
@@ -56,6 +57,16 @@ export default async function PiecesPage({ params }: PageProps) {
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/dossier/pieces`);
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[dossier-pieces:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // 2. Validation UUID
   if (!UUID_SHAPE.test(params.id)) {
@@ -74,7 +85,7 @@ export default async function PiecesPage({ params }: PageProps) {
     const [tender] = await db
       .select({ id: tenders.id, title: tenders.title, buyer: tenders.buyer })
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
       .limit(1);
 
     if (!tender) {
@@ -92,7 +103,7 @@ export default async function PiecesPage({ params }: PageProps) {
       .where(
         and(
           eq(tenderEvents.tenderId, tenderId),
-          eq(tenderEvents.organizationId, ALYOS_ORG_ID),
+          eq(tenderEvents.organizationId, orgId),
           eq(tenderEvents.eventType, "rc_analyzed"),
         ),
       )
@@ -119,10 +130,10 @@ export default async function PiecesPage({ params }: PageProps) {
     const libraryItems = await db
       .select()
       .from(presentationLibrary)
-      .where(eq(presentationLibrary.organizationId, ALYOS_ORG_ID));
+      .where(eq(presentationLibrary.organizationId, orgId));
 
     // 3d. DC1 / DC2 existants
-    const { dc1: existingDc1, dc2: existingDc2 } = await loadExistingCerfa(tenderId);
+    const { dc1: existingDc1, dc2: existingDc2 } = await loadExistingCerfa(tenderId, orgId);
 
     // 4. Matching pièces RC vs bibliothèque
     const pieceMatches = rcAnalysis

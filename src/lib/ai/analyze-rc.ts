@@ -21,7 +21,6 @@ import { createHash } from "crypto";
 
 import { db } from "@/db/client";
 import { aiPrompts, aiRuns } from "@/db/schema/ai";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { rcAnalysisSchema, type RcAnalysis } from "./schemas";
 
 // ---------------------------------------------------------------------------
@@ -71,8 +70,13 @@ export type AnalyzeRcResult =
  *
  * @param tenderId  UUID du tender auquel le RC appartient
  * @param rcText    Texte brut extrait du PDF RC (via pdf-parse)
+ * @param orgId     UUID de l'organisation courante (résolu via getRequiredOrgId)
  */
-export async function analyzeRc(tenderId: string, rcText: string): Promise<AnalyzeRcResult> {
+export async function analyzeRc(
+  tenderId: string,
+  rcText: string,
+  orgId: string,
+): Promise<AnalyzeRcResult> {
   try {
     // 1. Charger le prompt actif depuis la BDD
     const [prompt] = await db
@@ -163,7 +167,7 @@ export async function analyzeRc(tenderId: string, rcText: string): Promise<Analy
     const inserted = await db
       .insert(aiRuns)
       .values({
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         promptId: prompt.id,
         tenderId,
         inputHash,

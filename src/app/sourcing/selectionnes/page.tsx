@@ -5,6 +5,7 @@ import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { TenderSummaryCard } from "@/app/sourcing/_shared/TenderSummaryCard";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { db } from "@/db/client";
 import { getTendersSelected } from "@/lib/sourcing/queries";
@@ -35,12 +36,22 @@ export default async function SelectionnesPage() {
   if (!user) redirect("/login?next=/sourcing/selectionnes");
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[selectionnes:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // Résilience runtime : fetch encapsulé dans try/catch absorbé.
   let selectedTenders: Awaited<ReturnType<typeof getTendersSelected>> = [];
   let fetchError: string | null = null;
   try {
-    selectedTenders = await getTendersSelected(ALYOS_ORG_ID, db);
+    selectedTenders = await getTendersSelected(orgId, db);
   } catch (err) {
     console.error("[selectionnes:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);

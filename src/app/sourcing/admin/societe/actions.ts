@@ -19,7 +19,7 @@ import { eq } from "drizzle-orm";
 import { db as defaultDb } from "@/db/client";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { organizationProfiles } from "@/db/schema/messaging";
 import { organizations } from "@/db/schema/organizations";
@@ -88,6 +88,8 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
     return { ok: false, error: "forbidden_role" };
   }
 
+  const orgId = await getRequiredOrgId(user.id);
+
   // 2. Parse + validation Zod
   const parsed = saveOrgProfileSchema.safeParse({
     presentationBlock: formData.get("presentationBlock") ?? "",
@@ -114,7 +116,7 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
     await defaultDb
       .insert(organizationProfiles)
       .values({
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         presentationBlock: values.presentationBlock,
         commercialName: values.commercialName,
         emailSignature: values.emailSignature,
@@ -141,7 +143,7 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
       });
 
     // Audit log best-effort
-    console.info(`[audit:org_profile_change] org=${ALYOS_ORG_ID} user=${user.email}`);
+    console.info(`[audit:org_profile_change] org=${orgId} user=${user.email}`);
 
     revalidatePath("/sourcing/admin/societe");
     revalidatePath("/sourcing/admin/modeles-email");
@@ -194,6 +196,8 @@ export async function saveOrgSiretAction(formData: FormData): Promise<SaveOrgSir
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
+  const orgId = await getRequiredOrgId(user.id);
+
   const raw = (formData.get("siret") ?? "").toString().trim();
 
   // Validation : vide = reset autorisé, sinon 14 chiffres stricts
@@ -209,7 +213,7 @@ export async function saveOrgSiretAction(formData: FormData): Promise<SaveOrgSir
     await defaultDb
       .update(organizations)
       .set({ siret: raw || null })
-      .where(eq(organizations.id, ALYOS_ORG_ID));
+      .where(eq(organizations.id, orgId));
 
     revalidatePath("/sourcing/admin/societe");
     return { ok: true };
@@ -224,15 +228,17 @@ export async function saveOrgSiretAction(formData: FormData): Promise<SaveOrgSir
 }
 
 /**
- * Charge le SIRET courant de l'organisation AlyoS.
+ * Charge le SIRET courant d'une organisation.
  * Retourne null si non renseigné ou si l'organisation est introuvable.
+ *
+ * @param organizationId UUID de l'organisation (résolu depuis memberships)
  */
-export async function loadOrgSiret(): Promise<string | null> {
+export async function loadOrgSiret(organizationId: string): Promise<string | null> {
   try {
     const rows = await defaultDb
       .select({ siret: organizations.siret })
       .from(organizations)
-      .where(eq(organizations.id, ALYOS_ORG_ID))
+      .where(eq(organizations.id, organizationId))
       .limit(1);
     return rows[0]?.siret ?? null;
   } catch {
@@ -247,16 +253,18 @@ export async function loadOrgSiret(): Promise<string | null> {
 /**
  * Charge le profil organisation depuis la BDD.
  * Retourne `null` si absent (seed non encore exécuté).
+ *
+ * @param organizationId UUID de l'organisation (résolu depuis memberships)
  */
-export async function loadOrgProfile() {
+export async function loadOrgProfile(organizationId: string) {
   try {
     // withTenantContext pose app.current_organization_id pour FORCE RLS
     // (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md + with-tenant-context.ts).
-    const rows = await withTenantContext(ALYOS_ORG_ID, defaultDb, (client) =>
+    const rows = await withTenantContext(organizationId, defaultDb, (client) =>
       client
         .select()
         .from(organizationProfiles)
-        .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
+        .where(eq(organizationProfiles.organizationId, organizationId))
         .limit(1),
     );
     return rows[0] ?? null;

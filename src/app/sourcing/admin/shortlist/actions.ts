@@ -31,7 +31,7 @@ import { db as defaultDb } from "@/db/client";
 import { shortlistCriteria, type ShortlistCriteria } from "@/db/schema/shortlist";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ============================================================================
@@ -95,7 +95,9 @@ type AdminAuthError = {
   error: "not_authenticated" | "forbidden_domain" | "forbidden_role";
 };
 
-async function requireAlyosAdmin(): Promise<{ ok: true; userId: string } | AdminAuthError> {
+async function requireAlyosAdmin(): Promise<
+  { ok: true; userId: string; orgId: string } | AdminAuthError
+> {
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -115,7 +117,8 @@ async function requireAlyosAdmin(): Promise<{ ok: true; userId: string } | Admin
     return err;
   }
 
-  return { ok: true, userId: user.id };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId };
 }
 
 // ============================================================================
@@ -131,17 +134,13 @@ async function requireAlyosAdmin(): Promise<{ ok: true; userId: string } | Admin
 export async function getShortlistCriteria(target: ShortlistTarget): Promise<ShortlistGetResult> {
   const authResult = await requireAlyosAdmin();
   if (!authResult.ok) return authResult;
+  const { orgId } = authResult;
 
   try {
     const rows = await defaultDb
       .select()
       .from(shortlistCriteria)
-      .where(
-        and(
-          eq(shortlistCriteria.organizationId, ALYOS_ORG_ID),
-          eq(shortlistCriteria.target, target),
-        ),
-      )
+      .where(and(eq(shortlistCriteria.organizationId, orgId), eq(shortlistCriteria.target, target)))
       .limit(1);
 
     return { ok: true, criteria: rows[0] ?? null };
@@ -170,6 +169,7 @@ export async function upsertShortlistCriteria(
 ): Promise<ShortlistActionResult> {
   const authResult = await requireAlyosAdmin();
   if (!authResult.ok) return authResult;
+  const { orgId: upsertOrgId } = authResult;
 
   const parsed = shortlistCriteriaSchema.safeParse(input);
   if (!parsed.success) {
@@ -186,7 +186,7 @@ export async function upsertShortlistCriteria(
     await defaultDb
       .insert(shortlistCriteria)
       .values({
-        organizationId: ALYOS_ORG_ID,
+        organizationId: upsertOrgId,
         target,
         caMiniEur: data.caMiniEur ?? null,
         effectifMini: data.effectifMini ?? null,

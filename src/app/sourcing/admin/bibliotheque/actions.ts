@@ -23,7 +23,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { presentationLibrary } from "@/db/schema/library";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -129,6 +129,8 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
+  const orgId = await getRequiredOrgId(user.id);
+
   // Storage admin : RLS bypass intentionnel — auth + isAdmin() vérifiés L.122-130
   const supabaseAdmin = createSupabaseAdminClient();
 
@@ -174,7 +176,7 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
   // 3. Chemin de stockage : {orgId}/{kind}/{timestamp}_{sanitizedFilename}
   const timestamp = Date.now();
   const safeFilename = sanitizeFilename(file.name);
-  const storagePath = `${ALYOS_ORG_ID}/${kind.trim()}/${timestamp}_${safeFilename}`;
+  const storagePath = `${orgId}/${kind.trim()}/${timestamp}_${safeFilename}`;
 
   // 4. Upload vers Supabase Storage
   const fileBuffer = await file.arrayBuffer();
@@ -194,7 +196,7 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
   // 5. Insert dans la table BDD
   try {
     await db.insert(presentationLibrary).values({
-      organizationId: ALYOS_ORG_ID,
+      organizationId: orgId,
       kind: kind.trim(),
       name: file.name,
       storagePath,
@@ -227,7 +229,7 @@ export interface DeleteLibraryDocResult {
  * Supprime un document de la bibliothèque (Storage + BDD).
  *
  * Sécurité : le `storagePath` passé par le client est IGNORÉ — on re-lit le
- * chemin depuis la BDD (filtre `organizationId = ALYOS_ORG_ID`) pour empêcher
+ * chemin depuis la BDD (filtre `organizationId = orgId`) pour empêcher
  * toute suppression cross-tenant.
  *
  * @param id          — UUID du document dans `presentation_library`
@@ -252,6 +254,8 @@ export async function deleteLibraryDoc(
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
+  const deleteOrgId = await getRequiredOrgId(user.id);
+
   // Storage admin : RLS bypass intentionnel — auth + isAdmin() vérifiés L.240-248
   const supabaseAdmin = createSupabaseAdminClient();
 
@@ -263,9 +267,7 @@ export async function deleteLibraryDoc(
   const [doc] = await db
     .select({ storagePath: presentationLibrary.storagePath })
     .from(presentationLibrary)
-    .where(
-      and(eq(presentationLibrary.id, id), eq(presentationLibrary.organizationId, ALYOS_ORG_ID)),
-    )
+    .where(and(eq(presentationLibrary.id, id), eq(presentationLibrary.organizationId, deleteOrgId)))
     .limit(1);
 
   if (!doc) return { ok: false, error: "document_not_found" };

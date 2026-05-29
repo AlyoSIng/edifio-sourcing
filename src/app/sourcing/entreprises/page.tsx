@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { COMPANY_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
 import type { Company } from "@/db/schema/companies";
 
@@ -39,6 +41,16 @@ export default async function EntreprisesPage({ searchParams }: { searchParams: 
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/entreprises");
   const profile = toUserProfile(user);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[entreprises:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
   const search = searchParams.search?.trim() || undefined;
@@ -49,7 +61,7 @@ export default async function EntreprisesPage({ searchParams }: { searchParams: 
   let fetchError: string | null = null;
 
   try {
-    result = await fetchCompaniesPage({ page, search, specialty, implantation });
+    result = await fetchCompaniesPage({ page, search, specialty, implantation, orgId });
   } catch (err) {
     console.error("[entreprises-page:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);

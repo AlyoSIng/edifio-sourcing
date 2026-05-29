@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import {
   createTemplateResolver,
   TEMPLATE_META,
@@ -66,6 +67,16 @@ export default async function ModelesEmailPage({
 
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[admin-modeles-email:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // 2. Paramètres URL (canal actif + template actif)
   const params = searchParams ? await searchParams : {};
@@ -73,7 +84,7 @@ export default async function ModelesEmailPage({
   const activeKey = params?.template as TemplateKey | undefined;
 
   // 3. Chargement des templates (try/catch résilience)
-  const resolver = createTemplateResolver(db, ALYOS_ORG_ID);
+  const resolver = createTemplateResolver(db, orgId);
   const allKeys: TemplateKey[] = [...BREVO_KEYS, ...RESEND_KEYS];
 
   type TemplateData = {

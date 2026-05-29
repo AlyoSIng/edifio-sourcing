@@ -45,7 +45,7 @@ import { audit } from "@/lib/audit";
 import { generateBrief } from "@/lib/ai/generate-brief";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ============================================================================
@@ -126,10 +126,13 @@ function isAllowedHoursOffset(value: unknown): value is AllowedHoursOffset {
 /**
  * Étape commune : auth + domaine. Retourne le profil utilisateur OU un
  * `ActionResult` d'échec à propager tel quel.
+ *
+ * Résout également l'orgId via `getRequiredOrgId` (lookup memberships —
+ * Phase A multi-tenant, fallback ALYOS_ORG_ID pour retro-compat).
  */
 async function requireAlyosUser(
   authClient: AuthClientLike,
-): Promise<{ ok: true; userId: string } | Exclude<ActionResult, { ok: true }>> {
+): Promise<{ ok: true; userId: string; orgId: string } | Exclude<ActionResult, { ok: true }>> {
   const {
     data: { user },
   } = await authClient.auth.getUser();
@@ -138,7 +141,8 @@ async function requireAlyosUser(
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
 
-  return { ok: true, userId: user.id };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId };
 }
 
 /**
@@ -169,7 +173,11 @@ type TxLike = {
   select: DrizzleClient["select"];
 };
 
-async function lockAndFetchTender(tx: TxLike, tenderId: string): Promise<TenderSnapshot | null> {
+async function lockAndFetchTender(
+  tx: TxLike,
+  tenderId: string,
+  organizationId: string,
+): Promise<TenderSnapshot | null> {
   const rows = await tx
     .select({
       status: tenders.status,
@@ -177,7 +185,7 @@ async function lockAndFetchTender(tx: TxLike, tenderId: string): Promise<TenderS
       externalRef: tenders.externalRef,
     })
     .from(tenders)
-    .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+    .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, organizationId)))
     .for("update")
     .limit(1);
 
@@ -218,7 +226,7 @@ export async function selectTenderAction(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { userId } = authResult;
+  const { userId, orgId } = authResult;
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
@@ -229,7 +237,7 @@ export async function selectTenderAction(
   let snapshot: TenderSnapshot | null = null;
   try {
     snapshot = await dbInstance.transaction(async (tx) => {
-      const snap = await lockAndFetchTender(tx, tenderId);
+      const snap = await lockAndFetchTender(tx, tenderId, orgId);
       if (!snap) throw new BusinessError("tender_not_found");
       if (snap.status !== "sourced") throw new BusinessError("invalid_state");
 
@@ -243,11 +251,11 @@ export async function selectTenderAction(
           deferredUntil: null,
           updatedAt: sql`now()`,
         })
-        .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)));
+        .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)));
 
       await tx.insert(tenderEvents).values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         eventType: "selected",
         actorId: userId,
         data: {
@@ -315,7 +323,7 @@ export async function deferTenderAction(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { userId } = authResult;
+  const { userId, orgId } = authResult;
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
@@ -331,7 +339,7 @@ export async function deferTenderAction(
   let deferredUntilIso: string | null = null;
   try {
     const txResult = await dbInstance.transaction(async (tx) => {
-      const snap = await lockAndFetchTender(tx, tenderId);
+      const snap = await lockAndFetchTender(tx, tenderId, orgId);
       if (!snap) throw new BusinessError("tender_not_found");
       if (snap.status !== "sourced") throw new BusinessError("invalid_state");
 
@@ -343,7 +351,7 @@ export async function deferTenderAction(
           deferredUntil: sql`now() + (${hoursOffset} * interval '1 hour')`,
           updatedAt: sql`now()`,
         })
-        .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+        .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
         .returning({ deferredUntil: tenders.deferredUntil });
 
       const newDeferredUntil = updated[0]?.deferredUntil ?? null;
@@ -351,7 +359,7 @@ export async function deferTenderAction(
 
       await tx.insert(tenderEvents).values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         eventType: "deferred",
         actorId: userId,
         data: {
@@ -419,7 +427,7 @@ export async function rejectTenderAction(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { userId } = authResult;
+  const { userId, orgId } = authResult;
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
@@ -431,7 +439,7 @@ export async function rejectTenderAction(
   let snapshot: TenderSnapshot | null = null;
   try {
     snapshot = await dbInstance.transaction(async (tx) => {
-      const snap = await lockAndFetchTender(tx, tenderId);
+      const snap = await lockAndFetchTender(tx, tenderId, orgId);
       if (!snap) throw new BusinessError("tender_not_found");
       if (snap.status !== "sourced") throw new BusinessError("invalid_state");
 
@@ -441,11 +449,11 @@ export async function rejectTenderAction(
           status: "dropped",
           updatedAt: sql`now()`,
         })
-        .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)));
+        .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)));
 
       await tx.insert(tenderEvents).values({
         tenderId,
-        organizationId: ALYOS_ORG_ID,
+        organizationId: orgId,
         eventType: "rejected",
         actorId: userId,
         data: {
@@ -517,6 +525,7 @@ export async function excludeTenderAction(
   // 2. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId } = authResult;
 
   // 3. Mise à jour directe (pas de transaction — idempotente)
   try {
@@ -526,7 +535,7 @@ export async function excludeTenderAction(
         excludedAt: exclude ? sql`now()` : null,
         updatedAt: sql`now()`,
       })
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)));
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)));
   } catch (err) {
     console.error("[tender-actions:exclude:fail]", err);
     return { ok: false, error: "internal_error" };
@@ -643,6 +652,7 @@ export async function generateTenderBriefAction(
   if (!authResult.ok) {
     return { ok: false, error: authResult.error };
   }
+  const { orgId } = authResult;
 
   // 2. Validation UUID
   if (!UUID_SHAPE.test(tenderId)) {
@@ -656,7 +666,7 @@ export async function generateTenderBriefAction(
       rawData: tenders.rawData,
     })
     .from(tenders)
-    .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, ALYOS_ORG_ID)))
+    .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
     .limit(1);
 
   if (!tenderRow) {
@@ -664,7 +674,7 @@ export async function generateTenderBriefAction(
   }
 
   // 4. Appel au module IA
-  const briefResult = await generateBrief(tenderRow.rawData, tenderId, dbInstance);
+  const briefResult = await generateBrief(tenderRow.rawData, tenderId, orgId, dbInstance);
 
   if (!briefResult.ok) {
     console.error("[generateTenderBriefAction:generateBrief:fail]", briefResult);
@@ -689,7 +699,7 @@ export async function generateTenderBriefAction(
     // 6. INSERT nouveau brief actif
     await dbInstance.insert(tenderBriefs).values({
       tenderId,
-      organizationId: ALYOS_ORG_ID,
+      organizationId: orgId,
       aiRunId: briefResult.runId !== "unknown" ? briefResult.runId : null,
       content: briefResult.briefText,
       isActive: true,

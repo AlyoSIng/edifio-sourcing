@@ -11,7 +11,7 @@
  *
  * Sécurité :
  *  - Auth check via helper local `requireAlyosUser`
- *  - Filtre tenant explicite `ALYOS_ORG_ID` sur toutes les requêtes
+ *  - Filtre tenant explicite sur toutes les requêtes (orgId résolu via memberships)
  *  - Écriture (upsertArchitect, setRgpdOpposition) : admin uniquement
  *  - Audit A17 `architect_edit` sur chaque modification fiche
  *  - Audit A19 `architect_export` sur chaque export (prévu)
@@ -29,6 +29,7 @@ import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { withTenantContext } from "@/lib/db/with-tenant-context";
 import {
   getPappersBySiren,
@@ -59,6 +60,8 @@ export interface FetchArchitectsPageParams {
   solicitable?: boolean;
   /** Filtre booléen `rgpd_opposition`. */
   rgpdOpposition?: boolean;
+  /** UUID de l'organisation courante (résolu par la page appelante). */
+  orgId?: string;
 }
 
 export interface FetchArchitectsPageResult {
@@ -130,7 +133,7 @@ interface AuthClientLike {
 async function requireAlyosUser(
   authClient: AuthClientLike,
 ): Promise<
-  | { ok: true; userId: string; profile: ReturnType<typeof toUserProfile> }
+  | { ok: true; userId: string; orgId: string; profile: ReturnType<typeof toUserProfile> }
   | { ok: false; error: "not_authenticated" | "forbidden_domain" }
 > {
   const {
@@ -139,7 +142,8 @@ async function requireAlyosUser(
   if (!user) return { ok: false, error: "not_authenticated" };
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
-  return { ok: true, userId: user.id, profile };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId, profile };
 }
 
 // ============================================================================
@@ -167,11 +171,13 @@ export async function fetchArchitectsPage(
     tutoiement,
     solicitable,
     rgpdOpposition,
+    orgId: paramOrgId,
   } = params;
+  const resolvedOrgId = paramOrgId ?? ALYOS_ORG_ID;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
   // Construction dynamique des conditions WHERE
-  const conditions = [eq(architects.organizationId, ALYOS_ORG_ID)];
+  const conditions = [eq(architects.organizationId, resolvedOrgId)];
 
   if (search && search.trim().length > 0) {
     const term = `%${search.trim()}%`;
@@ -210,7 +216,7 @@ export async function fetchArchitectsPage(
 
   // withTenantContext pose app.current_organization_id pour FORCE RLS
   // (architects a relforcerowsecurity = true depuis migration 0002)
-  const [rows, countRows] = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+  const [rows, countRows] = await withTenantContext(resolvedOrgId, dbClient, (client) =>
     Promise.all([
       client
         .select()
@@ -261,7 +267,7 @@ export async function upsertArchitect(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { userId, profile } = authResult;
+  const { userId, orgId, profile } = authResult;
 
   // 2. Vérification rôle admin
   if (!isAdmin(profile)) {
@@ -283,11 +289,11 @@ export async function upsertArchitect(
 
     if (id) {
       // Mise à jour — on exclut les colonnes dérivées et les timestamps auto
-      const rows = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+      const rows = await withTenantContext(orgId, dbClient, (client) =>
         client
           .update(architects)
           .set({ ...input, updatedAt: new Date() })
-          .where(and(eq(architects.id, id), eq(architects.organizationId, ALYOS_ORG_ID)))
+          .where(and(eq(architects.id, id), eq(architects.organizationId, orgId)))
           .returning(),
       );
 
@@ -295,10 +301,10 @@ export async function upsertArchitect(
       result = rows[0];
     } else {
       // Création
-      const rows = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+      const rows = await withTenantContext(orgId, dbClient, (client) =>
         client
           .insert(architects)
-          .values({ ...input, organizationId: ALYOS_ORG_ID })
+          .values({ ...input, organizationId: orgId })
           .returning(),
       );
 
@@ -355,7 +361,7 @@ export async function importArchitectsFromCsv(formData: FormData): Promise<Impor
   if (!authResult.ok) {
     return { imported: 0, updated: 0, errors: ["Non authentifié ou domaine non autorisé."] };
   }
-  const { profile } = authResult;
+  const { profile, orgId } = authResult;
 
   if (!isAdmin(profile)) {
     return { imported: 0, updated: 0, errors: ["Action réservée aux administrateurs."] };
@@ -389,9 +395,7 @@ export async function importArchitectsFromCsv(formData: FormData): Promise<Impor
 
   // Défense-en-profondeur Phase 2 : contexte tenant pour FORCE RLS
   // (postgres/service_role bypassent RLS → no-op actuel, effectif dès Phase 2)
-  await defaultDb.execute(
-    sql`SELECT set_config('app.current_organization_id', ${ALYOS_ORG_ID}, true)`,
-  );
+  await defaultDb.execute(sql`SELECT set_config('app.current_organization_id', ${orgId}, true)`);
 
   for (let i = 0; i < dataLines.length; i++) {
     const line = dataLines[i];
@@ -436,7 +440,7 @@ export async function importArchitectsFromCsv(formData: FormData): Promise<Impor
         const existing = await defaultDb
           .select({ id: architects.id })
           .from(architects)
-          .where(and(eq(architects.organizationId, ALYOS_ORG_ID), eq(architects.email, email)))
+          .where(and(eq(architects.organizationId, orgId), eq(architects.email, email)))
           .limit(1);
 
         if (existing[0]) {
@@ -459,13 +463,11 @@ export async function importArchitectsFromCsv(formData: FormData): Promise<Impor
               annualRevenue,
               updatedAt: new Date(),
             })
-            .where(
-              and(eq(architects.id, existing[0].id), eq(architects.organizationId, ALYOS_ORG_ID)),
-            );
+            .where(and(eq(architects.id, existing[0].id), eq(architects.organizationId, orgId)));
           updated++;
         } else {
           await defaultDb.insert(architects).values({
-            organizationId: ALYOS_ORG_ID,
+            organizationId: orgId,
             cabinet,
             email,
             phone,
@@ -487,7 +489,7 @@ export async function importArchitectsFromCsv(formData: FormData): Promise<Impor
       } else {
         // Pas d'email → INSERT simple
         await defaultDb.insert(architects).values({
-          organizationId: ALYOS_ORG_ID,
+          organizationId: orgId,
           cabinet,
           email: null,
           phone,
@@ -546,7 +548,7 @@ export async function setRgpdOpposition(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { profile } = authResult;
+  const { profile, orgId } = authResult;
 
   // 2. Vérification rôle admin
   if (!isAdmin(profile)) {
@@ -560,7 +562,7 @@ export async function setRgpdOpposition(
 
   try {
     // 4. Mise à jour atomique : rgpd_opposition + rgpd_opposition_date + active
-    const rows = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+    const rows = await withTenantContext(orgId, dbClient, (client) =>
       client
         .update(architects)
         .set({
@@ -571,7 +573,7 @@ export async function setRgpdOpposition(
           active: !oppose,
           updatedAt: new Date(),
         })
-        .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+        .where(and(eq(architects.id, architectId), eq(architects.organizationId, orgId)))
         .returning(),
     );
 
@@ -657,19 +659,17 @@ export async function enrichArchitectsFromPappers(params: {
   if (!authResult.ok) {
     return { updated: 0, skipped: 0, notFound: 0, nextOffset: 0, total: 0 };
   }
-  const { profile } = authResult;
+  const { profile, orgId } = authResult;
 
   // Réservé aux admins
   if (!isAdmin(profile)) {
     return { updated: 0, skipped: 0, notFound: 0, nextOffset: 0, total: 0 };
   }
 
-  const orgFilter = eq(architects.organizationId, ALYOS_ORG_ID);
+  const orgFilter = eq(architects.organizationId, orgId);
 
   // Défense-en-profondeur Phase 2 : contexte tenant pour FORCE RLS
-  await defaultDb.execute(
-    sql`SELECT set_config('app.current_organization_id', ${ALYOS_ORG_ID}, true)`,
-  );
+  await defaultDb.execute(sql`SELECT set_config('app.current_organization_id', ${orgId}, true)`);
 
   // Récupération du total et du batch en parallèle
   const [batch, totalRows] = await Promise.all([
@@ -825,7 +825,7 @@ export async function enrichSingleArchitectFromPappers(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { profile } = authResult;
+  const { profile, orgId } = authResult;
 
   // 2. Vérification rôle admin
   if (!isAdmin(profile)) {
@@ -846,15 +846,13 @@ export async function enrichSingleArchitectFromPappers(
 
   try {
     // Défense-en-profondeur Phase 2 : contexte tenant pour FORCE RLS
-    await defaultDb.execute(
-      sql`SELECT set_config('app.current_organization_id', ${ALYOS_ORG_ID}, true)`,
-    );
+    await defaultDb.execute(sql`SELECT set_config('app.current_organization_id', ${orgId}, true)`);
 
     // 5. Récupération de l'architecte (filtré tenant)
     const rows = await defaultDb
       .select()
       .from(architects)
-      .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+      .where(and(eq(architects.id, architectId), eq(architects.organizationId, orgId)))
       .limit(1);
 
     const arch = rows[0];
@@ -935,7 +933,7 @@ export async function enrichSingleArchitectFromPappers(
         annualRevenue: arch.annualRevenue ?? newAnnualRevenue,
         updatedAt: new Date(),
       })
-      .where(and(eq(architects.id, arch.id), eq(architects.organizationId, ALYOS_ORG_ID)));
+      .where(and(eq(architects.id, arch.id), eq(architects.organizationId, orgId)));
 
     // 11. Audit A17 architect_edit (best-effort)
     await audit({
@@ -1007,7 +1005,7 @@ export async function deleteArchitectAction(
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
-  const { profile } = authResult;
+  const { profile, orgId } = authResult;
 
   // 2. Vérification rôle admin
   if (!isAdmin(profile)) {
@@ -1050,10 +1048,10 @@ export async function deleteArchitectAction(
     }
 
     // 6. DELETE tenant-scoped
-    const deleted = await withTenantContext(ALYOS_ORG_ID, dbClient, (client) =>
+    const deleted = await withTenantContext(orgId, dbClient, (client) =>
       client
         .delete(architects)
-        .where(and(eq(architects.id, architectId), eq(architects.organizationId, ALYOS_ORG_ID)))
+        .where(and(eq(architects.id, architectId), eq(architects.organizationId, orgId)))
         .returning({ id: architects.id }),
     );
 

@@ -18,10 +18,11 @@
 import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { toUserProfile } from "@/lib/auth/types";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { CotraitancePipelineClient } from "./CotraitancePipelineClient";
 import { PipelineStats } from "./PipelineStats";
@@ -43,13 +44,23 @@ export default async function CotraitancePipelinePage() {
   if (!user) redirect("/login?next=/sourcing/cotraitance");
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[cotraitance:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // Résilience runtime : try/catch absorbé sur l'I/O BDD.
   let loadResult: Awaited<ReturnType<typeof loadCotraitancePipelineData>> | null = null;
   let fetchError: string | null = null;
 
   try {
-    loadResult = await loadCotraitancePipelineData(ALYOS_ORG_ID);
+    loadResult = await loadCotraitancePipelineData(orgId);
   } catch (err) {
     console.error("[cotraitance-pipeline-page:unhandled]", err);
     fetchError = err instanceof Error ? err.message : String(err);

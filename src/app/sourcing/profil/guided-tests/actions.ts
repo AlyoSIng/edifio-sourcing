@@ -19,12 +19,12 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { type GuidedTestAnswers, guidedTestSubmissions, guidedTests } from "@/db/schema/superadmin";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ─── Guard interne ────────────────────────────────────────────────────────────
 
-async function requireAlyosUser(): Promise<{ userId: string } | { error: string }> {
+async function requireAlyosUser(): Promise<{ userId: string; orgId: string } | { error: string }> {
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -33,7 +33,8 @@ async function requireAlyosUser(): Promise<{ userId: string } | { error: string 
   if (!user) return { error: "Non authentifié." };
   if (!isAuthorizedEmail(user.email)) return { error: "Domaine non autorisé." };
 
-  return { userId: user.id };
+  const orgId = await getRequiredOrgId(user.id);
+  return { userId: user.id, orgId };
 }
 
 // ─── submitGuidedTestAction ───────────────────────────────────────────────────
@@ -57,7 +58,7 @@ export async function submitGuidedTestAction(
 ): Promise<{ ok: boolean; score: number | null; error?: string }> {
   const guard = await requireAlyosUser();
   if ("error" in guard) return { ok: false, score: null, error: guard.error };
-  const { userId } = guard;
+  const { userId, orgId } = guard;
 
   // Validation UUID basique
   if (!testId || typeof testId !== "string" || testId.length < 10) {
@@ -113,7 +114,7 @@ export async function submitGuidedTestAction(
       await db.insert(guidedTestSubmissions).values({
         testId,
         userId,
-        orgId: ALYOS_ORG_ID,
+        orgId,
         answers,
         remarks: remarks ?? null,
         score,

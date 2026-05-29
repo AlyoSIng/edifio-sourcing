@@ -19,7 +19,6 @@ import { createHash } from "crypto";
 import { db } from "@/db/client";
 import { aiPrompts, aiRuns } from "@/db/schema/ai";
 import type { TenderRawData } from "@/db/types/jsonb";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 // ---------------------------------------------------------------------------
 // Mapping enum BDD → identifiant API Anthropic
@@ -108,11 +107,13 @@ function buildAoContext(rawData: TenderRawData): string {
  *
  * @param rawData   Payload brut de la plateforme (tender.rawData)
  * @param tenderId  UUID du tender (pour traçabilité ai_runs)
+ * @param orgId     UUID de l'organisation courante (résolu via getRequiredOrgId)
  * @param dbClient  Instance Drizzle (injectable en tests)
  */
 export async function generateBrief(
   rawData: TenderRawData | null,
   tenderId: string,
+  orgId: string,
   dbClient = db,
 ): Promise<GenerateBriefResult> {
   // 1. Vérifie que rawData est non-null
@@ -183,7 +184,7 @@ export async function generateBrief(
   const inserted = await dbClient
     .insert(aiRuns)
     .values({
-      organizationId: ALYOS_ORG_ID,
+      organizationId: orgId,
       promptId: prompt.id,
       tenderId,
       inputHash,

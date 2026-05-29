@@ -33,7 +33,7 @@ import { db as defaultDb } from "@/db/client";
 import { audit } from "@/lib/audit";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import {
   createSearchProfile,
   deleteSearchProfile,
@@ -167,7 +167,7 @@ const updateProfileSchema = searchProfileBaseSchema.partial().extend({
 async function requireAlyosAdmin(
   authClient: AuthClientLike,
 ): Promise<
-  | { ok: true; userId: string }
+  | { ok: true; userId: string; orgId: string }
   | Extract<
       ProfileActionResult,
       { ok: false; error: "not_authenticated" | "forbidden_domain" | "forbidden_role" }
@@ -182,7 +182,8 @@ async function requireAlyosAdmin(
   if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
-  return { ok: true, userId: user.id };
+  const orgId = await getRequiredOrgId(user.id);
+  return { ok: true, userId: user.id, orgId };
 }
 
 function toNumericString(value: number | null | undefined): string | null {
@@ -212,9 +213,10 @@ export async function listSearchProfilesAction(
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId } = authResult;
 
   try {
-    const rows = await listSearchProfiles(ALYOS_ORG_ID, dbInstance, includeInactive);
+    const rows = await listSearchProfiles(orgId, dbInstance, includeInactive);
     const profiles: SearchProfileListItem[] = rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -258,6 +260,7 @@ export async function createSearchProfileAction(
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId: createOrgId } = authResult;
 
   const parsed = createProfileSchema.safeParse(input);
   if (!parsed.success) {
@@ -278,7 +281,7 @@ export async function createSearchProfileAction(
 
   try {
     const profile = await createSearchProfile(
-      ALYOS_ORG_ID,
+      createOrgId,
       {
         name: data.name,
         displayOrder: data.displayOrder,
@@ -336,6 +339,7 @@ export async function updateSearchProfileAction(
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId: updateOrgId } = authResult;
 
   const parsed = updateProfileSchema.safeParse(input);
   if (!parsed.success) {
@@ -356,7 +360,7 @@ export async function updateSearchProfileAction(
 
   try {
     const updated = await updateSearchProfileMulti(
-      ALYOS_ORG_ID,
+      updateOrgId,
       profileId,
       {
         name: data.name,
@@ -417,9 +421,10 @@ export async function deleteSearchProfileAction(
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId: deleteOrgId } = authResult;
 
   try {
-    await deleteSearchProfile(ALYOS_ORG_ID, profileId, dbInstance);
+    await deleteSearchProfile(deleteOrgId, profileId, dbInstance);
 
     await audit({
       action: "search_profile_change",
@@ -469,9 +474,10 @@ export async function setDefaultProfileAction(
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId: defaultOrgId } = authResult;
 
   try {
-    const updated = await setDefaultSearchProfile(ALYOS_ORG_ID, profileId, dbInstance);
+    const updated = await setDefaultSearchProfile(defaultOrgId, profileId, dbInstance);
 
     await audit({
       action: "search_profile_change",
@@ -519,13 +525,14 @@ export async function duplicateSearchProfileAction(
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
+  const { orgId: dupOrgId } = authResult;
 
   try {
-    const source = await getSearchProfileById(ALYOS_ORG_ID, profileId, dbInstance);
+    const source = await getSearchProfileById(dupOrgId, profileId, dbInstance);
     if (!source) return { ok: false, error: "profile_not_found" };
 
     const copy = await createSearchProfile(
-      ALYOS_ORG_ID,
+      dupOrgId,
       {
         name: `${source.name} (copie)`,
         isDefault: false,

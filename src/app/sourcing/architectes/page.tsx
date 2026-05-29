@@ -4,8 +4,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { shortlistCriteria } from "@/db/schema/shortlist";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import type { Architect } from "@/db/schema/architects";
 
 import { fetchArchitectsPage } from "./actions";
@@ -58,6 +59,16 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/architectes");
   const profile = toUserProfile(user);
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[architectes:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   // Parsing des searchParams URL
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
@@ -98,6 +109,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
       tutoiement,
       solicitable,
       rgpdOpposition,
+      orgId,
     });
   } catch (err) {
     console.error("[architectes-page:fetch-failed]", err);
@@ -113,7 +125,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
   let duplicateGroups: DuplicateGroup[] = [];
   if (adminUser) {
     try {
-      duplicateGroups = await detectArchitectDuplicatesAction();
+      duplicateGroups = await detectArchitectDuplicatesAction(orgId);
     } catch (err) {
       console.error("[architectes-page:duplicates-failed]", err);
       // Pas bloquant : on affiche la page sans le bandeau doublons
@@ -129,7 +141,7 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
       .from(shortlistCriteria)
       .where(
         and(
-          eq(shortlistCriteria.organizationId, ALYOS_ORG_ID),
+          eq(shortlistCriteria.organizationId, orgId),
           eq(shortlistCriteria.target, "architects"),
         ),
       )

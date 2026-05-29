@@ -27,10 +27,11 @@
 import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { toUserProfile } from "@/lib/auth/types";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
+import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { TandemShortlistClient } from "./TandemShortlistClient";
 import { loadTandemShortlistData } from "./page-data";
@@ -113,6 +114,16 @@ export default async function TandemShortlistPage({ params }: PageProps) {
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/tandem`);
   const profile = toUserProfile(user);
   if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // Résolution dynamique de l'org (Phase A multi-tenant).
+  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
+  // plutôt que crash 500 de la page entière.
+  let orgId: string;
+  try {
+    orgId = await getRequiredOrgId(user.id);
+  } catch (err) {
+    console.error("[ao-tandem:org-resolution-failed]", err);
+    orgId = ALYOS_ORG_ID;
+  }
 
   if (!UUID_SHAPE.test(params.id)) {
     return (
@@ -126,7 +137,7 @@ export default async function TandemShortlistPage({ params }: PageProps) {
   let loadResult: Awaited<ReturnType<typeof loadTandemShortlistData>> | null = null;
   let fetchError: string | null = null;
   try {
-    loadResult = await loadTandemShortlistData(params.id, ALYOS_ORG_ID);
+    loadResult = await loadTandemShortlistData(params.id, orgId);
   } catch (err) {
     console.error("[tandem-shortlist-page:unhandled]", err);
     fetchError = err instanceof Error ? err.message : String(err);
