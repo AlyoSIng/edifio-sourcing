@@ -37,6 +37,7 @@ function makeTender(overrides: Partial<NormalizedTender> = {}): NormalizedTender
     visitDate: null,
     dceUrl: "https://www.boamp.fr/dce/abc",
     sourceUrl: "https://www.boamp.fr/avis/detail/25-XYZ-00001",
+    noticeType: null,
     rawData: {
       platform_code: "boamp",
       record: { idweb: "25-XYZ-00001" },

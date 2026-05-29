@@ -117,6 +117,9 @@ export interface BoampApiRecord {
   criteres_attribution?: string[];
   /** URL du DCE (Dossier de Consultation des Entreprises) */
   url_dce?: string;
+  /** Type d'avis BOAMP : "Avis de marché", "Avis d'attribution de marché", etc.
+   *  Champ `nature` dans l'API Opendatasoft BOAMP v2.1. */
+  nature?: string;
   /**
    * Champ d'extension : BOAMP ajoute régulièrement des colonnes sans préavis
    * (date_visite, date_questions, lots, ...). On garde une porte ouverte
@@ -199,6 +202,12 @@ export interface NormalizedTender {
   dceUrl: string | null;
   /** URL source côté plateforme (lien direct fiche AO) — facultative */
   sourceUrl: string | null;
+  /**
+   * Type d'avis tel que fourni par la plateforme source (nullable).
+   * Extrait depuis `rawData.record.nature` pour BOAMP.
+   * `null` pour les scrapers (PLACE, francmarches, mp_info, prive).
+   */
+  noticeType: string | null;
   /** Payload brut + métadonnées (conservé pour debug + apprentissage) */
   rawData: TenderRawData;
 }

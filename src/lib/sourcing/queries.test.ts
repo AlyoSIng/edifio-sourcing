@@ -65,6 +65,7 @@ const tenderRow1: TenderOfTheDay = {
   postalCode: "42000",
   department: "42",
   activeBrief: null,
+  noticeType: null,
 };
 
 const tenderRow2: TenderOfTheDay = {
@@ -85,6 +86,7 @@ const tenderRow2: TenderOfTheDay = {
   postalCode: "69007",
   department: "69",
   activeBrief: null,
+  noticeType: null,
 };
 
 const tenderRow3: TenderOfTheDay = {
@@ -105,6 +107,7 @@ const tenderRow3: TenderOfTheDay = {
   postalCode: null,
   department: null,
   activeBrief: null,
+  noticeType: null,
 };
 
 /**
@@ -132,6 +135,7 @@ const tenderRow4PreviouslyDeferred: TenderOfTheDay = {
   postalCode: null,
   department: null,
   activeBrief: null,
+  noticeType: null,
 };
 
 // ----------------------------------------------------------------------------

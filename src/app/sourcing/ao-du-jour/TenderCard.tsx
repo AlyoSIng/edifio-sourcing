@@ -5,6 +5,20 @@ import { formatAmount, formatDeadline } from "./format";
 import { TenderCardActions } from "./TenderCardActions";
 
 /**
+ * Formate le type d'avis BOAMP pour l'affichage.
+ * Réduit les libellés longs en formes courtes reconnaissables.
+ */
+function noticeTypeLabel(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("attribution")) return "Attribution";
+  if (lower.includes("préinformation") || lower.includes("preinformation")) return "Préinfo";
+  if (lower.includes("rectificatif")) return "Rectificatif";
+  if (lower.includes("marché") || lower.includes("marche")) return "Avis de marché";
+  // Valeur brute tronquée si non reconnue
+  return raw.length > 25 ? raw.slice(0, 22) + "…" : raw;
+}
+
+/**
  * Carte AO « du jour » — habillage charte edifio (M-A lignes 236-302).
  *
  * Server Component pour le rendu + sous-composant Client `<TenderCardActions />`
@@ -56,6 +70,19 @@ export function TenderCard({ tender }: { tender: TenderOfTheDay }) {
           ) : (
             <span className="text-[10px] text-muted">CP non précisé</span>
           )}
+          {/* Badge type d'avis — affiché si disponible */}
+          {tender.noticeType ? (
+            <span
+              className={[
+                "rounded-sm px-1.5 py-0.5 text-[10px] font-medium",
+                tender.noticeType.toLowerCase().includes("attribution")
+                  ? "bg-gray-100 text-gray-500 line-through"
+                  : "bg-blue-50 text-blue-700",
+              ].join(" ")}
+            >
+              {noticeTypeLabel(tender.noticeType)}
+            </span>
+          ) : null}
           <span
             className="rounded-xs bg-paper-2 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-2"
             aria-label="Plateforme source"

@@ -120,6 +120,7 @@ const baseTender: NormalizedTender = {
   visitDate: null,
   dceUrl: "https://exemple.test/dce/abc",
   sourceUrl: "https://www.boamp.fr/avis/detail/MOCK-123",
+  noticeType: null,
   rawData: {
     platform_code: "boamp",
     record: { idweb: "MOCK-123", objet: "Mission de MOE" },
@@ -255,7 +256,13 @@ describe("insertTender — onConflictDoUpdate (politique re-source)", () => {
     );
 
     const setKeys = Object.keys(insertCapture.onConflictSet ?? {});
-    expect(setKeys.sort()).toEqual(["department", "postalCode", "rawData", "updatedAt"]);
+    expect(setKeys.sort()).toEqual([
+      "department",
+      "noticeType",
+      "postalCode",
+      "rawData",
+      "updatedAt",
+    ]);
     // Les champs métier ne doivent PAS être mis à jour
     expect(setKeys).not.toContain("score");
     expect(setKeys).not.toContain("status");
