@@ -157,7 +157,14 @@ export default async function ProfilFormationsPage() {
                   )}
 
                   <div className="mt-auto flex items-center gap-3">
-                    {formation.url ? (
+                    {formation.type === "doc" && formation.slug ? (
+                      <Link
+                        href={`/sourcing/profil/formations/${formation.slug}`}
+                        className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-800"
+                      >
+                        {buttonLabel}
+                      </Link>
+                    ) : formation.url ? (
                       <a
                         href={formation.url}
                         target="_blank"
@@ -168,7 +175,7 @@ export default async function ProfilFormationsPage() {
                       </a>
                     ) : (
                       <span className="rounded-md border border-dashed border-line px-3 py-1.5 text-xs italic text-muted">
-                        Vidéo en cours d&apos;ajout…
+                        Contenu en cours d&apos;ajout…
                       </span>
                     )}
                     {hasTest && (

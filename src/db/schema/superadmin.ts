@@ -134,6 +134,16 @@ export const formations = pgTable("formations", {
   durationMin: integer("duration_min"),
   isActive: boolean("is_active").notNull().default(true),
   displayOrder: integer("display_order").notNull().default(0),
+  /**
+   * Identifiant URL stable pour les guides intégrés (type='doc').
+   * Pivot 2026-05-29 : contenu inline BDD, pas d'URL externe.
+   */
+  slug: text("slug").unique(),
+  /**
+   * Corps du guide en markdown.
+   * Rendu inline côté serveur (pas de dépendance externe).
+   */
+  contentMd: text("content_md"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

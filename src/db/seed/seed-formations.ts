@@ -6,53 +6,31 @@
  *
  * Idempotence : UUID déterministes + ON CONFLICT DO NOTHING.
  * Les 4 formations et les 4 tests guidés sont insérés dans l'ordre d'affichage.
+ *
+ * Pivot 2026-05-29 : formations en contenu intégré (guides markdown BDD).
+ * Les données proviennent de FORMATIONS_CONTENT_FIXTURE (type='doc', slug, contentMd).
  */
 
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { formations, guidedTests, type GuidedTestStep } from "@/db/schema/superadmin";
+import { FORMATIONS_CONTENT_FIXTURE } from "./formations-content-fixture";
 
-// ─── Données formations ───────────────────────────────────────────────────────
+// ─── Données formations (pivot : guides intégrés, type='doc') ─────────────────
 
-const FORMATIONS: Array<typeof formations.$inferInsert> = [
-  {
-    id: "fb000001-0000-0000-0000-000000000001",
-    title: "Prendre en main edifio Sourcing en 10 minutes",
-    description: "Tour d'horizon : connexion, AO du jour, premier traitement d'annonce.",
-    url: null,
-    type: "video",
-    isActive: true,
-    displayOrder: 1,
-  },
-  {
-    id: "fb000001-0000-0000-0000-000000000002",
-    title: "Traiter sa file « AO du jour »",
-    description: "Reporter, écarter, lire le brief d'opportunité, ouvrir l'annonce et le DCE.",
-    url: null,
-    type: "video",
-    isActive: true,
-    displayOrder: 2,
-  },
-  {
-    id: "fb000001-0000-0000-0000-000000000003",
-    title: "Répondre en cotraitance avec un architecte",
-    description: "Comprendre la shortlist, solliciter un architecte, suivre les réponses.",
-    url: null,
-    type: "video",
-    isActive: true,
-    displayOrder: 3,
-  },
-  {
-    id: "fb000001-0000-0000-0000-000000000004",
-    title: "Gérer les contacts et le coffre documentaire BET",
-    description: "Annuaires Architectes / BE / Entreprises, pièces administratives et expirations.",
-    url: null,
-    type: "video",
-    isActive: true,
-    displayOrder: 4,
-  },
-];
+const FORMATIONS: Array<typeof formations.$inferInsert> = FORMATIONS_CONTENT_FIXTURE.map((f) => ({
+  id: f.id,
+  title: f.title,
+  description: f.description,
+  url: null,
+  type: f.type,
+  slug: f.slug,
+  contentMd: f.contentMd,
+  durationMin: f.durationMin,
+  isActive: f.isActive,
+  displayOrder: f.displayOrder,
+}));
 
 // ─── Données tests guidés ─────────────────────────────────────────────────────
 
@@ -455,7 +433,20 @@ async function seedFormations() {
       .limit(1);
 
     if (existing.length > 0 && existing[0]) {
-      console.log(`[seed-formations] ${label} — OK (déjà présente, id=${existing[0].id})`);
+      // Mise à jour du slug, contentMd et type (pivot video → doc 2026-05-29)
+      await db
+        .update(formations)
+        .set({
+          type: f.type,
+          slug: f.slug ?? null,
+          contentMd: f.contentMd ?? null,
+          durationMin: f.durationMin ?? null,
+          url: null,
+        })
+        .where(eq(formations.id, existing[0].id));
+      console.log(
+        `[seed-formations] ${label} — OK (mise à jour slug+contentMd, id=${existing[0].id})`,
+      );
       formationIdByTitle.set(f.title, existing[0].id);
       formationsSkipped++;
     } else {
