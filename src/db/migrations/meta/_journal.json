@@ -208,21 +208,21 @@
     {
       "idx": 29,
       "version": "7",
-      "when": 1748996200000,
+      "when": 1779731004000,
       "tag": "0029_tender_notice_type",
       "breakpoints": true
     },
     {
       "idx": 30,
       "version": "7",
-      "when": 1748996300000,
+      "when": 1779731005000,
       "tag": "0030_formations_slug_content",
       "breakpoints": true
     },
     {
       "idx": 31,
       "version": "7",
-      "when": 1748996400000,
+      "when": 1779731006000,
       "tag": "0031_tender_is_exclusive",
       "breakpoints": true
     }
