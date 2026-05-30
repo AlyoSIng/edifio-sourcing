@@ -84,7 +84,7 @@ export function PappersEnrichSingleButton({ beId }: Props) {
         result.updated ? (
           <>
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-[11px] font-medium text-green-800"
+              className="inline-flex items-center gap-1 rounded-full bg-success-bg px-2.5 py-0.5 text-[11px] font-medium text-success"
               role="status"
               aria-live="polite"
             >
@@ -100,7 +100,7 @@ export function PappersEnrichSingleButton({ beId }: Props) {
           </>
         ) : (
           <span
-            className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-medium text-gray-600"
+            className="inline-flex items-center rounded-full bg-paper-2 px-2.5 py-0.5 text-[11px] font-medium text-ink-2"
             role="status"
             aria-live="polite"
           >
@@ -111,7 +111,7 @@ export function PappersEnrichSingleButton({ beId }: Props) {
 
       {state === "error" && result ? (
         <span
-          className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-medium text-red-800"
+          className="inline-flex items-center rounded-full bg-error-bg px-2.5 py-0.5 text-[11px] font-medium text-error"
           role="alert"
           aria-live="assertive"
         >

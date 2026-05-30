@@ -111,7 +111,7 @@ export default async function BEFichePage({ params }: { params: { id: string } }
                     ✓ Sollicitable
                   </span>
                 ) : (
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                  <span className="rounded-full bg-paper-2 px-2 py-0.5 text-[11px] font-medium text-muted">
                     Non sollicitable
                   </span>
                 )}

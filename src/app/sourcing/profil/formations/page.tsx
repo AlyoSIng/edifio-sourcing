@@ -40,8 +40,8 @@ const TYPE_BUTTON_LABELS: Record<string, string> = {
 
 const TYPE_BADGE_CLASSES: Record<string, string> = {
   video: "bg-violet-100 text-violet-700",
-  doc: "bg-blue-100 text-blue-700",
-  external: "bg-green-100 text-green-700",
+  doc: "bg-info-bg text-info",
+  external: "bg-success-bg text-success",
 };
 
 export default async function ProfilFormationsPage() {
@@ -118,7 +118,7 @@ export default async function ProfilFormationsPage() {
               const typeLabel = TYPE_LABELS[formation.type] ?? formation.type;
               const typeIcon = TYPE_ICONS[formation.type] ?? "";
               const buttonLabel = TYPE_BUTTON_LABELS[formation.type] ?? "Accéder";
-              const badgeClass = TYPE_BADGE_CLASSES[formation.type] ?? "bg-gray-100 text-gray-700";
+              const badgeClass = TYPE_BADGE_CLASSES[formation.type] ?? "bg-paper-2 text-ink-2";
               const hasTest = testFormationIds.has(formation.id);
 
               return (
@@ -142,7 +142,7 @@ export default async function ProfilFormationsPage() {
                       </span>
                     )}
                     {formation.durationMin != null && (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                      <span className="rounded-full bg-paper-2 px-2 py-0.5 text-xs font-semibold text-ink-2">
                         ⏱ {formation.durationMin} min
                       </span>
                     )}

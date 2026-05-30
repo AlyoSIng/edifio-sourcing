@@ -459,7 +459,7 @@ function InfoRow({
     <div>
       <dt className="text-[10px] font-medium uppercase tracking-wider text-muted">{label}</dt>
       <dd
-        className={`mt-0.5 text-sm ${mono ? "font-mono" : ""} ${urgent ? "font-semibold text-[#c8002a]" : "text-ink"}`}
+        className={`mt-0.5 text-sm ${mono ? "font-mono" : ""} ${urgent ? "font-semibold text-brand-red-dark" : "text-ink"}`}
       >
         {value}
       </dd>

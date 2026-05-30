@@ -113,12 +113,12 @@ export function CotraitantPageClient({ token, items: initialItems }: Props) {
     <div className="space-y-4">
       {/* Messages globaux */}
       {globalError ? (
-        <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-error">
+        <div role="alert" className="rounded-md bg-error-bg p-3 text-sm text-error">
           {globalError}
         </div>
       ) : null}
       {globalSuccess ? (
-        <div role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+        <div role="status" className="rounded-md bg-success-bg p-3 text-sm text-success">
           {globalSuccess}
         </div>
       ) : null}
@@ -130,7 +130,7 @@ export function CotraitantPageClient({ token, items: initialItems }: Props) {
           <div
             key={item.id}
             className={`rounded-md border p-4 ${
-              isSigned ? "border-green-200 bg-green-50" : "border-line bg-white"
+              isSigned ? "border-green-200 bg-success-bg" : "border-line bg-white"
             }`}
           >
             {/* En-tête */}
@@ -141,7 +141,7 @@ export function CotraitantPageClient({ token, items: initialItems }: Props) {
               </div>
               <span
                 className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                  isSigned ? "bg-green-600 text-white" : "bg-neutral-100 text-muted"
+                  isSigned ? "bg-success text-white" : "bg-paper-3 text-muted"
                 }`}
               >
                 {isSigned ? "Signé" : "En attente"}
@@ -166,7 +166,7 @@ export function CotraitantPageClient({ token, items: initialItems }: Props) {
                   type="button"
                   onClick={() => handleDownload(item.id)}
                   disabled={isPending}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   &darr; Télécharger la pièce originale
                 </button>
@@ -226,8 +226,8 @@ export function CotraitantPageClient({ token, items: initialItems }: Props) {
 
       {/* Message final toutes pièces signées */}
       {allSigned ? (
-        <div className="rounded-md bg-green-50 p-4 text-center">
-          <p className="font-semibold text-green-700">
+        <div className="rounded-md bg-success-bg p-4 text-center">
+          <p className="font-semibold text-success">
             Toutes les pièces ont été signées et déposées
           </p>
           <p className="mt-1 text-sm text-muted">

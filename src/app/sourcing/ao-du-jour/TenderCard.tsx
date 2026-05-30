@@ -82,8 +82,8 @@ export function TenderCard({
               className={[
                 "rounded-sm px-1.5 py-0.5 text-[10px] font-medium",
                 tender.noticeType.toLowerCase().includes("attribution")
-                  ? "bg-gray-100 text-gray-500 line-through"
-                  : "bg-blue-50 text-blue-700",
+                  ? "bg-paper-2 text-muted line-through"
+                  : "bg-info-bg text-info",
               ].join(" ")}
             >
               {noticeTypeLabel(tender.noticeType)}
@@ -268,9 +268,9 @@ function daysUntil(deadline: Date | null): number | null {
  */
 function deadlineToneFromDays(days: number | null): string {
   if (days === null) return "text-muted";
-  if (days < 7) return "text-[#c8002a] font-semibold";
-  if (days <= 15) return "text-[#d97706]";
-  return "text-[#16a34a]";
+  if (days < 7) return "text-brand-red-dark font-semibold";
+  if (days <= 15) return "text-warn";
+  return "text-success";
 }
 
 /**
@@ -282,9 +282,9 @@ function deadlineToneFromDays(days: number | null): string {
  */
 function deadlineBgFromDays(days: number | null): string {
   if (days === null) return "";
-  if (days < 7) return "bg-red-50";
-  if (days <= 15) return "bg-amber-50";
-  return "bg-green-50";
+  if (days < 7) return "bg-error-bg";
+  if (days <= 15) return "bg-warn-bg";
+  return "bg-success-bg";
 }
 
 /**

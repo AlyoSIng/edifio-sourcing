@@ -160,7 +160,7 @@ export function PartageClient({ tenderId, libraryItems, existingShares }: Props)
                     {items.map((item) => (
                       <label
                         key={item.id}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-neutral-50"
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-paper-2"
                       >
                         <input
                           type="checkbox"
@@ -218,8 +218,8 @@ export function PartageClient({ tenderId, libraryItems, existingShares }: Props)
 
             {/* Lien généré */}
             {generatedLink ? (
-              <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3">
-                <p className="mb-1 text-xs font-semibold text-green-700">
+              <div className="mt-4 rounded-md border border-green-200 bg-success-bg p-3">
+                <p className="mb-1 text-xs font-semibold text-success">
                   Lien créé — valable 30 jours
                 </p>
                 <div className="flex items-center gap-2">
@@ -229,7 +229,7 @@ export function PartageClient({ tenderId, libraryItems, existingShares }: Props)
                   <button
                     type="button"
                     onClick={() => void navigator.clipboard.writeText(generatedLink)}
-                    className="shrink-0 rounded-full border border-line px-2 py-1 text-[11px] font-medium text-ink transition hover:bg-neutral-50"
+                    className="shrink-0 rounded-full border border-line px-2 py-1 text-[11px] font-medium text-ink transition hover:bg-paper-2"
                   >
                     Copier
                   </button>
@@ -264,7 +264,7 @@ export function PartageClient({ tenderId, libraryItems, existingShares }: Props)
                 key={share.id}
                 className={`rounded-md border p-4 ${
                   isRevoked || isExpired
-                    ? "border-line bg-neutral-50 opacity-70"
+                    ? "border-line bg-paper-2 opacity-70"
                     : "border-line bg-white"
                 }`}
               >

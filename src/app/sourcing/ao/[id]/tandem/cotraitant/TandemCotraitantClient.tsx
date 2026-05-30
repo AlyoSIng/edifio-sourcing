@@ -93,7 +93,7 @@ const KIND_COLORS: Record<CotraitantDocumentKind, string> = {
   rib: "bg-purple-50 text-purple-700",
   convention: "bg-indigo-50 text-indigo-700",
   alyos_rc: "bg-slate-50 text-slate-700",
-  autre: "bg-gray-100 text-gray-600",
+  autre: "bg-paper-2 text-ink-2",
 };
 
 // ============================================================================
@@ -395,7 +395,7 @@ export function TandemCotraitantClient({
                         <li key={doc.id} className="flex items-center justify-between gap-3">
                           <div className="flex min-w-0 flex-1 items-center gap-2">
                             <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${KIND_COLORS[doc.kind as CotraitantDocumentKind] ?? "bg-gray-100 text-gray-600"}`}
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${KIND_COLORS[doc.kind as CotraitantDocumentKind] ?? "bg-paper-2 text-ink-2"}`}
                             >
                               {KIND_LABELS[doc.kind as CotraitantDocumentKind] ?? doc.kind}
                             </span>

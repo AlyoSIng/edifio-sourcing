@@ -166,7 +166,7 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
                     ✓ Sollicitable
                   </span>
                 ) : (
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                  <span className="rounded-full bg-paper-2 px-2 py-0.5 text-[11px] font-medium text-muted">
                     Non sollicitable
                   </span>
                 )}
@@ -434,14 +434,14 @@ function InfoField({
 
 function ResponseStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
-    pending: { label: "En attente", className: "bg-amber-50 text-amber-700" },
-    accepted: { label: "Acceptée", className: "bg-green-50 text-green-700" },
-    declined: { label: "Refusée", className: "bg-red-50 text-red-700" },
-    info: { label: "Info demandée", className: "bg-blue-50 text-blue-700" },
+    pending: { label: "En attente", className: "bg-warn-bg text-warn" },
+    accepted: { label: "Acceptée", className: "bg-success-bg text-success" },
+    declined: { label: "Refusée", className: "bg-error-bg text-error" },
+    info: { label: "Info demandée", className: "bg-info-bg text-info" },
   };
   const { label, className } = map[status] ?? {
     label: status,
-    className: "bg-gray-100 text-gray-600",
+    className: "bg-paper-2 text-ink-2",
   };
   return (
     <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>

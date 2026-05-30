@@ -68,7 +68,7 @@ function SuccessState() {
     <div className="flex flex-col items-center gap-4 text-center" role="status">
       <div
         aria-hidden
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-2xl text-green-700"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-success-bg text-2xl text-success"
       >
         ✓
       </div>

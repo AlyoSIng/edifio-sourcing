@@ -35,7 +35,7 @@ export function ResetPasswordForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <div className="rounded-md border border-amber-300 bg-warn-bg px-3 py-2 text-sm text-warn">
         Choisissez un mot de passe durable. Votre mot de passe provisoire ne sera plus utilisable
         après ce changement.
       </div>
@@ -81,7 +81,7 @@ export function ResetPasswordForm() {
         <p
           role="alert"
           data-testid="auth-error"
-          className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-md border border-red-300 bg-error-bg px-3 py-2 text-sm text-error"
         >
           {state.message}
         </p>
@@ -139,10 +139,10 @@ function StrengthHint({
     );
   }
   if (errors.length === 0) {
-    return <span className="text-xs text-green-700">Mot de passe robuste.</span>;
+    return <span className="text-xs text-success">Mot de passe robuste.</span>;
   }
   return (
-    <ul className="mt-1 list-disc pl-5 text-xs text-amber-800">
+    <ul className="mt-1 list-disc pl-5 text-xs text-warn">
       {errors.map((e) => (
         <li key={e}>{passwordErrorLabel(e)}</li>
       ))}

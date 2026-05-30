@@ -87,7 +87,7 @@ export default async function ProfilSupportPage() {
         <div className="flex flex-col gap-4">
           {tickets.map((ticket) => {
             const statusLabel = STATUS_LABELS[ticket.status] ?? ticket.status;
-            const statusClass = STATUS_CLASSES[ticket.status] ?? "bg-gray-100 text-gray-700";
+            const statusClass = STATUS_CLASSES[ticket.status] ?? "bg-paper-2 text-ink-2";
 
             const formattedDate = new Intl.DateTimeFormat("fr-FR", {
               day: "numeric",

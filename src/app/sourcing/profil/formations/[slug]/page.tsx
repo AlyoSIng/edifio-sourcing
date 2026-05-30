@@ -132,11 +132,11 @@ export default async function FormationDetailPage({ params }: { params: { slug: 
       {/* En-tête */}
       <header className="mb-6">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+          <span className="rounded-full bg-info-bg px-2 py-0.5 text-xs font-semibold text-info">
             📄 Guide
           </span>
           {formation.durationMin != null && (
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+            <span className="rounded-full bg-paper-2 px-2 py-0.5 text-xs font-semibold text-ink-2">
               ⏱ {formation.durationMin} min
             </span>
           )}
