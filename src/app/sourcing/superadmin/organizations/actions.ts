@@ -236,6 +236,17 @@ export async function createOrgAction(
 export async function updateOrgAction(
   formData: FormData,
 ): Promise<{ ok: boolean; error?: string }> {
+  // ── Guard superadmin ─────────────────────────────────────────────────────────
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user: caller },
+  } = await supabase.auth.getUser();
+
+  if (!caller) return { ok: false, error: "Authentification requise." };
+  if (!isSuperAdmin(toUserProfile(caller))) {
+    return { ok: false, error: "Réservé aux superadmins." };
+  }
+
   const id = (formData.get("id") as string | null)?.trim() ?? "";
   const name = (formData.get("name") as string | null)?.trim() ?? "";
   const tierRaw = (formData.get("subscriptionTier") as string | null)?.trim() ?? "studio";
