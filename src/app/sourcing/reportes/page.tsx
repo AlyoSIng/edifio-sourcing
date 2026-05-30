@@ -116,7 +116,7 @@ export default async function ReportesPage({
                     {/* CTA : retour vers AO du jour pour retraiter */}
                     <Link
                       href="/sourcing/ao-du-jour"
-                      className="inline-flex items-center justify-center gap-1 rounded-sm border border-line-2 bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
+                      className="inline-flex items-center justify-center gap-1 rounded-full border border-line-2 bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
                     >
                       Retraiter maintenant →
                     </Link>

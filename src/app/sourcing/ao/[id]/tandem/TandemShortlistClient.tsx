@@ -593,7 +593,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
             type="button"
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="rounded-sm border border-line-2 px-3 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-40"
+            className="rounded-full border border-line-2 px-3 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-40"
           >
             &larr; Précédent
           </button>
@@ -604,7 +604,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
             type="button"
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={page === totalPages - 1}
-            className="rounded-sm border border-line-2 px-3 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-40"
+            className="rounded-full border border-line-2 px-3 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-40"
           >
             Suivant &rarr;
           </button>

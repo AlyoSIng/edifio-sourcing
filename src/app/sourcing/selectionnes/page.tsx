@@ -132,14 +132,14 @@ export default async function SelectionnesPage({
                     {tender.status === "selected_solo" ? (
                       <Link
                         href={`/sourcing/ao/${tender.id}/dossier`}
-                        className="inline-flex items-center justify-center gap-1 rounded-sm bg-brand-red px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
+                        className="inline-flex items-center justify-center gap-1 rounded-full bg-brand-red px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
                       >
                         Préparer le dossier →
                       </Link>
                     ) : (
                       <Link
                         href={`/sourcing/ao/${tender.id}/tandem`}
-                        className="inline-flex items-center justify-center gap-1 rounded-sm border border-line-2 bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
+                        className="inline-flex items-center justify-center gap-1 rounded-full border border-line-2 bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
                       >
                         Voir Co-traitant →
                       </Link>

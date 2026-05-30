@@ -354,7 +354,7 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
                         type="button"
                         disabled={isPending}
                         onClick={() => handleSetDefault(p.id)}
-                        className="rounded-sm border border-line px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
+                        className="rounded-full border border-line px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
                       >
                         Définir par défaut
                       </button>
@@ -363,7 +363,7 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
                       type="button"
                       disabled={isPending}
                       onClick={() => (mode === p.id ? resetMode() : openEdit(p))}
-                      className="rounded-sm border border-line px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
+                      className="rounded-full border border-line px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
                     >
                       {mode === p.id ? "Annuler" : "Modifier"}
                     </button>
@@ -371,7 +371,7 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
                       type="button"
                       disabled={isPending}
                       onClick={() => handleDuplicate(p.id, p.name)}
-                      className="rounded-sm border border-line px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
+                      className="rounded-full border border-line px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
                     >
                       Dupliquer
                     </button>
@@ -379,7 +379,7 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
                       type="button"
                       disabled={isPending}
                       onClick={() => handleDelete(p.id, p.name)}
-                      className="rounded-sm border border-line px-2.5 py-1 text-xs font-medium text-error transition hover:bg-error-bg disabled:opacity-50"
+                      className="rounded-full border border-line px-2.5 py-1 text-xs font-medium text-error transition hover:bg-error-bg disabled:opacity-50"
                     >
                       Supprimer
                     </button>
@@ -425,7 +425,7 @@ export function SearchProfilesClient({ profiles: initialProfiles }: SearchProfil
           type="button"
           onClick={openCreate}
           disabled={isPending}
-          className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
         >
           <svg
             viewBox="0 0 16 16"
@@ -562,7 +562,7 @@ function ProfileInlineForm({
             return (
               <label
                 key={mt}
-                className={`flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-1.5 text-xs transition ${
+                className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${
                   checked
                     ? "border-brand-red bg-brand-red text-white"
                     : "border-line-2 bg-white text-ink hover:bg-paper-2"
@@ -594,7 +594,7 @@ function ProfileInlineForm({
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:bg-line-2 disabled:opacity-70"
+          className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:bg-line-2 disabled:opacity-70"
         >
           {isPending ? "En cours…" : submitLabel}
         </button>
@@ -602,7 +602,7 @@ function ProfileInlineForm({
           type="button"
           onClick={onCancel}
           disabled={isPending}
-          className="rounded-sm border border-line-2 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 disabled:opacity-60"
+          className="rounded-full border border-line-2 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 disabled:opacity-60"
         >
           Annuler
         </button>

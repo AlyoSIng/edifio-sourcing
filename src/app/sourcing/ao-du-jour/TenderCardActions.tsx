@@ -208,7 +208,7 @@ export function TenderCardActions({
           onClick={() => setShowSoloTandemModal(true)}
           disabled={isPending}
           title="Bascule l'AO en pipeline. Vous choisirez ensuite Mandataire ou Cotraitance."
-          className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-brand-red px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-brand-red px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x2713;</span>
           Sélectionner
@@ -223,7 +223,7 @@ export function TenderCardActions({
             aria-haspopup="menu"
             aria-expanded={showDeferPopover}
             title="Reporte l'AO. Il reviendra dans le digest après le délai choisi."
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 focus-visible:ring-offset-1 disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 focus-visible:ring-offset-1 disabled:opacity-50"
           >
             <span aria-hidden>&#x23F8;</span>
             Reporter
@@ -256,7 +256,7 @@ export function TenderCardActions({
           onClick={() => setShowRejectModal(true)}
           disabled={isPending}
           title="Écarte l'AO. Un motif vous sera demandé pour améliorer le scoring."
-          className="inline-flex items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-error transition hover:bg-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-error transition hover:bg-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x2715;</span>
           Écarter
@@ -271,7 +271,7 @@ export function TenderCardActions({
               ? "Inclure à nouveau cet AO dans la liste"
               : "Exclure cet AO de la liste (réversible)"
           }
-          className="inline-flex items-center justify-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-muted transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 focus-visible:ring-offset-1 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-muted transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 focus-visible:ring-offset-1 disabled:opacity-50"
         >
           {isExcluded ? "↩ Inclure" : "⊘ Exclure"}
         </button>

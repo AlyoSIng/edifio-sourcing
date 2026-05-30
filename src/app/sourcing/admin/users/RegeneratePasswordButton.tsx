@@ -89,7 +89,7 @@ export function RegeneratePasswordButton({ userId, email }: { userId: string; em
       type="button"
       onClick={handleClick}
       disabled={state.status === "submitting"}
-      className="rounded-sm border border-line-2 bg-white px-2.5 py-1 text-[11px] font-semibold text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-paper-3 disabled:text-muted"
+      className="rounded-full border border-line-2 bg-white px-2.5 py-1 text-[11px] font-semibold text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-paper-3 disabled:text-muted"
     >
       {state.status === "submitting" ? "Envoi…" : "Renvoyer"}
     </button>

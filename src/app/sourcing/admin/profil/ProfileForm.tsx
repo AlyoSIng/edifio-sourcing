@@ -302,7 +302,7 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
             return (
               <label
                 key={mt}
-                className={`flex cursor-pointer items-center gap-2 rounded-sm border px-3 py-1.5 text-sm transition ${
+                className={`flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${
                   checked
                     ? "border-brand-red bg-brand-red text-white"
                     : "border-line-2 bg-white text-ink hover:bg-paper-2"
@@ -397,7 +397,7 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:bg-line-2 disabled:opacity-70"
+          className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:bg-line-2 disabled:opacity-70"
         >
           {isPending ? "Enregistrement…" : "Enregistrer"}
         </button>
@@ -405,7 +405,7 @@ export function ProfileForm({ initialValues, profileName }: ProfileFormProps) {
           type="button"
           onClick={handleReset}
           disabled={isPending}
-          className="rounded-sm border border-line-2 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 disabled:opacity-60"
+          className="rounded-full border border-line-2 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2 disabled:opacity-60"
         >
           Annuler les modifications
         </button>

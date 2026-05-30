@@ -94,10 +94,11 @@ const config: Config = {
         // (rounded-sm/md/lg) restent disponibles ; on ajoute uniquement les
         // alias DS pour rappeler la sémantique aux développeurs.
         xs: "var(--radius-xs)", // 3px — tags inline mono
-        sm: "var(--radius-sm)", // 6px — boutons, champs
-        md: "var(--radius-md)", // 8px — cartes, panneaux
-        lg: "var(--radius-lg)", // 12px — modales, héros
+        sm: "var(--radius-sm)", // 8px — champs, éléments décoratifs
+        md: "var(--radius-md)", // 14px — cartes, panneaux
+        lg: "var(--radius-lg)", // 22px — modales, héros
         full: "var(--radius-full)", // 999px — chips, pills
+        pill: "99px", // DS variante B — boutons en pills
       },
 
       boxShadow: {

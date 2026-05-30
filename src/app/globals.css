@@ -36,19 +36,19 @@
 
   /* ---------- Texte / fonds sombres ---------- */
   --ink: #0f1a2e;
-  --ink-2: #1f2937;
+  --ink-2: #3b475c;
 
   /* ---------- Papier (fonds clairs hiérarchisés) ---------- */
-  --paper: #faf9f6;
-  --paper-2: #f3f1ec;
+  --paper: #fafaf7;
+  --paper-2: #f3f1e9;
   --paper-3: #e8e5dd;
 
   /* ---------- Bordures ---------- */
-  --line: #e2dfd6;
-  --line-2: #cfcbc0;
+  --line: #e2e0d8;
+  --line-2: #cfcdc2;
 
   /* ---------- Neutres ---------- */
-  --muted: #6b7280;
+  --muted: #6b7589;
   --white: #ffffff;
 
   /* ---------- Statuts (cf. tokens.json color.status) ---------- */
@@ -68,9 +68,9 @@
 
   /* ---------- Radius (cf. tokens.json radius) ---------- */
   --radius-xs: 3px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
   --radius-full: 999px;
 
   /* ---------- Ombres (cf. tokens.json shadow) ---------- */
@@ -83,6 +83,11 @@
   --marketing-pill-color: #c8002a;
   --font-size-marketing-h1: 52px;
   --letter-spacing-marketing-h1: -1.5px;
+}
+
+/* DS variante B — boutons en pills */
+.btn-pill {
+  border-radius: 99px;
 }
 
 @layer components {

@@ -56,7 +56,7 @@ export function LandingSpotlight() {
 
         <Link
           href="/login"
-          className="relative inline-block rounded-sm bg-brand-red px-7 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-dark"
+          className="relative inline-block rounded-full bg-brand-red px-7 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-dark"
         >
           Accéder à edifio Sourcing
         </Link>

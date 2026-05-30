@@ -140,7 +140,7 @@ function KeywordBarUI({
         <button
           type="button"
           onClick={onSearch}
-          className="hover:bg-ink/80 rounded-sm bg-ink px-2 py-1 text-[11px] font-medium text-white"
+          className="hover:bg-ink/80 rounded-full bg-ink px-2 py-1 text-[11px] font-medium text-white"
           aria-label="Lancer la recherche"
         >
           OK

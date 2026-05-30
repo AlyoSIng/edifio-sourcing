@@ -166,7 +166,7 @@ export function CotraitantPageClient({ token, items: initialItems }: Props) {
                   type="button"
                   onClick={() => handleDownload(item.id)}
                   disabled={isPending}
-                  className="inline-flex items-center gap-1.5 rounded-sm border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   &darr; Télécharger la pièce originale
                 </button>
@@ -212,7 +212,7 @@ export function CotraitantPageClient({ token, items: initialItems }: Props) {
                       type="button"
                       onClick={() => handleUpload(item.id)}
                       disabled={isPending || !uploadFiles[item.id]}
-                      className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isPending ? "Dépôt en cours…" : "Déposer la pièce signée"}
                     </button>

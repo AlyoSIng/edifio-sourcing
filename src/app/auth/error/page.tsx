@@ -54,7 +54,7 @@ export default function AuthErrorPage({
         <div className="flex flex-col items-center gap-3">
           <Link
             href={actionHref}
-            className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
+            className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
           >
             {actionLabel}
           </Link>

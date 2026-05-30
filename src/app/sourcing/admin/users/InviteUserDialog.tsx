@@ -97,7 +97,7 @@ export function InviteUserDialog() {
           setOpen(true);
           setState({ status: "idle" });
         }}
-        className="rounded-sm bg-brand-red px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
+        className="rounded-full bg-brand-red px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
       >
         + Inviter un collaborateur
       </button>
@@ -189,14 +189,14 @@ export function InviteUserDialog() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-sm border border-line-2 bg-white px-3.5 py-1.5 text-xs font-semibold text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2"
+              className="rounded-full border border-line-2 bg-white px-3.5 py-1.5 text-xs font-semibold text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-line-2"
             >
               Fermer
             </button>
             <button
               type="submit"
               disabled={state.status === "submitting"}
-              className="rounded-sm bg-brand-red px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red disabled:bg-line-2 disabled:opacity-70"
+              className="rounded-full bg-brand-red px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red disabled:bg-line-2 disabled:opacity-70"
             >
               {state.status === "submitting" ? "Création…" : "Créer et envoyer"}
             </button>

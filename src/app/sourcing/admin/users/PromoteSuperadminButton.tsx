@@ -73,8 +73,8 @@ export function PromoteSuperadminButton({
 
   // Style violet pour la promotion superadmin, neutral pour la rétrogradation
   const buttonClass = isPromotion
-    ? "rounded-sm border border-violet-500 px-2.5 py-1 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40"
-    : "rounded-sm border border-line-2 px-2.5 py-1 text-[11px] font-semibold text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40";
+    ? "rounded-full border border-violet-500 px-2.5 py-1 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40"
+    : "rounded-full border border-line-2 px-2.5 py-1 text-[11px] font-semibold text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40";
 
   function handleClick() {
     setInlineError(null);

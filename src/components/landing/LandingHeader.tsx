@@ -44,13 +44,13 @@ export function LandingHeader() {
       <div className="flex items-center gap-3">
         <Link
           href="/login"
-          className="rounded-sm border border-line bg-transparent px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper-2"
+          className="rounded-full border border-line bg-transparent px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper-2"
         >
           Se connecter
         </Link>
         <a
           href="mailto:it@alyosingenierie.fr?subject=Demande%20d%27acc%C3%A8s%20%E2%80%94%20edifio%20Sourcing"
-          className="hidden rounded-sm bg-brand-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark md:inline-block"
+          className="hidden rounded-full bg-brand-red px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark md:inline-block"
         >
           Demander un accès
         </a>
