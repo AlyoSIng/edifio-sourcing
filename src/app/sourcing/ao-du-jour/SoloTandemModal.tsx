@@ -74,16 +74,16 @@ export function SoloTandemModal({
       <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
         {/* Header */}
         <div className="mb-5">
-          <div className="font-mono text-[11px] uppercase tracking-wider text-[#FF0033]">
+          <div className="font-mono text-[11px] uppercase tracking-wider text-brand-red">
             Mode de réponse
           </div>
           <h2
             id={titleId}
-            className="mt-1 font-display text-[22px] font-bold leading-snug text-neutral-900"
+            className="mt-1 font-display text-[22px] font-bold leading-snug text-ink"
           >
             Comment réponds-tu à cet AO ?
           </h2>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-muted">
             {tenderTitle} · {tenderAmount} · Remise {tenderDeadline}
           </p>
         </div>
@@ -127,7 +127,7 @@ export function SoloTandemModal({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+            className="rounded-full border border-line-2 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
           >
             Annuler
           </button>
@@ -135,7 +135,7 @@ export function SoloTandemModal({
             type="button"
             onClick={handleConfirm}
             disabled={selectedMode === null}
-            className="rounded-md bg-[#FF0033] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#cc0029] disabled:cursor-not-allowed disabled:bg-neutral-300"
+            className="rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
           >
             Confirmer
           </button>
@@ -180,18 +180,16 @@ function ModeCard({
       aria-label={`Choisir le mode ${name}`}
       data-mode={mode}
       className={`relative flex flex-col items-start gap-2 rounded-md border-2 p-4 text-left transition ${
-        selected
-          ? "border-[#FF0033] bg-red-50/50"
-          : "border-neutral-200 bg-white hover:border-neutral-400"
+        selected ? "border-brand-red bg-error-bg" : "border-line bg-white hover:border-line-2"
       }`}
     >
       <span className="text-2xl" aria-hidden>
         {icon}
       </span>
-      <span className="font-display text-base font-bold text-neutral-900">{name}</span>
-      <span className="text-xs leading-relaxed text-neutral-600">{description}</span>
+      <span className="font-display text-base font-bold text-ink">{name}</span>
+      <span className="text-xs leading-relaxed text-ink-2">{description}</span>
       {recommendedTag ? (
-        <span className="mt-1 rounded bg-[#FF0033] px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white">
+        <span className="mt-1 rounded-full bg-brand-red px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white">
           {recommendedTag}
         </span>
       ) : null}

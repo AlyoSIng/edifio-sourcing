@@ -65,7 +65,7 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
     onConfirm(trimmed === "" ? null : trimmed);
   }
 
-  const counterColor = reason.length >= WARN_LENGTH ? "text-red-600" : "text-neutral-500";
+  const counterColor = reason.length >= WARN_LENGTH ? "text-error" : "text-muted";
 
   return (
     <div
@@ -78,16 +78,16 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
         {/* Header */}
         <div className="mb-4">
-          <div className="font-mono text-[11px] uppercase tracking-wider text-[#FF0033]">
+          <div className="font-mono text-[11px] uppercase tracking-wider text-brand-red">
             Écarter AO
           </div>
           <h2
             id={titleId}
-            className="mt-1 font-display text-[20px] font-bold leading-snug text-neutral-900"
+            className="mt-1 font-display text-[20px] font-bold leading-snug text-ink"
           >
             Pourquoi écarter cet AO ?
           </h2>
-          <p className="mt-1 text-sm text-neutral-500">{tenderTitle}</p>
+          <p className="mt-1 text-sm text-muted">{tenderTitle}</p>
         </div>
 
         {/* Textarea */}
@@ -100,7 +100,7 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
             rows={4}
             placeholder="Optionnel — quelques mots aident l'IA à affiner le scoring (max 280 caractères)"
             aria-label="Motif (optionnel, 280 caractères max)"
-            className="w-full resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-[#FF0033] focus:outline-none focus:ring-1 focus:ring-[#FF0033]"
+            className="w-full resize-none rounded-sm border border-line-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
           />
           <p className={`mt-1 text-right font-mono text-[11px] ${counterColor}`} aria-live="polite">
             {reason.length}/{MAX_LENGTH}
@@ -112,14 +112,14 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+            className="rounded-full border border-line-2 bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
           >
             Annuler
           </button>
           <button
             type="button"
             onClick={handleConfirm}
-            className="rounded-md border border-red-300 bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1"
+            className="rounded-full bg-error px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1"
           >
             Écarter
           </button>

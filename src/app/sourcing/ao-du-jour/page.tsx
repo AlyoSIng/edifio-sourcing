@@ -243,7 +243,7 @@ export default async function AoDuJourPage({
         <div className="mb-3 flex justify-end">
           <Link
             href="/sourcing/ao/nouveau"
-            className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2"
+            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2"
           >
             <svg
               viewBox="0 0 16 16"
