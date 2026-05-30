@@ -44,10 +44,17 @@ export const metadata = {
 
 /**
  * Statuts autorisant l'accès au dossier de candidature.
- * - `architect_accepted` : flux Tandem (architecte partenaire accepté)
- * - `selected_solo`      : flux Solo (réponse AlyoS seule)
+ * - `architect_accepted`      : flux Tandem (architecte partenaire accepté)
+ * - `selected_solo`           : flux Solo (réponse AlyoS seule)
+ * - `dossier_review_required` : dossier en révision (modification RC en cours)
+ * - `dossier_ready`           : dossier finalisé, prêt à diffuser
  */
-const DOSSIER_ALLOWED_STATUSES = ["architect_accepted", "selected_solo"] as const;
+const DOSSIER_ALLOWED_STATUSES = [
+  "architect_accepted",
+  "selected_solo",
+  "dossier_review_required",
+  "dossier_ready",
+] as const;
 type DossierAllowedStatus = (typeof DOSSIER_ALLOWED_STATUSES)[number];
 
 interface PageProps {

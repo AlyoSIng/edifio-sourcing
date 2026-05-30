@@ -33,12 +33,13 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
 import { platforms } from "@/db/schema/config";
-import { tenderEvents, tenders } from "@/db/schema/tenders";
+import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { RcAnalysisCard } from "./RcAnalysisCard";
+import { RcSidebarWidget } from "./RcSidebarWidget";
 
 import { formatAmount, formatDeadline } from "@/app/sourcing/ao-du-jour/format";
 
@@ -119,8 +120,15 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
     );
   }
 
-  // Chargement du tender — résilience runtime
+  // Chargement du tender et du RC — résilience runtime
   let tender: TenderRow | null = null;
+  let rcDocument: {
+    id: string;
+    name: string;
+    sizeBytes: number | null;
+    analyzed: boolean;
+    uploadedAt: Date;
+  } | null = null;
   let fetchError: string | null = null;
 
   try {
@@ -156,6 +164,28 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
       .limit(1);
 
     tender = rows[0] ?? null;
+
+    // Chargement du RC le plus récent pour le widget sidebar
+    const [rcDoc] = await db
+      .select({
+        id: tenderDocuments.id,
+        name: tenderDocuments.name,
+        sizeBytes: tenderDocuments.sizeBytes,
+        analyzed: tenderDocuments.analyzed,
+        uploadedAt: tenderDocuments.uploadedAt,
+      })
+      .from(tenderDocuments)
+      .where(
+        and(
+          eq(tenderDocuments.tenderId, params.id),
+          eq(tenderDocuments.organizationId, orgId),
+          eq(tenderDocuments.kind, "RC"),
+        ),
+      )
+      .orderBy(desc(tenderDocuments.uploadedAt))
+      .limit(1);
+
+    rcDocument = rcDoc ?? null;
   } catch (err) {
     console.error("[ao-detail:fetch-failed]", err);
     fetchError = err instanceof Error ? err.message : String(err);
@@ -363,6 +393,11 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
               <p className="text-xs text-muted">DCE non disponible sur cette annonce.</p>
             )}
           </section>
+
+          {/* Widget RC — import et statut du Règlement de consultation */}
+          {DOSSIER_STATUSES.has(tender.status) && (
+            <RcSidebarWidget tenderId={tender.id} dceUrl={tender.dceUrl} rcDocument={rcDocument} />
+          )}
 
           {/* Bloc lien source */}
           {tender.sourceUrl && (
