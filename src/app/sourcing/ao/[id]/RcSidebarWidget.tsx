@@ -152,12 +152,20 @@ export function RcSidebarWidget({ tenderId, dceUrl, rcDocument }: RcSidebarWidge
             </button>
 
             {importError && (
-              <p
-                role="alert"
-                className="rounded-md border border-error bg-error-bg px-3 py-2 text-xs text-error"
-              >
-                {importError}
-              </p>
+              <>
+                <p
+                  role="alert"
+                  className="rounded-md border border-error bg-error-bg px-3 py-2 text-xs text-error"
+                >
+                  {importError}
+                </p>
+                <Link
+                  href={`/sourcing/ao/${tenderId}/dossier`}
+                  className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+                >
+                  Importer manuellement → Dossier
+                </Link>
+              </>
             )}
           </div>
         ) : (

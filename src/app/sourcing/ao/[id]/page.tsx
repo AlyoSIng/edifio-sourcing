@@ -362,32 +362,47 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
             </h2>
             {tender.dceUrl ? (
               <div className="space-y-3">
-                <p className="text-xs text-ink-2">
-                  Le DCE est disponible sur la plateforme source. Cliquez pour y accéder
-                  directement.
-                </p>
-                <a
-                  href={tender.dceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2"
-                >
-                  {/* Icône téléchargement inline SVG */}
-                  <svg
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4 shrink-0"
-                    aria-hidden
+                {!DOSSIER_STATUSES.has(tender.status) ? (
+                  /* AO non sélectionné : gros bouton CTA */
+                  <>
+                    <p className="text-xs text-ink-2">
+                      Le DCE est disponible sur la plateforme source. Cliquez pour y accéder
+                      directement.
+                    </p>
+                    <a
+                      href={tender.dceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-red px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red"
+                    >
+                      {/* Icône téléchargement inline SVG */}
+                      <svg
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4 shrink-0"
+                        aria-hidden
+                      >
+                        <path d="M10 3v10m0 0-3-3m3 3 3-3" />
+                        <path d="M3 14v2a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2" />
+                      </svg>
+                      Récupérer le DCE
+                    </a>
+                  </>
+                ) : (
+                  /* AO sélectionné : lien discret (le RC widget est le CTA principal) */
+                  <a
+                    href={tender.dceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
                   >
-                    <path d="M10 3v10m0 0-3-3m3 3 3-3" />
-                    <path d="M3 14v2a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2" />
-                  </svg>
-                  Récupérer le DCE
-                </a>
+                    Consulter la plateforme source ↗
+                  </a>
+                )}
               </div>
             ) : (
               <p className="text-xs text-muted">DCE non disponible sur cette annonce.</p>
