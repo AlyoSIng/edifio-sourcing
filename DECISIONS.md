@@ -2,6 +2,18 @@
 
 ---
 
+## 2026-05-30 — Migration 0032 org_branding appliquée en prod
+
+**Agent** : Steve (Ops) / Alex (dev) / Yann (ps_operator)
+**Action** :
+1. PR #108 (`feat/multitenant-phase-a`) mergée — Phase A multi-tenant + Phase B superadmin organisations UI + correctif CI coverage (`getRequiredOrgId` tests).
+2. PR #109 (`feat/pipeline-keyword-filter`) mergée — filtre mot-clé sur les 5 pages pipeline (Sélectionnés, Reportés, Cotraitance, Mandataire, C/R) + badges mots-clés correspondants sur les cartes AO du jour.
+3. PR #110 (`feat/org-branding`) mergée — personnalisation org : logo, couleur dominante, police de titre. Page `/sourcing/admin/settings`. Injection CSS vars dans layout Sourcing.
+4. Migration `0032_org_branding.sql` appliquée manuellement sur Supabase prod (SQL Editor) — 3 colonnes ajoutées sur `organizations` (`logo_url TEXT`, `primary_color VARCHAR(7)`, `font_family VARCHAR(50)`) + bucket `org-assets` créé.
+**Motif** : livraison feature branding + multi-tenant Phase A+B en production.
+
+---
+
 ## 2026-05-28 — Fix FORCE RLS `architects` dans `fetchArchitectsPage` (PR #86)
 
 **Agent** : Alex (`dev`)
