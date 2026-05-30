@@ -16,6 +16,20 @@ import Link from "next/link";
  *
  * Server Component pur — aucune interactivité.
  */
+
+/**
+ * Calcule le libellé du prochain jour de sourcing (cron lun-ven 6h30 Paris).
+ * - Ven ou Sam → "lundi"
+ * - Dim → "demain" (= lundi)
+ * - Lun-Jeu → "demain"
+ */
+function nextSourcingDayLabel(): string {
+  // Heure Paris (Europe/Paris)
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+  const day = now.getDay(); // 0=dim, 1=lun, …, 5=ven, 6=sam
+  return day === 5 || day === 6 ? "lundi" : "demain";
+}
+
 export function EmptyState({
   profileName,
   isAdmin = false,
@@ -23,6 +37,8 @@ export function EmptyState({
   profileName: string | null;
   isAdmin?: boolean;
 }) {
+  const nextDay = nextSourcingDayLabel();
+
   return (
     <div role="status" className="rounded-md border border-line bg-white px-6 py-12 text-center">
       {/* Glyphe minimal — emoji ☕ comme dans la maquette M-E (ligne 541). */}
@@ -32,7 +48,7 @@ export function EmptyState({
       <h2 className="font-display text-lg font-semibold text-ink">Rien de neuf ce matin</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted">
         Aucun nouvel AO ne correspond à votre profil de recherche depuis hier. Le prochain sourcing
-        tourne demain à 6h30 (lun-ven).
+        tourne {nextDay} à 6h30 (lun-ven).
       </p>
       {profileName ? (
         <p className="mt-4 font-mono text-[11px] text-muted">
