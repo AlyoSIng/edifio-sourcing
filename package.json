@@ -29,6 +29,7 @@
     "db:seed:architects": "tsx src/db/seed/architects-fixture.ts",
     "db:seed:faq": "tsx src/db/seed/seed-faq.ts",
     "db:seed:formations": "tsx src/db/seed/seed-formations.ts",
+    "db:seed:app-content": "tsx src/db/seed/seed-app-content.ts",
     "db:seed:prod": "tsx src/db/seed/prod.ts",
     "db:reset": "tsx src/db/seed/reset.ts",
     "db:backfill:postal-code": "tsx src/db/seed/backfill-postal-code.ts",
