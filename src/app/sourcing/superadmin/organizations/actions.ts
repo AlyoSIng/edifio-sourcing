@@ -4,19 +4,27 @@
  * Server Actions — module organisations superadmin — edifio Sourcing
  *
  * Actions disponibles :
- *   - `createOrgAction`  : crée une organisation + revalidate
+ *   - `createOrgAction`  : crée une organisation + administrateur initial + envoi invitation
  *   - `updateOrgAction`  : met à jour nom/tier/siren/siret + revalidate
  *
- * Note : la garde triple (session + domaine + superadmin) est prise en charge
- * par le layout superadmin. Ces actions ajoutent néanmoins une validation
- * métier stricte des données entrantes.
+ * Note : la garde superadmin est vérifiée dans chaque action (défense en profondeur),
+ * en plus du layout superadmin qui bloque déjà l'accès aux non-superadmins.
  *
- * Source de vérité schema : `src/db/schema/organizations.ts`.
+ * Source de vérité schema : `src/db/schema/organizations.ts` + `src/db/schema/users.ts`.
  */
 
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
+import { users, memberships } from "@/db/schema/users";
+import { isAuthorizedEmail } from "@/lib/auth/domain";
+import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
+import { computeProvisionalExpiresAt } from "@/lib/auth/password";
+import { generateProvisionalPassword } from "@/lib/auth/password-server";
+import { isSuperAdmin, toUserProfile, type UserMetadata } from "@/lib/auth/types";
+import { sendWelcomeEmail } from "@/lib/email/send";
+import { getSiteUrl } from "@/lib/site-url";
+import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { createOrganization, updateOrganization } from "@/lib/superadmin/organizations-queries";
 
 // ─── Valeurs autorisées ───────────────────────────────────────────────────────
@@ -51,12 +59,32 @@ function validateSiret(raw: string): { value: string | null; error?: string } {
 // ─── createOrgAction ──────────────────────────────────────────────────────────
 
 /**
- * Crée une nouvelle organisation depuis le formulaire inline NewOrgForm.
- * Reçoit un FormData avec les champs : name, subscriptionTier, siren, siret.
+ * Crée une nouvelle organisation depuis le formulaire inline NewOrgForm,
+ * puis crée le compte de l'administrateur initial et lui envoie l'email
+ * d'invitation avec son mot de passe provisoire.
+ *
+ * Reçoit un FormData avec les champs :
+ *   - name, subscriptionTier, siren, siret (organisation)
+ *   - adminFirstName, adminLastName, adminEmail (admin initial — obligatoires)
+ *
+ * GARDE-FOU SÉCURITÉ : le mot de passe provisoire n'est jamais retourné
+ * dans le résultat de l'action (cf. invariante password-server.ts).
  */
 export async function createOrgAction(
   formData: FormData,
 ): Promise<{ ok: boolean; error?: string }> {
+  // ── Guard superadmin ─────────────────────────────────────────────────────────
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user: caller },
+  } = await supabase.auth.getUser();
+
+  if (!caller) return { ok: false, error: "Authentification requise." };
+  if (!isSuperAdmin(toUserProfile(caller))) {
+    return { ok: false, error: "Réservé aux superadmins." };
+  }
+
+  // ── Lecture champs organisation ──────────────────────────────────────────────
   const name = (formData.get("name") as string | null)?.trim() ?? "";
   const tierRaw = (formData.get("subscriptionTier") as string | null)?.trim() ?? "studio";
   const sirenRaw = (formData.get("siren") as string | null) ?? "";
@@ -79,8 +107,28 @@ export async function createOrgAction(
   const siretResult = validateSiret(siretRaw);
   if (siretResult.error) return { ok: false, error: siretResult.error };
 
+  // ── Lecture champs admin ─────────────────────────────────────────────────────
+  const adminEmail = (formData.get("adminEmail") as string | null)?.trim().toLowerCase() ?? "";
+  const adminFirstName = (formData.get("adminFirstName") as string | null)?.trim() ?? "";
+  const adminLastName = (formData.get("adminLastName") as string | null)?.trim() ?? "";
+
+  if (!adminEmail || !adminFirstName || !adminLastName) {
+    return {
+      ok: false,
+      error: "Les informations de l'administrateur initial sont obligatoires.",
+    };
+  }
+  if (!isAuthorizedEmail(adminEmail)) {
+    return {
+      ok: false,
+      error: "L'email de l'administrateur doit appartenir à @alyosingenierie.fr ou @edifio.fr.",
+    };
+  }
+
+  // ── Création de l'organisation ───────────────────────────────────────────────
+  let org;
   try {
-    await createOrganization(
+    org = await createOrganization(
       {
         name,
         subscriptionTier: tierRaw,
@@ -89,9 +137,6 @@ export async function createOrgAction(
       },
       db,
     );
-
-    revalidatePath("/sourcing/superadmin/organizations");
-    return { ok: true };
   } catch (err) {
     // Erreur contrainte UNIQUE sur siren
     const msg = err instanceof Error ? err.message : "Erreur inconnue lors de la création.";
@@ -100,6 +145,86 @@ export async function createOrgAction(
     }
     return { ok: false, error: msg };
   }
+
+  // ── Création du compte administrateur initial ────────────────────────────────
+  const adminClient = createSupabaseAdminClient();
+  const provisional = generateProvisionalPassword();
+  const expiresAt = computeProvisionalExpiresAt(PROVISIONAL_PASSWORD_TTL_HOURS);
+
+  const metadata: UserMetadata = {
+    role: "admin",
+    must_change_password: true,
+    provisional_password_expires_at: expiresAt,
+    first_name: adminFirstName,
+    last_name: adminLastName,
+  };
+
+  const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
+    email: adminEmail,
+    password: provisional,
+    email_confirm: true,
+    user_metadata: metadata as Record<string, unknown>,
+  });
+
+  if (createErr || !created.user) {
+    if (createErr && /already/i.test(createErr.message ?? "")) {
+      return {
+        ok: false,
+        error: `L'organisation a été créée mais un compte existe déjà pour ${adminEmail}. Ajoutez l'utilisateur manuellement.`,
+      };
+    }
+    return {
+      ok: false,
+      error: `L'organisation a été créée mais la création du compte admin a échoué : ${createErr?.message ?? "erreur inconnue"}. Ajoutez l'utilisateur manuellement.`,
+    };
+  }
+
+  // ── Insert public.users + membership (non-bloquant sur erreur) ───────────────
+  try {
+    await db
+      .insert(users)
+      .values({
+        id: created.user.id,
+        email: adminEmail,
+        firstname: adminFirstName,
+        lastname: adminLastName,
+      })
+      .onConflictDoNothing();
+
+    await db
+      .insert(memberships)
+      .values({
+        organizationId: org.id,
+        userId: created.user.id,
+        role: "admin",
+      })
+      .onConflictDoNothing();
+  } catch (dbErr) {
+    console.error("[createOrgAction:db:fail]", {
+      message: dbErr instanceof Error ? dbErr.message : String(dbErr),
+    });
+  }
+
+  // ── Envoi email d'invitation ─────────────────────────────────────────────────
+  try {
+    await sendWelcomeEmail({
+      to: adminEmail,
+      email: adminEmail,
+      firstName: adminFirstName,
+      provisionalPassword: provisional,
+      expiresAt,
+      loginUrl: `${getSiteUrl()}/login`,
+    });
+  } catch {
+    console.error("[createOrgAction:email:fail]", { email: adminEmail });
+    // Succès partiel : org + user créés, email a foiré. L'admin peut régénérer
+    // le provisoire via la liste users de l'organisation.
+    revalidatePath("/sourcing/superadmin/organizations");
+    return { ok: true };
+  }
+
+  revalidatePath("/sourcing/superadmin/organizations");
+  return { ok: true };
 }
 
 // ─── updateOrgAction ──────────────────────────────────────────────────────────

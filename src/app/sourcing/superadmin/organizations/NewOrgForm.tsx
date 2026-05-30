@@ -4,8 +4,11 @@
  * NewOrgForm — formulaire de création d'une organisation (superadmin)
  *
  * Client Component — appelle `createOrgAction` via useTransition.
- * Champs : name (obligatoire), subscriptionTier (select), siren (optionnel), siret (optionnel).
+ * Champs : name (obligatoire), subscriptionTier (select), siren (optionnel),
+ * siret (optionnel), adminFirstName (obligatoire), adminLastName (obligatoire),
+ * adminEmail (obligatoire).
  *
+ * Un email d'invitation est automatiquement envoyé à l'administrateur initial.
  * Même pattern de style que `FaqItemForm`.
  */
 
@@ -28,6 +31,9 @@ export function NewOrgForm({ onClose }: NewOrgFormProps) {
   const [tier, setTier] = useState("studio");
   const [siren, setSiren] = useState("");
   const [siret, setSiret] = useState("");
+  const [adminFirstName, setAdminFirstName] = useState("");
+  const [adminLastName, setAdminLastName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -39,6 +45,10 @@ export function NewOrgForm({ onClose }: NewOrgFormProps) {
       setError("Le nom de l'organisation est obligatoire.");
       return;
     }
+    if (!adminFirstName.trim() || !adminLastName.trim() || !adminEmail.trim()) {
+      setError("Les informations de l'administrateur initial sont obligatoires.");
+      return;
+    }
 
     startTransition(async () => {
       const formData = new FormData();
@@ -46,6 +56,9 @@ export function NewOrgForm({ onClose }: NewOrgFormProps) {
       formData.set("subscriptionTier", tier);
       formData.set("siren", siren.trim());
       formData.set("siret", siret.trim());
+      formData.set("adminFirstName", adminFirstName.trim());
+      formData.set("adminLastName", adminLastName.trim());
+      formData.set("adminEmail", adminEmail.trim().toLowerCase());
 
       const result = await createOrgAction(formData);
       if (!result.ok) {
@@ -56,6 +69,9 @@ export function NewOrgForm({ onClose }: NewOrgFormProps) {
         setTier("studio");
         setSiren("");
         setSiret("");
+        setAdminFirstName("");
+        setAdminLastName("");
+        setAdminEmail("");
         onClose();
       }
     });
@@ -144,6 +160,69 @@ export function NewOrgForm({ onClose }: NewOrgFormProps) {
           />
         </div>
 
+        {/* Administrateur initial */}
+        <div className="border-t border-line pt-4">
+          <p className="mb-3 text-xs font-semibold text-ink">
+            Administrateur initial{" "}
+            <span className="font-normal text-muted">
+              — un email d&apos;invitation sera envoyé automatiquement
+            </span>
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="admin-firstname"
+                className="mb-1 block text-xs font-medium text-ink-2"
+              >
+                Prénom <span className="text-error">*</span>
+              </label>
+              <input
+                id="admin-firstname"
+                type="text"
+                value={adminFirstName}
+                onChange={(e) => setAdminFirstName(e.target.value)}
+                maxLength={100}
+                placeholder="Marie"
+                disabled={isPending}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label htmlFor="admin-lastname" className="mb-1 block text-xs font-medium text-ink-2">
+                Nom <span className="text-error">*</span>
+              </label>
+              <input
+                id="admin-lastname"
+                type="text"
+                value={adminLastName}
+                onChange={(e) => setAdminLastName(e.target.value)}
+                maxLength={100}
+                placeholder="Dupont"
+                disabled={isPending}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <div className="mt-3">
+            <label htmlFor="admin-email" className="mb-1 block text-xs font-medium text-ink-2">
+              Email <span className="text-error">*</span>{" "}
+              <span className="font-normal text-muted">
+                (doit être @alyosingenierie.fr ou @edifio.fr)
+              </span>
+            </label>
+            <input
+              id="admin-email"
+              type="email"
+              value={adminEmail}
+              onChange={(e) => setAdminEmail(e.target.value)}
+              maxLength={255}
+              placeholder="marie.dupont@alyosingenierie.fr"
+              disabled={isPending}
+              className={inputCls}
+            />
+          </div>
+        </div>
+
         {/* Erreur */}
         {error && (
           <div
@@ -166,7 +245,13 @@ export function NewOrgForm({ onClose }: NewOrgFormProps) {
           </button>
           <button
             type="submit"
-            disabled={!name.trim() || isPending}
+            disabled={
+              !name.trim() ||
+              !adminEmail.trim() ||
+              !adminFirstName.trim() ||
+              !adminLastName.trim() ||
+              isPending
+            }
             className="inline-flex items-center rounded-full bg-brand-red px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? "Création…" : "Créer l'organisation"}
