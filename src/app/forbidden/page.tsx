@@ -52,13 +52,13 @@ export default function Forbidden() {
         <div className="flex justify-center gap-3">
           <Link
             href="/"
-            className="rounded-sm border border-line bg-transparent px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-paper-2"
+            className="rounded-full border border-line bg-transparent px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-paper-2"
           >
             ← Retour à l&apos;accueil
           </Link>
           <a
             href="mailto:it@alyosingenierie.fr"
-            className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
+            className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
           >
             Contacter le support
           </a>

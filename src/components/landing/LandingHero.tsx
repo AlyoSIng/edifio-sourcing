@@ -34,13 +34,13 @@ export function LandingHero() {
       <div className="flex flex-wrap justify-center gap-3">
         <Link
           href="/login"
-          className="rounded-sm bg-brand-red px-6 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-dark"
+          className="rounded-full bg-brand-red px-6 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-brand-red-dark"
         >
           Accéder à edifio Sourcing
         </Link>
         <a
           href="#fonctionnement"
-          className="rounded-sm border border-line bg-transparent px-6 py-3.5 text-[15px] font-semibold text-ink transition-colors hover:bg-paper-2"
+          className="rounded-full border border-line bg-transparent px-6 py-3.5 text-[15px] font-semibold text-ink transition-colors hover:bg-paper-2"
         >
           Voir comment ça marche →
         </a>

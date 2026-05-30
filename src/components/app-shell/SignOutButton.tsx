@@ -31,7 +31,7 @@ export function SignOutButton() {
       disabled={isPending}
       title="Se déconnecter"
       aria-label="Se déconnecter"
-      className="rounded-sm border border-line-2 bg-white px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted outline-none transition hover:border-line-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:opacity-50"
+      className="rounded-full border border-line-2 bg-white px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-muted outline-none transition hover:border-line-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:opacity-50"
     >
       {isPending ? "…" : "Déco"}
     </button>

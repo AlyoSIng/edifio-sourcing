@@ -58,7 +58,7 @@ export function EmptyState({
       {isAdmin ? (
         <Link
           href="/sourcing/admin/profil"
-          className="mt-5 inline-flex items-center gap-1.5 rounded-sm border border-line-2 bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
+          className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-line-2 bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
         >
           Ajuster les filtres du profil →
         </Link>

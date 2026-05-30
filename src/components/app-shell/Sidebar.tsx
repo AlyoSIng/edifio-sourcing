@@ -115,7 +115,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
   }
 
   const baseClasses =
-    "flex items-center gap-2.5 rounded-sm px-2.5 py-2 text-[13px] outline-none transition focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 focus-visible:ring-offset-ink";
+    "flex items-center gap-2.5 rounded-full px-2.5 py-2 text-[13px] outline-none transition focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 focus-visible:ring-offset-ink";
   const stateClasses = active
     ? "bg-brand-red text-white"
     : "text-white/75 hover:bg-white/5 hover:text-white";

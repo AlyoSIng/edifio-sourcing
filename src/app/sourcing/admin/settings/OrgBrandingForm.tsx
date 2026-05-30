@@ -130,7 +130,7 @@ function LogoSection({ currentLogoUrl }: { currentLogoUrl: string | null }) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isPending}
-            className="rounded-sm border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-paper disabled:opacity-50"
+            className="rounded-full border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-paper disabled:opacity-50"
           >
             {isPending ? "Envoi…" : previewUrl ? "Changer le logo" : "Ajouter un logo"}
           </button>
@@ -288,7 +288,7 @@ function ColorFontSection({
       <button
         type="submit"
         disabled={isPending}
-        className="mt-6 rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-dark disabled:opacity-50"
+        className="mt-6 rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-red-dark disabled:opacity-50"
       >
         {isPending ? "Enregistrement…" : "Enregistrer les modifications"}
       </button>

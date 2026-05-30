@@ -211,7 +211,7 @@ export function PartageClient({ tenderId, libraryItems, existingShares }: Props)
               type="button"
               onClick={handleCreate}
               disabled={isPending}
-              className="rounded-sm bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isPending ? "Création…" : "Créer le lien de partage"}
             </button>
@@ -229,7 +229,7 @@ export function PartageClient({ tenderId, libraryItems, existingShares }: Props)
                   <button
                     type="button"
                     onClick={() => void navigator.clipboard.writeText(generatedLink)}
-                    className="shrink-0 rounded-sm border border-line px-2 py-1 text-[11px] font-medium text-ink transition hover:bg-neutral-50"
+                    className="shrink-0 rounded-full border border-line px-2 py-1 text-[11px] font-medium text-ink transition hover:bg-neutral-50"
                   >
                     Copier
                   </button>
