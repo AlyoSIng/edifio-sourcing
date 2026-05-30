@@ -58,7 +58,7 @@ export function TenderActionsErrorToast() {
     <div
       role="alert"
       aria-live="assertive"
-      className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm"
+      className="mb-4 rounded-md border border-error bg-error-bg px-4 py-3 text-sm text-error shadow-sm"
     >
       <strong className="mr-1 font-semibold">Action impossible :</strong>
       {state.message}

@@ -274,7 +274,7 @@ export function TandemCotraitantClient({
               <div className="flex flex-wrap gap-2">
                 <a
                   href="/sourcing/cotraitants"
-                  className="focus:ring-brand-red/40 inline-flex h-8 items-center rounded-md border border-line bg-white px-3 text-xs text-muted hover:text-ink focus:outline-none focus:ring-2"
+                  className="focus:ring-brand-red/40 inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-xs text-muted hover:text-ink focus:outline-none focus:ring-2"
                 >
                   Gérer la fiche
                 </a>
@@ -283,7 +283,7 @@ export function TandemCotraitantClient({
                     type="button"
                     onClick={handleDissociate}
                     disabled={assocLoading}
-                    className="focus:ring-error/40 inline-flex h-8 items-center rounded-md border border-line bg-white px-3 text-xs text-error hover:bg-error-bg focus:outline-none focus:ring-2 disabled:opacity-50"
+                    className="focus:ring-error/40 inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-xs text-error hover:bg-error-bg focus:outline-none focus:ring-2 disabled:opacity-50"
                   >
                     Dissocier
                   </button>
@@ -330,13 +330,13 @@ export function TandemCotraitantClient({
                   type="button"
                   onClick={handleAssociate}
                   disabled={!selectedCotraitantId || assocLoading}
-                  className="hover:bg-brand-red/90 focus:ring-brand-red/40 inline-flex h-9 items-center rounded-md bg-brand-red px-4 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-50"
+                  className="focus:ring-brand-red/40 inline-flex h-9 items-center rounded-full bg-brand-red px-4 text-sm font-medium text-white hover:opacity-90 focus:outline-none focus:ring-2 disabled:opacity-50"
                 >
                   {assocLoading ? "Association…" : "Associer"}
                 </button>
                 <a
                   href="/sourcing/cotraitants"
-                  className="focus:ring-brand-red/40 inline-flex h-9 items-center rounded-md border border-line bg-white px-3 text-xs text-muted hover:text-ink focus:outline-none focus:ring-2"
+                  className="focus:ring-brand-red/40 inline-flex h-9 items-center rounded-full border border-line bg-white px-3 text-xs text-muted hover:text-ink focus:outline-none focus:ring-2"
                 >
                   Gérer l&apos;annuaire
                 </a>
@@ -498,14 +498,14 @@ export function TandemCotraitantClient({
                           <button
                             type="button"
                             onClick={() => setUploadSectionId(null)}
-                            className="hover:bg-surface focus:ring-brand-red/40 rounded-md border border-line bg-white px-3 py-1.5 text-xs text-ink focus:outline-none focus:ring-2"
+                            className="hover:bg-surface focus:ring-brand-red/40 rounded-full border border-line bg-white px-3 py-1.5 text-xs text-ink focus:outline-none focus:ring-2"
                           >
                             Annuler
                           </button>
                           <button
                             type="submit"
                             disabled={uploadLoading}
-                            className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-md bg-brand-red px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-50"
+                            className="focus:ring-brand-red/40 rounded-full bg-brand-red px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 focus:outline-none focus:ring-2 disabled:opacity-50"
                           >
                             {uploadLoading ? "Upload…" : "Déposer"}
                           </button>

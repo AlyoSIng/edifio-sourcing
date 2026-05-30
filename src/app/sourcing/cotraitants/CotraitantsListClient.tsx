@@ -263,7 +263,7 @@ export function CotraitantsListClient({ cotraitants: initialList, isAdmin }: Pro
           <button
             type="button"
             onClick={openCreate}
-            className="hover:bg-brand-red/90 focus:ring-brand-red/40 inline-flex h-8 items-center gap-1.5 rounded-md bg-brand-red px-4 text-xs font-medium text-white focus:outline-none focus:ring-2"
+            className="focus:ring-brand-red/40 inline-flex h-8 items-center gap-1.5 rounded-full bg-brand-red px-4 text-xs font-medium text-white hover:opacity-90 focus:outline-none focus:ring-2"
           >
             + Nouveau cotraitant
           </button>
@@ -470,14 +470,14 @@ export function CotraitantsListClient({ cotraitants: initialList, isAdmin }: Pro
                 <button
                   type="button"
                   onClick={() => setPanelOpen(false)}
-                  className="hover:bg-surface focus:ring-brand-red/40 rounded-md border border-line bg-white px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2"
+                  className="hover:bg-surface focus:ring-brand-red/40 rounded-full border border-line bg-white px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-md bg-brand-red px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-50"
+                  className="focus:ring-brand-red/40 rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white hover:opacity-90 focus:outline-none focus:ring-2 disabled:opacity-50"
                 >
                   {submitting ? "Enregistrement…" : editTarget ? "Enregistrer" : "Créer"}
                 </button>

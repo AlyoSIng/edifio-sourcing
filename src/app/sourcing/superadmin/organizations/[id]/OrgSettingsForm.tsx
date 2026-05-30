@@ -177,7 +177,7 @@ export function OrgSettingsForm({ org }: OrgSettingsFormProps) {
           <button
             type="submit"
             disabled={!name.trim() || isPending}
-            className="inline-flex items-center rounded-md bg-brand-red px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center rounded-full bg-brand-red px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? "Enregistrement…" : "Enregistrer"}
           </button>

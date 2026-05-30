@@ -116,7 +116,7 @@ export function CsvImportModal({ type, onSuccess }: CsvImportModalProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="focus:ring-brand-red/40 hover:bg-surface inline-flex h-8 items-center rounded-md border border-line bg-white px-3 text-xs font-medium text-ink focus:outline-none focus:ring-2"
+        className="focus:ring-brand-red/40 hover:bg-surface inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-xs font-medium text-ink focus:outline-none focus:ring-2"
       >
         Importer CSV
       </button>
@@ -138,7 +138,7 @@ export function CsvImportModal({ type, onSuccess }: CsvImportModalProps) {
                 type="button"
                 onClick={handleClose}
                 aria-label="Fermer"
-                className="rounded-md p-1 text-muted hover:text-ink"
+                className="rounded-full p-1 text-muted hover:text-ink"
               >
                 ✕
               </button>
@@ -213,7 +213,7 @@ export function CsvImportModal({ type, onSuccess }: CsvImportModalProps) {
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="hover:bg-surface focus:ring-brand-red/40 rounded-md border border-line bg-white px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2"
+                  className="hover:bg-surface focus:ring-brand-red/40 rounded-full border border-line bg-white px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2"
                 >
                   {result ? "Fermer" : "Annuler"}
                 </button>
@@ -222,7 +222,7 @@ export function CsvImportModal({ type, onSuccess }: CsvImportModalProps) {
                     type="submit"
                     disabled={pending}
                     aria-busy={pending}
-                    className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-md bg-brand-red px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-50"
+                    className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-50"
                   >
                     {pending ? "Import en cours…" : "Importer"}
                   </button>

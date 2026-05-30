@@ -402,14 +402,14 @@ export function PrivateTenderForm() {
       <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
         <a
           href="/sourcing/ao-du-jour"
-          className="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2"
+          className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2"
         >
           Annuler
         </a>
         <button
           type="submit"
           disabled={isPending}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 rounded-md px-5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending && (
             <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>

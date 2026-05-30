@@ -551,7 +551,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
           <button
             type="submit"
             disabled={editPending}
-            className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-md bg-brand-red px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-50"
+            className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-50"
             aria-busy={editPending}
           >
             {editPending ? "Enregistrement…" : "Enregistrer les modifications"}
@@ -600,7 +600,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
           onClick={handleRgpdToggle}
           disabled={rgpdPending}
           aria-busy={rgpdPending}
-          className={`focus:ring-brand-red/40 rounded-md px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 disabled:opacity-50 ${
+          className={`focus:ring-brand-red/40 rounded-full px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 disabled:opacity-50 ${
             architect.rgpdOpposition
               ? "hover:bg-surface border border-line bg-white text-ink"
               : "hover:bg-error/90 bg-error text-white"

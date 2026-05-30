@@ -207,14 +207,14 @@ export function FormationForm({ nextOrder, onClose }: FormationFormProps) {
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="inline-flex items-center rounded-md border border-line bg-paper-2 px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-paper-3 hover:text-ink disabled:opacity-50"
+            className="inline-flex items-center rounded-full border border-line bg-paper-2 px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-paper-3 hover:text-ink disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={!title.trim() || !url.trim() || isPending}
-            className="inline-flex items-center rounded-md bg-brand-red px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center rounded-full bg-brand-red px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPending ? "Création…" : "Créer la formation"}
           </button>

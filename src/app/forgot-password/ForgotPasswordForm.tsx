@@ -25,7 +25,7 @@ export function ForgotPasswordForm() {
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label htmlFor="email" className="text-sm font-medium text-neutral-700">
+        <label htmlFor="email" className="text-sm font-medium text-ink">
           Email AlyoS
         </label>
         <input
@@ -35,13 +35,13 @@ export function ForgotPasswordForm() {
           required
           autoComplete="email"
           placeholder="prenom.nom@alyosingenierie.fr"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder-neutral-400 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+          className="rounded-sm border border-line-2 px-3 py-2 text-sm placeholder-muted focus:border-ink-2 focus:outline-none focus:ring-1 focus:ring-ink-2"
         />
       </div>
 
       <SubmitButton />
 
-      <p className="text-center text-xs text-neutral-600">
+      <p className="text-center text-xs text-ink-2">
         <Link href="/login" className="underline-offset-4 hover:underline">
           ← Retour à la connexion
         </Link>
@@ -56,7 +56,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-400"
+      className="rounded-full bg-brand-red px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
     >
       {pending ? "Envoi…" : "Recevoir un nouveau mot de passe"}
     </button>
@@ -73,14 +73,14 @@ function SuccessState() {
         ✓
       </div>
       <h3 className="font-display text-lg font-semibold">Demande prise en compte</h3>
-      <p className="text-sm text-neutral-600">
+      <p className="text-sm text-ink-2">
         Si un compte existe pour cet email, un nouveau mot de passe provisoire vient d&apos;être
         envoyé. Vérifie ta boîte mail puis connecte-toi avec ce mot de passe.
       </p>
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-muted">
         Pas reçu ? Vérifie tes spams ou réessaie dans quelques minutes.
       </p>
-      <Link href="/login" className="text-xs text-neutral-600 underline-offset-4 hover:underline">
+      <Link href="/login" className="text-xs text-ink-2 underline-offset-4 hover:underline">
         ← Retour à la connexion
       </Link>
     </div>

@@ -62,7 +62,7 @@ export function ShortlistCriteriaForm({
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 px-4 py-2 text-sm font-medium transition ${
+            className={`flex-1 rounded-full px-4 py-2 text-sm font-medium transition ${
               activeTab === tab.id
                 ? "bg-brand-red text-white"
                 : "bg-white text-ink-2 hover:bg-paper-2"
@@ -319,7 +319,7 @@ function TargetPanel({ target, label, initial }: TargetPanelProps) {
           role="alert"
           className={`rounded-md border px-4 py-3 text-sm ${
             saveResult.ok
-              ? "border-green-200 bg-green-50 text-green-700"
+              ? "border-success bg-success-bg text-success"
               : "border-l-4 border-line border-l-error bg-error-bg text-error"
           }`}
         >
@@ -343,7 +343,7 @@ function TargetPanel({ target, label, initial }: TargetPanelProps) {
         <button
           type="submit"
           disabled={isPending}
-          className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-md bg-brand-red px-5 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-60"
+          className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-full bg-brand-red px-5 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-60"
         >
           {isPending ? "Enregistrement…" : "Enregistrer"}
         </button>

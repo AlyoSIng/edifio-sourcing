@@ -31,7 +31,7 @@ export function NewTicketToggle({ defaultOpen = false }: NewTicketToggleProps) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="mb-4 rounded-md bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800"
+          className="mb-4 rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800"
         >
           + Nouveau ticket
         </button>

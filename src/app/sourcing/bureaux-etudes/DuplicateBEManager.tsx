@@ -81,7 +81,7 @@ export function DuplicateBEManager({ duplicateGroups: initialGroups }: Props) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="focus:ring-warn/40 inline-flex items-center gap-1 rounded-md border border-warn bg-white px-3 py-1 text-xs font-medium text-warn hover:bg-warn-bg focus:outline-none focus:ring-2"
+          className="focus:ring-warn/40 inline-flex items-center gap-1 rounded-full border border-warn bg-white px-3 py-1 text-xs font-medium text-warn hover:bg-warn-bg focus:outline-none focus:ring-2"
           aria-expanded={expanded}
         >
           {expanded ? "Masquer" : "Voir les doublons"}
@@ -167,7 +167,7 @@ function DuplicateBEGroupPanel({ group, isPending, errors, onDelete }: PanelProp
                   type="button"
                   onClick={() => onDelete(entry.id)}
                   disabled={isPending}
-                  className="focus:ring-error/40 border-error/30 shrink-0 rounded-md border bg-error-bg px-2.5 py-1 text-xs font-medium text-error hover:border-error focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="focus:ring-error/40 border-error/30 shrink-0 rounded-full border bg-error-bg px-2.5 py-1 text-xs font-medium text-error hover:border-error focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label={`Supprimer l'entrée ${entry.cabinet}`}
                 >
                   Supprimer

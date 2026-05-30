@@ -22,7 +22,7 @@ export function FaqToggleWrapper({ nextOrder }: FaqToggleWrapperProps) {
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="inline-flex items-center rounded-md bg-brand-red px-3 py-1.5 text-xs font-medium text-white hover:brightness-110"
+          className="inline-flex items-center rounded-full bg-brand-red px-3 py-1.5 text-xs font-medium text-white hover:brightness-110"
         >
           + Nouvelle question
         </button>

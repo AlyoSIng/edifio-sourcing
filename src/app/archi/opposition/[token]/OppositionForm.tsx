@@ -66,7 +66,7 @@ export function OppositionForm({ action }: Props) {
         type="button"
         onClick={() => void handleClick()}
         disabled={busy}
-        className="self-start rounded-md bg-error px-5 py-3 text-base font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        className="self-start rounded-full bg-error px-5 py-3 text-base font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? "Enregistrement…" : "Confirmer mon opposition"}
       </button>

@@ -41,7 +41,7 @@ export function ResetPasswordForm() {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="text-sm font-medium text-neutral-700">
+        <label htmlFor="password" className="text-sm font-medium text-ink">
           Nouveau mot de passe
         </label>
         <input
@@ -52,14 +52,14 @@ export function ResetPasswordForm() {
           autoComplete="new-password"
           value={pwd}
           onChange={(e) => setPwd(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder-neutral-400 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+          className="rounded-sm border border-line-2 px-3 py-2 text-sm placeholder-muted focus:border-ink-2 focus:outline-none focus:ring-1 focus:ring-ink-2"
         />
         <PassphraseHint />
         <StrengthHint pwd={pwd} errors={strength.errors} />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="confirm" className="text-sm font-medium text-neutral-700">
+        <label htmlFor="confirm" className="text-sm font-medium text-ink">
           Confirmation
         </label>
         <input
@@ -70,7 +70,7 @@ export function ResetPasswordForm() {
           autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm placeholder-neutral-400 focus:border-neutral-500 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+          className="rounded-sm border border-line-2 px-3 py-2 text-sm placeholder-muted focus:border-ink-2 focus:outline-none focus:ring-1 focus:ring-ink-2"
         />
         {confirmMismatch ? (
           <span className="text-xs text-red-700">Les deux saisies diffèrent.</span>
@@ -98,7 +98,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-400"
+      className="rounded-full bg-brand-red px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-red-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
     >
       {pending ? "Mise à jour…" : "Définir mon mot de passe"}
     </button>
@@ -114,10 +114,10 @@ function SubmitButton() {
  */
 function PassphraseHint() {
   return (
-    <p className="mt-1 text-xs text-neutral-500">
+    <p className="mt-1 text-xs text-muted">
       <strong className="font-medium">Astuce</strong> : une passphrase facile à retenir et sûre.
       Exemple :{" "}
-      <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono">
+      <code className="rounded bg-paper-3 px-1 py-0.5 font-mono">
         montagne bleue sourire café 7 !
       </code>
     </p>
@@ -133,7 +133,7 @@ function StrengthHint({
 }) {
   if (pwd.length === 0) {
     return (
-      <span className="text-xs text-neutral-500">
+      <span className="text-xs text-muted">
         {MIN_LENGTH} caractères minimum, avec majuscule, minuscule, chiffre et symbole.
       </span>
     );

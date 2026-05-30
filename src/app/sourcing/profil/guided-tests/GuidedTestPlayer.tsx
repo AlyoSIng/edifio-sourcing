@@ -88,7 +88,7 @@ export function GuidedTestPlayer({ test, previousSubmission }: GuidedTestPlayerP
         <button
           type="button"
           onClick={handleRestart}
-          className="rounded-md border border-green-600 px-3 py-1.5 text-sm font-semibold text-green-700 hover:bg-green-100"
+          className="rounded-full border border-green-600 px-3 py-1.5 text-sm font-semibold text-green-700 hover:bg-green-100"
         >
           Refaire le test
         </button>
@@ -221,7 +221,7 @@ export function GuidedTestPlayer({ test, previousSubmission }: GuidedTestPlayerP
             type="button"
             onClick={handleSubmit}
             disabled={isPending || !canProceed}
-            className="rounded-md bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+            className="rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
           >
             {isPending ? "Envoi en cours…" : "Soumettre"}
           </button>
@@ -230,7 +230,7 @@ export function GuidedTestPlayer({ test, previousSubmission }: GuidedTestPlayerP
             type="button"
             onClick={handleNext}
             disabled={!canProceed}
-            className="rounded-md bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+            className="rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
           >
             Suivant
           </button>

@@ -217,7 +217,7 @@ function DceSection({ tenderId, dceUrl, rcDocument }: DceSectionProps) {
               type="button"
               onClick={handleDownload}
               disabled={isDownloading}
-              className="hover:bg-ink/80 rounded-md bg-ink px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
+              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {isDownloading ? "Téléchargement en cours…" : "Télécharger le DCE automatiquement"}
             </button>
@@ -267,7 +267,7 @@ function DceSection({ tenderId, dceUrl, rcDocument }: DceSectionProps) {
             <button
               type="submit"
               disabled={isUploading}
-              className="hover:bg-ink/80 rounded-md bg-ink px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
+              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {isUploading ? "Upload en cours…" : "Uploader le RC manuellement"}
             </button>
@@ -321,7 +321,7 @@ function AnalysisTriggerSection({
         type="button"
         onClick={handleAnalyze}
         disabled={isPending}
-        className="hover:bg-brand-red/90 rounded-md bg-brand-red px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
+        className="rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
       >
         {isPending ? "Analyse en cours… (30–60 s)" : "Analyser le RC avec Sonnet 4.6"}
       </button>
@@ -484,7 +484,7 @@ function AnalysisResultSection({ analysis, tenderId }: { analysis: RcAnalysis; t
       <div className="flex justify-end pt-2">
         <a
           href={`/sourcing/ao/${tenderId}/dossier/cerfa`}
-          className="hover:bg-ink/80 inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-medium text-white transition"
+          className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
         >
           Préparer les DC
           <span aria-hidden>&rarr;</span>

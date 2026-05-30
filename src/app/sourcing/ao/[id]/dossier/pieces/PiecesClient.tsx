@@ -331,7 +331,7 @@ export function PiecesClient({
               <a
                 href={downloadUrl}
                 download
-                className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+                className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
               >
                 Télécharger le dossier (ZIP)
                 <span aria-hidden>↓</span>
@@ -340,7 +340,7 @@ export function PiecesClient({
                 type="button"
                 onClick={handleCompile}
                 disabled={isCompiling || cerfsIncomplete}
-                className="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
+                className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
               >
                 Recompiler
               </button>
@@ -357,7 +357,7 @@ export function PiecesClient({
               type="button"
               onClick={handleCompile}
               disabled={isCompiling || cerfsIncomplete}
-              className="hover:bg-brand-red/90 inline-flex items-center gap-2 rounded-md bg-brand-red px-4 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               title={cerfsIncomplete ? "Validez DC1 et DC2 avant de compiler" : undefined}
             >
               {isCompiling ? (

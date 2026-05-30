@@ -156,7 +156,7 @@ function SingleCerfaForm({ tenderId, doc, existingFile }: SingleCerfaFormProps) 
           <button
             type="button"
             onClick={handleEdit}
-            className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2"
+            className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2"
           >
             Modifier
           </button>
@@ -234,7 +234,7 @@ function SingleCerfaForm({ tenderId, doc, existingFile }: SingleCerfaFormProps) 
             type="button"
             onClick={handleValidate}
             disabled={isPending}
-            className="hover:bg-ink/80 rounded-md bg-ink px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
+            className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {isPending ? "Enregistrement…" : `Valider le ${doc.cerfa_kind}`}
           </button>

@@ -160,7 +160,7 @@ export default async function ProfilFormationsPage() {
                     {formation.type === "doc" && formation.slug ? (
                       <Link
                         href={`/sourcing/profil/formations/${formation.slug}`}
-                        className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-800"
+                        className="rounded-full bg-blue-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-800"
                       >
                         {buttonLabel}
                       </Link>
@@ -169,7 +169,7 @@ export default async function ProfilFormationsPage() {
                         href={formation.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-md bg-violet-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-violet-800"
+                        className="rounded-full bg-violet-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-violet-800"
                       >
                         {buttonLabel}
                       </a>

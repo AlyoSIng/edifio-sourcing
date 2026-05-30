@@ -340,7 +340,7 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
                   href={tender.dceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2"
                 >
                   {/* Icône téléchargement inline SVG */}
                   <svg
@@ -391,7 +391,7 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
                 {DOSSIER_STATUSES.has(tender.status) && (
                   <Link
                     href={`/sourcing/ao/${tender.id}/dossier`}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2"
                   >
                     Dossier de candidature →
                   </Link>
@@ -399,7 +399,7 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
                 {TANDEM_STATUSES.has(tender.status) && (
                   <Link
                     href={`/sourcing/ao/${tender.id}/tandem`}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2"
                   >
                     Short-list architectes →
                   </Link>

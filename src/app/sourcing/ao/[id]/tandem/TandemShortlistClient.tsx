@@ -448,7 +448,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
                     const v = Math.max(1, Math.min(50, parseInt(e.target.value, 10) || 10));
                     setDraftCriteria((prev) => ({ ...prev, topN: v }));
                   }}
-                  className="w-full rounded border border-line bg-neutral-50 px-3 py-1.5 text-sm text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                  className="w-full rounded border border-line bg-paper-2 px-3 py-1.5 text-sm text-ink focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
                 />
               </div>
 
@@ -469,7 +469,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
                       .filter(Boolean);
                     setDraftCriteria((prev) => ({ ...prev, depts }));
                   }}
-                  className="w-full rounded border border-line bg-neutral-50 px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+                  className="w-full rounded border border-line bg-paper-2 px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
                 />
                 <p className="mt-1 text-[10px] text-muted">Vide = tous les départements</p>
               </div>
@@ -512,14 +512,14 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
                   setDraftCriteria(criteria);
                   setCriteriaOpen(false);
                 }}
-                className="rounded-md border border-line px-3 py-1.5 text-sm text-ink-2 hover:bg-paper-2"
+                className="rounded-full border border-line px-3 py-1.5 text-sm text-ink-2 hover:bg-paper-2"
               >
                 Annuler
               </button>
               <button
                 type="button"
                 onClick={() => void handleRecalculate()}
-                className="rounded-md bg-brand-red px-4 py-1.5 text-sm font-semibold text-white hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red"
+                className="rounded-full bg-brand-red px-4 py-1.5 text-sm font-semibold text-white hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red"
               >
                 Recalculer la shortlist
               </button>
@@ -544,7 +544,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
           type="button"
           onClick={() => void handleBulkSend()}
           disabled={eligibleCheckedCount === 0 || sending}
-          className="rounded-md bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-neutral-300"
+          className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
         >
           {sending ? "Envoi…" : "Envoyer les sollicitations sélectionnées"}
         </button>
@@ -617,7 +617,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
           <button
             type="button"
             onClick={() => setShowSearch(true)}
-            className="rounded-md border border-dashed border-line bg-white px-4 py-3 text-sm font-medium text-ink-2 transition hover:border-brand-red hover:text-brand-red focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
+            className="rounded-full border border-dashed border-line bg-white px-4 py-3 text-sm font-medium text-ink-2 transition hover:border-brand-red hover:text-brand-red focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
           >
             + Ajouter un architecte
           </button>
@@ -643,7 +643,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
               value={searchQuery}
               onChange={handleSearchQueryChange}
               placeholder="Rechercher par cabinet ou nom…"
-              className="w-full rounded border border-line bg-neutral-50 px-3 py-2 text-sm text-ink placeholder-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
+              className="w-full rounded border border-line bg-paper-2 px-3 py-2 text-sm text-ink placeholder-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
               autoFocus
             />
             {searching && <p className="mt-2 text-xs text-muted">Recherche en cours…</p>}
@@ -654,7 +654,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
                     <button
                       type="button"
                       onClick={() => handleAddFromSearch(item)}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red"
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-paper-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red"
                     >
                       <span>
                         <span className="font-medium text-ink">{item.cabinet}</span>
@@ -798,7 +798,7 @@ function ArchitectCard({
             onClick={onSelect}
             disabled={sent}
             data-testid={`select-architect-${row.rank}`}
-            className="rounded-md bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-neutral-300"
+            className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
           >
             {sent ? "Déjà sollicité" : "Préparer la sollicitation"}
           </button>

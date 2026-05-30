@@ -59,7 +59,7 @@ export function PappersEnrichSingleButton({ beId }: Props) {
         type="button"
         onClick={handleClick}
         disabled={isPending || state === "done"}
-        className="focus:ring-brand-red/40 hover:bg-surface inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-3 text-xs font-medium text-ink focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="focus:ring-brand-red/40 hover:bg-surface inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-white px-3 text-xs font-medium text-ink focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
         aria-label="Enrichir cette fiche depuis l'API Pappers"
       >
         {/* Icône éclair SVG amber — identique à PappersEnrichButton */}

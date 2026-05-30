@@ -165,7 +165,7 @@ export default async function FormationDetailPage({ params }: { params: { slug: 
           </p>
           <Link
             href="/sourcing/profil/guided-tests"
-            className="mt-2 inline-flex rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+            className="mt-2 inline-flex rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
           >
             Passer le test →
           </Link>

@@ -97,7 +97,7 @@ export function TicketForm({ onCreated }: TicketFormProps) {
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+          className="rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
         >
           {isPending ? "Envoi en cours…" : "Envoyer le ticket"}
         </button>

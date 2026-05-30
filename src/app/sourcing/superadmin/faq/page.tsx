@@ -175,7 +175,7 @@ function FaqItemCard({ item }: { item: FaqItem }) {
             <button
               type="submit"
               className={[
-                "inline-flex items-center rounded-md border px-3 py-1 text-xs font-medium transition-colors",
+                "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                 item.isActive
                   ? "border-line bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink"
                   : "border-brand-red bg-brand-red text-white hover:brightness-110",
@@ -194,7 +194,7 @@ function FaqItemCard({ item }: { item: FaqItem }) {
           >
             <button
               type="submit"
-              className="inline-flex items-center rounded-md border border-line bg-paper-2 px-3 py-1 text-xs font-medium text-error hover:border-error hover:bg-error-bg"
+              className="inline-flex items-center rounded-full border border-line bg-paper-2 px-3 py-1 text-xs font-medium text-error hover:border-error hover:bg-error-bg"
             >
               Supprimer
             </button>

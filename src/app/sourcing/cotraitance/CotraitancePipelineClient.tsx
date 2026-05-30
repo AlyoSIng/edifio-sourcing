@@ -256,14 +256,14 @@ function PipelineCard({ entry }: { entry: PipelineEntry }) {
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
         <a
           href={`/sourcing/ao/${tender.id}/tandem`}
-          className="focus:ring-brand-red/40 inline-flex items-center rounded-md border border-line bg-white px-3 py-1 text-xs font-medium text-ink-2 hover:bg-paper-2 hover:text-ink focus:outline-none focus:ring-2"
+          className="focus:ring-brand-red/40 inline-flex items-center rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink-2 hover:bg-paper-2 hover:text-ink focus:outline-none focus:ring-2"
         >
           Voir la short-list →
         </a>
         {tender.status === "architect_accepted" && (
           <a
             href={`/sourcing/ao/${tender.id}/dossier`}
-            className="focus:ring-brand-red/40 hover:bg-brand-red/90 inline-flex items-center rounded-md bg-brand-red px-3 py-1 text-xs font-medium text-white focus:outline-none focus:ring-2"
+            className="focus:ring-brand-red/40 inline-flex items-center rounded-full bg-brand-red px-3 py-1 text-xs font-medium text-white hover:opacity-90 focus:outline-none focus:ring-2"
           >
             Préparer le dossier →
           </a>

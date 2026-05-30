@@ -261,7 +261,7 @@ export function BrevoPreviewModal({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium text-ink-2 transition hover:bg-paper-2 disabled:opacity-50"
+            className="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink-2 transition hover:bg-paper-2 disabled:opacity-50"
           >
             Annuler
           </button>
@@ -270,7 +270,7 @@ export function BrevoPreviewModal({
             onClick={handleSend}
             disabled={busy}
             data-testid="send-solicitation-button"
-            className="rounded-md bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? "Envoi en cours…" : "Envoyer le mail"}
           </button>
@@ -302,7 +302,7 @@ function RegisterButton({
       onClick={onSelect}
       disabled={disabled}
       data-register={value}
-      className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
+      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
         selected
           ? "bg-brand-red text-white"
           : "border border-line bg-white text-ink-2 hover:bg-paper-2"

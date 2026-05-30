@@ -137,7 +137,7 @@ export function ArchitectResponseForm({
           type="button"
           onClick={() => void submit("accepted")}
           disabled={busy !== null}
-          className="rounded-md bg-brand-red px-5 py-3 text-base font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full bg-brand-red px-5 py-3 text-base font-semibold text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy === "accepted" ? "Envoi…" : isTu ? "Oui, je suis partant" : "Oui, je suis partant"}
         </button>
@@ -145,7 +145,7 @@ export function ArchitectResponseForm({
           type="button"
           onClick={() => setShowInfoTextarea((v) => !v)}
           disabled={busy !== null}
-          className="hover:bg-bg-alt rounded-md border border-line bg-white px-5 py-3 text-base font-medium text-ink transition disabled:cursor-not-allowed disabled:opacity-60"
+          className="hover:bg-bg-alt rounded-full border border-line bg-white px-5 py-3 text-base font-medium text-ink transition disabled:cursor-not-allowed disabled:opacity-60"
         >
           Plus d&rsquo;infos avant de décider
         </button>
@@ -153,7 +153,7 @@ export function ArchitectResponseForm({
           type="button"
           onClick={() => void submit("declined")}
           disabled={busy !== null}
-          className="hover:bg-bg-alt rounded-md border border-line bg-white px-5 py-3 text-base font-medium text-ink-2 transition disabled:cursor-not-allowed disabled:opacity-60"
+          className="hover:bg-bg-alt rounded-full border border-line bg-white px-5 py-3 text-base font-medium text-ink-2 transition disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy === "declined" ? "Envoi…" : isTu ? "Non, pas cette fois" : "Non, pas cette fois"}
         </button>
@@ -181,7 +181,7 @@ export function ArchitectResponseForm({
             type="button"
             onClick={() => void submit("info_requested")}
             disabled={busy !== null}
-            className="self-start rounded-md bg-ink px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="self-start rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy === "info_requested" ? "Envoi…" : "Envoyer ma demande"}
           </button>

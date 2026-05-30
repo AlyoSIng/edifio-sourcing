@@ -54,8 +54,8 @@ export function ClientCallbackHandler() {
   }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50">
-      <p className="text-sm text-neutral-600">Redirection en cours…</p>
+    <main className="flex min-h-screen items-center justify-center bg-paper-2">
+      <p className="text-sm text-ink-2">Redirection en cours…</p>
     </main>
   );
 }

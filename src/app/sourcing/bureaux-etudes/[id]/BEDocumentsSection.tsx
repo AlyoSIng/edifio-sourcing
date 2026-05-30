@@ -175,7 +175,7 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-md bg-brand-red px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2"
+            className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-full bg-brand-red px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2"
           >
             + Ajouter un document
           </button>
@@ -200,7 +200,7 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
       {isAdmin && showForm ? (
         <form
           onSubmit={handleUpload}
-          className="mb-6 rounded-md border border-line bg-gray-50 p-4"
+          className="mb-6 rounded-md border border-line bg-paper-2 p-4"
           aria-label="Ajouter un document administratif"
         >
           <h3 className="mb-3 text-sm font-semibold text-ink">Nouveau document</h3>
@@ -284,7 +284,7 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
             <button
               type="submit"
               disabled={isUploading}
-              className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-md bg-brand-red px-4 py-2 text-xs font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-60"
+              className="hover:bg-brand-red/90 focus:ring-brand-red/40 rounded-full bg-brand-red px-4 py-2 text-xs font-medium text-white focus:outline-none focus:ring-2 disabled:opacity-60"
             >
               {isUploading ? "Upload…" : "Ajouter"}
             </button>
@@ -294,7 +294,7 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
                 setShowForm(false);
                 setFormError(null);
               }}
-              className="focus:ring-brand-red/40 rounded-md border border-line bg-white px-4 py-2 text-xs font-medium text-ink hover:bg-gray-50 focus:outline-none focus:ring-2"
+              className="focus:ring-brand-red/40 rounded-full border border-line bg-white px-4 py-2 text-xs font-medium text-ink hover:bg-paper-2 focus:outline-none focus:ring-2"
             >
               Annuler
             </button>
@@ -362,7 +362,7 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
                     onClick={() => handleDownload(doc.id, doc.filename)}
                     disabled={downloadingId === doc.id}
                     aria-label={`Télécharger ${doc.label}`}
-                    className="focus:ring-brand-red/40 rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-ink hover:bg-gray-50 focus:outline-none focus:ring-2 disabled:opacity-60"
+                    className="focus:ring-brand-red/40 rounded-full border border-line bg-white px-2.5 py-1.5 text-xs font-medium text-ink hover:bg-paper-2 focus:outline-none focus:ring-2 disabled:opacity-60"
                   >
                     {downloadingId === doc.id ? "…" : "Télécharger"}
                   </button>
@@ -372,7 +372,7 @@ export function BEDocumentsSection({ beId, documents, isAdmin }: BEDocumentsSect
                       onClick={() => handleDelete(doc.id)}
                       disabled={deletingId === doc.id || isUploading}
                       aria-label={`Supprimer ${doc.label}`}
-                      className="rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-60"
+                      className="rounded-full border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-60"
                     >
                       {deletingId === doc.id ? "…" : "Supprimer"}
                     </button>

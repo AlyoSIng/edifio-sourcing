@@ -341,14 +341,14 @@ function FilterBar({
       </label>
       <button
         type="submit"
-        className="hover:bg-brand-red/90 focus:ring-brand-red/40 h-8 rounded-md bg-brand-red px-4 text-xs font-medium text-white focus:outline-none focus:ring-2"
+        className="hover:bg-brand-red/90 focus:ring-brand-red/40 h-8 rounded-full bg-brand-red px-4 text-xs font-medium text-white focus:outline-none focus:ring-2"
       >
         Filtrer
       </button>
       {/* Lien reset — efface tous les filtres */}
       <a
         href="/sourcing/architectes"
-        className="inline-flex h-8 items-center rounded-md border border-line bg-white px-3 text-xs text-muted hover:text-ink"
+        className="inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-xs text-muted hover:text-ink"
       >
         Réinitialiser
       </a>
@@ -554,7 +554,7 @@ function PaginationBar({
         {page > 1 ? (
           <a
             href={buildHref(page - 1)}
-            className="hover:bg-surface focus:ring-brand-red/40 rounded-md border border-line bg-white px-3 py-1 focus:outline-none focus:ring-2"
+            className="hover:bg-surface focus:ring-brand-red/40 rounded-full border border-line bg-white px-3 py-1 focus:outline-none focus:ring-2"
           >
             ← Précédent
           </a>
@@ -562,7 +562,7 @@ function PaginationBar({
         {page < totalPages ? (
           <a
             href={buildHref(page + 1)}
-            className="hover:bg-surface focus:ring-brand-red/40 rounded-md border border-line bg-white px-3 py-1 focus:outline-none focus:ring-2"
+            className="hover:bg-surface focus:ring-brand-red/40 rounded-full border border-line bg-white px-3 py-1 focus:outline-none focus:ring-2"
           >
             Suivant →
           </a>

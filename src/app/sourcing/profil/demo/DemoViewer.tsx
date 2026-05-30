@@ -82,7 +82,7 @@ export function DemoViewer({ url }: DemoViewerProps) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="rounded-md bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800"
+        className="rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800"
       >
         Regarder la démo
       </a>
