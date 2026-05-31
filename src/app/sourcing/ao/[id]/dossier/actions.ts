@@ -31,6 +31,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { auditLogs } from "@/db/schema/audit";
+import { platforms } from "@/db/schema/config";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -157,6 +158,89 @@ async function getAuthenticatedProfile() {
 }
 
 // ---------------------------------------------------------------------------
+// Helper privé : _downloadAndStoreFromUrl
+// ---------------------------------------------------------------------------
+
+/**
+ * Factorisation interne : fetch HTTPS + vérif PDF + upload Storage + insert BDD.
+ *
+ * Utilisé par `downloadDceFromUrl`, `importDceFromPastedUrl`, et
+ * `fetchBoampDceAction`.
+ *
+ * Retourne :
+ *   - `{ ok: true }`         → RC enregistré dans Storage + BDD
+ *   - `{ ok: false, error }` → erreur (ssrf, fetch_failed, not_a_pdf, storage, db)
+ */
+async function _downloadAndStoreFromUrl(
+  tenderId: string,
+  orgId: string,
+  url: string,
+  supabaseAdmin: ReturnType<typeof createSupabaseAdminClient>,
+  logPrefix: string,
+): Promise<DceActionResult> {
+  // Validation SSRF
+  const urlError = validateExternalUrl(url);
+  if (urlError) {
+    console.warn(`[${logPrefix}:ssrf-block]`, url);
+    return { ok: false, error: urlError };
+  }
+
+  // Fetch avec timeout 30 s
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  } catch (err) {
+    console.error(`[${logPrefix}:fetch:fail]`, err);
+    return { ok: false, error: "fetch_failed" };
+  }
+
+  if (!response.ok) {
+    return { ok: false, error: "fetch_failed" };
+  }
+
+  // Vérification content-type : on n'accepte que les PDF directs
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("pdf")) {
+    return { ok: false, error: "not_a_pdf" };
+  }
+
+  const buffer = await response.arrayBuffer();
+
+  // Upload Storage : chemin tenant-scoped
+  const storagePath = `${orgId}/${tenderId}/${Date.now()}_RC.pdf`;
+
+  const { error: storageError } = await supabaseAdmin.storage
+    .from(BUCKET)
+    .upload(storagePath, buffer, { contentType: "application/pdf", upsert: false });
+
+  if (storageError) {
+    console.error(`[${logPrefix}:storage:fail]`, storageError);
+    return { ok: false, error: "storage_upload_failed" };
+  }
+
+  // Insert dans tender_documents
+  try {
+    await db.insert(tenderDocuments).values({
+      tenderId,
+      organizationId: orgId,
+      kind: "RC",
+      name: "RC.pdf",
+      format: "pdf",
+      storagePath,
+      sizeBytes: buffer.byteLength,
+      analyzed: false,
+    });
+  } catch (err) {
+    console.error(`[${logPrefix}:db:fail]`, err);
+    // Nettoyage Storage best-effort
+    await supabaseAdmin.storage.from(BUCKET).remove([storagePath]);
+    return { ok: false, error: "db_insert_failed" };
+  }
+
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Action 1 : downloadDceFromUrl
 // ---------------------------------------------------------------------------
 
@@ -185,84 +269,23 @@ export async function downloadDceFromUrl(tenderId: string): Promise<DceActionRes
     if (!tender) return { ok: false, error: "tender_not_found" };
     if (!tender.dceUrl) return { ok: false, error: "no_dce_url" };
 
-    // Validation SSRF : HTTPS uniquement + hostname hors plages privées/réservées
-    const urlError = validateExternalUrl(tender.dceUrl);
-    if (urlError) {
-      console.warn("[dossier:download-dce:ssrf-block]", tender.dceUrl);
-      return { ok: false, error: urlError };
-    }
-
-    // Fetch avec timeout 30 s
-    let response: Response;
-    try {
-      response = await fetch(tender.dceUrl, {
-        signal: AbortSignal.timeout(30_000),
-      });
-    } catch (err) {
-      console.error("[dossier:download-dce:fetch:fail]", err);
-      return {
-        ok: false,
-        error: "fetch_failed",
-      };
-    }
-
-    if (!response.ok) {
-      return { ok: false, error: "fetch_failed" };
-    }
-
-    // Vérification content-type : on n'accepte que les PDF directs
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("pdf")) {
-      return { ok: false, error: "not_a_pdf" };
-    }
-
-    const buffer = await response.arrayBuffer();
-
-    // Upload Storage : chemin tenant-scoped
-    const storagePath = `${auth.orgId}/${tenderId}/${Date.now()}_RC.pdf`;
-
-    // Storage admin : RLS bypass intentionnel — auth vérifiée L.175
     const supabaseAdmin = createSupabaseAdminClient();
-    const { error: storageError } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: "application/pdf",
-        upsert: false,
-      });
+    // Storage admin : RLS bypass intentionnel — auth vérifiée ci-dessus
+    const result = await _downloadAndStoreFromUrl(
+      tenderId,
+      auth.orgId,
+      tender.dceUrl,
+      supabaseAdmin,
+      "dossier:download-dce",
+    );
 
-    if (storageError) {
-      console.error("[dossier:download-dce:storage:fail]", storageError);
-      return { ok: false, error: "storage_upload_failed" };
-    }
-
-    // Insert dans tender_documents
-    try {
-      await db.insert(tenderDocuments).values({
-        tenderId,
-        organizationId: auth.orgId,
-        kind: "RC",
-        name: "RC.pdf",
-        format: "pdf",
-        storagePath,
-        sizeBytes: buffer.byteLength,
-        analyzed: false,
-      });
-    } catch (err) {
-      console.error("[dossier:download-dce:db:fail]", err);
-      // Nettoyage Storage best-effort
-      // Storage admin : RLS bypass intentionnel — auth vérifiée L.175
-      await supabaseAdmin.storage.from(BUCKET).remove([storagePath]);
-      return { ok: false, error: "db_insert_failed" };
-    }
+    if (!result.ok) return result;
 
     revalidatePath(`/sourcing/ao/${tenderId}/dossier`);
     return { ok: true };
   } catch (err) {
     console.error("[dossier:download-dce:unhandled]", err);
-    return {
-      ok: false,
-      error: "internal_error",
-    };
+    return { ok: false, error: "internal_error" };
   }
 }
 
@@ -378,13 +401,6 @@ export async function importDceFromPastedUrl(
     const auth = await getAuthenticatedProfile();
     if (!auth) return { ok: false, error: "not_authenticated" };
 
-    // Validation SSRF : HTTPS uniquement + hostname hors plages privées/réservées
-    const urlError = validateExternalUrl(pastedUrl);
-    if (urlError) {
-      console.warn("[dossier:import-pasted:ssrf-block]", pastedUrl);
-      return { ok: false, error: urlError };
-    }
-
     // Vérification que le tender appartient à l'org
     const [tender] = await db
       .select({ id: tenders.id })
@@ -394,64 +410,17 @@ export async function importDceFromPastedUrl(
 
     if (!tender) return { ok: false, error: "tender_not_found" };
 
-    // Fetch avec timeout 30 s
-    let response: Response;
-    try {
-      response = await fetch(pastedUrl, {
-        signal: AbortSignal.timeout(30_000),
-      });
-    } catch (err) {
-      console.error("[dossier:import-pasted:fetch:fail]", err);
-      return { ok: false, error: "fetch_failed" };
-    }
-
-    if (!response.ok) {
-      return { ok: false, error: "fetch_failed" };
-    }
-
-    // Vérification content-type : on n'accepte que les PDF directs
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("pdf")) {
-      return { ok: false, error: "not_a_pdf" };
-    }
-
-    const buffer = await response.arrayBuffer();
-
-    // Upload Storage : chemin tenant-scoped
-    const storagePath = `${auth.orgId}/${tenderId}/${Date.now()}_RC.pdf`;
-
     // Storage admin : RLS bypass intentionnel — auth vérifiée ci-dessus
     const supabaseAdmin = createSupabaseAdminClient();
-    const { error: storageError } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(storagePath, buffer, {
-        contentType: "application/pdf",
-        upsert: false,
-      });
+    const result = await _downloadAndStoreFromUrl(
+      tenderId,
+      auth.orgId,
+      pastedUrl,
+      supabaseAdmin,
+      "dossier:import-pasted",
+    );
 
-    if (storageError) {
-      console.error("[dossier:import-pasted:storage:fail]", storageError);
-      return { ok: false, error: "storage_upload_failed" };
-    }
-
-    // Insert dans tender_documents
-    try {
-      await db.insert(tenderDocuments).values({
-        tenderId,
-        organizationId: auth.orgId,
-        kind: "RC",
-        name: "RC.pdf",
-        format: "pdf",
-        storagePath,
-        sizeBytes: buffer.byteLength,
-        analyzed: false,
-      });
-    } catch (err) {
-      console.error("[dossier:import-pasted:db:fail]", err);
-      // Nettoyage Storage best-effort
-      await supabaseAdmin.storage.from(BUCKET).remove([storagePath]);
-      return { ok: false, error: "db_insert_failed" };
-    }
+    if (!result.ok) return result;
 
     // Sauvegarde de l'URL pour les futurs téléchargements — non bloquant
     try {
@@ -473,7 +442,145 @@ export async function importDceFromPastedUrl(
 }
 
 // ---------------------------------------------------------------------------
-// Action 4 : getRcSignedUrlAction
+// Action 4 : fetchBoampDceAction
+// ---------------------------------------------------------------------------
+
+/**
+ * Récupère l'URL DCE depuis l'API BOAMP (Opendatasoft v2.1) via l'idweb
+ * stocké dans tenders.external_ref.
+ * Si l'URL pointe vers un PDF direct, tente l'import automatique.
+ *
+ * Retours :
+ *   - downloaded:true  → RC importé, page refresh via revalidatePath
+ *   - downloaded:false → URL récupérée mais pas un PDF direct (url retournée
+ *     pour pré-remplir le champ paste)
+ *   - ok:false         → erreur (not_boamp, no_external_ref, url_not_found, etc.)
+ */
+export async function fetchBoampDceAction(
+  tenderId: string,
+): Promise<
+  | { ok: true; downloaded: true }
+  | { ok: true; downloaded: false; dceUrl: string }
+  | { ok: false; error: string }
+> {
+  try {
+    // Auth check
+    const auth = await getAuthenticatedProfile();
+    if (!auth) return { ok: false, error: "not_authenticated" };
+
+    // Charger le tender avec la platformCode via JOIN platforms
+    const [tender] = await db
+      .select({
+        id: tenders.id,
+        externalRef: tenders.externalRef,
+        platformCode: platforms.code,
+        organizationId: tenders.organizationId,
+        dceUrl: tenders.dceUrl,
+      })
+      .from(tenders)
+      .innerJoin(platforms, eq(tenders.platformId, platforms.id))
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)))
+      .limit(1);
+
+    if (!tender) return { ok: false, error: "tender_not_found" };
+
+    // Vérification que l'AO provient de BOAMP
+    if (tender.platformCode !== "boamp") {
+      return { ok: false, error: "not_boamp" };
+    }
+
+    // Vérification que l'identifiant externe est présent
+    if (!tender.externalRef) {
+      return { ok: false, error: "no_external_ref" };
+    }
+
+    let fetchedUrl: string;
+
+    if (tender.dceUrl) {
+      // URL déjà en BDD — on passe directement à la tentative d'import
+      fetchedUrl = tender.dceUrl;
+    } else {
+      // Appel API BOAMP Opendatasoft v2.1
+      const apiUrl =
+        `https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records` +
+        `?where=idweb%3D%22${encodeURIComponent(tender.externalRef)}%22&limit=1&select=url_dce`;
+
+      let apiResponse: Response;
+      try {
+        apiResponse = await fetch(apiUrl, { signal: AbortSignal.timeout(10_000) });
+      } catch (err) {
+        console.error("[dossier:fetch-boamp:api:fail]", err);
+        return { ok: false, error: "boamp_api_error" };
+      }
+
+      if (!apiResponse.ok) {
+        console.error("[dossier:fetch-boamp:api:status]", apiResponse.status);
+        return { ok: false, error: "boamp_api_error" };
+      }
+
+      let apiData: { results?: Array<{ url_dce?: string }> };
+      try {
+        apiData = (await apiResponse.json()) as { results?: Array<{ url_dce?: string }> };
+      } catch (err) {
+        console.error("[dossier:fetch-boamp:api:parse]", err);
+        return { ok: false, error: "boamp_api_error" };
+      }
+
+      const rawUrl = apiData.results?.[0]?.url_dce;
+      if (!rawUrl || typeof rawUrl !== "string" || !rawUrl.trim()) {
+        return { ok: false, error: "url_not_found" };
+      }
+
+      // Normalisation : trim + assure https://
+      fetchedUrl = rawUrl.trim();
+      if (fetchedUrl.startsWith("http://")) {
+        fetchedUrl = "https://" + fetchedUrl.slice("http://".length);
+      }
+
+      // Sauvegarde en BDD — non bloquant sur erreur
+      try {
+        await db
+          .update(tenders)
+          .set({ dceUrl: fetchedUrl })
+          .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)));
+      } catch (err) {
+        console.warn("[dossier:fetch-boamp:update-url:fail]", err);
+        // Non bloquant
+      }
+    }
+
+    // Tentative d'import PDF depuis l'URL récupérée
+    const supabaseAdmin = createSupabaseAdminClient();
+    // Storage admin : RLS bypass intentionnel — auth vérifiée ci-dessus
+    const importResult = await _downloadAndStoreFromUrl(
+      tenderId,
+      auth.orgId,
+      fetchedUrl,
+      supabaseAdmin,
+      "dossier:fetch-boamp:import",
+    );
+
+    if (importResult.ok) {
+      revalidatePath(`/sourcing/ao/${tenderId}/dossier`);
+      return { ok: true, downloaded: true };
+    }
+
+    // L'URL n'est pas un PDF direct (ou fetch impossible) — on retourne l'URL
+    // pour que l'utilisateur puisse l'utiliser dans le champ paste
+    if (importResult.error === "not_a_pdf" || importResult.error === "fetch_failed") {
+      return { ok: true, downloaded: false, dceUrl: fetchedUrl };
+    }
+
+    // Autre erreur (SSRF, storage…)
+    return { ok: false, error: importResult.error ?? "internal_error" };
+  } catch (err) {
+    console.error("[dossier:fetch-boamp:unhandled]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Action 5 : getRcSignedUrlAction
 // ---------------------------------------------------------------------------
 
 /**
@@ -526,7 +633,7 @@ export async function getRcSignedUrlAction(
 }
 
 // ---------------------------------------------------------------------------
-// Action 5 : analyzeRcAction
+// Action 6 : analyzeRcAction
 // ---------------------------------------------------------------------------
 
 /**

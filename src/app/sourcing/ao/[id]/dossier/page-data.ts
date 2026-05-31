@@ -17,6 +17,7 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { platforms } from "@/db/schema/config";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import type { RcAnalysis } from "@/lib/ai/schemas";
 
@@ -32,6 +33,10 @@ export interface DossierPageData {
     dceUrl: string | null;
     status: string;
     deadline: Date | null;
+    /** Code de la plateforme source (ex. 'boamp', 'place', 'prive'…) */
+    platformCode: string;
+    /** Référence externe de l'AO sur la plateforme source (ex. idweb BOAMP) */
+    externalRef: string | null;
   };
   /** Document RC le plus récent stocké dans `tender_documents` (kind='RC'). Null si absent. */
   rcDocument: {
@@ -68,7 +73,7 @@ export async function loadDossierPageData(
   orgId: string,
 ): Promise<LoadDossierResult> {
   try {
-    // 1. Charger le tender (filtre tenant)
+    // 1. Charger le tender + la plateforme (JOIN pour récupérer platformCode)
     const [tender] = await db
       .select({
         id: tenders.id,
@@ -77,8 +82,11 @@ export async function loadDossierPageData(
         dceUrl: tenders.dceUrl,
         status: tenders.status,
         deadline: tenders.deadline,
+        platformCode: platforms.code,
+        externalRef: tenders.externalRef,
       })
       .from(tenders)
+      .innerJoin(platforms, eq(tenders.platformId, platforms.id))
       .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
       .limit(1);
 
