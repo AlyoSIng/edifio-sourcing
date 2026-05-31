@@ -361,7 +361,7 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, externalRef }:
               type="button"
               onClick={handleDownload}
               disabled={isDownloading}
-              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+              className="rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {isDownloading ? "Téléchargement en cours…" : "Télécharger le DCE automatiquement"}
             </button>
@@ -434,7 +434,7 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, externalRef }:
             accept=".pdf,application/pdf"
             required
             disabled={isUploading}
-            className="hover:file:bg-ink/80 w-full rounded border border-line bg-paper px-2 py-1.5 text-sm text-ink file:mr-3 file:rounded file:border-0 file:bg-ink file:px-2 file:py-1 file:text-xs file:font-medium file:text-white disabled:opacity-50"
+            className="hover:file:bg-brand-red/80 w-full rounded border border-line bg-paper px-2 py-1.5 text-sm text-ink file:mr-3 file:rounded file:border-0 file:bg-brand-red file:px-2 file:py-1 file:text-xs file:font-medium file:text-white disabled:opacity-50"
           />
           {uploadError && (
             <p role="alert" className="mt-2 text-sm text-error">
@@ -445,7 +445,7 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, externalRef }:
             <button
               type="submit"
               disabled={isUploading}
-              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+              className="rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {isUploading ? "Upload en cours…" : "Uploader le RC manuellement"}
             </button>
@@ -521,13 +521,13 @@ function AnalysisResultSection({ analysis, tenderId }: { analysis: RcAnalysis; t
     <div className="space-y-5">
       {/* Alertes */}
       {analysis.alertes.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="mb-2 text-sm font-semibold text-amber-800">
+        <div className="rounded-lg border border-warn bg-warn-bg p-4">
+          <p className="mb-2 text-sm font-semibold text-warn">
             Alertes ({analysis.alertes.length})
           </p>
           <ul className="space-y-1" role="list">
             {analysis.alertes.map((alerte, i) => (
-              <li key={i} className="flex gap-2 text-sm text-amber-800">
+              <li key={i} className="flex gap-2 text-sm text-warn">
                 <span aria-hidden className="mt-0.5 shrink-0">
                   ⚠
                 </span>
@@ -689,11 +689,17 @@ export function DossierClient({ data }: DossierClientProps) {
 
   return (
     <div className="space-y-6">
-      {/* Section 1 — DCE */}
-      <section aria-labelledby="dce-section-heading">
-        <h2 id="dce-section-heading" className="mb-3 font-display text-base font-semibold text-ink">
-          1. Règlement de Consultation (RC)
-        </h2>
+      {/* Étape 1 — Règlement de Consultation (RC) */}
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-red font-mono text-[11px] font-bold text-white"
+            aria-hidden
+          >
+            1
+          </span>
+          <h2 className="text-sm font-semibold text-ink">Règlement de Consultation (RC)</h2>
+        </div>
         <DceSection
           tenderId={tender.id}
           dceUrl={tender.dceUrl}
@@ -701,36 +707,42 @@ export function DossierClient({ data }: DossierClientProps) {
           platformCode={tender.platformCode}
           externalRef={tender.externalRef}
         />
-      </section>
+      </div>
 
-      {/* Section 2 — Analyse RC (visible seulement si RC présent et pas encore analysé) */}
+      {/* Étape 2 — Analyse IA du RC (visible seulement si RC présent et pas encore analysé) */}
       {rcDocument && !localAnalysis && (
-        <section aria-labelledby="analyze-section-heading">
-          <h2
-            id="analyze-section-heading"
-            className="mb-3 font-display text-base font-semibold text-ink"
-          >
-            2. Analyse du RC par IA
-          </h2>
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <span
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-red font-mono text-[11px] font-bold text-white"
+              aria-hidden
+            >
+              2
+            </span>
+            <h2 className="text-sm font-semibold text-ink">Analyse IA du RC</h2>
+          </div>
           <AnalysisTriggerSection
             tenderId={tender.id}
             rcDocument={rcDocument}
             onAnalysisDone={setLocalAnalysis}
           />
-        </section>
+        </div>
       )}
 
-      {/* Section 3 — Résultats de l'analyse */}
+      {/* Étape 3 — Résultats de l'analyse */}
       {localAnalysis && (
-        <section aria-labelledby="results-section-heading">
-          <h2
-            id="results-section-heading"
-            className="mb-3 font-display text-base font-semibold text-ink"
-          >
-            2. Résultats de l&apos;analyse RC
-          </h2>
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <span
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success font-mono text-[11px] font-bold text-white"
+              aria-hidden
+            >
+              3
+            </span>
+            <h2 className="text-sm font-semibold text-ink">Résultats — pièces &amp; critères</h2>
+          </div>
           <AnalysisResultSection analysis={localAnalysis} tenderId={tender.id} />
-        </section>
+        </div>
       )}
     </div>
   );

@@ -37,6 +37,8 @@ export interface DossierPageData {
     platformCode: string;
     /** Référence externe de l'AO sur la plateforme source (ex. idweb BOAMP) */
     externalRef: string | null;
+    /** URL de l'annonce sur la plateforme source (lien externe vers la fiche AO). */
+    sourceUrl: string | null;
   };
   /** Document RC le plus récent stocké dans `tender_documents` (kind='RC'). Null si absent. */
   rcDocument: {
@@ -84,6 +86,7 @@ export async function loadDossierPageData(
         deadline: tenders.deadline,
         platformCode: platforms.code,
         externalRef: tenders.externalRef,
+        sourceUrl: tenders.sourceUrl,
       })
       .from(tenders)
       .innerJoin(platforms, eq(tenders.platformId, platforms.id))

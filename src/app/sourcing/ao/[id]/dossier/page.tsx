@@ -201,6 +201,17 @@ export default async function DossierPage({ params }: PageProps) {
               Deadline : <strong className="text-ink">{formatDate(data.tender.deadline)}</strong>
             </span>
           )}
+          {data.tender.sourceUrl && (
+            <a
+              href={data.tender.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-brand-red underline-offset-2 hover:underline"
+              aria-label="Voir l'annonce officielle sur la plateforme source"
+            >
+              Voir l&apos;annonce en ligne ↗
+            </a>
+          )}
         </div>
       </header>
 
