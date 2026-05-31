@@ -23,7 +23,13 @@ import { useRef, useState, useTransition } from "react";
 
 import type { DossierPageData } from "./page-data";
 import type { RcAnalysis } from "@/lib/ai/schemas";
-import { downloadDceFromUrl, uploadDcePdf, analyzeRcAction } from "./actions";
+import {
+  downloadDceFromUrl,
+  uploadDcePdf,
+  analyzeRcAction,
+  importDceFromPastedUrl,
+  getRcSignedUrlAction,
+} from "./actions";
 
 // ---------------------------------------------------------------------------
 // Helpers de formatage
@@ -137,6 +143,16 @@ function DceSection({ tenderId, dceUrl, rcDocument }: DceSectionProps) {
   const [isUploading, startUpload] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- États pour l'import depuis URL collée ---
+  const [pastedUrl, setPastedUrl] = useState("");
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  const [isPasteImporting, startPasteImport] = useTransition();
+
+  // --- États pour l'aperçu PDF ---
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isLoadingPreview, startPreview] = useTransition();
+
   function handleDownload() {
     setDownloadError(null);
     startDownload(async () => {
@@ -161,7 +177,30 @@ function DceSection({ tenderId, dceUrl, rcDocument }: DceSectionProps) {
     });
   }
 
-  // RC déjà présent → affichage de la carte verte
+  function handlePasteImport() {
+    setPasteError(null);
+    startPasteImport(async () => {
+      const result = await importDceFromPastedUrl(tenderId, pastedUrl.trim());
+      if (!result.ok) {
+        setPasteError(downloadErrorLabel(result.error));
+      }
+      // succès : revalidatePath côté server rafraîchit la page
+    });
+  }
+
+  function handlePreview() {
+    setPreviewError(null);
+    startPreview(async () => {
+      const result = await getRcSignedUrlAction(tenderId);
+      if (result.ok) {
+        setPreviewUrl(result.url);
+      } else {
+        setPreviewError("Impossible de charger l'aperçu. Réessayez.");
+      }
+    });
+  }
+
+  // RC déjà présent → affichage de la carte verte + aperçu PDF
   if (rcDocument) {
     return (
       <section
@@ -196,6 +235,40 @@ function DceSection({ tenderId, dceUrl, rcDocument }: DceSectionProps) {
               Ajouté le {formatDateTime(rcDocument.uploadedAt)}
             </p>
           </div>
+        </div>
+
+        {/* Aperçu PDF */}
+        <div className="mt-3 border-t border-line pt-3">
+          {previewUrl ? (
+            <div className="space-y-2">
+              <iframe
+                src={previewUrl}
+                title="Aperçu RC — Règlement de consultation"
+                className="h-[600px] w-full rounded border border-line"
+              />
+              <button
+                type="button"
+                onClick={() => setPreviewUrl(null)}
+                className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+              >
+                Fermer l&apos;aperçu
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={isLoadingPreview}
+              className="text-xs text-brand-red underline-offset-2 hover:underline disabled:opacity-50"
+            >
+              {isLoadingPreview ? "Chargement…" : "Voir le PDF ↗"}
+            </button>
+          )}
+          {previewError && (
+            <p role="alert" className="mt-1 text-xs text-error">
+              {previewError}
+            </p>
+          )}
         </div>
       </section>
     );
@@ -237,6 +310,40 @@ function DceSection({ tenderId, dceUrl, rcDocument }: DceSectionProps) {
           )}
         </div>
       ) : null}
+
+      {/* Paste URL (visible seulement si dceUrl absent) */}
+      {!dceUrl && (
+        <div className="rounded-lg border border-line bg-white p-4">
+          <p className="mb-1 text-sm font-medium text-ink">Importer depuis une URL DCE</p>
+          <p className="mb-3 text-xs text-ink-2">
+            Collez l&apos;URL directe du RC (PDF BOAMP ou autre plateforme). L&apos;URL sera
+            sauvegardée pour cet AO.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="url"
+              value={pastedUrl}
+              onChange={(e) => setPastedUrl(e.target.value)}
+              placeholder="https://www.boamp.fr/…/rc.pdf"
+              disabled={isPasteImporting}
+              className="flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={handlePasteImport}
+              disabled={isPasteImporting || !pastedUrl.trim()}
+              className="rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isPasteImporting ? "Import en cours…" : "Importer"}
+            </button>
+          </div>
+          {pasteError && (
+            <p role="alert" className="mt-2 text-sm text-error">
+              {pasteError}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Upload manuel */}
       <div className="rounded-lg border border-dashed border-line bg-white p-4">

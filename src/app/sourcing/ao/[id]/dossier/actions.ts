@@ -27,7 +27,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { auditLogs } from "@/db/schema/audit";
@@ -357,7 +357,176 @@ export async function uploadDcePdf(tenderId: string, formData: FormData): Promis
 }
 
 // ---------------------------------------------------------------------------
-// Action 3 : analyzeRcAction
+// Action 3 : importDceFromPastedUrl
+// ---------------------------------------------------------------------------
+
+/**
+ * Importe le RC depuis une URL collée manuellement par l'utilisateur.
+ * Même logique SSRF + fetch + PDF que `downloadDceFromUrl`, mais l'URL
+ * est fournie en paramètre au lieu d'être lue depuis tenders.dce_url.
+ * Après succès : met à jour tenders.dce_url pour les futurs téléchargements.
+ *
+ * @param tenderId  UUID du tender
+ * @param pastedUrl URL DCE fournie par l'utilisateur
+ */
+export async function importDceFromPastedUrl(
+  tenderId: string,
+  pastedUrl: string,
+): Promise<DceActionResult> {
+  try {
+    // Auth check
+    const auth = await getAuthenticatedProfile();
+    if (!auth) return { ok: false, error: "not_authenticated" };
+
+    // Validation SSRF : HTTPS uniquement + hostname hors plages privées/réservées
+    const urlError = validateExternalUrl(pastedUrl);
+    if (urlError) {
+      console.warn("[dossier:import-pasted:ssrf-block]", pastedUrl);
+      return { ok: false, error: urlError };
+    }
+
+    // Vérification que le tender appartient à l'org
+    const [tender] = await db
+      .select({ id: tenders.id })
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)))
+      .limit(1);
+
+    if (!tender) return { ok: false, error: "tender_not_found" };
+
+    // Fetch avec timeout 30 s
+    let response: Response;
+    try {
+      response = await fetch(pastedUrl, {
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      console.error("[dossier:import-pasted:fetch:fail]", err);
+      return { ok: false, error: "fetch_failed" };
+    }
+
+    if (!response.ok) {
+      return { ok: false, error: "fetch_failed" };
+    }
+
+    // Vérification content-type : on n'accepte que les PDF directs
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("pdf")) {
+      return { ok: false, error: "not_a_pdf" };
+    }
+
+    const buffer = await response.arrayBuffer();
+
+    // Upload Storage : chemin tenant-scoped
+    const storagePath = `${auth.orgId}/${tenderId}/${Date.now()}_RC.pdf`;
+
+    // Storage admin : RLS bypass intentionnel — auth vérifiée ci-dessus
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { error: storageError } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .upload(storagePath, buffer, {
+        contentType: "application/pdf",
+        upsert: false,
+      });
+
+    if (storageError) {
+      console.error("[dossier:import-pasted:storage:fail]", storageError);
+      return { ok: false, error: "storage_upload_failed" };
+    }
+
+    // Insert dans tender_documents
+    try {
+      await db.insert(tenderDocuments).values({
+        tenderId,
+        organizationId: auth.orgId,
+        kind: "RC",
+        name: "RC.pdf",
+        format: "pdf",
+        storagePath,
+        sizeBytes: buffer.byteLength,
+        analyzed: false,
+      });
+    } catch (err) {
+      console.error("[dossier:import-pasted:db:fail]", err);
+      // Nettoyage Storage best-effort
+      await supabaseAdmin.storage.from(BUCKET).remove([storagePath]);
+      return { ok: false, error: "db_insert_failed" };
+    }
+
+    // Sauvegarde de l'URL pour les futurs téléchargements — non bloquant
+    try {
+      await db
+        .update(tenders)
+        .set({ dceUrl: pastedUrl })
+        .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)));
+    } catch (err) {
+      console.warn("[dossier:import-pasted:update-url:fail]", err);
+      // Non bloquant : l'import est réussi même si la mise à jour de l'URL échoue
+    }
+
+    revalidatePath(`/sourcing/ao/${tenderId}/dossier`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[dossier:import-pasted:unhandled]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Action 4 : getRcSignedUrlAction
+// ---------------------------------------------------------------------------
+
+/**
+ * Génère une URL signée (1 h) pour prévisualiser le RC en iframe.
+ * Lit le storagePath du document RC le plus récent depuis tender_documents.
+ *
+ * @param tenderId UUID du tender
+ */
+export async function getRcSignedUrlAction(
+  tenderId: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  try {
+    // Auth check
+    const auth = await getAuthenticatedProfile();
+    if (!auth) return { ok: false, error: "not_authenticated" };
+
+    // Récupération du storagePath du document RC le plus récent
+    const [doc] = await db
+      .select({ storagePath: tenderDocuments.storagePath })
+      .from(tenderDocuments)
+      .where(
+        and(
+          eq(tenderDocuments.tenderId, tenderId),
+          eq(tenderDocuments.organizationId, auth.orgId),
+          eq(tenderDocuments.kind, "RC"),
+        ),
+      )
+      .orderBy(desc(tenderDocuments.uploadedAt))
+      .limit(1);
+
+    if (!doc) return { ok: false, error: "not_found" };
+
+    // Génération URL signée 1 h (3 600 secondes)
+    // Storage admin : RLS bypass intentionnel — auth vérifiée ci-dessus
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { data: signedData, error: signedError } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .createSignedUrl(doc.storagePath, 3600);
+
+    if (signedError || !signedData?.signedUrl) {
+      console.error("[dossier:signed-url:fail]", signedError);
+      return { ok: false, error: "storage_error" };
+    }
+
+    return { ok: true, url: signedData.signedUrl };
+  } catch (err) {
+    console.error("[dossier:signed-url:unhandled]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Action 5 : analyzeRcAction
 // ---------------------------------------------------------------------------
 
 /**
