@@ -29,7 +29,6 @@ import {
   analyzeRcAction,
   importDceFromPastedUrl,
   getRcSignedUrlAction,
-  fetchBoampDceAction,
 } from "./actions";
 
 // ---------------------------------------------------------------------------
@@ -137,11 +136,11 @@ interface DceSectionProps {
   rcDocument: DossierPageData["rcDocument"];
   /** Code de la plateforme source (ex. 'boamp', 'place', 'prive'…) */
   platformCode: string;
-  /** Référence externe de l'AO sur la plateforme source (ex. idweb BOAMP) */
-  externalRef: string | null;
+  /** URL de l'annonce sur la plateforme source (lien direct vers la fiche AO). */
+  sourceUrl: string | null;
 }
 
-function DceSection({ tenderId, dceUrl, rcDocument, platformCode, externalRef }: DceSectionProps) {
+function DceSection({ tenderId, dceUrl, rcDocument, platformCode, sourceUrl }: DceSectionProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDownloading, startDownload] = useTransition();
@@ -152,11 +151,6 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, externalRef }:
   const [pastedUrl, setPastedUrl] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [isPasteImporting, startPasteImport] = useTransition();
-
-  // --- États pour la récupération BOAMP ---
-  const [isFetchingBoamp, startFetchBoamp] = useTransition();
-  const [boampError, setBoampError] = useState<string | null>(null);
-  const [boampFetchedUrl, setBoampFetchedUrl] = useState<string | null>(null);
 
   // --- États pour l'aperçu PDF ---
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -195,33 +189,6 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, externalRef }:
         setPasteError(downloadErrorLabel(result.error));
       }
       // succès : revalidatePath côté server rafraîchit la page
-    });
-  }
-
-  function handleFetchBoamp() {
-    setBoampError(null);
-    setBoampFetchedUrl(null);
-    startFetchBoamp(async () => {
-      const result = await fetchBoampDceAction(tenderId);
-      if (!result.ok) {
-        const msgs: Record<string, string> = {
-          not_boamp: "Cet AO n'est pas issu de BOAMP.",
-          no_external_ref: "Identifiant BOAMP manquant.",
-          url_not_found: "Aucune URL DCE trouvée sur BOAMP pour cet AO.",
-          boamp_api_error: "L'API BOAMP est indisponible. Réessayez.",
-          not_authenticated: "Session expirée.",
-          internal_error: "Erreur interne. Réessayez.",
-        };
-        setBoampError(msgs[result.error] ?? "Erreur inconnue.");
-        return;
-      }
-      if (result.downloaded) {
-        // revalidatePath côté server → la page se rafraîchit
-        return;
-      }
-      // URL récupérée mais pas un PDF direct — pré-remplir le champ paste
-      setBoampFetchedUrl(result.dceUrl);
-      setPastedUrl(result.dceUrl);
     });
   }
 
@@ -314,36 +281,26 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, externalRef }:
   // RC absent → formulaire de téléchargement / upload
   return (
     <section className="space-y-4" aria-label="Obtenir le DCE">
-      {/* Récupération automatique BOAMP (si plateforme = BOAMP et pas d'URL DCE) */}
+      {/* Bloc BOAMP informatif (si plateforme = BOAMP et pas d'URL DCE) */}
       {platformCode === "boamp" && !dceUrl && (
-        <div className="border-brand-red/20 rounded-lg border bg-error-bg p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-ink">Récupérer le DCE depuis BOAMP</p>
-              <p className="mt-0.5 text-xs text-muted">
-                Interroge l&apos;API BOAMP pour obtenir l&apos;URL du dossier de consultation
-                {externalRef ? ` (réf. ${externalRef})` : ""}.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleFetchBoamp}
-              disabled={isFetchingBoamp}
-              className="shrink-0 rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        <div className="rounded-lg border border-line bg-paper-2 p-4">
+          <p className="mb-1 text-sm font-medium text-ink">Obtenir le DCE depuis BOAMP</p>
+          <p className="mb-3 text-xs text-ink-2">
+            L&apos;URL du dossier de consultation n&apos;est pas exposée par l&apos;API BOAMP.
+            Ouvrez l&apos;annonce en ligne, copiez l&apos;URL du DCE depuis la plateforme source,
+            puis collez-la dans le champ ci-dessous.
+          </p>
+          {sourceUrl ? (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-2"
             >
-              {isFetchingBoamp ? "Récupération…" : "Récupérer ↗"}
-            </button>
-          </div>
-          {boampError && (
-            <p role="alert" className="mt-2 text-xs text-error">
-              {boampError}
-            </p>
-          )}
-          {boampFetchedUrl && (
-            <p className="mt-2 text-xs text-success">
-              URL récupérée et sauvegardée. Le DCE n&apos;est pas un PDF direct — utilisez le champ
-              ci-dessous pour importer.
-            </p>
+              Ouvrir l&apos;annonce BOAMP ↗
+            </a>
+          ) : (
+            <p className="text-xs text-muted">URL de l&apos;annonce non disponible.</p>
           )}
         </div>
       )}
@@ -705,7 +662,7 @@ export function DossierClient({ data }: DossierClientProps) {
           dceUrl={tender.dceUrl}
           rcDocument={rcDocument}
           platformCode={tender.platformCode}
-          externalRef={tender.externalRef}
+          sourceUrl={tender.sourceUrl}
         />
       </div>
 

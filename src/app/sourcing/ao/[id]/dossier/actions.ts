@@ -3,13 +3,15 @@
 /**
  * Server Actions — page dossier IA `/sourcing/ao/[id]/dossier`.
  *
- * Trois actions :
- *   - `downloadDceFromUrl`  : tente de télécharger le DCE depuis l'URL publique
- *                             stockée dans `tenders.dce_url`. Si l'URL n'est pas
- *                             un PDF direct, retourne `not_a_pdf` (upload manuel requis).
- *   - `uploadDcePdf`        : upload manuel du RC par l'utilisateur (FormData).
- *   - `analyzeRcAction`     : extrait le texte PDF + appelle Claude Sonnet 4.6 via
- *                             `analyzeRc()`, insère un `tender_event` rc_analyzed.
+ * Cinq actions :
+ *   - `downloadDceFromUrl`     : tente de télécharger le DCE depuis l'URL publique
+ *                               stockée dans `tenders.dce_url`. Si l'URL n'est pas
+ *                               un PDF direct, retourne `not_a_pdf` (upload manuel requis).
+ *   - `uploadDcePdf`           : upload manuel du RC par l'utilisateur (FormData).
+ *   - `importDceFromPastedUrl` : import RC depuis une URL collée manuellement.
+ *   - `getRcSignedUrlAction`   : URL signée 1 h pour aperçu PDF en iframe.
+ *   - `analyzeRcAction`        : extrait le texte PDF + appelle Claude Sonnet 4.6 via
+ *                               `analyzeRc()`, insère un `tender_event` rc_analyzed.
  *
  * Sécurité :
  *   - Auth check sur chaque action (defense in depth)
@@ -31,7 +33,6 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { auditLogs } from "@/db/schema/audit";
-import { platforms } from "@/db/schema/config";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -164,8 +165,7 @@ async function getAuthenticatedProfile() {
 /**
  * Factorisation interne : fetch HTTPS + vérif PDF + upload Storage + insert BDD.
  *
- * Utilisé par `downloadDceFromUrl`, `importDceFromPastedUrl`, et
- * `fetchBoampDceAction`.
+ * Utilisé par `downloadDceFromUrl` et `importDceFromPastedUrl`.
  *
  * Retourne :
  *   - `{ ok: true }`         → RC enregistré dans Storage + BDD
@@ -442,145 +442,7 @@ export async function importDceFromPastedUrl(
 }
 
 // ---------------------------------------------------------------------------
-// Action 4 : fetchBoampDceAction
-// ---------------------------------------------------------------------------
-
-/**
- * Récupère l'URL DCE depuis l'API BOAMP (Opendatasoft v2.1) via l'idweb
- * stocké dans tenders.external_ref.
- * Si l'URL pointe vers un PDF direct, tente l'import automatique.
- *
- * Retours :
- *   - downloaded:true  → RC importé, page refresh via revalidatePath
- *   - downloaded:false → URL récupérée mais pas un PDF direct (url retournée
- *     pour pré-remplir le champ paste)
- *   - ok:false         → erreur (not_boamp, no_external_ref, url_not_found, etc.)
- */
-export async function fetchBoampDceAction(
-  tenderId: string,
-): Promise<
-  | { ok: true; downloaded: true }
-  | { ok: true; downloaded: false; dceUrl: string }
-  | { ok: false; error: string }
-> {
-  try {
-    // Auth check
-    const auth = await getAuthenticatedProfile();
-    if (!auth) return { ok: false, error: "not_authenticated" };
-
-    // Charger le tender avec la platformCode via JOIN platforms
-    const [tender] = await db
-      .select({
-        id: tenders.id,
-        externalRef: tenders.externalRef,
-        platformCode: platforms.code,
-        organizationId: tenders.organizationId,
-        dceUrl: tenders.dceUrl,
-      })
-      .from(tenders)
-      .innerJoin(platforms, eq(tenders.platformId, platforms.id))
-      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)))
-      .limit(1);
-
-    if (!tender) return { ok: false, error: "tender_not_found" };
-
-    // Vérification que l'AO provient de BOAMP
-    if (tender.platformCode !== "boamp") {
-      return { ok: false, error: "not_boamp" };
-    }
-
-    // Vérification que l'identifiant externe est présent
-    if (!tender.externalRef) {
-      return { ok: false, error: "no_external_ref" };
-    }
-
-    let fetchedUrl: string;
-
-    if (tender.dceUrl) {
-      // URL déjà en BDD — on passe directement à la tentative d'import
-      fetchedUrl = tender.dceUrl;
-    } else {
-      // Appel API BOAMP Opendatasoft v2.1
-      const apiUrl =
-        `https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records` +
-        `?where=idweb%3D%22${encodeURIComponent(tender.externalRef)}%22&limit=1&select=url_dce`;
-
-      let apiResponse: Response;
-      try {
-        apiResponse = await fetch(apiUrl, { signal: AbortSignal.timeout(10_000) });
-      } catch (err) {
-        console.error("[dossier:fetch-boamp:api:fail]", err);
-        return { ok: false, error: "boamp_api_error" };
-      }
-
-      if (!apiResponse.ok) {
-        console.error("[dossier:fetch-boamp:api:status]", apiResponse.status);
-        return { ok: false, error: "boamp_api_error" };
-      }
-
-      let apiData: { results?: Array<{ url_dce?: string }> };
-      try {
-        apiData = (await apiResponse.json()) as { results?: Array<{ url_dce?: string }> };
-      } catch (err) {
-        console.error("[dossier:fetch-boamp:api:parse]", err);
-        return { ok: false, error: "boamp_api_error" };
-      }
-
-      const rawUrl = apiData.results?.[0]?.url_dce;
-      if (!rawUrl || typeof rawUrl !== "string" || !rawUrl.trim()) {
-        return { ok: false, error: "url_not_found" };
-      }
-
-      // Normalisation : trim + assure https://
-      fetchedUrl = rawUrl.trim();
-      if (fetchedUrl.startsWith("http://")) {
-        fetchedUrl = "https://" + fetchedUrl.slice("http://".length);
-      }
-
-      // Sauvegarde en BDD — non bloquant sur erreur
-      try {
-        await db
-          .update(tenders)
-          .set({ dceUrl: fetchedUrl })
-          .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)));
-      } catch (err) {
-        console.warn("[dossier:fetch-boamp:update-url:fail]", err);
-        // Non bloquant
-      }
-    }
-
-    // Tentative d'import PDF depuis l'URL récupérée
-    const supabaseAdmin = createSupabaseAdminClient();
-    // Storage admin : RLS bypass intentionnel — auth vérifiée ci-dessus
-    const importResult = await _downloadAndStoreFromUrl(
-      tenderId,
-      auth.orgId,
-      fetchedUrl,
-      supabaseAdmin,
-      "dossier:fetch-boamp:import",
-    );
-
-    if (importResult.ok) {
-      revalidatePath(`/sourcing/ao/${tenderId}/dossier`);
-      return { ok: true, downloaded: true };
-    }
-
-    // L'URL n'est pas un PDF direct (ou fetch impossible) — on retourne l'URL
-    // pour que l'utilisateur puisse l'utiliser dans le champ paste
-    if (importResult.error === "not_a_pdf" || importResult.error === "fetch_failed") {
-      return { ok: true, downloaded: false, dceUrl: fetchedUrl };
-    }
-
-    // Autre erreur (SSRF, storage…)
-    return { ok: false, error: importResult.error ?? "internal_error" };
-  } catch (err) {
-    console.error("[dossier:fetch-boamp:unhandled]", err);
-    return { ok: false, error: "internal_error" };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Action 5 : getRcSignedUrlAction
+// Action 4 : getRcSignedUrlAction
 // ---------------------------------------------------------------------------
 
 /**
