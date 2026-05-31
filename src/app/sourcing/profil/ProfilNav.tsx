@@ -23,7 +23,7 @@ const TABS: NavTab[] = [
   { href: "/sourcing/profil/formations", label: "Formations" },
   { href: "/sourcing/profil/guided-tests", label: "Tests guidés" },
   { href: "/sourcing/profil/faq", label: "FAQ" },
-  { href: "/sourcing/profil/demo", label: "Démo" },
+  // Démo masquée jusqu'à réception de l'URL vidéo du Board (demo_video_url dans app_content).
 ];
 
 export function ProfilNav() {
