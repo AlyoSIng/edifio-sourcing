@@ -30,7 +30,8 @@
  *
  * V1 limites :
  *  - Pas de drag-and-drop
- *  - Pas de raccourcis clavier (TODO Phase 2 : touche `S` / `D` / `R`)
+ *  - Raccourcis clavier hover-based : `S` Sélectionner, `D` Différer, `R` Rejeter
+ *    (actifs quand la souris survole le bloc actions — ignorés si focus dans un input)
  *  - `useOptimistic` non utilisé ici car le tableau optimiste vit côté page
  *    parent (la card disparaît, pas juste un changement local) — pour V1
  *    on s'appuie sur `revalidatePath` côté server action pour rafraîchir
@@ -125,6 +126,7 @@ export function TenderCardActions({
   const [showSoloTandemModal, setShowSoloTandemModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDeferPopover, setShowDeferPopover] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Ref sur le wrapper popover pour détection click-outside.
   const deferContainerRef = useRef<HTMLDivElement | null>(null);
@@ -149,6 +151,33 @@ export function TenderCardActions({
       window.removeEventListener("mousedown", onClick);
     };
   }, [showDeferPopover]);
+
+  // Raccourcis clavier S / D / R — actifs quand la souris survole les actions
+  useEffect(() => {
+    if (!isHovered || isPending) return;
+    const onKey = (e: KeyboardEvent) => {
+      // Ignorer si l'utilisateur tape dans un champ texte
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable)
+        return;
+      switch (e.key.toLowerCase()) {
+        case "s":
+          e.preventDefault();
+          setShowSoloTandemModal(true);
+          break;
+        case "d":
+          e.preventDefault();
+          setShowDeferPopover((v) => !v);
+          break;
+        case "r":
+          e.preventDefault();
+          setShowRejectModal(true);
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isHovered, isPending]);
 
   function handleSelect(mode: "solo" | "tandem" | "conception_realisation"): void {
     setShowSoloTandemModal(false);
@@ -202,6 +231,8 @@ export function TenderCardActions({
       <div
         className={`flex flex-col gap-1.5 sm:items-stretch ${isPending ? "pointer-events-none opacity-50" : ""}`}
         aria-busy={isPending}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         <button
           type="button"
@@ -212,6 +243,11 @@ export function TenderCardActions({
         >
           <span aria-hidden>&#x2713;</span>
           Sélectionner
+          {isHovered && (
+            <kbd className="ml-1 rounded bg-white/20 px-1 py-0.5 font-mono text-[9px] text-white/80">
+              S
+            </kbd>
+          )}
         </button>
 
         {/* « Reporter » : bouton + popover shortcuts (+1j / +3j / +7j) */}
@@ -227,6 +263,11 @@ export function TenderCardActions({
           >
             <span aria-hidden>&#x23F8;</span>
             Reporter
+            {isHovered && (
+              <kbd className="ml-1 rounded bg-paper-3 px-1 py-0.5 font-mono text-[9px] text-muted">
+                D
+              </kbd>
+            )}
           </button>
 
           {showDeferPopover ? (
@@ -260,6 +301,11 @@ export function TenderCardActions({
         >
           <span aria-hidden>&#x2715;</span>
           Écarter
+          {isHovered && (
+            <kbd className="ml-1 rounded bg-error-bg px-1 py-0.5 font-mono text-[9px] text-error">
+              R
+            </kbd>
+          )}
         </button>
 
         <button
