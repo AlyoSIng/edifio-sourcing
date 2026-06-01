@@ -24,7 +24,7 @@ import { matchesProfile } from "@/lib/sourcing/filter";
 import { insertTender } from "@/lib/sourcing/insert";
 import { normalize } from "@/lib/sourcing/normalize";
 import { scoreTender } from "@/lib/sourcing/scoring";
-import type { RawTender } from "@/lib/sourcing/types";
+import type { PlatformCode, RawTender } from "@/lib/sourcing/types";
 import type { TenderRawData } from "@/db/types/jsonb";
 
 // ============================================================================
@@ -128,10 +128,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Mapping code scraper → code plateforme BDD (PlatformCode).
   // Le worker Playwright utilise ses propres codes (ex. "marchespublicsinfo")
   // qui diffèrent parfois des codes canoniques en BDD (ex. "mp_info").
-  const PLATFORM_CODE_MAP: Record<string, string> = {
+  const PLATFORM_CODE_MAP: Record<string, PlatformCode> = {
     marchespublicsinfo: "mp_info",
   };
-  const dbPlatformCode = PLATFORM_CODE_MAP[platform] ?? platform;
+  const dbPlatformCode: PlatformCode = PLATFORM_CODE_MAP[platform] ?? (platform as PlatformCode);
 
   const raws: RawTender[] = tenders.map((t) => ({
     externalRef: t.externalRef,
