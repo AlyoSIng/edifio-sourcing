@@ -171,6 +171,13 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
         </div>
         {adminUser ? (
           <div className="flex shrink-0 flex-wrap items-start gap-2">
+            {/* Bouton création manuelle d'un architecte */}
+            <a
+              href="/sourcing/architectes/nouveau"
+              className="hover:bg-brand-red/90 focus:ring-brand-red/40 inline-flex h-8 items-center rounded-full bg-brand-red px-3 text-xs font-medium text-white focus:outline-none focus:ring-2"
+            >
+              + Ajouter un architecte
+            </a>
             {/* Badge critères short-list actifs — Tandem Phase 1 */}
             {hasShortlistCriteria ? (
               <a
