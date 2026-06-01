@@ -309,7 +309,18 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
       },
       responseStatus: null,
     };
-    setRows((prev) => [...prev, newRow]);
+    const updatedRows = [...rows, newRow];
+    setRows(updatedRows);
+    // Persistance fire-and-forget — même pattern que le matcher V1
+    void persistMatchProposals(
+      tenderId,
+      updatedRows.map((r, idx) => ({
+        architectId: r.architectId,
+        score: r.score,
+        rank: idx + 1,
+        rationale: r.rationale,
+      })),
+    );
     // Réinitialise la recherche
     setSearchQuery("");
     setSearchResults([]);
