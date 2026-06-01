@@ -129,6 +129,8 @@ export type MatchActionResult =
         | "invalid_input"
         | "tender_not_found"
         | "internal_error";
+      /** Détail temporaire pour diagnostic — non exposé en prod. */
+      detail?: string;
     };
 
 export interface MatchScoreWithArchitect extends MatchScore {
