@@ -15,7 +15,7 @@
 import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-import { createPrivateTender } from "./actions";
+import { createPrivateTender, enrichTenderFromUrlAction } from "./actions";
 
 // ============================================================================
 // Données statiques — sélects
@@ -157,6 +157,43 @@ export function PrivateTenderForm() {
   const [marketType, setMarketType] = useState("");
   const [notes, setNotes] = useState("");
 
+  // État enrichissement automatique depuis URL
+  const [enrichUrl, setEnrichUrl] = useState("");
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+  const [enrichSuccess, setEnrichSuccess] = useState(false);
+  const [isEnriching, startEnrich] = useTransition();
+
+  /** Messages d'erreur lisibles pour les codes retournés par enrichTenderFromUrlAction. */
+  const ENRICH_ERROR_MESSAGES: Record<string, string> = {
+    not_authenticated: "Session expirée.",
+    invalid_url: "L'URL n'est pas valide (HTTPS requis).",
+    not_a_webpage: "L'URL ne pointe pas vers une page HTML.",
+    parse_error: "Impossible d'extraire les informations. Remplissez manuellement.",
+    fetch_failed: "Impossible d'accéder à l'URL. Vérifiez le lien.",
+    internal_error: "Erreur interne. Réessayez.",
+  };
+
+  function handleEnrich() {
+    setEnrichError(null);
+    setEnrichSuccess(false);
+    startEnrich(async () => {
+      const result = await enrichTenderFromUrlAction(enrichUrl.trim());
+      if (!result.ok) {
+        setEnrichError(ENRICH_ERROR_MESSAGES[result.error] ?? "Erreur inconnue.");
+        return;
+      }
+      const d = result.data;
+      if (d.title) setTitle(d.title);
+      if (d.buyerName) setBuyerName(d.buyerName);
+      if (d.deadline) setDeadline(d.deadline);
+      if (d.estimatedValue) setEstimatedValue(String(d.estimatedValue));
+      if (d.description) setDescription(d.description);
+      if (d.department) setDepartment(d.department);
+      if (d.marketType) setMarketType(d.marketType);
+      setEnrichSuccess(true);
+    });
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -213,6 +250,45 @@ export function PrivateTenderForm() {
           {error}
         </div>
       )}
+
+      {/* Bloc enrichissement automatique depuis URL */}
+      <div className="rounded-md border border-line bg-paper-2 p-4">
+        <p className="mb-2 text-sm font-medium text-ink">
+          Enrichissement automatique
+          <span className="ml-2 text-xs font-normal text-muted">— optionnel</span>
+        </p>
+        <p className="mb-3 text-xs text-muted">
+          Collez l&apos;URL de l&apos;annonce. Les champs seront pré-remplis automatiquement.
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="url"
+            value={enrichUrl}
+            onChange={(e) => setEnrichUrl(e.target.value)}
+            placeholder="https://www.boamp.fr/avis/detail/… ou https://www.marches-publics.info/…"
+            disabled={isEnriching}
+            className="flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={handleEnrich}
+            disabled={isEnriching || !enrichUrl.trim()}
+            className="whitespace-nowrap rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isEnriching ? "Analyse en cours…" : "Remplir automatiquement"}
+          </button>
+        </div>
+        {enrichError && (
+          <p role="alert" className="mt-2 text-xs text-error">
+            {enrichError}
+          </p>
+        )}
+        {enrichSuccess && (
+          <p className="mt-2 text-xs text-success">
+            Champs pré-remplis — vérifiez avant de valider.
+          </p>
+        )}
+      </div>
 
       {/* Section 1 — Informations générales */}
       <fieldset className="space-y-4">

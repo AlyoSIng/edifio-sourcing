@@ -1,27 +1,25 @@
 "use server";
 
 /**
- * Server Action — création d'un AO manuel (consultation privée).
+ * Server Actions — création et enrichissement d'un AO manuel (consultation privée).
  *
- * Flux :
- *  1. Auth check + isAdmin
- *  2. Validation des champs obligatoires
- *  3. Upload DCE optionnel vers bucket `tender_documents`
- *  4. INSERT dans `tenders` avec platformCode = 'prive'
- *  5. INSERT optionnel dans `tender_documents` (si fichier DCE uploadé)
- *  6. revalidatePath + return de l'ID pour redirection côté client
+ * Actions exposées :
+ *   - `createPrivateTender`      : crée un AO manuel depuis un formulaire
+ *   - `enrichTenderFromUrlAction`: enrichit les champs depuis une URL d'annonce
  *
  * Sécurité :
  *  - Auth check systématique
  *  - Validation MIME + taille côté serveur (jamais côté client seul)
  *  - `externalRef` = UUID v4 généré côté serveur (jamais depuis le client)
  *  - `dceUrl` = URL publique signée Supabase Storage (si fichier uploadé)
+ *  - SSRF check sur toutes les URLs externes (HTTPS only, pas d'IP privée)
  *
  * Source de vérité : brief Board feat/boamp-dce-ao-manuel (2026-05-27).
  */
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
+import Anthropic from "@anthropic-ai/sdk";
 
 import { db } from "@/db/client";
 import { platforms } from "@/db/schema/config";
@@ -287,4 +285,420 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
   revalidatePath("/sourcing/ao-du-jour");
 
   return { ok: true, tenderId };
+}
+
+// ============================================================================
+// Enrichissement automatique depuis URL
+// ============================================================================
+
+/**
+ * Données extraites d'une page d'annonce d'AO (BOAMP ou autre plateforme).
+ * Tous les champs sont optionnels — Claude ou l'API peuvent ne pas trouver
+ * certaines informations.
+ */
+export interface EnrichedTenderData {
+  title?: string;
+  buyerName?: string;
+  /** Date limite de remise des offres, format YYYY-MM-DD. */
+  deadline?: string;
+  /** Montant estimé du marché en euros. */
+  estimatedValue?: number;
+  /** Description courte du marché (max 300 chars). */
+  description?: string;
+  /** URL directe vers le DCE / RC si trouvée. */
+  dceUrl?: string;
+  /** Code département sur 2 caractères (ex : "62", "2A"). */
+  department?: string;
+  /** Type de marché parmi : moe, services, travaux, fournitures, autre. */
+  marketType?: string;
+}
+
+/** Types de retour de enrichTenderFromUrlAction. */
+export type EnrichTenderResult =
+  | { ok: true; data: EnrichedTenderData }
+  | { ok: false; error: string };
+
+// ---------------------------------------------------------------------------
+// Helpers internes
+// ---------------------------------------------------------------------------
+
+/**
+ * Vérifie si un hostname correspond à une plage IP privée / réservée.
+ * Protection anti-SSRF (Server-Side Request Forgery).
+ */
+function _isPrivateHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+
+  if (
+    h === "localhost" ||
+    h === "metadata.google.internal" ||
+    h === "instance-data" ||
+    h === "169.254.169.254"
+  ) {
+    return true;
+  }
+
+  const ipv4Patterns = [
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^0\./,
+    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./,
+    /^198\.(18|19)\./,
+    /^240\./,
+  ];
+
+  if (ipv4Patterns.some((re) => re.test(h))) return true;
+
+  if (
+    h === "::1" ||
+    /^fe80:/i.test(h) ||
+    /^fc[0-9a-f]{2}:/i.test(h) ||
+    /^fd[0-9a-f]{2}:/i.test(h)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Valide qu'une URL est autorisée pour un fetch externe :
+ *  - Protocole HTTPS uniquement
+ *  - Hostname hors plages privées (anti-SSRF)
+ * Retourne null si valide, ou un message d'erreur.
+ */
+function _validateExternalUrl(rawUrl: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return "invalid_url";
+  }
+  if (parsed.protocol !== "https:") return "invalid_url";
+  if (_isPrivateHostname(parsed.hostname)) return "invalid_url";
+  return null;
+}
+
+/**
+ * Extrait l'idweb BOAMP depuis une URL BOAMP.
+ * Ex : https://www.boamp.fr/avis/detail/26-50052/0 → "26-50052"
+ */
+function _extractBoampIdweb(url: string): string | null {
+  // Pattern : /avis/detail/{idweb} ou /avis/detail/{idweb}/{suffix}
+  const match = url.match(/\/avis\/detail\/([^/?#]+)/i);
+  return match?.[1] ?? null;
+}
+
+/**
+ * Mappe le type_marche BOAMP vers les valeurs de l'enum interne.
+ */
+function _mapBoampMarketType(typeMarche: string | null | undefined): string | undefined {
+  if (!typeMarche) return undefined;
+  const t = typeMarche.toLowerCase();
+  if (t.includes("travaux")) return "travaux";
+  if (t.includes("service")) return "services";
+  if (t.includes("fourniture")) return "fournitures";
+  if (t.includes("moe") || t.includes("maîtrise") || t.includes("maitrise")) return "moe";
+  return "autre";
+}
+
+/**
+ * Parse une date ISO ou partielle vers le format YYYY-MM-DD.
+ * Retourne undefined si la date est invalide ou absente.
+ */
+function _parseDeadline(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  // Tenter un Date parse → extraire YYYY-MM-DD
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Extrait le code département depuis un champ potentiellement formaté "62-Pas-de-Calais"
+ * ou "62" ou "062".
+ * Normalise vers 2-3 chars alphanumériques.
+ */
+function _normalizeDepartment(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  // Prendre les 2-3 premiers chars alphabétiques/numériques avant "-" ou espace
+  const match = raw.match(/^([0-9A-Za-z]{1,3})/);
+  if (!match || !match[1]) return undefined;
+  const code = match[1].toUpperCase();
+  // Vérifier que c'est un code valide (pas "000" ni chaîne > 3 chars)
+  return code.length >= 1 && code.length <= 3 ? code : undefined;
+}
+
+/**
+ * Supprime les balises <script>, <style> et leurs contenus du HTML.
+ * Puis retire toutes les balises HTML restantes.
+ * Retourne le texte brut tronqué à maxChars.
+ */
+function _stripHtmlToText(html: string, maxChars: number): string {
+  let text = html
+    // Supprimer blocs script et style (contenus inclus)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    // Supprimer toutes les balises restantes
+    .replace(/<[^>]+>/g, " ")
+    // Nettoyer les espaces multiples
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (text.length > maxChars) {
+    text = text.slice(0, maxChars);
+  }
+
+  return text;
+}
+
+// ---------------------------------------------------------------------------
+// Enrichissement via API BOAMP (Opendatasoft)
+// ---------------------------------------------------------------------------
+
+/**
+ * Enrichit les données depuis l'API Opendatasoft BOAMP.
+ * Retourne les données enrichies ou une erreur.
+ */
+async function _enrichFromBoamp(idweb: string): Promise<EnrichTenderResult> {
+  const apiUrl =
+    `https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records` +
+    `?where=idweb%3D%22${encodeURIComponent(idweb)}%22` +
+    `&limit=1` +
+    `&select=objet,nomacheteur,datelimitereponse,descripteur,type_marche,code_departement,url_avis,donnees`;
+
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, { signal: AbortSignal.timeout(10_000) });
+  } catch (err) {
+    console.error("[enrich-from-url:boamp:fetch:fail]", err);
+    return { ok: false, error: "fetch_failed" };
+  }
+
+  if (!response.ok) {
+    console.warn("[enrich-from-url:boamp:api:non-ok]", response.status);
+    return { ok: false, error: "fetch_failed" };
+  }
+
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch {
+    return { ok: false, error: "parse_error" };
+  }
+
+  const record =
+    json !== null &&
+    typeof json === "object" &&
+    "results" in json &&
+    Array.isArray((json as { results: unknown[] }).results)
+      ? (json as { results: unknown[] }).results[0]
+      : null;
+
+  if (!record || typeof record !== "object") {
+    // Aucun résultat trouvé pour cet idweb
+    return { ok: false, error: "fetch_failed" };
+  }
+
+  const r = record as Record<string, unknown>;
+
+  const data: EnrichedTenderData = {
+    title: typeof r.objet === "string" ? r.objet.trim() || undefined : undefined,
+    buyerName: typeof r.nomacheteur === "string" ? r.nomacheteur.trim() || undefined : undefined,
+    deadline: _parseDeadline(typeof r.datelimitereponse === "string" ? r.datelimitereponse : null),
+    description:
+      typeof r.descripteur === "string"
+        ? r.descripteur.trim().slice(0, 300) || undefined
+        : undefined,
+    department: _normalizeDepartment(
+      typeof r.code_departement === "string" ? r.code_departement : null,
+    ),
+    marketType: _mapBoampMarketType(typeof r.type_marche === "string" ? r.type_marche : null),
+    // url_dce supprimé de l'API BOAMP v2.1 (décision 2026-06-01)
+    dceUrl: undefined,
+  };
+
+  return { ok: true, data };
+}
+
+// ---------------------------------------------------------------------------
+// Enrichissement via Claude Haiku 4.5 (pages tierces)
+// ---------------------------------------------------------------------------
+
+/** Prompt système pour l'extraction structurée. */
+const ENRICH_SYSTEM_PROMPT = `Tu es un assistant qui extrait des informations structurées depuis une page d'appel d'offres public français. Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte avant ou après.`;
+
+/** Template du message utilisateur — {htmlContent} sera remplacé. */
+const ENRICH_USER_TEMPLATE = `Extrait les informations suivantes depuis ce texte de page web d'appel d'offres (réponds UNIQUEMENT en JSON valide, sans markdown) :
+{
+  "title": "titre complet du marché ou null",
+  "buyerName": "nom du maître d'ouvrage / acheteur public ou null",
+  "deadline": "date limite de remise des offres au format YYYY-MM-DD ou null",
+  "estimatedValue": nombre en euros ou null,
+  "description": "description courte du marché (max 300 chars) ou null",
+  "dceUrl": "URL directe pour télécharger le DCE/RC ou null",
+  "department": "code département 2 chars (ex: 62, 75, 2A) ou null",
+  "marketType": "un de: moe, services, travaux, fournitures, autre, ou null"
+}
+
+Texte de la page :
+{htmlContent}`;
+
+/**
+ * Enrichit les données depuis une page HTML quelconque via Claude Haiku 4.5.
+ */
+async function _enrichFromHtmlViaHaiku(htmlContent: string): Promise<EnrichTenderResult> {
+  const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
+
+  const userMessage = ENRICH_USER_TEMPLATE.replace("{htmlContent}", htmlContent);
+
+  let response: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    response = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 1024,
+      system: ENRICH_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userMessage }],
+    });
+  } catch (err) {
+    console.error("[enrich-from-url:haiku:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+
+  const rawText = response.content[0]?.type === "text" ? (response.content[0].text as string) : "";
+
+  // Extraction JSON robuste (même helper que analyze-rc)
+  const jsonText = _extractJson(rawText);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    console.warn("[enrich-from-url:haiku:parse:fail]", rawText.slice(0, 200));
+    return { ok: false, error: "parse_error" };
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    return { ok: false, error: "parse_error" };
+  }
+
+  const p = parsed as Record<string, unknown>;
+
+  // Construction des données — les champs absents ou null deviennent undefined
+  const data: EnrichedTenderData = {
+    title: typeof p.title === "string" && p.title ? p.title.trim() : undefined,
+    buyerName: typeof p.buyerName === "string" && p.buyerName ? p.buyerName.trim() : undefined,
+    deadline: _parseDeadline(typeof p.deadline === "string" ? p.deadline : null),
+    estimatedValue:
+      typeof p.estimatedValue === "number" && p.estimatedValue > 0
+        ? Math.round(p.estimatedValue)
+        : undefined,
+    description:
+      typeof p.description === "string" && p.description
+        ? p.description.trim().slice(0, 300)
+        : undefined,
+    dceUrl: typeof p.dceUrl === "string" && p.dceUrl.startsWith("https://") ? p.dceUrl : undefined,
+    department: _normalizeDepartment(typeof p.department === "string" ? p.department : null),
+    marketType:
+      typeof p.marketType === "string" &&
+      ["moe", "services", "travaux", "fournitures", "autre"].includes(p.marketType)
+        ? p.marketType
+        : undefined,
+  };
+
+  return { ok: true, data };
+}
+
+/**
+ * Extrait le JSON d'une réponse potentiellement enveloppée dans ```json ... ```.
+ */
+function _extractJson(text: string): string {
+  const mdMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (mdMatch && mdMatch[1] !== undefined) return mdMatch[1].trim();
+
+  const start = text.search(/[{[]/);
+  const lastBrace = text.lastIndexOf("}");
+  const lastBracket = text.lastIndexOf("]");
+  const end = Math.max(lastBrace, lastBracket);
+  if (start !== -1 && end > start) return text.slice(start, end + 1);
+
+  return text.trim();
+}
+
+// ---------------------------------------------------------------------------
+// Action principale
+// ---------------------------------------------------------------------------
+
+/**
+ * Enrichit les champs d'un AO depuis une URL d'annonce publique.
+ *
+ * Stratégie :
+ *  - URL BOAMP (boamp.fr) → extraction idweb + appel API Opendatasoft (10 s timeout)
+ *  - Autre URL           → fetch HTML + Claude Haiku 4.5 extraction structurée (15 s timeout)
+ *
+ * Sécurité : SSRF check (HTTPS, pas d'IP privée).
+ *
+ * @param url URL de l'annonce d'appel d'offres
+ */
+export async function enrichTenderFromUrlAction(url: string): Promise<EnrichTenderResult> {
+  try {
+    // 1. Auth check
+    const supabase = createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return { ok: false, error: "not_authenticated" };
+
+    // 2. Validation URL basique (SSRF + HTTPS)
+    if (!url || url.length > 2048) return { ok: false, error: "invalid_url" };
+    const urlError = _validateExternalUrl(url);
+    if (urlError) return { ok: false, error: urlError };
+
+    // 3. Branche BOAMP
+    if (url.includes("boamp.fr")) {
+      const idweb = _extractBoampIdweb(url);
+      if (!idweb) return { ok: false, error: "fetch_failed" };
+      return await _enrichFromBoamp(idweb);
+    }
+
+    // 4. Branche HTML générique → Haiku 4.5
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        signal: AbortSignal.timeout(15_000),
+        headers: { "User-Agent": "edifio-sourcing-bot/1.0" },
+      });
+    } catch (err) {
+      console.error("[enrich-from-url:fetch:fail]", err);
+      return { ok: false, error: "fetch_failed" };
+    }
+
+    if (!response.ok) {
+      return { ok: false, error: "fetch_failed" };
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("text/html")) {
+      return { ok: false, error: "not_a_webpage" };
+    }
+
+    const rawHtml = await response.text();
+    // Nettoyage HTML + troncature à 15 000 chars pour Haiku
+    const textContent = _stripHtmlToText(rawHtml, 15_000);
+
+    if (!textContent || textContent.trim().length < 50) {
+      return { ok: false, error: "not_a_webpage" };
+    }
+
+    return await _enrichFromHtmlViaHaiku(textContent);
+  } catch (err) {
+    console.error("[enrich-from-url:unhandled]", err);
+    return { ok: false, error: "internal_error" };
+  }
 }
