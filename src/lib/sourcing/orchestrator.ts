@@ -47,8 +47,21 @@ import { normalize } from "./normalize";
 import { scoreTender } from "./scoring";
 import type { NormalizedTender, RawTender } from "./types";
 
-/** Fenêtre de fetch côté BOAMP : 24 heures glissantes (cron quotidien). */
-const FETCH_WINDOW_MS = 24 * 60 * 60 * 1000;
+/**
+ * Fenêtre de fetch côté BOAMP : 72 heures glissantes.
+ * 72h (au lieu de 24h) pour couvrir les week-ends : BOAMP publie le samedi
+ * et le dimanche, mais le cron ne tourne que lun-ven. Sans cette fenêtre
+ * élargie, le cron du lundi manque systématiquement les AOs du samedi.
+ * L'idempotence `onConflictDoUpdate` sur (org, externalRef, platformId)
+ * garantit qu'un AO déjà inséré n'est pas dupliqué si la fenêtre recouvre
+ * des jours déjà traités.
+ *
+ * Décision 2026-06-01 — bug #P1 : dateparution est un champ DATE dans BOAMP
+ * (pas DATETIME) → comparaison datetime ISO excluait les AOs du jour courant
+ * (publiés à minuit UTC < lastRunAt 04h30 UTC). Corrigé dans buildBoampUrl
+ * (comparaison date-only YYYY-MM-DD). La fenêtre 72h couvre aussi ce cas.
+ */
+const FETCH_WINDOW_MS = 72 * 60 * 60 * 1000;
 
 /**
  * Résultat synthétique d'un run sur un profil — sérialisable JSON, retourné

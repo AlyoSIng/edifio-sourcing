@@ -106,17 +106,23 @@ function sleep(ms: number): Promise<void> {
 /**
  * Encode l'URL Opendatasoft v2.1 avec les paramètres demandés.
  *
- * v2.1 syntax : champ renommé `datepublication` → `dateparution`, format date ISO
- * accepté (`YYYY-MM-DDTHH:MM:SSZ`). Quote simple recommandée par doc Opendatasoft.
+ * IMPORTANT — `dateparution` est un champ DATE (pas DATETIME) dans l'API BOAMP.
+ * Comparer avec un ISO datetime (`2026-05-31T04:30:00Z`) excluait les AOs
+ * publiés ce même jour : l'API les traite comme `2026-05-31T00:00:00Z` <
+ * `2026-05-31T04:30:00Z` → résultat : zéro AO retourné.
+ * Fix (2026-06-01 bug #P1) : on extrait la partie date (`YYYY-MM-DD`) pour
+ * comparer date-à-date, ce qui inclut tous les records du jour.
  *
- * @param lastRunAt — borne inférieure de `dateparution` (ISO 8601)
+ * @param lastRunAt — borne inférieure de `dateparution`
  * @param offset    — offset de pagination (0-based)
  */
 function buildBoampUrl(lastRunAt: Date, offset: number): string {
+  // Extrait YYYY-MM-DD — comparaison date-only, insensible à l'heure du cron.
+  const datePart = lastRunAt.toISOString().split("T")[0]!;
   const params = new URLSearchParams({
     limit: String(PAGE_SIZE),
     offset: String(offset),
-    where: `dateparution >= "${lastRunAt.toISOString()}"`,
+    where: `dateparution >= "${datePart}"`,
     order_by: "dateparution desc",
   });
   return `${BOAMP_ENDPOINT}?${params.toString()}`;
