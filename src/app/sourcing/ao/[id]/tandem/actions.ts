@@ -349,8 +349,17 @@ export async function matchArchitectsForTender(
 
     return { ok: true, matches };
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    console.error("[tandem-actions:match:fail]", detail);
+    // Capture étendue pour diagnostic : message + code postgres-js si présent
+    const detail = [
+      err instanceof Error
+        ? `${err.constructor.name}: ${err.message || "(no message)"}`
+        : String(err),
+      (err as { code?: string }).code ? `code=${(err as { code?: string }).code}` : null,
+      (err as { detail?: string }).detail ?? null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    console.error("[tandem-actions:match:fail]", detail, err);
     // TODO: retirer le `detail` en prod une fois le bug identifié
     return { ok: false, error: "internal_error", detail };
   }
