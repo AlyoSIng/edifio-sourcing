@@ -204,8 +204,13 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         rationale: row.rationale,
         rank: row.rank,
       });
+      // eslint-disable-next-line no-console
+      console.log("[tandem:solicit:result]", JSON.stringify(result).slice(0, 500));
       if (!result.ok) {
-        setLoadError(mapErrorToFr(result.error));
+        const detail = (result as { detail?: string }).detail;
+        setLoadError(
+          `${mapErrorToFr(result.error)} [${result.error}]${detail ? ` — ${detail}` : ""}`,
+        );
         setPreviewFor(null);
         return;
       }
