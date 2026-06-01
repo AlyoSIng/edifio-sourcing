@@ -121,7 +121,7 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
       };
       const lastRunAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      for (const platform of ["francmarches", "place"] as const) {
+      for (const platform of ["francmarches", "place", "marchespublicsinfo"] as const) {
         try {
           const ack = await triggerScrapeJob({
             platform,

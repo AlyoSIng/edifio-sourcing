@@ -49,7 +49,7 @@ interface ScrapedTenderRecord {
 /** Corps complet du POST reçu par ce webhook. */
 interface ScrapeWebhookPayload {
   runId: string;
-  platform: "place" | "francmarches";
+  platform: "place" | "francmarches" | "marchespublicsinfo";
   profileId: string;
   orgId: string;
   tenders: ScrapedTenderRecord[] | null;
@@ -124,12 +124,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Convertit ScrapedTenderRecord[] → RawTender[] pour entrer dans le pipeline
   const fetchedAt = new Date().toISOString();
+
+  // Mapping code scraper → code plateforme BDD (PlatformCode).
+  // Le worker Playwright utilise ses propres codes (ex. "marchespublicsinfo")
+  // qui diffèrent parfois des codes canoniques en BDD (ex. "mp_info").
+  const PLATFORM_CODE_MAP: Record<string, string> = {
+    marchespublicsinfo: "mp_info",
+  };
+  const dbPlatformCode = PLATFORM_CODE_MAP[platform] ?? platform;
+
   const raws: RawTender[] = tenders.map((t) => ({
     externalRef: t.externalRef,
-    platformCode: platform,
+    platformCode: dbPlatformCode,
     fetchedAt,
     rawData: {
-      platform_code: platform,
+      platform_code: dbPlatformCode,
       fetched_at: fetchedAt,
       record: {
         title: t.title,
