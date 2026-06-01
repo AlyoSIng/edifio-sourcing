@@ -652,8 +652,17 @@ export async function sendArchitectSolicitation(
     if (err instanceof InvalidStateError) {
       return { ok: false, error: "invalid_state", detail: err.message };
     }
-    console.error("[tandem-actions:solicit:db_fail]", err);
-    return { ok: false, error: "internal_error" };
+    const detail = [
+      err instanceof Error
+        ? `${err.constructor.name}: ${err.message || "(no message)"}`
+        : String(err),
+      (err as { code?: string }).code ? `code=${(err as { code?: string }).code}` : null,
+      (err as { detail?: string }).detail ?? null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    console.error("[tandem-actions:solicit:db_fail]", detail, err);
+    return { ok: false, error: "internal_error", detail };
   }
 
   // 7. Envoi Brevo (hors transaction — latence variable)
