@@ -347,8 +347,10 @@ export async function matchArchitectsForTender(
 
     return { ok: true, matches };
   } catch (err) {
-    console.error("[tandem-actions:match:fail]", err);
-    return { ok: false, error: "internal_error" };
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[tandem-actions:match:fail]", detail);
+    // TODO: retirer le `detail` en prod une fois le bug identifié
+    return { ok: false, error: "internal_error", detail };
   }
 }
 

@@ -134,7 +134,9 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
       const result = await matchArchitectsForTender(tenderId, { topN: criteria.topN });
       if (cancelled) return;
       if (!result.ok) {
-        setLoadError(mapErrorToFr(result.error));
+        // `detail` surfacé temporairement pour diagnostic — à retirer après
+        const detail = (result as { detail?: string }).detail;
+        setLoadError(`${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`);
         setLoading(false);
         return;
       }
