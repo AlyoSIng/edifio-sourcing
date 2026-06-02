@@ -65,6 +65,7 @@ import {
   templateNameFor,
   type BrevoRegister,
 } from "@/lib/brevo/template-picker";
+import { renderMustache } from "@/lib/brevo/render-template";
 import { resolveBrevoTemplate } from "@/lib/brevo/template-resolver";
 import { buildBrevoVariables } from "@/lib/brevo/variables";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -700,34 +701,44 @@ export async function sendArchitectSolicitation(
   // Brevo accepte un nom complet — on reconstruit depuis archi_prenom + archi_nom.
   const toName = [variables.archi_prenom, variables.archi_nom].filter(Boolean).join(" ");
 
-  // Envoi en mode raw : on passe subject + htmlContent issus de resolveBrevoTemplate
-  // (BDD org-scopée → fallback DEFAULT_TEMPLATE_COPY). Plus de templateId Brevo —
-  // la source unique du contenu reste le code (cf. templates-copy.ts).
+  // Envoi en mode raw : on PRÉ-REND le template côté Node.js via renderMustache.
+  // Brevo a des limitations sur sa syntaxe Mustache (pas de blocks `{{#X}}`,
+  // pas de triple-accolade `{{{X}}}`, certaines vars non interpolées dans le
+  // subject). On contourne en envoyant du HTML/texte déjà résolu, sans variables.
   const senderEmail = process.env.BREVO_SENDER_EMAIL ?? "no-reply@alyosingenierie.fr";
   const senderName = nomCommercial ?? "AlyoS Ingénierie";
+
+  const renderParams = {
+    greeting: variables.greeting,
+    nom_commercial: variables.nom_commercial,
+    civilite: variables.civilite,
+    archi_prenom: variables.archi_prenom,
+    archi_nom: variables.archi_nom,
+    cabinet: variables.cabinet,
+    ao_objet: variables.ao_objet,
+    ao_acheteur: variables.ao_acheteur,
+    ao_departement: variables.ao_departement,
+    ao_cloture: variables.ao_cloture,
+    lien_ao: variables.lien_ao,
+    lien_opposition: variables.lien_opposition,
+    bloc_annonce_officielle: variables.bloc_annonce_officielle,
+    presentation_societe: variables.presentation_societe,
+    rgpd_block: variables.rgpd_block,
+  };
+
+  const renderedSubject = renderMustache(
+    resolvedTemplate?.subject ?? "Sollicitation architecte",
+    renderParams,
+  );
+  const renderedHtml = renderMustache(resolvedTemplate?.body ?? "", renderParams);
 
   const sendResult = await brevoClient.send({
     to: { email: architect.email, name: toName || variables.cabinet },
     sender: { email: senderEmail, name: senderName },
-    subject: resolvedTemplate?.subject ?? "Sollicitation architecte",
-    htmlContent: resolvedTemplate?.body ?? "",
-    params: {
-      greeting: variables.greeting,
-      nom_commercial: variables.nom_commercial,
-      civilite: variables.civilite,
-      archi_prenom: variables.archi_prenom,
-      archi_nom: variables.archi_nom,
-      cabinet: variables.cabinet,
-      ao_objet: variables.ao_objet,
-      ao_acheteur: variables.ao_acheteur,
-      ao_departement: variables.ao_departement,
-      ao_cloture: variables.ao_cloture,
-      lien_ao: variables.lien_ao,
-      lien_opposition: variables.lien_opposition,
-      bloc_annonce_officielle: variables.bloc_annonce_officielle,
-      presentation_societe: variables.presentation_societe,
-      rgpd_block: variables.rgpd_block,
-    },
+    subject: renderedSubject,
+    htmlContent: renderedHtml,
+    // params vide — le rendu est déjà fait côté Node.js
+    params: {},
     customHeader: `tender:${tenderId};archi:${architectId}`,
   });
 
@@ -1041,26 +1052,27 @@ export async function sendDossierToArchitectAction(
   const senderEmail = process.env.BREVO_SENDER_EMAIL ?? "no-reply@alyosingenierie.fr";
   const senderName = variables.nom_commercial;
 
-  // 9. Envoi Brevo (mode raw — subject + htmlContent depuis resolvedTemplate)
+  // 9. Envoi Brevo (mode raw — pré-rendu Mustache côté Node.js)
+  const renderParams = {
+    greeting: variables.greeting,
+    nom_commercial: variables.nom_commercial,
+    civilite: variables.civilite,
+    archi_prenom: variables.archi_prenom,
+    archi_nom: variables.archi_nom,
+    cabinet: variables.cabinet,
+    ao_objet: variables.ao_objet,
+    ao_acheteur: variables.ao_acheteur,
+    ao_departement: variables.ao_departement,
+    ao_cloture: variables.ao_cloture,
+    lien_dossier: lienDossier,
+    rgpd_block: variables.rgpd_block,
+  };
   const sendResult = await brevoClient.send({
     to: { email: architect.email, name: toName || variables.cabinet },
     sender: { email: senderEmail, name: senderName },
-    subject: resolvedTemplate.subject,
-    htmlContent: resolvedTemplate.body,
-    params: {
-      greeting: variables.greeting,
-      nom_commercial: variables.nom_commercial,
-      civilite: variables.civilite,
-      archi_prenom: variables.archi_prenom,
-      archi_nom: variables.archi_nom,
-      cabinet: variables.cabinet,
-      ao_objet: variables.ao_objet,
-      ao_acheteur: variables.ao_acheteur,
-      ao_departement: variables.ao_departement,
-      ao_cloture: variables.ao_cloture,
-      lien_dossier: lienDossier,
-      rgpd_block: variables.rgpd_block,
-    },
+    subject: renderMustache(resolvedTemplate.subject, renderParams),
+    htmlContent: renderMustache(resolvedTemplate.body, renderParams),
+    params: {},
     customHeader: `tender:${tenderId};archi:${architectId};kind:dossier_diffusion`,
   });
 
