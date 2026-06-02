@@ -544,11 +544,20 @@ function AnalysisTriggerSection({
   function handleAnalyze() {
     setAnalyzeError(null);
     startAnalysis(async () => {
-      const result = await analyzeRcAction(tenderId, rcDocument.id);
-      if (result.ok && result.analysis) {
-        onAnalysisDone(result.analysis);
-      } else {
-        setAnalyzeError(analyzeErrorLabel(result.error));
+      try {
+        const result = await analyzeRcAction(tenderId, rcDocument.id);
+        if (result.ok && result.analysis) {
+          onAnalysisDone(result.analysis);
+        } else {
+          const detail = (result as { message?: string }).message;
+          setAnalyzeError(`${analyzeErrorLabel(result.error)}${detail ? ` — ${detail}` : ""}`);
+        }
+      } catch (err) {
+        // Crash réseau (timeout Vercel 504) ou exception non gérée côté serveur
+        // eslint-disable-next-line no-console
+        console.error("[analyze-rc:client:thrown]", err);
+        const msg = err instanceof Error ? `${err.constructor.name}: ${err.message}` : String(err);
+        setAnalyzeError(`Erreur inattendue — ${msg}`);
       }
     });
   }
