@@ -20,7 +20,7 @@ import { useState, useTransition } from "react";
 
 import type { CerfaDoc, CerfaField } from "@/lib/dossier/cerfa-prefill";
 import type { AcceptedArchitect } from "../page-data";
-import { validateCerfa } from "./actions";
+import { getCerfaSignedUrl, validateCerfa } from "./actions";
 import type { ExistingCerfa } from "./actions";
 
 // ---------------------------------------------------------------------------
@@ -96,6 +96,18 @@ function SingleCerfaForm({ tenderId, doc, existingFile, architectId }: SingleCer
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(existingFile !== null);
   const [isPending, startTransition] = useTransition();
+  /**
+   * ID du `response_files` PDF courant pour ce CERFA, utilisé par le bouton
+   * "Télécharger le PDF" qui demande une URL signée à la Server Action.
+   * Initialisé depuis `existingFile` (si l'utilisateur revient sur la page
+   * après une validation antérieure), puis mis à jour après chaque submit.
+   */
+  const [responseFileId, setResponseFileId] = useState<string | null>(existingFile?.id ?? null);
+  /**
+   * Indicateur de chargement spécifique au bouton "Télécharger" — évite de
+   * bloquer le reste du formulaire (qui utilise `isPending` de useTransition).
+   */
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   // Nombre de champs restants à compléter
   const toCompleteCount = fields.filter(
@@ -126,6 +138,9 @@ function SingleCerfaForm({ tenderId, doc, existingFile, architectId }: SingleCer
       if (result.ok) {
         setSuccess(true);
         setIsEditing(false);
+        if (result.responseFileId) {
+          setResponseFileId(result.responseFileId);
+        }
       } else if (result.error === "missing_required_fields") {
         const labels = result.missing
           ?.map((id) => fields.find((f) => f.field_id === id)?.field_label ?? id)
@@ -140,6 +155,33 @@ function SingleCerfaForm({ tenderId, doc, existingFile, architectId }: SingleCer
   function handleEdit() {
     setSuccess(false);
     setIsEditing(true);
+  }
+
+  /**
+   * Demande une URL signée (1h) à la Server Action puis ouvre l'onglet de
+   * téléchargement. On préfère `window.open` à un `<a download>` car l'URL
+   * signée n'est connue qu'après l'aller-retour serveur — le `<a download>`
+   * nécessiterait de pré-générer l'URL au mount, ce qui serait gaspillé si
+   * l'utilisateur ne télécharge pas.
+   */
+  async function handleDownload() {
+    if (!responseFileId) return;
+    setError(null);
+    setIsDownloading(true);
+    try {
+      const result = await getCerfaSignedUrl(responseFileId);
+      if (result.ok && result.url) {
+        // _blank pour ne pas faire perdre l'état du formulaire à l'utilisateur.
+        // noopener+noreferrer = bonnes pratiques sécurité pour les liens externes.
+        window.open(result.url, "_blank", "noopener,noreferrer");
+      } else {
+        setError("Impossible de générer le lien de téléchargement — réessayez.");
+      }
+    } catch {
+      setError("Erreur réseau pendant la demande de téléchargement — réessayez.");
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   return (
@@ -164,15 +206,38 @@ function SingleCerfaForm({ tenderId, doc, existingFile, architectId }: SingleCer
             </span>
           )}
         </div>
-        {/* Bouton Modifier si déjà validé */}
+        {/* Boutons Télécharger + Modifier si déjà validé */}
         {success && !isEditing && (
-          <button
-            type="button"
-            onClick={handleEdit}
-            className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2"
-          >
-            Modifier
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {responseFileId && (
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="hover:bg-ink/80 inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-white transition disabled:opacity-50"
+                aria-label={`Télécharger le ${doc.cerfa_kind} en PDF`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 16 16"
+                  width={12}
+                  height={12}
+                  fill="currentColor"
+                  aria-hidden
+                >
+                  <path d="M8 1a.75.75 0 0 1 .75.75v7.69l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75A.75.75 0 0 1 8 1ZM2.75 13a.75.75 0 0 0 0 1.5h10.5a.75.75 0 0 0 0-1.5H2.75Z" />
+                </svg>
+                {isDownloading ? "Préparation…" : `Télécharger le ${doc.cerfa_kind}.pdf`}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleEdit}
+              className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2"
+            >
+              Modifier
+            </button>
+          </div>
         )}
       </div>
 

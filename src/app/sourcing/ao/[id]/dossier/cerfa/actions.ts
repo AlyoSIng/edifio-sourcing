@@ -3,17 +3,20 @@
 /**
  * Server Actions — page CERFA `/sourcing/ao/[id]/dossier/cerfa`.
  *
- * Action principale :
- *   `validateCerfa` : valide un formulaire DC1 ou DC2, sérialise les champs
- *   en JSON, upload vers Supabase Storage, insère un enregistrement
- *   `response_files` et revalide le cache de la page.
+ * Actions principales :
+ *   `validateCerfa` : valide un formulaire DC1 ou DC2, génère un PDF formaté
+ *     via pdf-lib, upload vers Supabase Storage, insère un enregistrement
+ *     `response_files` et revalide le cache de la page.
+ *   `getCerfaSignedUrl` : retourne une URL signée Supabase Storage (1 heure)
+ *     pour télécharger le PDF DC1/DC2 validé. Vérifie l'ownership tenant.
  *
  * Sécurité :
  *   - Auth check obligatoire (defense in depth)
- *   - Filtre `organizationId = orgId` sur tous les inserts
+ *   - Filtre `organizationId = orgId` sur tous les inserts et lectures
  *   - Validation des champs requis avant tout write
  *
- * Source de vérité : brief Board PR-C 2026-05-25.
+ * Source de vérité : brief Board PR-C 2026-05-25 + brief Lot A 2026-06-02
+ *   (passage JSON → PDF téléchargeable).
  */
 
 import { revalidatePath } from "next/cache";
@@ -21,13 +24,16 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db/client";
+import { organizations } from "@/db/schema/organizations";
 import { responseFiles } from "@/db/schema/library";
+import { architects } from "@/db/schema/architects";
 import { architectResponses } from "@/db/schema/selections";
 import { tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CerfaField } from "@/lib/dossier/cerfa-prefill";
+import { generateCerfaPdf } from "@/lib/dossier/cerfa-pdf";
 
 // ---------------------------------------------------------------------------
 // Constante bucket
@@ -35,6 +41,9 @@ import type { CerfaField } from "@/lib/dossier/cerfa-prefill";
 
 /** Bucket Supabase Storage pour les pièces de réponse. */
 const BUCKET = "response_files";
+
+/** Durée de validité de l'URL signée renvoyée par `getCerfaSignedUrl` (1 heure). */
+const SIGNED_URL_SECONDS = 3600;
 
 // ---------------------------------------------------------------------------
 // Validation UUID (B-1) + Zod schema fields (B-2)
@@ -46,8 +55,8 @@ const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}
 /** Valeurs autorisées pour `cerfaKind`. */
 const VALID_CERFA_KINDS = new Set(["DC1", "DC2"]);
 
-/** Taille maximale du JSON sérialisé avant upload Storage (512 Ko). */
-const MAX_JSON_SIZE_BYTES = 512 * 1024;
+/** Taille maximale du PDF généré avant upload Storage (1 Mo — large marge pour Helvetica + 2-3 pages). */
+const MAX_PDF_SIZE_BYTES = 1024 * 1024;
 
 /**
  * Schéma Zod pour un champ CERFA reçu du client.
@@ -89,6 +98,12 @@ export interface ValidateCerfaResult {
     | "internal_error";
   /** Champs obligatoires manquants (présent si error = 'missing_required_fields'). */
   missing?: string[];
+  /**
+   * UUID du `response_files` créé en cas de succès — permet au client
+   * d'appeler `getCerfaSignedUrl` pour proposer immédiatement le téléchargement
+   * du PDF sans avoir à refetch la page.
+   */
+  responseFileId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,9 +178,10 @@ export async function validateCerfa(
     }
     const validatedFields = fieldsResult.data;
 
-    // 2. Vérification ownership du tender
+    // 2. Vérification ownership du tender + chargement title/buyer
+    //    (nécessaires pour l'en-tête du PDF généré L.~268).
     const [tender] = await db
-      .select({ id: tenders.id })
+      .select({ id: tenders.id, title: tenders.title, buyer: tenders.buyer })
       .from(tenders)
       .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)))
       .limit(1);
@@ -175,10 +191,16 @@ export async function validateCerfa(
     // 2bis. Phase 3 : defense in depth — l'archi doit avoir status='accepted'
     // sur ce tender pour cette org. Un UUID arbitraire (même celui d'un archi
     // existant) est rejeté s'il n'a pas accepté la sollicitation.
+    // On charge en même temps le `cabinet` pour l'afficher dans le PDF.
+    let archiCabinet: string | null = null;
     if (architectId != null) {
       const [acceptedRow] = await db
-        .select({ id: architectResponses.id })
+        .select({
+          id: architectResponses.id,
+          cabinet: architects.cabinet,
+        })
         .from(architectResponses)
+        .innerJoin(architects, eq(architectResponses.architectId, architects.id))
         .where(
           and(
             eq(architectResponses.tenderId, tenderId),
@@ -193,6 +215,7 @@ export async function validateCerfa(
         console.warn("[cerfa:validate:archi:not-accepted]", { tenderId, architectId });
         return { ok: false, error: "architect_not_accepted" };
       }
+      archiCabinet = acceptedRow.cabinet;
     }
 
     // 3. Validation des champs requis non remplis (sur le tableau validé Zod)
@@ -204,31 +227,57 @@ export async function validateCerfa(
       return { ok: false, error: "missing_required_fields", missing };
     }
 
-    // 4. Sérialisation JSON (avec les champs validés côté serveur)
-    const payload = {
-      cerfa_kind: cerfaKind,
-      fields: validatedFields,
-      validated_at: new Date().toISOString(),
-    };
-    const json = JSON.stringify(payload);
-    const jsonBuffer = Buffer.from(json, "utf-8");
+    // 4. Chargement du nom d'organisation (pour le footer du PDF)
+    const [org] = await db
+      .select({ name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.id, auth.orgId))
+      .limit(1);
+    const organizationName = org?.name ?? "AlyoS Ingénierie";
+
+    // 5. Génération du PDF formaté via pdf-lib (cf. cerfa-pdf.ts)
+    //    On utilise `field_label` (issu de cerfa-prefill) comme libellé humain
+    //    dans le PDF — il est cohérent avec ce que l'utilisateur a vu en saisie.
+    let pdfBytes: Uint8Array;
+    try {
+      pdfBytes = await generateCerfaPdf({
+        kind: cerfaKind === "DC1" ? "dc1" : "dc2",
+        tenderTitle: tender.title,
+        tenderBuyer: tender.buyer,
+        organizationName,
+        selectedArchitect: archiCabinet ? { cabinet: archiCabinet } : null,
+        fields: validatedFields.map((f) => ({
+          id: f.field_id,
+          label: f.field_label,
+          value: f.value,
+          source: f.source,
+        })),
+        generatedAt: new Date(),
+      });
+    } catch (err) {
+      console.error("[cerfa:validate:pdf:fail]", err);
+      return { ok: false, error: "internal_error" };
+    }
 
     // B-2 : Limite de taille globale du payload (anti-DoS Storage)
-    if (jsonBuffer.byteLength > MAX_JSON_SIZE_BYTES) {
-      console.warn("[cerfa:validate:payload:too-large]", jsonBuffer.byteLength);
+    if (pdfBytes.byteLength > MAX_PDF_SIZE_BYTES) {
+      console.warn("[cerfa:validate:pdf:too-large]", pdfBytes.byteLength);
       return { ok: false, error: "invalid_input" };
     }
 
-    // 5. Upload Supabase Storage
-    const filename = `${cerfaKind.toLowerCase()}_${Date.now()}.json`;
+    // 6. Upload Supabase Storage (PDF)
+    const filename = `${cerfaKind.toLowerCase()}_${Date.now()}.pdf`;
     const storagePath = `${auth.orgId}/${tenderId}/cerfa/${filename}`;
 
     // Storage admin : RLS bypass intentionnel — auth vérifiée L.133
     const supabaseAdmin = createSupabaseAdminClient();
+    // Supabase Storage SDK accepte Uint8Array, Blob, File, Buffer. On caste en
+    // Buffer pour rester homogène avec les autres uploads du module.
+    const pdfBuffer = Buffer.from(pdfBytes);
     const { error: storageError } = await supabaseAdmin.storage
       .from(BUCKET)
-      .upload(storagePath, jsonBuffer, {
-        contentType: "application/json",
+      .upload(storagePath, pdfBuffer, {
+        contentType: "application/pdf",
         upsert: false,
       });
 
@@ -237,20 +286,30 @@ export async function validateCerfa(
       return { ok: false, error: "storage_upload_failed" };
     }
 
-    // 6. Insert response_files
-    const label = cerfaKind === "DC1" ? "DC1 pré-rempli" : "DC2 pré-rempli";
+    // 7. Insert response_files (format PDF — l'ancien JSON n'est plus stocké :
+    //    pour ré-éditer, l'utilisateur recommence depuis les pré-remplis,
+    //    cf. décision pragmatique brief Lot A 2026-06-02).
+    const label =
+      cerfaKind === "DC1" ? "DC1 — Lettre de candidature" : "DC2 — Déclaration du candidat";
+    let insertedId: string;
     try {
-      await db.insert(responseFiles).values({
-        tenderId,
-        organizationId: auth.orgId,
-        kind: cerfaKind.toLowerCase(),
-        name: label,
-        storagePath,
-        sizeBytes: jsonBuffer.byteLength,
-        validated: true,
-        // Phase 3 Tandem multi-archi — lien optionnel vers l'archi mandataire.
-        architectId,
-      });
+      const inserted = await db
+        .insert(responseFiles)
+        .values({
+          tenderId,
+          organizationId: auth.orgId,
+          kind: cerfaKind.toLowerCase(),
+          name: label,
+          storagePath,
+          sizeBytes: pdfBuffer.byteLength,
+          validated: true,
+          // Phase 3 Tandem multi-archi — lien optionnel vers l'archi mandataire.
+          architectId,
+        })
+        .returning({ id: responseFiles.id });
+      const row = inserted[0];
+      if (!row) throw new Error("insert returned no row");
+      insertedId = row.id;
     } catch (err) {
       console.error("[cerfa:validate:db:fail]", err);
       // Nettoyage Storage best-effort en cas d'échec BDD
@@ -262,9 +321,9 @@ export async function validateCerfa(
       return { ok: false, error: "db_insert_failed" };
     }
 
-    // 7. Revalidation cache
+    // 8. Revalidation cache + retour de l'ID pour le client (bouton télécharger)
     revalidatePath(`/sourcing/ao/${tenderId}/dossier/cerfa`);
-    return { ok: true };
+    return { ok: true, responseFileId: insertedId };
   } catch (err) {
     console.error("[cerfa:validate:unhandled]", err);
     return { ok: false, error: "internal_error" };
@@ -327,4 +386,81 @@ export async function loadExistingCerfa(
   const dc2 = rows.find((r) => r.kind === "dc2") ?? null;
 
   return { dc1, dc2 };
+}
+
+// ---------------------------------------------------------------------------
+// Action : getCerfaSignedUrl
+// ---------------------------------------------------------------------------
+
+export interface GetCerfaSignedUrlResult {
+  ok: boolean;
+  error?: "not_authenticated" | "invalid_input" | "file_not_found" | "signed_url_failed";
+  /** URL signée Supabase Storage valable 1 heure. */
+  url?: string;
+}
+
+/**
+ * Retourne une URL signée Supabase Storage (1 heure) pour télécharger le PDF
+ * d'un `response_file` DC1/DC2.
+ *
+ * Sécurité :
+ *   - Auth check obligatoire
+ *   - UUID validation défensive
+ *   - Filtre `organizationId = orgId` (un user ne peut pas obtenir une URL
+ *     vers un fichier d'une autre org, même en connaissant l'UUID)
+ *   - Filtre `kind IN ('dc1','dc2')` (cette action ne sert que pour les CERFA)
+ *
+ * @param responseFileId UUID du `response_files` ciblé
+ */
+export async function getCerfaSignedUrl(responseFileId: string): Promise<GetCerfaSignedUrlResult> {
+  try {
+    // 1. Auth check
+    const auth = await getAuthenticatedUser();
+    if (!auth) return { ok: false, error: "not_authenticated" };
+
+    // 2. UUID validation défensive (surface réseau Server Action)
+    if (!UUID_SHAPE.test(responseFileId)) {
+      return { ok: false, error: "invalid_input" };
+    }
+
+    // 3. Lookup tenant-scoped — l'org doit matcher pour éviter
+    //    qu'un user obtienne une URL vers le DC1 d'une autre organisation
+    //    en devinant un UUID (defense in depth en plus de la RLS BDD).
+    const [row] = await db
+      .select({
+        id: responseFiles.id,
+        storagePath: responseFiles.storagePath,
+        kind: responseFiles.kind,
+      })
+      .from(responseFiles)
+      .where(
+        and(
+          eq(responseFiles.id, responseFileId),
+          eq(responseFiles.organizationId, auth.orgId),
+          inArray(responseFiles.kind, ["dc1", "dc2"]),
+        ),
+      )
+      .limit(1);
+
+    if (!row) {
+      return { ok: false, error: "file_not_found" };
+    }
+
+    // 4. Signer l'URL côté admin (RLS bypass intentionnel — auth + tenant
+    //    déjà vérifiés ci-dessus).
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { data: signed, error: signedError } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .createSignedUrl(row.storagePath, SIGNED_URL_SECONDS);
+
+    if (signedError || !signed?.signedUrl) {
+      console.error("[cerfa:signed-url:fail]", signedError);
+      return { ok: false, error: "signed_url_failed" };
+    }
+
+    return { ok: true, url: signed.signedUrl };
+  } catch (err) {
+    console.error("[cerfa:signed-url:unhandled]", err);
+    return { ok: false, error: "signed_url_failed" };
+  }
 }

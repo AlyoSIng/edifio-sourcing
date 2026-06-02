@@ -49,6 +49,7 @@
     "drizzle-orm": "0.39.3",
     "fflate": "^0.8.3",
     "next": "14.2.35",
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "postgres": "3.4.9",
     "react": "^18.3.1",
