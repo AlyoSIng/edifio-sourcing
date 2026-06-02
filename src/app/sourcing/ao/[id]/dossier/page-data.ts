@@ -17,7 +17,9 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { architects } from "@/db/schema/architects";
 import { platforms } from "@/db/schema/config";
+import { architectResponses } from "@/db/schema/selections";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import type { RcAnalysis } from "@/lib/ai/schemas";
 
@@ -54,6 +56,33 @@ export interface DossierPageData {
    * où `eventType = 'rc_analyzed'`). Null si pas encore analysé.
    */
   rcAnalysis: RcAnalysis | null;
+  /**
+   * Liste des architectes ayant accepté la sollicitation Tandem pour cet AO.
+   * Vide ([]) pour Solo / Cotraitance BE / Tandem sans réponse positive.
+   * Le snapshot inclut les champs DC1 requis pour le pré-remplissage CERFA
+   * mandataire (Phase 3 — non utilisé Phase 2 mais déjà chargé).
+   */
+  acceptedArchitects: AcceptedArchitect[];
+}
+
+/**
+ * Snapshot d'un architecte ayant accepté la sollicitation Tandem pour un AO
+ * donné. Le `signedAt` correspond à `architect_responses.responded_at`
+ * (timestamp ISO du clic « J'accepte »).
+ */
+export interface AcceptedArchitect {
+  id: string;
+  cabinet: string;
+  contactName: string | null;
+  email: string;
+  legalRepresentativeName: string | null;
+  legalRepresentativeRole: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  zip: string | null;
+  city: string | null;
+  signatureCity: string | null;
+  signedAt: Date | null;
 }
 
 export type LoadDossierResult =
@@ -145,12 +174,63 @@ export async function loadDossierPageData(
       }
     }
 
+    // 4. Charger les architectes ayant accepté la sollicitation Tandem.
+    //    Filtre tenant explicite sur architect_responses ET architects
+    //    (defense in depth — le rôle postgres bypass RLS).
+    const acceptedArchitectsRows = await db
+      .select({
+        id: architects.id,
+        cabinet: architects.cabinet,
+        contactName: architects.contactName,
+        email: architects.email,
+        legalRepresentativeName: architects.legalRepresentativeName,
+        legalRepresentativeRole: architects.legalRepresentativeRole,
+        addressLine1: architects.addressLine1,
+        addressLine2: architects.addressLine2,
+        zip: architects.zip,
+        city: architects.city,
+        signatureCity: architects.signatureCity,
+        signedAt: architectResponses.respondedAt,
+      })
+      .from(architectResponses)
+      .innerJoin(architects, eq(architectResponses.architectId, architects.id))
+      .where(
+        and(
+          eq(architectResponses.tenderId, tenderId),
+          eq(architectResponses.organizationId, orgId),
+          eq(architectResponses.status, "accepted"),
+          eq(architects.organizationId, orgId),
+        ),
+      )
+      .orderBy(desc(architectResponses.respondedAt));
+
+    // Filtrage applicatif : un architecte accepté DOIT avoir un email
+    // (sinon la sollicitation initiale n'aurait pas pu partir). On force le
+    // type non-nullable de `email` côté snapshot pour simplifier la conso UI.
+    const acceptedArchitects: AcceptedArchitect[] = acceptedArchitectsRows
+      .filter((row): row is typeof row & { email: string } => row.email != null)
+      .map((row) => ({
+        id: row.id,
+        cabinet: row.cabinet,
+        contactName: row.contactName,
+        email: row.email,
+        legalRepresentativeName: row.legalRepresentativeName,
+        legalRepresentativeRole: row.legalRepresentativeRole,
+        addressLine1: row.addressLine1,
+        addressLine2: row.addressLine2,
+        zip: row.zip,
+        city: row.city,
+        signatureCity: row.signatureCity,
+        signedAt: row.signedAt,
+      }));
+
     return {
       ok: true,
       data: {
         tender,
         rcDocument: rcDoc ?? null,
         rcAnalysis,
+        acceptedArchitects,
       },
     };
   } catch (err) {

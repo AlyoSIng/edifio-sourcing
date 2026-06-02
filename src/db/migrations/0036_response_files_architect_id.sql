@@ -1,0 +1,21 @@
+-- Migration 0036 — response_files.architect_id (multi-archi Tandem)
+--
+-- Contexte : Phase 2 DC1/DC2 — En mode Tandem, plusieurs architectes peuvent
+-- accepter une sollicitation. Steve doit pouvoir préparer un dossier complet
+-- par architecte accepté (DC1 archi mandataire, DC2 AlyoS, Pouvoir AlyoS →
+-- archi, pièces communes). On lie donc chaque fichier de réponse à
+-- l'architecte concerné, quand applicable.
+--
+-- Colonne ajoutée :
+--   - architect_id : FK nullable vers architects(id). NULL pour Solo /
+--     Cotraitance BE (un seul dossier), NOT NULL pour le DC1 / Pouvoir
+--     spécifique à un archi en Tandem multi-archi. ON DELETE SET NULL pour
+--     conserver les fichiers historiques même si la fiche archi est purgée
+--     (RGPD art. 17).
+--
+-- Index partiel sur architect_id IS NOT NULL — chemin chaud du multi-archi.
+--
+-- Lien response_files → architect (nullable) pour le multi-archi en mode Tandem.
+-- Solo / Cotraitance BE : architect_id reste NULL.
+ALTER TABLE "response_files" ADD COLUMN IF NOT EXISTS "architect_id" uuid REFERENCES "architects"("id") ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS "idx_response_files_architect" ON "response_files" ("architect_id") WHERE "architect_id" IS NOT NULL;

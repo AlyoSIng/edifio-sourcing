@@ -30,6 +30,7 @@ import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
+import { AcceptedArchitectsSelector } from "./AcceptedArchitectsSelector";
 import { DossierClient } from "./DossierClient";
 import { loadDossierPageData } from "./page-data";
 
@@ -59,6 +60,13 @@ type DossierAllowedStatus = (typeof DOSSIER_ALLOWED_STATUSES)[number];
 
 interface PageProps {
   params: { id: string };
+  /**
+   * Query params :
+   *   - `archi` : UUID de l'architecte sélectionné pour préparer son dossier
+   *     en mode Tandem multi-archi. Ignoré si Solo / Cotraitance BE ou si
+   *     l'UUID ne correspond à aucun architecte accepté pour cet AO.
+   */
+  searchParams?: { archi?: string };
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -75,7 +83,7 @@ function formatDate(date: Date | null): string {
   });
 }
 
-export default async function DossierPage({ params }: PageProps) {
+export default async function DossierPage({ params, searchParams }: PageProps) {
   // Auth check défensif (le middleware a normalement déjà filtré)
   const supabase = createSupabaseServerClient();
   const {
@@ -153,6 +161,16 @@ export default async function DossierPage({ params }: PageProps) {
     ? "Dossier de candidature — Mandataire"
     : "Dossier de candidature — Cotraitance";
 
+  // Résolution archi sélectionné (Phase 2 — multi-archi Tandem).
+  // Validation : UUID dans le query param ET présent dans la liste des
+  // architectes acceptés pour cet AO. Sinon fallback null (sélecteur affiché).
+  const archiParam = searchParams?.archi;
+  const requestedArchiId = archiParam && UUID_SHAPE.test(archiParam) ? archiParam : null;
+  const selectedArchitect = requestedArchiId
+    ? (data.acceptedArchitects.find((a) => a.id === requestedArchiId) ?? null)
+    : null;
+  const hasAcceptedArchitects = data.acceptedArchitects.length > 0;
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
       {/* En-tête AO */}
@@ -215,7 +233,16 @@ export default async function DossierPage({ params }: PageProps) {
         </div>
       </header>
 
-      <DossierClient data={data} />
+      {/* Sélecteur multi-archi (Phase 2 — affiché uniquement s'il y a au moins
+          un architecte accepté). Pour Solo / Cotraitance BE : pas de sélecteur. */}
+      {hasAcceptedArchitects && (
+        <AcceptedArchitectsSelector
+          architects={data.acceptedArchitects}
+          selectedArchitectId={selectedArchitect?.id ?? null}
+        />
+      )}
+
+      <DossierClient data={data} selectedArchitect={selectedArchitect} />
     </main>
   );
 }

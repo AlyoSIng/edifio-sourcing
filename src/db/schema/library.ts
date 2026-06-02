@@ -12,6 +12,7 @@
 import { sql } from "drizzle-orm";
 import { bigint, boolean, date, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
+import { architects } from "./architects";
 import { organizations } from "./organizations";
 import { tenders } from "./tenders";
 import { users } from "./users";
@@ -33,6 +34,13 @@ export const responseFiles = pgTable(
     name: text("name").notNull(),
     storagePath: text("storage_path").notNull(),
     sizeBytes: bigint("size_bytes", { mode: "number" }),
+    /**
+     * Phase 2 DC1/DC2 multi-archi (Tandem) — lien optionnel vers l'architecte
+     * accepté concerné. NULL pour Solo / Cotraitance BE (un seul dossier).
+     * NOT NULL pour DC1 (mandataire = archi) et Pouvoir (AlyoS → archi) en
+     * Tandem multi-archi. ON DELETE SET NULL pour conserver les historiques.
+     */
+    architectId: uuid("architect_id").references(() => architects.id, { onDelete: "set null" }),
     validated: boolean("validated").notNull().default(false),
     validatedBy: uuid("validated_by").references(() => users.id, { onDelete: "set null" }),
     validatedAt: timestamp("validated_at", { withTimezone: true }),
@@ -40,6 +48,10 @@ export const responseFiles = pgTable(
   },
   (table) => ({
     tenderIdx: index("idx_response_files_tender").on(table.tenderId),
+    /** Index partiel — chemin chaud du multi-archi (filtre WHERE architect_id IS NOT NULL). */
+    architectIdx: index("idx_response_files_architect")
+      .on(table.architectId)
+      .where(sql`${table.architectId} IS NOT NULL`),
   }),
 );
 

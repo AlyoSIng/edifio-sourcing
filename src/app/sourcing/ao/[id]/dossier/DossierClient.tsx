@@ -21,7 +21,7 @@
 
 import { useRef, useState, useTransition } from "react";
 
-import type { DossierPageData } from "./page-data";
+import type { AcceptedArchitect, DossierPageData } from "./page-data";
 import type { RcAnalysis } from "@/lib/ai/schemas";
 import {
   downloadDceFromUrl,
@@ -754,9 +754,16 @@ function AnalysisResultSection({ analysis, tenderId }: { analysis: RcAnalysis; t
 
 interface DossierClientProps {
   data: DossierPageData;
+  /**
+   * Architecte sélectionné pour préparer son dossier (Phase 2 multi-archi).
+   * `null` si Solo / Cotraitance BE OU si Tandem sans archi encore sélectionné
+   * (sélecteur affiché côté server au-dessus). Phase 2 : la prop est passée
+   * mais le pré-remplissage DC1/DC2 ne la consomme pas encore (Phase 3).
+   */
+  selectedArchitect: AcceptedArchitect | null;
 }
 
-export function DossierClient({ data }: DossierClientProps) {
+export function DossierClient({ data, selectedArchitect }: DossierClientProps) {
   const { tender, rcDocument, rcAnalysis: initialAnalysis } = data;
 
   // L'analyse peut arriver via la page (rechargement serveur) ou via l'action
@@ -765,6 +772,14 @@ export function DossierClient({ data }: DossierClientProps) {
 
   return (
     <div className="space-y-6">
+      {/* Bandeau info — dossier ciblé sur un archi (Phase 2 multi-archi). */}
+      {selectedArchitect && (
+        <div className="mb-4 rounded-md border border-line bg-paper-2 p-3 text-sm text-ink-2">
+          Dossier préparé pour <strong className="text-ink">{selectedArchitect.cabinet}</strong>.
+          Les CERFA DC1 (mandataire) et Pouvoir seront liés à cet architecte.
+        </div>
+      )}
+
       {/* Étape 1 — Règlement de Consultation (RC) */}
       <div>
         <div className="mb-3 flex items-center gap-2">
