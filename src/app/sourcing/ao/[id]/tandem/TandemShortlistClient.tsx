@@ -131,27 +131,10 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     setLoading(true);
     setLoadError(null);
     void (async () => {
-      let result: Awaited<ReturnType<typeof matchArchitectsForTender>> | null = null;
-      try {
-        result = await matchArchitectsForTender(tenderId, { topN: criteria.topN });
-      } catch (e) {
-        // Erreur non capturée côté serveur (ex. requireAlyosUser throws)
-        const msg = e instanceof Error ? `${e.constructor.name}: ${e.message}` : String(e);
-        // eslint-disable-next-line no-console
-        console.error("[tandem:match:thrown]", e);
-        if (!cancelled) {
-          setLoadError(`Erreur inattendue — ${msg}`);
-          setLoading(false);
-        }
-        return;
-      }
+      const result = await matchArchitectsForTender(tenderId, { topN: criteria.topN });
       if (cancelled) return;
-      // eslint-disable-next-line no-console
-      console.log("[tandem:match:result]", JSON.stringify(result).slice(0, 500));
       if (!result.ok) {
-        // `detail` surfacé temporairement pour diagnostic — à retirer après
-        const detail = (result as { detail?: string }).detail;
-        setLoadError(`${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`);
+        setLoadError(mapErrorToFr(result.error));
         setLoading(false);
         return;
       }
@@ -204,13 +187,8 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         rationale: row.rationale,
         rank: row.rank,
       });
-      // eslint-disable-next-line no-console
-      console.log("[tandem:solicit:result]", JSON.stringify(result).slice(0, 500));
       if (!result.ok) {
-        const detail = (result as { detail?: string }).detail;
-        setLoadError(
-          `${mapErrorToFr(result.error)} [${result.error}]${detail ? ` — ${detail}` : ""}`,
-        );
+        setLoadError(mapErrorToFr(result.error));
         setPreviewFor(null);
         return;
       }
