@@ -44,11 +44,19 @@ export const metadata = {
 
 interface PageProps {
   params: { id: string };
+  /**
+   * Query params :
+   *   - `archi` : UUID de l'architecte sélectionné pour préparer son dossier
+   *     en mode Tandem multi-archi (Phase 3). Propagé sur tous les liens de
+   *     la page (retour Dossier, lien vers CERFA) pour conserver le contexte.
+   *     UUID invalide → ignoré, comportement standard (pas d'archi).
+   */
+  searchParams?: { archi?: string };
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-export default async function PiecesPage({ params }: PageProps) {
+export default async function PiecesPage({ params, searchParams }: PageProps) {
   // 1. Auth check défensif
   const supabase = createSupabaseServerClient();
   const {
@@ -78,6 +86,14 @@ export default async function PiecesPage({ params }: PageProps) {
   }
 
   const tenderId = params.id;
+
+  // Résolution du param archi (Phase 3 — propagation contexte multi-archi).
+  // Pas de validation BDD ici (defense in depth déjà faite par la page
+  // dossier/cerfa qui consomment archi). On filtre juste sur la forme UUID
+  // pour éviter de propager une valeur arbitraire dans les URLs.
+  const archiParamRaw = searchParams?.archi;
+  const archiParam = archiParamRaw && UUID_SHAPE.test(archiParamRaw) ? archiParamRaw : null;
+  const archiQuery = archiParam ? `?archi=${archiParam}` : "";
 
   // 3. Chargement des données — résilience runtime
   try {
@@ -159,14 +175,14 @@ export default async function PiecesPage({ params }: PageProps) {
           </a>
           <span aria-hidden>/</span>
           <a
-            href={`/sourcing/ao/${tenderId}/dossier`}
+            href={`/sourcing/ao/${tenderId}/dossier${archiQuery}`}
             className="hover:text-ink hover:underline focus:outline-none"
           >
             Dossier
           </a>
           <span aria-hidden>/</span>
           <a
-            href={`/sourcing/ao/${tenderId}/dossier/cerfa`}
+            href={`/sourcing/ao/${tenderId}/dossier/cerfa${archiQuery}`}
             className="hover:text-ink hover:underline focus:outline-none"
           >
             DC1 &amp; DC2
@@ -194,7 +210,7 @@ export default async function PiecesPage({ params }: PageProps) {
           >
             Aucune analyse RC disponible — retournez à la{" "}
             <a
-              href={`/sourcing/ao/${tenderId}/dossier`}
+              href={`/sourcing/ao/${tenderId}/dossier${archiQuery}`}
               className="font-medium underline hover:opacity-80"
             >
               page Dossier
@@ -208,6 +224,7 @@ export default async function PiecesPage({ params }: PageProps) {
           existingDc1={existingDc1}
           existingDc2={existingDc2}
           pieceMatches={pieceMatches}
+          archiParam={archiParam}
         />
       </main>
     );

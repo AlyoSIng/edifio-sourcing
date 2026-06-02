@@ -31,6 +31,12 @@ export interface PiecesClientProps {
   existingDc1: ExistingCerfa | null;
   existingDc2: ExistingCerfa | null;
   pieceMatches: PieceMatch[];
+  /**
+   * UUID archi sélectionné (Phase 3 multi-archi). Propagé sur tous les liens
+   * internes vers `/dossier` et `/dossier/cerfa` pour conserver le contexte
+   * archi mandataire. `null` → liens standards sans query param.
+   */
+  archiParam: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,10 +91,12 @@ function CerfaStatusCard({
   label,
   existing,
   tenderId,
+  archiQuery,
 }: {
   label: string;
   existing: ExistingCerfa | null;
   tenderId: string;
+  archiQuery: string;
 }) {
   const isDone = existing !== null;
   return (
@@ -115,7 +123,7 @@ function CerfaStatusCard({
           <span className="text-xs font-medium text-emerald-700">Prêt</span>
         ) : (
           <a
-            href={`/sourcing/ao/${tenderId}/dossier/cerfa`}
+            href={`/sourcing/ao/${tenderId}/dossier/cerfa${archiQuery}`}
             className="text-xs font-medium text-amber-700 underline hover:text-amber-900"
           >
             Valider →
@@ -157,10 +165,15 @@ export function PiecesClient({
   existingDc1,
   existingDc2,
   pieceMatches,
+  archiParam,
 }: PiecesClientProps) {
   const missingCount = pieceMatches.filter((m) => m.status === "missing").length;
   const partialCount = pieceMatches.filter((m) => m.status === "partial").length;
   const availableCount = pieceMatches.filter((m) => m.status === "available").length;
+
+  // Phase 3 — query string propagé sur tous les liens internes vers
+  // /dossier et /dossier/cerfa pour conserver le contexte archi mandataire.
+  const archiQuery = archiParam ? `?archi=${archiParam}` : "";
 
   // Alerte si DC1 ou DC2 manquants
   const cerfsIncomplete = !existingDc1 || !existingDc2;
@@ -187,6 +200,13 @@ export function PiecesClient({
 
   return (
     <div className="space-y-8">
+      {/* Bandeau info — pièces ciblées sur l'archi mandataire (Phase 3). */}
+      {archiParam && (
+        <div className="mb-4 rounded-md border border-line bg-paper-2 p-3 text-xs text-ink-2">
+          Pièces du dossier préparé pour l&apos;architecte mandataire sélectionné.
+        </div>
+      )}
+
       {/* Section : formulaires CERFA */}
       <section aria-labelledby="cerfa-section-heading">
         <h2
@@ -200,11 +220,13 @@ export function PiecesClient({
             label="DC1 — Lettre de candidature"
             existing={existingDc1}
             tenderId={tenderId}
+            archiQuery={archiQuery}
           />
           <CerfaStatusCard
             label="DC2 — Déclaration du candidat"
             existing={existingDc2}
             tenderId={tenderId}
+            archiQuery={archiQuery}
           />
         </div>
         {cerfsIncomplete && (
