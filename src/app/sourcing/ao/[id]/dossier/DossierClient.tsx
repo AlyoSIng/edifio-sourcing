@@ -21,6 +21,7 @@
 
 import { useRef, useState, useTransition } from "react";
 
+import { BeCotraitantsSection } from "./BeCotraitantsSection";
 import type { AcceptedArchitect, DossierPageData } from "./page-data";
 import type { RcAnalysis } from "@/lib/ai/schemas";
 import {
@@ -782,11 +783,16 @@ interface DossierClientProps {
 }
 
 export function DossierClient({ data, selectedArchitect }: DossierClientProps) {
-  const { tender, rcDocument, rcAnalysis: initialAnalysis } = data;
+  const { tender, rcDocument, rcAnalysis: initialAnalysis, beCotraitants } = data;
 
   // L'analyse peut arriver via la page (rechargement serveur) ou via l'action
   // (sans rechargement, résultat retourné directement depuis la Server Action)
   const [localAnalysis, setLocalAnalysis] = useState<RcAnalysis | null>(initialAnalysis);
+
+  // Mode Cotraitance BE : la section BE n'a de sens QUE si l'AO n'est pas en Tandem.
+  // En Tandem (au moins 1 archi accepté), AlyoS est cotraitant — pas BE.
+  const isTandemMode = data.acceptedArchitects.length > 0;
+  const showBeCotraitants = !isTandemMode;
 
   return (
     <div className="space-y-6">
@@ -856,6 +862,11 @@ export function DossierClient({ data, selectedArchitect }: DossierClientProps) {
             selectedArchitectId={selectedArchitect?.id ?? null}
           />
         </div>
+      )}
+
+      {/* Mode Cotraitance BE — gestion des BE cotraitants (hors mode Tandem). */}
+      {showBeCotraitants && (
+        <BeCotraitantsSection tenderId={tender.id} beCotraitants={beCotraitants} />
       )}
     </div>
   );

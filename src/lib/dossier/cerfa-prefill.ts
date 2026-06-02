@@ -93,6 +93,35 @@ export interface PrefillInput {
     legalRepresentativeName: string | null;
     legalRepresentativeRole: string | null;
   } | null;
+  /**
+   * BE cotraitant sélectionné (Lot B — Cotraitance BE). Quand cette valeur
+   * est non-null, le DC2 décrit ce BE en tant que candidat membre du
+   * groupement (et non plus AlyoS). Tous les champs candidat (dénomination,
+   * SIREN, adresse, représentant légal, capital, etc.) viennent du BE.
+   *
+   * Cas d'usage : page `/sourcing/ao/[id]/dossier/cerfa?be=<uuid>` — un BE
+   * cotraitant a été choisi via `BeCotraitantsSection` sur la page dossier.
+   *
+   * Mutual exclusivity avec `selectedArchitect` : si les deux sont fournis,
+   * `selectedArchitect` (Tandem) prime (cf. logique côté Server Component
+   * `cerfa/page.tsx`).
+   */
+  selectedBe?: {
+    id: string;
+    cabinet: string;
+    contactName: string | null;
+    email: string | null;
+    phone: string | null;
+    siren: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    zip: string | null;
+    city: string | null;
+    capitalEur: number | null;
+    signatureCity: string | null;
+    legalRepresentativeName: string | null;
+    legalRepresentativeRole: string | null;
+  } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,32 +314,82 @@ export function buildDc1(input: PrefillInput): CerfaDoc {
  * Construit le DC2 prérempli depuis les données connues.
  *
  * Les champs financiers (CA N-1/N-2/N-3) et forme juridique sont toujours
- * `a_completer` — non disponibles dans le profil AlyoS au MVP.
+ * `a_completer` — non disponibles dans le profil AlyoS / BE au MVP.
+ *
+ * Lot B — Cotraitance BE : si `selectedBe` est fourni, le DC2 décrit ce BE
+ * cotraitant (et non AlyoS). Tous les champs candidat (dénomination, SIREN,
+ * adresse, représentant légal, capital, etc.) viennent de la fiche BE.
+ * Sinon → comportement standard (candidat = AlyoS).
  */
 export function buildDc2(input: PrefillInput): CerfaDoc {
-  const { org, orgProfile } = input;
+  const { org, orgProfile, selectedBe } = input;
+
+  // Lot B — Branching candidat : BE cotraitant ou AlyoS.
+  const isBeCandidate = selectedBe != null;
+
+  // Adresse BE concaténée (même pattern que pour l'archi DC1).
+  const beAdresse = isBeCandidate
+    ? [selectedBe.addressLine1, selectedBe.addressLine2, selectedBe.zip, selectedBe.city]
+        .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+        .join(", ")
+    : "";
+
+  // Fallback rep légal → contactName si pas de représentant explicite (idem DC1 archi).
+  const beRepresentantLegal = isBeCandidate
+    ? (selectedBe.legalRepresentativeName ?? selectedBe.contactName ?? "")
+    : "";
+
+  // Capital BE : on l'affiche en euros bruts ("125000") — la mise en forme
+  // (espaces millier, "€") est réservée au rendu PDF.
+  const beCapital =
+    isBeCandidate && selectedBe.capitalEur != null ? String(selectedBe.capitalEur) : "";
 
   const fields: CerfaField[] = [
-    field("dc2_denomination", "Dénomination sociale", org.name, "company_data", true),
-    field("dc2_siren", "SIREN / SIRET", org.siren ?? "", "company_data", true),
+    field(
+      "dc2_denomination",
+      "Dénomination sociale",
+      isBeCandidate ? selectedBe.cabinet : org.name,
+      "company_data",
+      true,
+    ),
+    field(
+      "dc2_siren",
+      "SIREN / SIRET",
+      isBeCandidate ? (selectedBe.siren ?? "") : (org.siren ?? ""),
+      "company_data",
+      true,
+    ),
     field("dc2_forme_juridique", "Forme juridique (ex. SAS, SARL, SA)", "", "company_data", true),
     field(
       "dc2_adresse",
       "Adresse du siège social",
-      orgProfile?.agencyDetails ?? "",
+      isBeCandidate ? beAdresse : (orgProfile?.agencyDetails ?? ""),
       "company_data",
       false,
     ),
-    field("dc2_representant_legal", "Nom du représentant légal", "", "company_data", true),
-    field("dc2_qualite", "Qualité du signataire (ex. Président, Gérant)", "", "company_data", true),
+    field(
+      "dc2_representant_legal",
+      "Nom du représentant légal",
+      isBeCandidate ? beRepresentantLegal : "",
+      "company_data",
+      true,
+    ),
+    field(
+      "dc2_qualite",
+      "Qualité du signataire (ex. Président, Gérant)",
+      isBeCandidate ? (selectedBe.legalRepresentativeRole ?? "") : "",
+      "company_data",
+      true,
+    ),
     field(
       "dc2_activite_principale",
       "Activité principale",
-      "Ingénierie et conception — BTP, maîtrise d'œuvre",
+      isBeCandidate ? "" : "Ingénierie et conception — BTP, maîtrise d'œuvre",
       "company_data",
       false,
     ),
     field("dc2_effectif", "Effectif moyen annuel (ex. 15)", "", "company_data", false),
+    field("dc2_capital", "Capital social (en euros)", beCapital, "company_data", false),
     field("dc2_ca_n1", "Chiffre d'affaires N-1 (en euros)", "", "company_data", false),
     field("dc2_ca_n2", "Chiffre d'affaires N-2 (en euros)", "", "company_data", false),
     field("dc2_ca_n3", "Chiffre d'affaires N-3 (en euros)", "", "company_data", false),
@@ -328,7 +407,13 @@ export function buildDc2(input: PrefillInput): CerfaDoc {
       "company_data",
       true,
     ),
-    field("dc2_lieu_date", "Fait à (lieu et date de signature)", "", "company_data", false),
+    field(
+      "dc2_lieu_date",
+      "Fait à (lieu et date de signature)",
+      isBeCandidate ? (selectedBe.signatureCity ?? "") : "",
+      "company_data",
+      false,
+    ),
   ];
 
   return {

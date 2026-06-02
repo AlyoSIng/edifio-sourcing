@@ -19,7 +19,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
+import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { architectResponses } from "@/db/schema/selections";
+import { tenderBeCotraitants } from "@/db/schema/tender-cotraitants";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { organizations } from "@/db/schema/organizations";
 import { organizationProfiles } from "@/db/schema/messaging";
@@ -30,7 +32,7 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { buildDc1, buildDc2 } from "@/lib/dossier/cerfa-prefill";
-import type { AcceptedArchitect } from "../page-data";
+import type { AcceptedArchitect, BeCotraitantSnapshot } from "../page-data";
 import { CerfaFormClient } from "./CerfaFormClient";
 import { loadExistingCerfa } from "./actions";
 
@@ -51,8 +53,16 @@ interface PageProps {
    *     le DC1 est pré-rempli depuis les coordonnées de cet architecte
    *     au lieu d'AlyoS. UUID invalide / archi non accepté pour cet AO
    *     → fallback Solo (DC1 = AlyoS, archi ignoré).
+   *   - `be` : UUID du BE cotraitant sélectionné (Lot B — Cotraitance BE).
+   *     Si fourni et valide (BE présent dans `tender_be_cotraitants` pour
+   *     ce tender), le DC2 est pré-rempli depuis sa fiche au lieu d'AlyoS.
+   *     UUID invalide / BE non cotraitant → fallback standard (DC2 = AlyoS).
+   *
+   * Mutual exclusivity : `archi` et `be` ne se mélangent pas (Tandem ≠
+   * Cotraitance BE). Si les deux sont présents → `archi` prime (Tandem) et
+   * `be` est ignoré.
    */
-  searchParams?: { archi?: string };
+  searchParams?: { archi?: string; be?: string };
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -216,6 +226,66 @@ export default async function CerfaPage({ params, searchParams }: PageProps) {
       }
     }
 
+    // 3g. Résolution BE cotraitant sélectionné (Lot B — Cotraitance BE).
+    //     Mutual exclusivity : si `?archi=` est déjà résolu (Tandem prime),
+    //     on ignore `?be=` (Tandem ≠ Cotraitance BE). Sinon validation :
+    //     UUID dans le query param ET BE présent dans `tender_be_cotraitants`
+    //     pour ce tender ET cette org (defense in depth — un UUID arbitraire
+    //     ne suffit pas, même si c'est un BE valide d'une autre org).
+    const beParam = searchParams?.be;
+    const requestedBeId =
+      !selectedArchitect && beParam && UUID_SHAPE.test(beParam) ? beParam : null;
+    let selectedBe: BeCotraitantSnapshot | null = null;
+    if (requestedBeId) {
+      const [beRow] = await db
+        .select({
+          id: bureauEtudes.id,
+          cabinet: bureauEtudes.cabinet,
+          contactName: bureauEtudes.contactName,
+          email: bureauEtudes.email,
+          phone: bureauEtudes.phone,
+          siren: bureauEtudes.siren,
+          addressLine1: bureauEtudes.addressLine1,
+          addressLine2: bureauEtudes.addressLine2,
+          zip: bureauEtudes.zip,
+          city: bureauEtudes.city,
+          capitalEur: bureauEtudes.capitalEur,
+          signatureCity: bureauEtudes.signatureCity,
+          legalRepresentativeName: bureauEtudes.legalRepresentativeName,
+          legalRepresentativeRole: bureauEtudes.legalRepresentativeRole,
+        })
+        .from(tenderBeCotraitants)
+        .innerJoin(bureauEtudes, eq(tenderBeCotraitants.beId, bureauEtudes.id))
+        .where(
+          and(
+            eq(tenderBeCotraitants.tenderId, tenderId),
+            eq(tenderBeCotraitants.organizationId, orgId),
+            eq(tenderBeCotraitants.beId, requestedBeId),
+            eq(bureauEtudes.organizationId, orgId),
+          ),
+        )
+        .limit(1);
+
+      if (beRow) {
+        selectedBe = {
+          id: beRow.id,
+          cabinet: beRow.cabinet,
+          contactName: beRow.contactName,
+          email: beRow.email,
+          phone: beRow.phone,
+          siren: beRow.siren,
+          addressLine1: beRow.addressLine1,
+          addressLine2: beRow.addressLine2,
+          zip: beRow.zip,
+          city: beRow.city,
+          capitalEur: beRow.capitalEur,
+          signatureCity: beRow.signatureCity,
+          legalRepresentativeName: beRow.legalRepresentativeName,
+          legalRepresentativeRole: beRow.legalRepresentativeRole,
+        };
+      }
+    }
+
     // 4. isTandem : au MVP, seuls les AOs `architect_accepted` accèdent au dossier
     // donc isTandem est toujours true ici.
     // Conservé en variable explicite pour préparation Phase 2 Solo.
@@ -227,6 +297,7 @@ export default async function CerfaPage({ params, searchParams }: PageProps) {
       orgProfile: orgProfile ?? null,
       isTandem,
       selectedArchitect,
+      selectedBe,
     };
 
     // 5. Construction des CERFA préremplis
@@ -301,6 +372,7 @@ export default async function CerfaPage({ params, searchParams }: PageProps) {
           existingDc1={existingDc1}
           existingDc2={existingDc2}
           selectedArchitect={selectedArchitect}
+          selectedBe={selectedBe}
         />
 
         {/* Lien vers l'étape suivante */}

@@ -19,7 +19,7 @@
 import { useState, useTransition } from "react";
 
 import type { CerfaDoc, CerfaField } from "@/lib/dossier/cerfa-prefill";
-import type { AcceptedArchitect } from "../page-data";
+import type { AcceptedArchitect, BeCotraitantSnapshot } from "../page-data";
 import { getCerfaSignedUrl, validateCerfa } from "./actions";
 import type { ExistingCerfa } from "./actions";
 
@@ -45,6 +45,13 @@ export interface CerfaFormClientProps {
    * Affiche aussi un mini header de contexte au-dessus des formulaires.
    */
   selectedArchitect: AcceptedArchitect | null;
+  /**
+   * BE cotraitant sélectionné (Lot B — Cotraitance BE). Quand non-null,
+   * l'UUID est passé à `validateCerfa` pour lier le `response_file` au BE
+   * via `response_files.be_id`. Affiche un bandeau info au-dessus du DC2.
+   * Mutual exclusivity avec `selectedArchitect` (Tandem prime).
+   */
+  selectedBe: BeCotraitantSnapshot | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,9 +93,15 @@ interface SingleCerfaFormProps {
    * lier le response_file. `null` si Solo / Tandem sans archi sélectionné.
    */
   architectId: string | null;
+  /**
+   * UUID du BE cotraitant (Lot B) — transmis à `validateCerfa` pour lier
+   * le response_file au BE via `response_files.be_id`. `null` si DC1 ou si
+   * mode standard (DC2 AlyoS).
+   */
+  beId: string | null;
 }
 
-function SingleCerfaForm({ tenderId, doc, existingFile, architectId }: SingleCerfaFormProps) {
+function SingleCerfaForm({ tenderId, doc, existingFile, architectId, beId }: SingleCerfaFormProps) {
   // Initialisation depuis les champs préremplis (ou depuis l'état "déjà validé")
   const [fields, setFields] = useState<CerfaField[]>(doc.fields);
   // Mode édition : true si l'utilisateur clique "Modifier" après validation
@@ -134,7 +147,7 @@ function SingleCerfaForm({ tenderId, doc, existingFile, architectId }: SingleCer
   function handleValidate() {
     setError(null);
     startTransition(async () => {
-      const result = await validateCerfa(tenderId, doc.cerfa_kind, fields, architectId);
+      const result = await validateCerfa(tenderId, doc.cerfa_kind, fields, architectId, beId);
       if (result.ok) {
         setSuccess(true);
         setIsEditing(false);
@@ -343,6 +356,8 @@ function errorLabel(code: string | undefined): string {
       return "AO introuvable — rechargez la page.";
     case "architect_not_accepted":
       return "Architecte non accepté pour cet AO — rechargez la page et resélectionnez.";
+    case "be_not_cotraitant":
+      return "Bureau d'études non cotraitant sur cet AO — rechargez la page et resélectionnez.";
     case "storage_upload_failed":
       return "Erreur d'enregistrement dans le stockage — réessayez.";
     case "db_insert_failed":
@@ -362,6 +377,10 @@ function errorLabel(code: string | undefined): string {
  * Phase 3 — quand un architecte mandataire est sélectionné, affiche un mini
  * header de contexte et propage son UUID au submit pour lier le
  * `response_files.architect_id`.
+ *
+ * Lot B — quand un BE cotraitant est sélectionné (mode Cotraitance BE),
+ * affiche un bandeau info dédié au DC2 et propage son UUID au submit pour
+ * lier le `response_files.be_id`. Le DC1 reste celui d'AlyoS (mandataire).
  */
 export function CerfaFormClient({
   dc1,
@@ -370,8 +389,10 @@ export function CerfaFormClient({
   existingDc1,
   existingDc2,
   selectedArchitect,
+  selectedBe,
 }: CerfaFormClientProps) {
   const architectId = selectedArchitect?.id ?? null;
+  const beId = selectedBe?.id ?? null;
 
   return (
     <div>
@@ -381,18 +402,27 @@ export function CerfaFormClient({
           DC1 utilise les informations de cet architecte comme mandataire du groupement.
         </div>
       )}
+      {selectedBe && (
+        <div className="mb-4 rounded-md border border-line bg-paper-2 p-3 text-sm text-ink-2">
+          DC2 préparé pour le BE cotraitant{" "}
+          <strong className="text-ink">{selectedBe.cabinet}</strong>. Le DC1 reste celui
+          d&apos;AlyoS Ingénierie (mandataire du groupement).
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <SingleCerfaForm
           tenderId={tenderId}
           doc={dc1}
           existingFile={existingDc1}
           architectId={architectId}
+          beId={null}
         />
         <SingleCerfaForm
           tenderId={tenderId}
           doc={dc2}
           existingFile={existingDc2}
           architectId={architectId}
+          beId={beId}
         />
       </div>
     </div>

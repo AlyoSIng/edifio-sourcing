@@ -18,8 +18,10 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
+import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { platforms } from "@/db/schema/config";
 import { architectResponses } from "@/db/schema/selections";
+import { tenderBeCotraitants } from "@/db/schema/tender-cotraitants";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import type { RcAnalysis } from "@/lib/ai/schemas";
 
@@ -63,6 +65,34 @@ export interface DossierPageData {
    * mandataire (Phase 3 — non utilisé Phase 2 mais déjà chargé).
    */
   acceptedArchitects: AcceptedArchitect[];
+  /**
+   * Liste des BE cotraitants attachés à cet AO (mode Cotraitance BE — Lot B).
+   * Vide ([]) en mode Tandem ou si aucun BE n'a encore été ajouté. Le snapshot
+   * inclut les champs DC2 requis pour le pré-remplissage CERFA candidat BE.
+   */
+  beCotraitants: BeCotraitantSnapshot[];
+}
+
+/**
+ * Snapshot d'un BE cotraitant attaché à un AO. Réplique fidèle des champs
+ * DC2 (CERFA n°12157) que la fiche BE porte pour permettre le pré-remplissage
+ * sans aller-retour BDD supplémentaire côté CERFA.
+ */
+export interface BeCotraitantSnapshot {
+  id: string;
+  cabinet: string;
+  contactName: string | null;
+  email: string | null;
+  siren: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  zip: string | null;
+  city: string | null;
+  capitalEur: number | null;
+  signatureCity: string | null;
+  legalRepresentativeName: string | null;
+  legalRepresentativeRole: string | null;
+  phone: string | null;
 }
 
 /**
@@ -232,6 +262,55 @@ export async function loadDossierPageData(
         signedAt: row.signedAt,
       }));
 
+    // 5. Charger les BE cotraitants attachés à cet AO (mode Cotraitance BE).
+    //    INNER JOIN bureaux_etudes pour récupérer les champs DC2 ; filtre
+    //    tenant explicite sur les deux tables (defense in depth).
+    const beCotraitantsRows = await db
+      .select({
+        id: bureauEtudes.id,
+        cabinet: bureauEtudes.cabinet,
+        contactName: bureauEtudes.contactName,
+        email: bureauEtudes.email,
+        siren: bureauEtudes.siren,
+        addressLine1: bureauEtudes.addressLine1,
+        addressLine2: bureauEtudes.addressLine2,
+        zip: bureauEtudes.zip,
+        city: bureauEtudes.city,
+        capitalEur: bureauEtudes.capitalEur,
+        signatureCity: bureauEtudes.signatureCity,
+        legalRepresentativeName: bureauEtudes.legalRepresentativeName,
+        legalRepresentativeRole: bureauEtudes.legalRepresentativeRole,
+        phone: bureauEtudes.phone,
+        addedAt: tenderBeCotraitants.addedAt,
+      })
+      .from(tenderBeCotraitants)
+      .innerJoin(bureauEtudes, eq(tenderBeCotraitants.beId, bureauEtudes.id))
+      .where(
+        and(
+          eq(tenderBeCotraitants.tenderId, tenderId),
+          eq(tenderBeCotraitants.organizationId, orgId),
+          eq(bureauEtudes.organizationId, orgId),
+        ),
+      )
+      .orderBy(desc(tenderBeCotraitants.addedAt));
+
+    const beCotraitants: BeCotraitantSnapshot[] = beCotraitantsRows.map((row) => ({
+      id: row.id,
+      cabinet: row.cabinet,
+      contactName: row.contactName,
+      email: row.email,
+      siren: row.siren,
+      addressLine1: row.addressLine1,
+      addressLine2: row.addressLine2,
+      zip: row.zip,
+      city: row.city,
+      capitalEur: row.capitalEur,
+      signatureCity: row.signatureCity,
+      legalRepresentativeName: row.legalRepresentativeName,
+      legalRepresentativeRole: row.legalRepresentativeRole,
+      phone: row.phone,
+    }));
+
     return {
       ok: true,
       data: {
@@ -239,6 +318,7 @@ export async function loadDossierPageData(
         rcDocument: rcDoc ?? null,
         rcAnalysis,
         acceptedArchitects,
+        beCotraitants,
       },
     };
   } catch (err) {

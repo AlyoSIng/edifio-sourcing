@@ -27,7 +27,9 @@ import { db } from "@/db/client";
 import { organizations } from "@/db/schema/organizations";
 import { responseFiles } from "@/db/schema/library";
 import { architects } from "@/db/schema/architects";
+import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { architectResponses } from "@/db/schema/selections";
+import { tenderBeCotraitants } from "@/db/schema/tender-cotraitants";
 import { tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -92,6 +94,7 @@ export interface ValidateCerfaResult {
     | "tender_not_found"
     | "invalid_input"
     | "architect_not_accepted"
+    | "be_not_cotraitant"
     | "missing_required_fields"
     | "storage_upload_failed"
     | "db_insert_failed"
@@ -145,12 +148,16 @@ async function getAuthenticatedUser() {
  * @param architectId UUID de l'architecte mandataire (Phase 3 Tandem multi-archi).
  *                    NULL pour Solo / Cotraitance BE. La présence d'un UUID
  *                    sera validée contre `architect_responses.status='accepted'`.
+ * @param beId        UUID du BE cotraitant (Lot B — Cotraitance BE). NULL pour
+ *                    DC1 ou pour DC2 standard (AlyoS). La présence d'un UUID
+ *                    sera validée contre `tender_be_cotraitants` pour ce tender.
  */
 export async function validateCerfa(
   tenderId: string,
   cerfaKind: "DC1" | "DC2",
   fields: CerfaField[],
   architectId: string | null = null,
+  beId: string | null = null,
 ): Promise<ValidateCerfaResult> {
   try {
     // 1. Auth check
@@ -167,6 +174,10 @@ export async function validateCerfa(
     }
     // Phase 3 : si `architectId` fourni, valider la forme UUID (défense profonde).
     if (architectId != null && !UUID_SHAPE.test(architectId)) {
+      return { ok: false, error: "invalid_input" };
+    }
+    // Lot B : si `beId` fourni, valider la forme UUID (défense profonde).
+    if (beId != null && !UUID_SHAPE.test(beId)) {
       return { ok: false, error: "invalid_input" };
     }
 
@@ -218,6 +229,36 @@ export async function validateCerfa(
       archiCabinet = acceptedRow.cabinet;
     }
 
+    // 2ter. Lot B : defense in depth — le BE doit être présent dans
+    // `tender_be_cotraitants` pour ce tender et cette org. Un UUID arbitraire
+    // (même celui d'un BE valide de l'org) est rejeté s'il n'a pas été ajouté
+    // explicitement comme cotraitant pour cet AO.
+    let beCabinet: string | null = null;
+    if (beId != null) {
+      const [beRow] = await db
+        .select({
+          id: tenderBeCotraitants.id,
+          cabinet: bureauEtudes.cabinet,
+        })
+        .from(tenderBeCotraitants)
+        .innerJoin(bureauEtudes, eq(tenderBeCotraitants.beId, bureauEtudes.id))
+        .where(
+          and(
+            eq(tenderBeCotraitants.tenderId, tenderId),
+            eq(tenderBeCotraitants.organizationId, auth.orgId),
+            eq(tenderBeCotraitants.beId, beId),
+            eq(bureauEtudes.organizationId, auth.orgId),
+          ),
+        )
+        .limit(1);
+
+      if (!beRow) {
+        console.warn("[cerfa:validate:be:not-cotraitant]", { tenderId, beId });
+        return { ok: false, error: "be_not_cotraitant" };
+      }
+      beCabinet = beRow.cabinet;
+    }
+
     // 3. Validation des champs requis non remplis (sur le tableau validé Zod)
     const missing = validatedFields
       .filter((f) => f.required && f.source === "a_completer" && f.value.trim() === "")
@@ -246,6 +287,7 @@ export async function validateCerfa(
         tenderBuyer: tender.buyer,
         organizationName,
         selectedArchitect: archiCabinet ? { cabinet: archiCabinet } : null,
+        selectedBe: beCabinet ? { cabinet: beCabinet } : null,
         fields: validatedFields.map((f) => ({
           id: f.field_id,
           label: f.field_label,
@@ -305,6 +347,8 @@ export async function validateCerfa(
           validated: true,
           // Phase 3 Tandem multi-archi — lien optionnel vers l'archi mandataire.
           architectId,
+          // Lot B Cotraitance BE — lien optionnel vers le BE cotraitant (DC2).
+          beId,
         })
         .returning({ id: responseFiles.id });
       const row = inserted[0];

@@ -79,6 +79,52 @@ const tandemArchiFallbackInput: PrefillInput = {
   },
 };
 
+/**
+ * Lot B — fixture Cotraitance BE : le BE devient candidat (DC2). Tous les
+ * champs candidat (dénomination, SIREN, adresse, représentant légal, capital,
+ * etc.) sont remplis depuis la fiche BE.
+ */
+const cotraitanceBeInput: PrefillInput = {
+  ...fullInput,
+  selectedBe: {
+    id: "00000000-0000-0000-0000-0000000000be",
+    cabinet: "Bureau d'Études Structure SARL",
+    contactName: "Sophie Martin",
+    email: "contact@bestructure.fr",
+    phone: "01 44 00 00 00",
+    siren: "456789123",
+    addressLine1: "8 boulevard Voltaire",
+    addressLine2: null,
+    zip: "75011",
+    city: "Paris",
+    capitalEur: 125000,
+    signatureCity: "Paris",
+    legalRepresentativeName: "Sophie Martin",
+    legalRepresentativeRole: "Gérante",
+  },
+};
+
+/** BE avec champs minimaux — vérifie les fallback / a_completer. */
+const cotraitanceBeMinimalInput: PrefillInput = {
+  ...fullInput,
+  selectedBe: {
+    id: "00000000-0000-0000-0000-0000000000bf",
+    cabinet: "BE Lambda",
+    contactName: "Jean Lambda",
+    email: null,
+    phone: null,
+    siren: null,
+    addressLine1: null,
+    addressLine2: null,
+    zip: null,
+    city: null,
+    capitalEur: null,
+    signatureCity: null,
+    legalRepresentativeName: null,
+    legalRepresentativeRole: null,
+  },
+};
+
 // ---------------------------------------------------------------------------
 // buildDc1
 // ---------------------------------------------------------------------------
@@ -334,5 +380,123 @@ describe("buildDc2", () => {
     const doc = buildDc2(minimalInput);
     const field = doc.fields.find((f) => f.field_id === "dc2_siren");
     expect(field?.source).toBe("a_completer");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildDc2 — Lot B Cotraitance BE (BE candidat membre du groupement)
+// ---------------------------------------------------------------------------
+
+describe("buildDc2 — Lot B Cotraitance BE", () => {
+  it("dc2_denomination = cabinet BE quand selectedBe fourni (company_data)", () => {
+    const doc = buildDc2(cotraitanceBeInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_denomination");
+    expect(field?.value).toBe("Bureau d'Études Structure SARL");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc2_siren = siren BE quand selectedBe fourni (company_data)", () => {
+    const doc = buildDc2(cotraitanceBeInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_siren");
+    expect(field?.value).toBe("456789123");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc2_adresse = concaténation des champs adresse BE", () => {
+    const doc = buildDc2(cotraitanceBeInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_adresse");
+    expect(field?.value).toBe("8 boulevard Voltaire, 75011, Paris");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc2_representant_legal = legalRepresentativeName BE", () => {
+    const doc = buildDc2(cotraitanceBeInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_representant_legal");
+    expect(field?.value).toBe("Sophie Martin");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc2_qualite = legalRepresentativeRole BE", () => {
+    const doc = buildDc2(cotraitanceBeInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_qualite");
+    expect(field?.value).toBe("Gérante");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc2_capital = capitalEur BE (string brut, sans formatage)", () => {
+    const doc = buildDc2(cotraitanceBeInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_capital");
+    expect(field?.value).toBe("125000");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc2_lieu_date = signatureCity BE", () => {
+    const doc = buildDc2(cotraitanceBeInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_lieu_date");
+    expect(field?.value).toBe("Paris");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc2_activite_principale est vide pour un BE (pas d'activité par défaut)", () => {
+    // En mode AlyoS on a un texte par défaut ; pour un BE on laisse vide
+    // (l'utilisateur doit compléter selon le profil du BE).
+    const doc = buildDc2(cotraitanceBeInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_activite_principale");
+    expect(field?.value).toBe("");
+    expect(field?.source).toBe("a_completer");
+  });
+
+  it("représentant légal fallback sur contactName si legalRepresentativeName null", () => {
+    // BE Lambda → contactName = "Jean Lambda", legalRepresentativeName = null
+    const doc = buildDc2(cotraitanceBeMinimalInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_representant_legal");
+    expect(field?.value).toBe("Jean Lambda");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc2_siren = a_completer si BE.siren null", () => {
+    const doc = buildDc2(cotraitanceBeMinimalInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_siren");
+    expect(field?.value).toBe("");
+    expect(field?.source).toBe("a_completer");
+  });
+
+  it("dc2_adresse vide → a_completer si tous les champs adresse BE sont null", () => {
+    const doc = buildDc2(cotraitanceBeMinimalInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_adresse");
+    expect(field?.value).toBe("");
+    expect(field?.source).toBe("a_completer");
+  });
+
+  it("dc2_capital = a_completer si BE.capitalEur null", () => {
+    const doc = buildDc2(cotraitanceBeMinimalInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_capital");
+    expect(field?.value).toBe("");
+    expect(field?.source).toBe("a_completer");
+  });
+
+  it("dc2_qualite = a_completer si BE.legalRepresentativeRole null", () => {
+    const doc = buildDc2(cotraitanceBeMinimalInput);
+    const field = doc.fields.find((f) => f.field_id === "dc2_qualite");
+    expect(field?.source).toBe("a_completer");
+    expect(field?.required).toBe(true);
+  });
+
+  it("selectedBe=null → comportement AlyoS classique", () => {
+    const doc = buildDc2({ ...fullInput, selectedBe: null });
+    const denomination = doc.fields.find((f) => f.field_id === "dc2_denomination");
+    const activite = doc.fields.find((f) => f.field_id === "dc2_activite_principale");
+    expect(denomination?.value).toBe("AlyoS Ingénierie");
+    expect(activite?.value).toContain("Ingénierie");
+  });
+
+  it("buildDc1 ignore selectedBe (DC1 = mandataire AlyoS, pas BE)", () => {
+    // Le DC1 décrit le mandataire du groupement = AlyoS en mode Cotraitance BE.
+    // Le BE étant cotraitant, il n'apparaît pas comme mandataire.
+    const doc = buildDc1(cotraitanceBeInput);
+    const mandataire = doc.fields.find((f) => f.field_id === "dc1_nom_mandataire");
+    // En mode Tandem (isTandem: true via fullInput), le mandataire reste AlyoS
+    // car selectedArchitect n'est pas fourni.
+    expect(mandataire?.value).toBe("AlyoS Ingénierie");
   });
 });

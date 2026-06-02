@@ -32,6 +32,11 @@ export interface CerfaPdfArchitect {
   cabinet: string;
 }
 
+/** Snapshot minimal du BE cotraitant (Lot B — Cotraitance BE). */
+export interface CerfaPdfBe {
+  cabinet: string;
+}
+
 /**
  * Entrée pour générer un PDF CERFA — snapshot complet des données à imprimer.
  *
@@ -54,6 +59,12 @@ export interface CerfaPdfInput {
    * AlyoS est mandataire.
    */
   selectedArchitect?: CerfaPdfArchitect | null;
+  /**
+   * Snapshot du BE cotraitant pour lequel ce DC2 est préparé (Lot B —
+   * Cotraitance BE). Null pour le DC1 ou pour un DC2 standard (AlyoS).
+   * Affiché comme « Candidat (BE cotraitant) : <cabinet> » dans l'en-tête PDF.
+   */
+  selectedBe?: CerfaPdfBe | null;
   /**
    * Liste ordonnée des champs à imprimer, dans l'ordre d'affichage UI.
    * `label` doit être en français (libellé court humain).
@@ -227,6 +238,16 @@ export async function generateCerfaPdf(input: CerfaPdfInput): Promise<Uint8Array
   y -= 15;
   if (input.selectedArchitect) {
     page.drawText(sanitizeForHelvetica(`Mandataire : ${input.selectedArchitect.cabinet}`), {
+      x: MARGIN_LEFT,
+      y,
+      size: 10,
+      font: fontBold,
+      color: BLACK,
+    });
+    y -= 15;
+  }
+  if (input.selectedBe) {
+    page.drawText(sanitizeForHelvetica(`Candidat (BE cotraitant) : ${input.selectedBe.cabinet}`), {
       x: MARGIN_LEFT,
       y,
       size: 10,

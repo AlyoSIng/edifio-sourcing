@@ -13,6 +13,7 @@ import { sql } from "drizzle-orm";
 import { bigint, boolean, date, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { architects } from "./architects";
+import { bureauEtudes } from "./bureaux-etudes";
 import { organizations } from "./organizations";
 import { tenders } from "./tenders";
 import { users } from "./users";
@@ -41,6 +42,14 @@ export const responseFiles = pgTable(
      * Tandem multi-archi. ON DELETE SET NULL pour conserver les historiques.
      */
     architectId: uuid("architect_id").references(() => architects.id, { onDelete: "set null" }),
+    /**
+     * Lot B Cotraitance BE — lien optionnel vers le BE cotraitant concerné.
+     * NULL pour DC1 (mandataire = AlyoS ou archi), DC2 AlyoS (mode standard),
+     * Tandem/Solo. NOT NULL pour les DC2 spécifiques d'un BE cotraitant.
+     * ON DELETE SET NULL pour conserver les historiques même si la fiche BE
+     * est purgée (RGPD art. 17).
+     */
+    beId: uuid("be_id").references(() => bureauEtudes.id, { onDelete: "set null" }),
     validated: boolean("validated").notNull().default(false),
     validatedBy: uuid("validated_by").references(() => users.id, { onDelete: "set null" }),
     validatedAt: timestamp("validated_at", { withTimezone: true }),
@@ -52,6 +61,10 @@ export const responseFiles = pgTable(
     architectIdx: index("idx_response_files_architect")
       .on(table.architectId)
       .where(sql`${table.architectId} IS NOT NULL`),
+    /** Index partiel — chemin chaud du DC2 par BE cotraitant (WHERE be_id IS NOT NULL). */
+    beIdx: index("idx_response_files_be")
+      .on(table.beId)
+      .where(sql`${table.beId} IS NOT NULL`),
   }),
 );
 
