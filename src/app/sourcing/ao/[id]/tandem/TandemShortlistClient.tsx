@@ -189,7 +189,10 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         rank: row.rank,
       });
       if (!result.ok) {
-        setLoadError(mapErrorToFr(result.error));
+        const detail = (result as { detail?: string }).detail;
+        setLoadError(
+          `[solicit:${result.error}] ${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`,
+        );
         setPreviewFor(null);
         return;
       }
@@ -341,7 +344,10 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     } satisfies ShortlistMatchOptions);
     setLoading(false);
     if (!result.ok) {
-      setLoadError(mapErrorToFr(result.error));
+      const detail = (result as { detail?: string }).detail;
+      setLoadError(
+        `[recalc:${result.error}] ${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`,
+      );
       return;
     }
     const newRows: ArchitectRow[] = result.matches.map((m, idx) => ({
