@@ -112,7 +112,10 @@ export function createBrevoClient(opts: { fetchFn?: FetchFn } = {}): BrevoClient
 
   return {
     async send(input: BrevoTransactionalEmailInput) {
-      const apiKey = process.env.BREVO_API_KEY;
+      // BREVO_SOURCING_API_KEY = clé dédiée au module Sourcing (préférée).
+      // BREVO_API_KEY = clé legacy partagée (fallback). À terme retirée
+      // quand tous les modules edifio auront leur clé dédiée.
+      const apiKey = process.env.BREVO_SOURCING_API_KEY ?? process.env.BREVO_API_KEY;
       if (!apiKey) {
         return { ok: false, error: "missing_api_key" };
       }
