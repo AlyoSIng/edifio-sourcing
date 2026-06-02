@@ -157,7 +157,6 @@ async function fetchFromDb(
           FROM message_templates
           WHERE organization_id = ${orgId}::uuid
             AND key = ${key}
-            AND active = TRUE
           LIMIT 1`,
     );
     const rows = Array.isArray(result)
