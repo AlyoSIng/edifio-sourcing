@@ -36,6 +36,8 @@
  *    du fallback et utiliser le select normalement.
  */
 
+import { sql } from "drizzle-orm";
+
 import type { DrizzleClient } from "@/app/sourcing/ao/[id]/tandem/actions";
 import { DEFAULT_TEMPLATE_COPY } from "./templates-copy";
 
@@ -144,20 +146,20 @@ async function fetchFromDb(
   db: DrizzleClient,
 ): Promise<MessageTemplateRow | null> {
   try {
-    // Accès direct SQL via `db.execute` pour éviter une dépendance à la
-    // définition Drizzle de `message_templates` (qui n'existe pas encore).
-    // Une fois la migration Alex mergée et le schema Drizzle exporté,
-    // remplacer par `db.select().from(messageTemplates).where(...)`.
-    // `db.execute` accepte un TaggedTemplate literal.
-    // Note : paramètres positionnels — pas d'interpolation de chaînes.
-    const result = await db.execute<MessageTemplateRow>(/* sql */ `
-        SELECT subject, body
-        FROM message_templates
-        WHERE organization_id = ${orgId}::uuid
-          AND key = ${key}
-          AND active = TRUE
-        LIMIT 1
-      `);
+    // Accès direct SQL via `db.execute` + `sql` tagged template Drizzle.
+    // CRUCIAL : utiliser `sql` (drizzle-orm) pour que les valeurs soient
+    // bindées comme paramètres positionnels Postgres ($1, $2). Sans `sql`,
+    // les `${orgId}` sont interpolés en SQL brut → Postgres reçoit un
+    // littéral non typé et peut planter avec "cannot cast type bigint to uuid"
+    // si la colonne attend un UUID.
+    const result = await db.execute<MessageTemplateRow>(
+      sql`SELECT subject, body
+          FROM message_templates
+          WHERE organization_id = ${orgId}::uuid
+            AND key = ${key}
+            AND active = TRUE
+          LIMIT 1`,
+    );
     const rows = Array.isArray(result)
       ? result
       : ((result as { rows?: MessageTemplateRow[] }).rows ?? []);
