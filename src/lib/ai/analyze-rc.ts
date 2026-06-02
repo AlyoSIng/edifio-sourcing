@@ -270,12 +270,47 @@ export async function analyzeRcFromPdf(
       return { ok: false, error: "prompt_not_seeded" };
     }
 
-    // 2. Substitution du placeholder : Claude reçoit le PDF en pièce jointe,
-    //    on lui demande explicitement de l'analyser directement.
-    const userMessage = prompt.userPromptTemplate.replace(
-      "<<RC_TEXT>>",
-      "Le RC est joint en pièce jointe (PDF). Analyse-le directement.",
-    );
+    // 2. Construction du user message avec schéma JSON explicite injecté.
+    //    Haiku 4.5 a besoin d'un schéma précis pour produire un JSON conforme
+    //    à `rcAnalysisSchema`. Sonnet 4.6 le devinait grâce à son raisonnement
+    //    supérieur ; Haiku exige de la structure explicite.
+    const userMessage = `Le RC est joint en pièce jointe (PDF). Analyse-le et retourne UNIQUEMENT un objet JSON valide (sans markdown, sans commentaire) conforme exactement à ce schéma :
+
+\`\`\`json
+{
+  "pieces_demandees": [
+    { "nom": "string", "format": "string|null", "signature_requise": true|false, "obligatoire": true|false, "provenance": { "page": number, "citation": "string" } }
+  ],
+  "echeances": [
+    { "type": "questions"|"visite"|"remise_plis"|"autre", "date": "string", "heure": "string|null", "provenance": { "page": number, "citation": "string" } }
+  ],
+  "criteres_jugement": [
+    { "critere": "string", "ponderation_pct": number, "sous_criteres": ["string"]|null, "provenance": { "page": number, "citation": "string" } }
+  ],
+  "modalites_remise": {
+    "plateforme": "string|null",
+    "format_pli": "string|null",
+    "signature": "string|null",
+    "provenance": { "page": number, "citation": "string" }|null
+  },
+  "clauses_specifiques": [
+    { "description": "string", "provenance": { "page": number, "citation": "string" } }
+  ],
+  "competences_demandees": [
+    { "competence": "string", "niveau": "string|null", "provenance": { "page": number, "citation": "string" } }
+  ],
+  "alertes": ["string"]
+}
+\`\`\`
+
+Règles strictes :
+- Tous les tableaux peuvent être vides (\`[]\`) si rien n'est trouvé, ne JAMAIS omettre une clé.
+- \`provenance.page\` = numéro de page entier (1 = première page).
+- \`provenance.citation\` = extrait littéral court (max 200 caractères).
+- \`ponderation_pct\` entre 0 et 100.
+- \`type\` d'échéance doit être exactement l'une des 4 valeurs énumérées.
+- Ne pas inventer de citations ou pages : si une info est absente, mets une chaîne vide \`""\` pour les strings ou \`[]\` pour les arrays.
+- Réponds UNIQUEMENT avec le JSON, sans texte avant ni après.`;
 
     // 3. Hash SHA-256 sur les bytes du PDF (traçabilité + dédup future)
     const inputHash = createHash("sha256").update(pdfBuffer).digest("hex");
@@ -302,7 +337,7 @@ export async function analyzeRcFromPdf(
     try {
       const stream = client.messages.stream({
         model: PDF_NATIVE_MODEL_API,
-        max_tokens: 4000,
+        max_tokens: 8000,
         system: prompt.systemPrompt,
         messages: [
           {
@@ -358,11 +393,17 @@ export async function analyzeRcFromPdf(
     // 8. Valider avec Zod (garantit la présence des provenances — Gate 5 §7)
     const validated = rcAnalysisSchema.safeParse(parsed);
     if (!validated.success) {
-      console.error("[analyze-rc-from-pdf:parse:zod:fail]", validated.error.flatten());
+      console.error("[analyze-rc-from-pdf:parse:zod:fail]", {
+        zodErrors: validated.error.flatten(),
+        rawTextPreview: rawText.slice(0, 1000),
+        parsedKeys: parsed && typeof parsed === "object" ? Object.keys(parsed) : null,
+      });
       return {
         ok: false,
         error: "parse_error",
-        message: "Structure JSON inattendue dans la réponse Anthropic",
+        message: `Structure JSON inattendue. Erreurs Zod : ${JSON.stringify(
+          validated.error.flatten().fieldErrors,
+        ).slice(0, 300)}`,
       };
     }
 
