@@ -114,9 +114,11 @@ function analyzeErrorLabel(code: string | undefined): string {
     case "storage_download_failed":
       return "Impossible de télécharger le RC depuis le stockage — réessayez.";
     case "pdf_parse_failed":
-      return "Impossible d'extraire le texte du PDF — vérifiez que le fichier est un PDF valide.";
+      return "Impossible d'analyser le PDF — vérifiez que le fichier est un PDF valide.";
     case "pdf_empty":
-      return "Le PDF RC ne contient pas de texte extractible (PDF scanné sans OCR ?).";
+      return "Le PDF RC est vide ou illisible — vérifiez le fichier.";
+    case "pdf_too_large":
+      return "Le PDF dépasse 32 Mo. Allégez-le ou contactez l'admin.";
     case "prompt_not_seeded":
       return "Le prompt P1 n'est pas en base. Exécutez src/db/seeds/001_ai_prompts.sql sur la BDD.";
     case "anthropic_error":

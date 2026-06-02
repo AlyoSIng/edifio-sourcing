@@ -1,6 +1,13 @@
 /**
  * analyzeRc — appel Anthropic Sonnet 4.6 + validation Zod pour le prompt P1.
  *
+ * Deux variantes exportées :
+ *   - `analyzeRc(tenderId, rcText, orgId)`     : envoi du texte déjà extrait
+ *     (rétro-compat — utile si on dispose déjà du texte côté caller).
+ *   - `analyzeRcFromPdf(tenderId, pdfBuffer, orgId)` : envoi direct du PDF binaire
+ *     à Claude (API Anthropic gère extraction texte + OCR auto natif).
+ *     Variante recommandée depuis 2026-06-02 (bug pdf-parse sur certains PDFs).
+ *
  * Charge le prompt actif depuis `ai_prompts` (name='rc_analysis_full').
  * Si absent → `{ ok: false, error: 'prompt_not_seeded' }`.
  *
@@ -204,6 +211,186 @@ export async function analyzeRc(
     };
   } catch (err) {
     console.error("[analyze-rc:unhandled]", err);
+    return {
+      ok: false,
+      error: "internal_error",
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fonction alternative : envoi direct du PDF à Claude (PDF natif)
+// ---------------------------------------------------------------------------
+
+/**
+ * Analyse un RC en envoyant le PDF binaire directement à Claude Sonnet 4.6.
+ *
+ * Avantages vs `analyzeRc(rcText)` :
+ *   - Plus de dépendance à `pdf-parse` (bug sur PDFs à fonts custom / encodage exotique)
+ *   - OCR automatique pour les pages scannées sans couche texte
+ *   - Anthropic gère nativement l'extraction
+ *
+ * Limites Anthropic :
+ *   - 32 Mo max par PDF (vérifié côté caller)
+ *   - 100 pages max (au-delà : erreur API renvoyée comme `anthropic_error`)
+ *
+ * Le placeholder `<<RC_TEXT>>` du prompt est remplacé par une consigne textuelle
+ * indiquant à Claude que le RC est en pièce jointe. L'inputHash est calculé
+ * sur les bytes du PDF (différent du hash texte, mais idem traçabilité ai_runs).
+ *
+ * @param tenderId  UUID du tender auquel le RC appartient
+ * @param pdfBuffer Buffer Node.js du PDF (lu depuis Supabase Storage)
+ * @param orgId     UUID de l'organisation courante (résolu via getRequiredOrgId)
+ */
+export async function analyzeRcFromPdf(
+  tenderId: string,
+  pdfBuffer: Buffer,
+  orgId: string,
+): Promise<AnalyzeRcResult> {
+  try {
+    // 1. Charger le prompt actif depuis la BDD
+    const [prompt] = await db
+      .select()
+      .from(aiPrompts)
+      .where(and(eq(aiPrompts.name, "rc_analysis_full"), eq(aiPrompts.active, true)))
+      .limit(1);
+
+    if (!prompt) {
+      return { ok: false, error: "prompt_not_seeded" };
+    }
+
+    // 2. Substitution du placeholder : Claude reçoit le PDF en pièce jointe,
+    //    on lui demande explicitement de l'analyser directement.
+    const userMessage = prompt.userPromptTemplate.replace(
+      "<<RC_TEXT>>",
+      "Le RC est joint en pièce jointe (PDF). Analyse-le directement.",
+    );
+
+    // 3. Hash SHA-256 sur les bytes du PDF (traçabilité + dédup future)
+    const inputHash = createHash("sha256").update(pdfBuffer).digest("hex");
+
+    // 4. Encodage base64 pour l'API Anthropic (DocumentBlockParam → Base64PDFSource)
+    const pdfBase64 = pdfBuffer.toString("base64");
+
+    // 5. Appel Anthropic — bloc `document` + bloc `text` dans le même message user
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
+    const startMs = Date.now();
+
+    let response: Awaited<ReturnType<typeof client.messages.create>>;
+    try {
+      response = await client.messages.create({
+        model: ANTHROPIC_MODEL_MAP[prompt.model] ?? prompt.model,
+        max_tokens: 4000,
+        system: prompt.systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: pdfBase64,
+                },
+              },
+              { type: "text", text: userMessage },
+            ],
+          },
+        ],
+      });
+    } catch (err) {
+      console.error("[analyze-rc-from-pdf:anthropic:fail]", err);
+      return {
+        ok: false,
+        error: "anthropic_error",
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    const latencyMs = Date.now() - startMs;
+
+    // 6. Extraire le texte de la réponse
+    const firstContent = response.content[0];
+    const rawText =
+      firstContent !== undefined && firstContent.type === "text"
+        ? (firstContent.text as string)
+        : "";
+
+    // 7. Parser le JSON (Anthropic peut envelopper dans ```json ... ```)
+    const jsonText = extractJson(rawText);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      console.error("[analyze-rc-from-pdf:parse:json:fail]", rawText.slice(0, 300));
+      return {
+        ok: false,
+        error: "parse_error",
+        message: "JSON invalide dans la réponse Anthropic",
+      };
+    }
+
+    // 8. Valider avec Zod (garantit la présence des provenances — Gate 5 §7)
+    const validated = rcAnalysisSchema.safeParse(parsed);
+    if (!validated.success) {
+      console.error("[analyze-rc-from-pdf:parse:zod:fail]", validated.error.flatten());
+      return {
+        ok: false,
+        error: "parse_error",
+        message: "Structure JSON inattendue dans la réponse Anthropic",
+      };
+    }
+
+    // 9. Calcul du coût estimé (même grille que analyzeRc texte)
+    const costUsd =
+      (response.usage.input_tokens * 3 + response.usage.output_tokens * 15) / 1_000_000;
+
+    // 10. Enregistrer le run IA dans ai_runs
+    const inserted = await db
+      .insert(aiRuns)
+      .values({
+        organizationId: orgId,
+        promptId: prompt.id,
+        tenderId,
+        inputHash,
+        output: {
+          prompt_name: prompt.name,
+          prompt_version: prompt.version,
+          payload: validated.data as Record<string, unknown>,
+          metadata: {
+            tokens_in: response.usage.input_tokens,
+            tokens_out: response.usage.output_tokens,
+            input_hash: inputHash,
+          },
+        },
+        costUsd: costUsd.toFixed(4),
+        latencyMs,
+        model: prompt.model,
+        succeeded: true,
+      })
+      .returning({ id: aiRuns.id });
+
+    const runId = inserted[0]?.id ?? "unknown";
+
+    return {
+      ok: true,
+      analysis: validated.data,
+      runId,
+      costUsd,
+      latencyMs,
+      promptName: prompt.name,
+      promptVersion: prompt.version,
+      model: prompt.model,
+      tokensIn: response.usage.input_tokens,
+      tokensOut: response.usage.output_tokens,
+    };
+  } catch (err) {
+    console.error("[analyze-rc-from-pdf:unhandled]", err);
     return {
       ok: false,
       error: "internal_error",

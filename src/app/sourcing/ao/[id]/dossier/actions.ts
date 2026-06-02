@@ -10,18 +10,20 @@
  *   - `uploadDcePdf`           : upload manuel du RC par l'utilisateur (FormData).
  *   - `importDceFromPastedUrl` : import RC depuis une URL collée manuellement.
  *   - `getRcSignedUrlAction`   : URL signée 1 h pour aperçu PDF en iframe.
- *   - `analyzeRcAction`        : extrait le texte PDF + appelle Claude Sonnet 4.6 via
- *                               `analyzeRc()`, insère un `tender_event` rc_analyzed.
+ *   - `analyzeRcAction`        : envoie le PDF binaire directement à Claude Sonnet 4.6
+ *                               via `analyzeRcFromPdf()` (API Anthropic gère extraction
+ *                               texte + OCR natif), insère un `tender_event` rc_analyzed.
  *
  * Sécurité :
  *   - Auth check sur chaque action (defense in depth)
  *   - Filtre `organizationId = orgId` sur toutes les requêtes BDD
- *   - PDF only, max 50 Mo pour l'upload manuel
+ *   - PDF only, max 50 Mo pour l'upload manuel (max 32 Mo pour l'envoi à Claude)
  *   - AbortSignal.timeout(30 s) pour le fetch DCE
  *
- * Note `pdf-parse` :
- *   Utilise un import dynamique `(await import('pdf-parse')).default` pour éviter
- *   les problèmes de build Next.js avec les modules CommonJS.
+ * Note PDF → IA (depuis 2026-06-02) :
+ *   On envoie le PDF brut à Claude (DocumentBlockParam base64) plutôt que d'extraire
+ *   le texte via `pdf-parse` côté serveur. Raison : pdf-parse échouait sur certains
+ *   PDFs (fonts custom, encodage exotique). Anthropic gère l'extraction + OCR auto.
  *
  * Source de vérité :
  *   - Spec PR-B module dossier IA (brief Board 2026-05-25)
@@ -37,7 +39,7 @@ import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
-import { analyzeRc } from "@/lib/ai/analyze-rc";
+import { analyzeRcFromPdf } from "@/lib/ai/analyze-rc";
 import type { RcAnalysis } from "@/lib/ai/schemas";
 
 // ---------------------------------------------------------------------------
@@ -50,8 +52,12 @@ const MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024;
 /** Nom du bucket Supabase Storage (privé, RLS activée) */
 const BUCKET = "tender_documents";
 
-/** Limite de texte envoyé à Claude — 100 000 chars ~= 25 K tokens (raisonnable) */
-const MAX_RC_TEXT_LENGTH = 100_000;
+/**
+ * Taille maximale d'un PDF envoyé directement à l'API Anthropic (limite
+ * documentée : 32 Mo par document). Au-delà → on retourne `pdf_too_large`
+ * et on demande à l'utilisateur d'alléger le fichier.
+ */
+const MAX_PDF_SIZE_FOR_AI = 32 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // Types retour
@@ -523,12 +529,11 @@ export async function getRcSignedUrlAction(
  * Workflow :
  *   1. Vérification auth + ownership du document
  *   2. Téléchargement du PDF depuis Supabase Storage
- *   3. Extraction texte via `pdf-parse` (import dynamique CommonJS)
- *   4. Troncature à 100 000 chars (contexte raisonnable)
- *   5. Appel `analyzeRc(tenderId, rcText)`
- *   6. Insert `tender_events` (eventType='rc_analyzed', data contient l'analyse)
- *   7. Update `tender_documents.analyzed = true`
- *   8. `revalidatePath`
+ *   3. Vérification taille (max 32 Mo — limite Anthropic)
+ *   4. Appel `analyzeRcFromPdf(tenderId, pdfBuffer)` — PDF envoyé en base64 à Claude
+ *   5. Insert `tender_events` (eventType='rc_analyzed', data contient l'analyse)
+ *   6. Update `tender_documents.analyzed = true`
+ *   7. `revalidatePath`
  *
  * @param tenderId   UUID du tender
  * @param documentId UUID du document dans `tender_documents`
@@ -576,27 +581,18 @@ export async function analyzeRcAction(
     // Conversion Blob → Buffer
     const pdfBuffer = Buffer.from(await storageData.arrayBuffer());
 
-    // Extraction texte PDF — import dynamique pour compatibilité CJS/ESM Next.js
-    let rcText: string;
-    try {
-      const pdfParse = (await import("pdf-parse")).default;
-      const pdfData = await pdfParse(pdfBuffer);
-      rcText = pdfData.text ?? "";
-    } catch (err) {
-      console.error("[dossier:analyze-rc:pdf-parse:fail]", err);
-      return { ok: false, error: "pdf_parse_failed" };
+    // Vérification taille — limite Anthropic = 32 Mo par document PDF
+    if (pdfBuffer.length > MAX_PDF_SIZE_FOR_AI) {
+      console.warn(
+        "[dossier:analyze-rc:pdf-too-large]",
+        `${pdfBuffer.length} bytes > ${MAX_PDF_SIZE_FOR_AI}`,
+      );
+      return { ok: false, error: "pdf_too_large" };
     }
 
-    if (!rcText || rcText.trim().length === 0) {
-      return { ok: false, error: "pdf_empty" };
-    }
-
-    // Troncature raisonnable (100 000 chars ~= 25 K tokens)
-    const truncated =
-      rcText.length > MAX_RC_TEXT_LENGTH ? rcText.slice(0, MAX_RC_TEXT_LENGTH) : rcText;
-
-    // Appel Claude Sonnet 4.6 via analyzeRc
-    const result = await analyzeRc(tenderId, truncated, auth.orgId);
+    // Envoi direct du PDF à Claude (extraction texte + OCR auto natif)
+    // — remplace pdf-parse qui échouait sur certains PDFs (fonts custom, etc.)
+    const result = await analyzeRcFromPdf(tenderId, pdfBuffer, auth.orgId);
 
     if (!result.ok) {
       if (result.error === "prompt_not_seeded") {
