@@ -134,8 +134,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
       const result = await matchArchitectsForTender(tenderId, { topN: criteria.topN });
       if (cancelled) return;
       if (!result.ok) {
-        const detail = (result as { detail?: string }).detail;
-        setLoadError(`${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`);
+        setLoadError(mapErrorToFr(result.error));
         setLoading(false);
         return;
       }
@@ -189,10 +188,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         rank: row.rank,
       });
       if (!result.ok) {
-        const detail = (result as { detail?: string }).detail;
-        setLoadError(
-          `[solicit:${result.error}] ${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`,
-        );
+        setLoadError(mapErrorToFr(result.error));
         setPreviewFor(null);
         return;
       }
@@ -344,10 +340,7 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
     } satisfies ShortlistMatchOptions);
     setLoading(false);
     if (!result.ok) {
-      const detail = (result as { detail?: string }).detail;
-      setLoadError(
-        `[recalc:${result.error}] ${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`,
-      );
+      setLoadError(mapErrorToFr(result.error));
       return;
     }
     const newRows: ArchitectRow[] = result.matches.map((m, idx) => ({
@@ -744,6 +737,15 @@ function ArchitectCard({
   onSelect: () => void;
 }) {
   const sent = row.responseStatus !== null;
+  // Boutton "Renvoyer" autorisé pour les pending uniquement.
+  // Les statuts terminaux (accepted/declined/info_requested) sont définitifs,
+  // on ne propose pas de relance manuelle (l'archi a déjà décidé).
+  const canResend = row.responseStatus === "pending";
+  const buttonLabel = !sent
+    ? "Préparer la sollicitation"
+    : canResend
+      ? "Renvoyer le mail"
+      : "Déjà sollicité";
   return (
     <article
       className="rounded-md border border-line bg-white p-5 shadow-sm transition hover:border-line-2"
@@ -814,11 +816,15 @@ function ArchitectCard({
           <button
             type="button"
             onClick={onSelect}
-            disabled={sent}
+            disabled={sent && !canResend}
             data-testid={`select-architect-${row.rank}`}
-            className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
+            className={
+              canResend
+                ? "rounded-full border border-brand-red bg-white px-4 py-2 text-sm font-semibold text-brand-red transition hover:bg-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1"
+                : "rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
+            }
           >
-            {sent ? "Déjà sollicité" : "Préparer la sollicitation"}
+            {buttonLabel}
           </button>
         </div>
       </div>

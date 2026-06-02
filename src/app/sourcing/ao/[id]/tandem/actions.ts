@@ -129,8 +129,6 @@ export type MatchActionResult =
         | "invalid_input"
         | "tender_not_found"
         | "internal_error";
-      /** Diagnostic temporaire — à retirer une fois le bug d'envoi mail identifié. */
-      detail?: string;
     };
 
 export interface MatchScoreWithArchitect extends MatchScore {
@@ -349,16 +347,8 @@ export async function matchArchitectsForTender(
 
     return { ok: true, matches };
   } catch (err) {
-    const detail = [
-      err instanceof Error
-        ? `${err.constructor.name}: ${err.message || "(no message)"}`
-        : String(err),
-      (err as { code?: string }).code ? `code=${(err as { code?: string }).code}` : null,
-    ]
-      .filter(Boolean)
-      .join(" | ");
-    console.error("[tandem-actions:match:fail]", detail, err);
-    return { ok: false, error: "internal_error", detail };
+    console.error("[tandem-actions:match:fail]", err);
+    return { ok: false, error: "internal_error" };
   }
 }
 
@@ -649,16 +639,8 @@ export async function sendArchitectSolicitation(
     if (err instanceof InvalidStateError) {
       return { ok: false, error: "invalid_state", detail: err.message };
     }
-    const detail = [
-      err instanceof Error
-        ? `${err.constructor.name}: ${err.message || "(no message)"}`
-        : String(err),
-      (err as { code?: string }).code ? `code=${(err as { code?: string }).code}` : null,
-    ]
-      .filter(Boolean)
-      .join(" | ");
-    console.error("[tandem-actions:solicit:db_fail]", detail, err);
-    return { ok: false, error: "internal_error", detail };
+    console.error("[tandem-actions:solicit:db_fail]", err);
+    return { ok: false, error: "internal_error" };
   }
 
   // 7. Envoi Brevo (hors transaction — latence variable)
