@@ -1,16 +1,18 @@
 /**
- * Mots de passe communs interdits — Board Q2/B 2026-05-12.
+ * Mots de passe communs interdits — VERSION CLIENT (~100 entrées sectorielles).
  *
- * Critère : rejette les passwords les plus dangereux (présents dans toutes
- * les listes d'attaque par dictionnaire). Le check s'ajoute à la politique
- * de force `validatePasswordStrength` (longueur + classes de caractères).
+ * Module isomorphique : importable côté client pour feedback live dans
+ * `ResetPasswordForm` (indicateur de force à chaque keystroke). Contient les
+ * entrées AlyoS/edifio + variantes françaises courantes qui passent souvent
+ * `MIN_LENGTH = 16` sans détection (saisons + années, motdepasse123, etc.).
  *
- * TODO Gate 7 : remplacer par la liste 10k complète (SecLists,
- * `Passwords/Common-Credentials/10-million-password-list-top-10000.txt`,
- * licence MIT). MVP utilise un sous-ensemble critique d'environ 100 entrées.
- * Ne PAS commiter la liste 10k complète directement dans le bundle JS —
- * privilégier un chargement lazy ou via une route API (le set complet pèse
- * ~85 kB et n'a rien à faire côté client).
+ * Architecture du split (Board 2026-05-29, Lot 3 v2) :
+ * - `common-passwords.ts`        → ce fichier, ~100 entrées sectorielles, client-safe
+ * - `common-passwords-full.ts`   → 10k SecLists, server-only (~85 KB), auto-généré
+ *
+ * Le check client donne un feedback immédiat sur les pires cas (sectoriels
+ * + variantes FR). Le check serveur (`validatePasswordStrengthServer` dans
+ * `./password.ts`) ajoute la liste complète SecLists en filet de sécurité.
  *
  * Liste normalisée en lowercase + trim. Couvre :
  *   - les 30 passwords les plus utilisés (123456, password, qwerty…)

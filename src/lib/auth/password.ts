@@ -16,6 +16,7 @@
  */
 
 import { isCommonPassword } from "./common-passwords";
+import { isCommonPasswordFull } from "./common-passwords-full";
 import {
   MIN_LENGTH,
   PASSWORD_ERROR_CODES,
@@ -68,6 +69,36 @@ export function validatePasswordStrength(pwd: string): PasswordValidationResult 
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Variante SERVER-ONLY de `validatePasswordStrength`.
+ *
+ * Applique exactement les mêmes règles, puis ajoute en plus le check sur la
+ * liste complète SecLists (10k entrées, ~85 KB). Cette liste vit dans
+ * `./common-passwords-full.ts` et ne doit JAMAIS être importée côté client.
+ *
+ * À utiliser dans toutes les Server Actions / Route Handlers qui acceptent un
+ * mot de passe choisi par l'utilisateur (cf. `app/reset-password/actions.ts`).
+ * Le Client Component continue d'appeler `validatePasswordStrength` pour le
+ * feedback live — la version serveur fait foi côté Server Action.
+ *
+ * Board 2026-05-29, Lot 3 v2 — défense en profondeur sur le brute-force par
+ * dictionnaire.
+ */
+export function validatePasswordStrengthServer(pwd: string): PasswordValidationResult {
+  const base = validatePasswordStrength(pwd);
+  // Si déjà rejeté pour TOO_COMMON via la liste sectorielle, pas besoin de
+  // réinjecter le code. On ne push TOO_COMMON qu'une seule fois pour ne pas
+  // dupliquer le libellé dans l'UI.
+  if (base.errors.includes(PASSWORD_ERROR_CODES.TOO_COMMON)) return base;
+  if (isCommonPasswordFull(pwd)) {
+    return {
+      valid: false,
+      errors: [...base.errors, PASSWORD_ERROR_CODES.TOO_COMMON],
+    };
+  }
+  return base;
 }
 
 /**

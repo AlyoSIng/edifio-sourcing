@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { passwordErrorLabel, validatePasswordStrength } from "@/lib/auth/password";
+import { passwordErrorLabel, validatePasswordStrengthServer } from "@/lib/auth/password";
 import { toUserProfile, type UserMetadata } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -49,8 +49,10 @@ export async function updatePasswordAction(
       return { status: "error", message: "Les deux mots de passe ne correspondent pas." };
     }
 
-    // Validation force serveur (en plus du client).
-    const strength = validatePasswordStrength(password);
+    // Validation force serveur (en plus du client). On utilise la variante
+    // SERVER qui couvre en plus la liste 10k SecLists — défense en profondeur
+    // contre le brute-force par dictionnaire (Board 2026-05-29, Lot 3 v2).
+    const strength = validatePasswordStrengthServer(password);
     if (!strength.valid) {
       return {
         status: "error",

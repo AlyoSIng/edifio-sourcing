@@ -7,6 +7,7 @@ import {
   formatCountdownMinSec,
   passwordErrorLabel,
   validatePasswordStrength,
+  validatePasswordStrengthServer,
 } from "./password";
 
 /**
@@ -86,6 +87,45 @@ describe("validatePasswordStrength", () => {
     expect(exactlyMin.length).toBe(MIN_LENGTH);
     const r = validatePasswordStrength(exactlyMin);
     expect(r.valid).toBe(true);
+  });
+});
+
+describe("validatePasswordStrengthServer", () => {
+  // Mot de passe robuste : 16+ chars, classes complètes, hors liste sectorielle
+  // ET hors top 10k SecLists.
+  const ROBUST = "Xy7!azerty-bleu-montagne";
+
+  it("accepte les mêmes mots de passe que la version client", () => {
+    const r = validatePasswordStrengthServer(ROBUST);
+    expect(r.valid).toBe(true);
+    expect(r.errors).toEqual([]);
+  });
+
+  it("rejette un mot de passe présent dans la liste 10k SecLists", () => {
+    // « password » est dans SecLists ET dans la liste client → déjà flag par la
+    // base. Mais on teste explicitement le code TOO_COMMON.
+    const r = validatePasswordStrengthServer("password");
+    expect(r.valid).toBe(false);
+    expect(r.errors).toContain(PASSWORD_ERROR_CODES.TOO_COMMON);
+  });
+
+  it("n'ajoute pas TOO_COMMON en double quand la base l'a déjà détecté", () => {
+    // « azerty » est dans les DEUX listes. Le code TOO_COMMON ne doit
+    // apparaître qu'une seule fois dans le tableau d'erreurs.
+    const r = validatePasswordStrengthServer("azerty");
+    const occurrences = r.errors.filter((e) => e === PASSWORD_ERROR_CODES.TOO_COMMON).length;
+    expect(occurrences).toBe(1);
+  });
+
+  it("propage toutes les erreurs de la base (longueur + classes)", () => {
+    const r = validatePasswordStrengthServer("aaaa");
+    expect(r.valid).toBe(false);
+    expect(r.errors).toContain(PASSWORD_ERROR_CODES.TOO_SHORT);
+  });
+
+  it("reste valid quand le mot de passe est solide et hors liste 10k", () => {
+    // 16 chars exactement, classes complètes, totalement absent des deux listes.
+    expect(validatePasswordStrengthServer("Qz4!plmkjnbvgft9").valid).toBe(true);
   });
 });
 
