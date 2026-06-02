@@ -2,6 +2,68 @@
 
 ---
 
+## 2026-06-02 — Chantier DC1/DC2/Pouvoir multi-archi / multi-BE
+
+**Contexte** : finaliser le module dossier de candidature pour gérer les
+3 modes de réponse à un AO : Solo, Tandem (avec architecte mandataire),
+Cotraitance BE (avec N bureaux d'études cotraitants).
+
+**Décisions actées** :
+
+1. **Multi-archi en mode Tandem** : 1 dossier par archi accepté. Sélecteur
+   sur la page dossier (`AcceptedArchitectsSelector`) qui pose un query param
+   `?archi=<uuid>`. Les CERFA sont liés via `response_files.architect_id`.
+   En Tandem, DC1 = archi (mandataire), DC2 = AlyoS (cotraitant).
+
+2. **Multi-BE en mode Cotraitance BE** : 1 dossier global avec N DC2 (un
+   par BE cotraitant). Nouvelle table `tender_be_cotraitants(tender_id,
+   be_id, organization_id)`. Sélecteur sur la page dossier qui charge un
+   BE depuis la bibliothèque. CERFA accepte `?be=<uuid>`. DC1 = AlyoS,
+   DC2 = par BE via `response_files.be_id`. Mutual exclusivity `?archi=`
+   prime sur `?be=`.
+
+3. **Champs administratifs** : ajout des colonnes `legal_representative_*`,
+   `address_line1/2`, `signature_city` sur architects, organization_profiles,
+   et bureaux_etudes (migrations 0033, 0034, 0035). `capital_eur` sur
+   organization_profiles et bureaux_etudes pour le DC2.
+
+4. **Génération PDF** : remplacement du JSON par PDF formaté A4 via pdf-lib
+   (sanitization Helvetica WinAnsi, pagination automatique). Layout custom
+   (pas les templates CERFA officiels qui posent trop de problèmes de form
+   fields). Bouton "Télécharger" via `getCerfaSignedUrl` (URL signée 1h).
+
+5. **Pouvoir** : pas un CERFA généré. Le template AlyoS est stocké dans
+   `presentation_library` avec `kind = 'pouvoir_mandataire'`. Inclus
+   systématiquement dans le ZIP de compilation pour les groupements
+   (Tandem + Cotraitance BE).
+
+6. **Analyse RC Claude** : double étage `pdf-parse` (rapide) → fallback PDF
+   natif Haiku 4.5 (~15-25s, tient sous timeout Vercel 60s vs Sonnet 4.6
+   qui dépasse). Schéma JSON injecté explicite dans le prompt car Haiku
+   ne devine pas la structure attendue par Zod comme Sonnet.
+
+**Migrations associées** : 0033, 0034, 0035, 0036, 0037.
+
+**Commits clés** : db79375, 8b79b9a, 3e82ad8, 213e154, 3efbfe3, ac3eea4,
+ffccd29, 1c6fb8e.
+
+**Fichiers modifiés ce jour (compilation ZIP)** :
+- `src/lib/dossier/zip-compile.ts` — extension `ZipCompileInput` avec
+  `forcedLibraryItems` (Pouvoir) et `tenderDocuments` (RC). Conserve les
+  extensions des fichiers source (PDF DC1/DC2, docx Pouvoir, PDF RC).
+- `src/app/sourcing/ao/[id]/dossier/pieces/actions.ts` — `compileDossierAction`
+  prend désormais `options?: { architectId, beId }`. Helper interne
+  `loadContextualCerfa` qui charge les CERFA selon le mode. Récupération
+  du Pouvoir + RC, nommage ZIP `dossier_{externalRef}_{contexte}.zip` avec
+  `download` filename injecté dans l'URL signée Supabase.
+- `src/app/sourcing/ao/[id]/dossier/pieces/page.tsx` — accepte `?be=`, le
+  passe à `PiecesClient`, mutual exclusivity côté page (archi > be).
+- `src/app/sourcing/ao/[id]/dossier/pieces/PiecesClient.tsx` — prop `beParam`,
+  bandeau d'info Cotraitance BE, hint UX au-dessus du bouton "Compiler"
+  qui décrit ce que contiendra le ZIP selon le mode.
+
+---
+
 ## 2026-05-30 — Migration 0032 org_branding appliquée en prod
 
 **Agent** : Steve (Ops) / Alex (dev) / Yann (ps_operator)

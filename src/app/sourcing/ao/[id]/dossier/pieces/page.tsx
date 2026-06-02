@@ -50,8 +50,11 @@ interface PageProps {
    *     en mode Tandem multi-archi (Phase 3). Propagé sur tous les liens de
    *     la page (retour Dossier, lien vers CERFA) pour conserver le contexte.
    *     UUID invalide → ignoré, comportement standard (pas d'archi).
+   *   - `be`    : UUID du BE cotraitant (Lot B Cotraitance BE). Mutuellement
+   *     exclusif avec `archi` — si les deux sont posés, `archi` prime. Sert
+   *     uniquement à la compilation du ZIP (DC2 spécifique BE) et au hint UX.
    */
-  searchParams?: { archi?: string };
+  searchParams?: { archi?: string; be?: string };
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -93,7 +96,16 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
   // pour éviter de propager une valeur arbitraire dans les URLs.
   const archiParamRaw = searchParams?.archi;
   const archiParam = archiParamRaw && UUID_SHAPE.test(archiParamRaw) ? archiParamRaw : null;
-  const archiQuery = archiParam ? `?archi=${archiParam}` : "";
+
+  // Résolution du param be (Lot B — Cotraitance BE). Mutuellement exclusif
+  // avec archiParam : si archi est posé, on ignore be (cohérent avec la
+  // règle de précédence du Server Action `compileDossierAction`).
+  const beParamRaw = searchParams?.be;
+  const beParam = !archiParam && beParamRaw && UUID_SHAPE.test(beParamRaw) ? beParamRaw : null;
+
+  // Query string propagé sur tous les liens internes vers /dossier et
+  // /dossier/cerfa. Priorité archi > be (un seul des deux pose un query param).
+  const archiQuery = archiParam ? `?archi=${archiParam}` : beParam ? `?be=${beParam}` : "";
 
   // 3. Chargement des données — résilience runtime
   try {
@@ -225,6 +237,7 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
           existingDc2={existingDc2}
           pieceMatches={pieceMatches}
           archiParam={archiParam}
+          beParam={beParam}
         />
       </main>
     );

@@ -37,6 +37,12 @@ export interface PiecesClientProps {
    * archi mandataire. `null` → liens standards sans query param.
    */
   archiParam: string | null;
+  /**
+   * UUID BE cotraitant sélectionné (Lot B — Cotraitance BE). Mutuellement
+   * exclusif avec `archiParam` (la page parent garantit qu'au plus l'un des
+   * deux est non null). `null` → comportement Solo / Tandem.
+   */
+  beParam: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +150,10 @@ function compileErrorLabel(code: string | undefined): string {
       return "Session expirée — reconnectez-vous.";
     case "no_cerfa":
       return "DC1 et DC2 doivent être validés avant de compiler le dossier.";
+    case "architect_not_accepted":
+      return "L'architecte sélectionné n'a pas accepté la sollicitation — impossible de compiler son dossier.";
+    case "be_not_cotraitant":
+      return "Le BE sélectionné n'est pas cotraitant sur cet AO — impossible de compiler son dossier.";
     case "zip_empty":
       return "Aucun document disponible — ajoutez des pièces à la bibliothèque d'abord.";
     case "zip_download_failed":
@@ -166,14 +176,20 @@ export function PiecesClient({
   existingDc2,
   pieceMatches,
   archiParam,
+  beParam,
 }: PiecesClientProps) {
   const missingCount = pieceMatches.filter((m) => m.status === "missing").length;
   const partialCount = pieceMatches.filter((m) => m.status === "partial").length;
   const availableCount = pieceMatches.filter((m) => m.status === "available").length;
 
-  // Phase 3 — query string propagé sur tous les liens internes vers
-  // /dossier et /dossier/cerfa pour conserver le contexte archi mandataire.
-  const archiQuery = archiParam ? `?archi=${archiParam}` : "";
+  // Phase 3 + Lot B — query string propagé sur tous les liens internes vers
+  // /dossier et /dossier/cerfa pour conserver le contexte archi mandataire ou
+  // BE cotraitant. Mutual exclusivity garantie par la page parent.
+  const archiQuery = archiParam ? `?archi=${archiParam}` : beParam ? `?be=${beParam}` : "";
+
+  // Mode courant — pour le hint UX au-dessus du bouton "Compiler".
+  type CompileMode = "tandem" | "cotraitance_be" | "solo";
+  const compileMode: CompileMode = archiParam ? "tandem" : beParam ? "cotraitance_be" : "solo";
 
   // Alerte si DC1 ou DC2 manquants
   const cerfsIncomplete = !existingDc1 || !existingDc2;
@@ -188,7 +204,10 @@ export function PiecesClient({
     setCompileError(null);
     setDownloadUrl(null);
     startCompile(async () => {
-      const result = await compileDossierAction(tenderId);
+      const result = await compileDossierAction(tenderId, {
+        architectId: archiParam,
+        beId: beParam,
+      });
       if (result.ok && result.downloadUrl) {
         setDownloadUrl(result.downloadUrl);
         setZipFileCount(result.fileCount ?? null);
@@ -198,12 +217,30 @@ export function PiecesClient({
     });
   }
 
+  // UX hint — message contextualisé selon le mode de réponse.
+  const compileHint: string = (() => {
+    switch (compileMode) {
+      case "tandem":
+        return "Le ZIP contiendra DC1 + DC2 + Pouvoir + RC + pièces, optimisé pour l'architecte sélectionné.";
+      case "cotraitance_be":
+        return "Le ZIP contiendra DC1 + DC2 du BE + Pouvoir + RC + pièces.";
+      case "solo":
+      default:
+        return "Le ZIP contiendra DC1 + DC2 + Pouvoir + RC + pièces de la bibliothèque.";
+    }
+  })();
+
   return (
     <div className="space-y-8">
-      {/* Bandeau info — pièces ciblées sur l'archi mandataire (Phase 3). */}
+      {/* Bandeau info — pièces ciblées sur l'archi mandataire (Phase 3) ou le BE cotraitant (Lot B). */}
       {archiParam && (
         <div className="mb-4 rounded-md border border-line bg-paper-2 p-3 text-xs text-ink-2">
           Pièces du dossier préparé pour l&apos;architecte mandataire sélectionné.
+        </div>
+      )}
+      {beParam && (
+        <div className="mb-4 rounded-md border border-line bg-paper-2 p-3 text-xs text-ink-2">
+          Pièces du dossier préparé pour le bureau d&apos;études cotraitant sélectionné.
         </div>
       )}
 
@@ -338,6 +375,8 @@ export function PiecesClient({
 
       {/* Compilation ZIP */}
       <div className="border-t border-line pt-6">
+        {/* Hint UX — composition du ZIP selon le mode de réponse. */}
+        {!downloadUrl && <p className="mb-3 text-xs text-ink-2">{compileHint}</p>}
         {/* Résultat : lien de téléchargement */}
         {downloadUrl ? (
           <div className="flex flex-col gap-3">
