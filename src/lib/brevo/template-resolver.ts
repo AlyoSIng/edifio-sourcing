@@ -90,11 +90,12 @@ function isRgpdMandatoryKey(key: string): boolean {
 export function assertRgpdGuardrails(key: string, body: string): void {
   if (!isRgpdMandatoryKey(key)) return;
 
-  // Accepte les deux syntaxes : variable Brevo et URL directe injectée
+  // Accepte les syntaxes : variable Brevo double et triple accolade, URL directe
   const hasLienOpposition =
     body.includes("{{lien_opposition}}") ||
     body.includes("{{ params.lien_opposition }}") ||
     body.includes("{{ params.rgpd_block }}") || // bloc complet injecté → contient le lien
+    body.includes("{{{ params.rgpd_block }}}") || // triple-accolade Mustache (HTML brut)
     body.includes("{{rgpd_block}}");
 
   if (!hasLienOpposition) {
@@ -107,6 +108,7 @@ export function assertRgpdGuardrails(key: string, body: string): void {
     body.includes("art. 14") ||
     body.includes("art.14") ||
     body.includes("{{ params.rgpd_block }}") || // bloc complet injecté → contient art. 14
+    body.includes("{{{ params.rgpd_block }}}") || // triple-accolade Mustache (HTML brut)
     body.includes("{{rgpd_block}}");
 
   if (!hasArt14Mention) {

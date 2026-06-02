@@ -35,8 +35,12 @@
  *    - {{ params.ao_cloture }}         — date clôture FR ("28 mai 2026")
  *    - {{ params.lien_ao }}            — URL page tokenisée CTA obligatoire
  *    - {{ params.lien_opposition }}    — URL opposition RGPD obligatoire
- *    - {{ params.presentation_societe }} — bloc HTML présentation AlyoS (lot D)
- *    - {{ params.rgpd_block }}         — bloc RGPD art.14 HTML complet (Option A)
+ *    - {{{ params.presentation_societe }}} — bloc HTML (triple-accolade = pas d'échappement)
+ *    - {{{ params.rgpd_block }}}         — bloc RGPD art.14 HTML (triple-accolade = pas d'échappement)
+ *
+ *  Note Brevo : double-accolade `{{ X }}` échappe le HTML (sécurité par défaut).
+ *  Pour injecter du HTML brut (presentation_societe, rgpd_block), utiliser
+ *  la syntaxe triple-accolade `{{{ X }}}` — syntaxe Mustache standard.
  *
  *  Les sujets et corps ci-dessous servent de **référence** pour saisir / mettre
  *  à jour ces templates dans l'interface Brevo. Ils constituent également le
@@ -141,7 +145,7 @@ export const BODY_SOLICITATION_VOUS_TEMPLATE = `<p>{{ params.greeting }}</p>
   <li><strong>Remise des plis :</strong> {{ params.ao_cloture }}</li>
 </ul>
 
-{{ params.presentation_societe }}
+{{{ params.presentation_societe }}}
 
 <p><strong>▸ Vos options</strong></p>
 <p><a href="{{ params.lien_ao }}" style="color:#FF0033;font-weight:bold;">→ Oui, je suis partant(e)</a></p>
@@ -149,7 +153,7 @@ export const BODY_SOLICITATION_VOUS_TEMPLATE = `<p>{{ params.greeting }}</p>
 
 <p>Bien cordialement,<br><em>— via edifio Sourcing</em></p>
 
-{{ params.rgpd_block }}`;
+{{{ params.rgpd_block }}}`;
 
 /**
  * Corps du template `architect_solicitation_TU` — copy v3 (PR #63).
@@ -170,7 +174,7 @@ export const BODY_SOLICITATION_TU_TEMPLATE = `<p>{{ params.greeting }}</p>
   <li><strong>Remise des plis :</strong> {{ params.ao_cloture }}</li>
 </ul>
 
-{{ params.presentation_societe }}
+{{{ params.presentation_societe }}}
 
 <p><strong>▸ Tes options</strong></p>
 <p><a href="{{ params.lien_ao }}" style="color:#FF0033;font-weight:bold;">→ Oui, je suis partant</a></p>
@@ -178,7 +182,7 @@ export const BODY_SOLICITATION_TU_TEMPLATE = `<p>{{ params.greeting }}</p>
 
 <p>À très vite,<br><em>— via edifio Sourcing</em></p>
 
-{{ params.rgpd_block }}`;
+{{{ params.rgpd_block }}}`;
 
 /* -------------------------------------------------------------------------- */
 /*  Map complète (utilisée par resolveBrevoTemplate)                          */
