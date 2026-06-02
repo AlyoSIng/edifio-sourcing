@@ -89,6 +89,12 @@ export function ArchitectCreateForm() {
         siret: siretValue,
         zip: zip.trim() || null,
         city: city.trim() || null,
+        // Champs DC1 — vides à la création, éditables ensuite sur la fiche
+        addressLine1: null,
+        addressLine2: null,
+        signatureCity: null,
+        legalRepresentativeName: null,
+        legalRepresentativeRole: null,
         notes: notes.trim() || null,
         tutoiement,
         preferred,

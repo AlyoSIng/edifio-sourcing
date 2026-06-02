@@ -74,6 +74,17 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
   const [city, setCity] = useState(architect.city ?? "");
   const [notes, setNotes] = useState(architect.notes ?? "");
 
+  // Champs DC1 (CERFA 12156 — lettre de candidature mandataire)
+  const [addressLine1, setAddressLine1] = useState(architect.addressLine1 ?? "");
+  const [addressLine2, setAddressLine2] = useState(architect.addressLine2 ?? "");
+  const [signatureCity, setSignatureCity] = useState(architect.signatureCity ?? "");
+  const [legalRepresentativeName, setLegalRepresentativeName] = useState(
+    architect.legalRepresentativeName ?? "",
+  );
+  const [legalRepresentativeRole, setLegalRepresentativeRole] = useState(
+    architect.legalRepresentativeRole ?? "",
+  );
+
   // Drapeaux booléens
   const [tutoiement, setTutoiement] = useState(architect.tutoiement);
   const [preferred, setPreferred] = useState(architect.preferred);
@@ -143,6 +154,11 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
           siren: siren.trim() || null,
           zip: zip.trim() || null,
           city: city.trim() || null,
+          addressLine1: addressLine1.trim() || null,
+          addressLine2: addressLine2.trim() || null,
+          signatureCity: signatureCity.trim() || null,
+          legalRepresentativeName: legalRepresentativeName.trim() || null,
+          legalRepresentativeRole: legalRepresentativeRole.trim() || null,
           notes: notes.trim() || null,
           tutoiement,
           preferred,
@@ -377,6 +393,95 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
               rows={3}
               className="focus:ring-brand-red/40 mt-1 w-full resize-y rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
             />
+          </div>
+
+          {/* -------------------------------------------------------------- */}
+          {/* Section : Données pour DC1 (CERFA 12156)                        */}
+          {/* -------------------------------------------------------------- */}
+          <div className="bg-surface/40 space-y-3 rounded-md border border-line p-3">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">
+                Données pour DC1 (lettre de candidature)
+              </h3>
+              <p className="mt-0.5 text-[11px] text-muted">
+                Champs administratifs nécessaires au pré-remplissage du CERFA n°12156
+                (l&rsquo;architecte est mandataire du groupement).
+              </p>
+            </div>
+
+            {/* Adresse — line1 puis line2 sur deux lignes */}
+            <div>
+              <label htmlFor="address-line1" className="block text-xs font-medium text-ink">
+                Adresse (ligne 1)
+              </label>
+              <input
+                id="address-line1"
+                type="text"
+                value={addressLine1}
+                onChange={(e) => setAddressLine1(e.target.value)}
+                placeholder="ex : 12 rue de la Paix"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label htmlFor="address-line2" className="block text-xs font-medium text-ink">
+                Adresse (ligne 2) <span className="text-xs font-normal text-muted">optionnel</span>
+              </label>
+              <input
+                id="address-line2"
+                type="text"
+                value={addressLine2}
+                onChange={(e) => setAddressLine2(e.target.value)}
+                placeholder="ex : Bâtiment B, 3e étage"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+
+            {/* Ville de signature */}
+            <div>
+              <label htmlFor="signature-city" className="block text-xs font-medium text-ink">
+                Ville de signature{" "}
+                <span className="text-xs font-normal text-muted">(« Fait à »)</span>
+              </label>
+              <input
+                id="signature-city"
+                type="text"
+                value={signatureCity}
+                onChange={(e) => setSignatureCity(e.target.value)}
+                placeholder="ex : Paris"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+
+            {/* Représentant légal — nom + qualité */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="legal-rep-name" className="block text-xs font-medium text-ink">
+                  Nom du représentant légal
+                </label>
+                <input
+                  id="legal-rep-name"
+                  type="text"
+                  value={legalRepresentativeName}
+                  onChange={(e) => setLegalRepresentativeName(e.target.value)}
+                  placeholder="ex : Jean Dupont"
+                  className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label htmlFor="legal-rep-role" className="block text-xs font-medium text-ink">
+                  Qualité du signataire
+                </label>
+                <input
+                  id="legal-rep-role"
+                  type="text"
+                  value={legalRepresentativeRole}
+                  onChange={(e) => setLegalRepresentativeRole(e.target.value)}
+                  placeholder="ex : Gérant, Architecte associé"
+                  className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Spécialités — checkboxes */}

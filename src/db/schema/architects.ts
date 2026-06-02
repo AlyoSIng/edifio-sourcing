@@ -87,6 +87,22 @@ export const architects = pgTable(
     siret: text("siret"),
     zip: text("zip"),
     city: text("city"),
+    /**
+     * Champs DC1 (CERFA n°12156 — Lettre de candidature mandataire).
+     * Phase 1 Lot A : l'architecte étant mandataire du groupement MOE BTP,
+     * sa fiche porte les champs administratifs requis au pré-remplissage du
+     * DC1. Tous nullable — anciens architectes restent valides.
+     */
+    /** Adresse du candidat (ligne 1 — rue). DC1 §A. */
+    addressLine1: text("address_line1"),
+    /** Adresse du candidat (ligne 2 — complément). DC1 §A. */
+    addressLine2: text("address_line2"),
+    /** Ville de signature ("Fait à") par défaut sur le DC1. */
+    signatureCity: text("signature_city"),
+    /** Nom du représentant légal — signataire DC1 §G. */
+    legalRepresentativeName: text("legal_representative_name"),
+    /** Qualité du signataire (ex. "Gérant", "Président", "Architecte associé"). DC1 §G. */
+    legalRepresentativeRole: text("legal_representative_role"),
     /** Effectif (enrichissement, hors matching V1). */
     headcount: integer("headcount"),
     /**
