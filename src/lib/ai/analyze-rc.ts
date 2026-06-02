@@ -283,11 +283,15 @@ export async function analyzeRcFromPdf(
     // 4. Encodage base64 pour l'API Anthropic (DocumentBlockParam → Base64PDFSource)
     const pdfBase64 = pdfBuffer.toString("base64");
 
-    // 5. Appel Anthropic en STREAMING — bloc `document` + bloc `text` dans le
-    //    même message user. Le streaming garde la connexion HTTP active pendant
-    //    que les tokens arrivent → pas de Vercel Gateway Timeout 504, même si
-    //    l'analyse complète dépasse 60 s. `stream.finalMessage()` retourne le
-    //    `Message` agrégé identique à l'API non-streaming.
+    // 5. Appel Anthropic — bloc `document` + bloc `text` dans le même message.
+    //    IMPORTANT — On FORCE Claude Haiku 4.5 ici (au lieu du modèle Sonnet 4.6
+    //    du prompt). Le PDF natif Sonnet sur 24 pages dépasse les 60 s de
+    //    Vercel Gateway (504 timeout). Haiku 4.5 est 3-4× plus rapide et reste
+    //    largement assez bon pour extraire pièces + critères + alertes.
+    //    Si Anthropic relève la limite Vercel ou si Haiku donne des résultats
+    //    insuffisants, on pourra repasser sur le model du prompt.
+    const PDF_NATIVE_MODEL_ENUM = "haiku-4-5";
+    const PDF_NATIVE_MODEL_API = ANTHROPIC_MODEL_MAP[PDF_NATIVE_MODEL_ENUM] ?? "claude-haiku-4-5";
     const client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
@@ -297,7 +301,7 @@ export async function analyzeRcFromPdf(
     let response: Anthropic.Messages.Message;
     try {
       const stream = client.messages.stream({
-        model: ANTHROPIC_MODEL_MAP[prompt.model] ?? prompt.model,
+        model: PDF_NATIVE_MODEL_API,
         max_tokens: 4000,
         system: prompt.systemPrompt,
         messages: [
@@ -362,11 +366,12 @@ export async function analyzeRcFromPdf(
       };
     }
 
-    // 9. Calcul du coût estimé (même grille que analyzeRc texte)
+    // 9. Calcul du coût estimé — grille Haiku 4.5 : $1/Mtok input + $5/Mtok output
+    //    (3-5× moins cher que Sonnet 4.6).
     const costUsd =
-      (response.usage.input_tokens * 3 + response.usage.output_tokens * 15) / 1_000_000;
+      (response.usage.input_tokens * 1 + response.usage.output_tokens * 5) / 1_000_000;
 
-    // 10. Enregistrer le run IA dans ai_runs
+    // 10. Enregistrer le run IA dans ai_runs (modèle réellement utilisé = haiku-4-5)
     const inserted = await db
       .insert(aiRuns)
       .values({
@@ -386,7 +391,7 @@ export async function analyzeRcFromPdf(
         },
         costUsd: costUsd.toFixed(4),
         latencyMs,
-        model: prompt.model,
+        model: PDF_NATIVE_MODEL_ENUM,
         succeeded: true,
       })
       .returning({ id: aiRuns.id });
@@ -401,7 +406,7 @@ export async function analyzeRcFromPdf(
       latencyMs,
       promptName: prompt.name,
       promptVersion: prompt.version,
-      model: prompt.model,
+      model: PDF_NATIVE_MODEL_ENUM,
       tokensIn: response.usage.input_tokens,
       tokensOut: response.usage.output_tokens,
     };
