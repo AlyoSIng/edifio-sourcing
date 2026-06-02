@@ -116,6 +116,7 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
   const marketType = formData.get("marketType");
   const dceFile = formData.get("dceFile");
   const notes = formData.get("notes");
+  const sourceUrlRaw = formData.get("sourceUrl");
 
   // 3. Validation des champs obligatoires
   if (typeof title !== "string" || title.trim().length === 0) {
@@ -147,6 +148,13 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
   if (departmentStr && !/^[0-9A-Za-z]{1,3}$/.test(departmentStr)) {
     return { ok: false, error: "Code département invalide (ex : 75, 2A, 971)." };
   }
+
+  // URL de l'annonce officielle — alimente tenders.source_url
+  // Validation minimaliste : on accepte uniquement les URLs HTTPS (sinon NULL).
+  // Le bouton "Détecter ↗" et le lien "Voir l'annonce en ligne" sur la page dossier
+  // dépendent de la présence de cette colonne.
+  const sourceUrlStr = typeof sourceUrlRaw === "string" ? sourceUrlRaw.trim() : "";
+  const finalSourceUrl = sourceUrlStr.startsWith("https://") ? sourceUrlStr : null;
 
   // Montant estimé
   let amount: string | null = null;
@@ -255,6 +263,7 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
       amount,
       deadline,
       dceUrl,
+      sourceUrl: finalSourceUrl,
       rawData,
       score: null,
       status: "sourced",

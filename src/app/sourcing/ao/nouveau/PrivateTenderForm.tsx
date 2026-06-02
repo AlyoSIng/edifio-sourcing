@@ -155,6 +155,7 @@ export function PrivateTenderForm() {
   const [estimatedValue, setEstimatedValue] = useState("");
   const [department, setDepartment] = useState("");
   const [marketType, setMarketType] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
   const [notes, setNotes] = useState("");
 
   // État enrichissement automatique depuis URL
@@ -190,6 +191,10 @@ export function PrivateTenderForm() {
       if (d.description) setDescription(d.description);
       if (d.department) setDepartment(d.department);
       if (d.marketType) setMarketType(d.marketType);
+      // Pré-remplit le champ "URL de l'annonce officielle" avec l'URL enrichie
+      // (si elle est valide HTTPS — la validation côté serveur fera office de filet)
+      const trimmedEnrichUrl = enrichUrl.trim();
+      if (trimmedEnrichUrl.startsWith("https://")) setSourceUrl(trimmedEnrichUrl);
       setEnrichSuccess(true);
     });
   }
@@ -217,6 +222,8 @@ export function PrivateTenderForm() {
     }
 
     const formData = new FormData(e.currentTarget);
+    // Champ contrôlé par React (input avec `value` mais sans `name`) → on l'injecte explicitement
+    formData.set("sourceUrl", sourceUrl.trim());
 
     startTransition(async () => {
       const result = await createPrivateTender(formData);
@@ -347,6 +354,26 @@ export function PrivateTenderForm() {
             placeholder="Ex. : Mairie de Lyon"
             className="focus:border-primary focus:ring-primary w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1"
           />
+        </div>
+
+        {/* URL de l'annonce officielle — alimente tenders.source_url */}
+        <div>
+          <label htmlFor="source-url" className="mb-1 block text-sm font-medium text-ink">
+            URL de l&apos;annonce officielle{" "}
+            <span className="font-normal text-muted">(BOAMP, PLACE, etc. — optionnel)</span>
+          </label>
+          <input
+            id="source-url"
+            type="url"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="https://www.boamp.fr/avis/detail/26-50052"
+            className="focus:border-primary focus:ring-primary w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1"
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            Sera utilisée pour la détection auto du RC/DCE et le lien « Voir l&apos;annonce en ligne
+            ».
+          </p>
         </div>
       </fieldset>
 
