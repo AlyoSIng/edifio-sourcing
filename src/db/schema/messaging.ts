@@ -136,6 +136,18 @@ export const organizationProfiles = pgTable("organization_profiles", {
    * Storage). Pas de type dédié : validation côté application.
    */
   logoUrl: text("logo_url"),
+  /**
+   * Données administratives DC2 (CERFA 12157) — Phase 1 Lot B.
+   * En cotraitance MOE BTP, AlyoS est cotraitant et doit produire son DC2 ;
+   * ces champs permettent le pré-remplissage du formulaire.
+   * Tous nullable : profils antérieurs à la migration 0034 restent valides.
+   */
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  legalRepresentativeName: text("legal_representative_name"),
+  legalRepresentativeRole: text("legal_representative_role"),
+  capitalEur: integer("capital_eur"),
+  signatureCity: text("signature_city"),
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

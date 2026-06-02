@@ -27,6 +27,12 @@ interface OrgProfileFormProps {
     | "phone"
     | "contactEmail"
     | "logoUrl"
+    | "addressLine1"
+    | "addressLine2"
+    | "legalRepresentativeName"
+    | "legalRepresentativeRole"
+    | "capitalEur"
+    | "signatureCity"
   > | null;
   /** SIRET de l'organisation (table organizations). Distinct du profil org. */
   initialSiret?: string | null;
@@ -40,6 +46,19 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? "");
   const [logoUrl, setLogoUrl] = useState(initial?.logoUrl ?? "");
+  // Données administratives DC2 (Lot B)
+  const [addressLine1, setAddressLine1] = useState(initial?.addressLine1 ?? "");
+  const [addressLine2, setAddressLine2] = useState(initial?.addressLine2 ?? "");
+  const [legalRepresentativeName, setLegalRepresentativeName] = useState(
+    initial?.legalRepresentativeName ?? "",
+  );
+  const [legalRepresentativeRole, setLegalRepresentativeRole] = useState(
+    initial?.legalRepresentativeRole ?? "",
+  );
+  const [capitalEur, setCapitalEur] = useState(
+    initial?.capitalEur != null ? String(initial.capitalEur) : "",
+  );
+  const [signatureCity, setSignatureCity] = useState(initial?.signatureCity ?? "");
   const [result, setResult] = useState<SaveOrgProfileResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -79,6 +98,12 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
     fd.set("phone", phone);
     fd.set("contactEmail", contactEmail);
     fd.set("logoUrl", logoUrl);
+    fd.set("addressLine1", addressLine1);
+    fd.set("addressLine2", addressLine2);
+    fd.set("legalRepresentativeName", legalRepresentativeName);
+    fd.set("legalRepresentativeRole", legalRepresentativeRole);
+    fd.set("capitalEur", capitalEur);
+    fd.set("signatureCity", signatureCity);
 
     startTransition(async () => {
       const res = await saveOrgProfileAction(fd);
@@ -260,6 +285,79 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
                 placeholder="Agence Normandie : 2 rue des Artisans, 76000 Rouen
 Agence PACA : 15 avenue du Mistral, 13100 Aix-en-Provence"
                 className="w-full rounded border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Données administratives — pré-remplissage DC2 (CERFA 12157)        */}
+        {/* ---------------------------------------------------------------- */}
+        <section>
+          <h2 className="mb-2 font-display text-base font-semibold text-ink">
+            Données administratives (pour DC2)
+          </h2>
+          <p className="mb-3 text-sm text-muted">
+            Ces informations sont utilisées pour pré-remplir la{" "}
+            <strong>Déclaration du candidat (DC2 — CERFA n°12157)</strong> produite par AlyoS en
+            cotraitance MOE BTP (cotraitant, l&rsquo;architecte étant mandataire du groupement).
+          </p>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field
+                id="addressLine1"
+                label="Adresse (ligne 1)"
+                value={addressLine1}
+                onChange={setAddressLine1}
+                maxLength={255}
+              />
+              <Field
+                id="addressLine2"
+                label="Adresse (ligne 2 — optionnel)"
+                value={addressLine2}
+                onChange={setAddressLine2}
+                maxLength={255}
+              />
+              <Field
+                id="signatureCity"
+                label="Ville de signature (Fait à…)"
+                value={signatureCity}
+                onChange={setSignatureCity}
+                maxLength={120}
+              />
+              <div>
+                <label
+                  htmlFor="capitalEur"
+                  className="mb-1.5 block font-mono text-[11px] uppercase tracking-wider text-ink-2"
+                >
+                  Capital social (€)
+                </label>
+                <input
+                  id="capitalEur"
+                  name="capitalEur"
+                  type="number"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  value={capitalEur}
+                  onChange={(e) => setCapitalEur(e.target.value)}
+                  placeholder="ex : 50000"
+                  className="w-full rounded border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
+                />
+              </div>
+              <Field
+                id="legalRepresentativeName"
+                label="Nom du représentant légal"
+                value={legalRepresentativeName}
+                onChange={setLegalRepresentativeName}
+                maxLength={200}
+              />
+              <Field
+                id="legalRepresentativeRole"
+                label="Qualité (Président, Gérant…)"
+                value={legalRepresentativeRole}
+                onChange={setLegalRepresentativeRole}
+                maxLength={120}
               />
             </div>
           </div>

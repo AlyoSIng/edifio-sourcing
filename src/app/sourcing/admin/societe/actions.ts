@@ -47,6 +47,18 @@ const saveOrgProfileSchema = z.object({
     .refine((v) => v === "" || /^https?:\/\//.test(v), {
       message: "L'URL du logo doit commencer par http:// ou https://",
     }),
+  // ---------------------------------------------------------------- DC2 (Lot B)
+  addressLine1: z.string().max(255, "Adresse trop longue"),
+  addressLine2: z.string().max(255, "Complément d'adresse trop long"),
+  legalRepresentativeName: z.string().max(200, "Nom du représentant légal trop long"),
+  legalRepresentativeRole: z.string().max(120, "Qualité trop longue"),
+  capitalEur: z
+    .string()
+    .max(20)
+    .refine((v) => v === "" || /^\d+$/.test(v), {
+      message: "Le capital doit être un entier positif en euros (sans séparateur)",
+    }),
+  signatureCity: z.string().max(120, "Ville de signature trop longue"),
 });
 
 /* -------------------------------------------------------------------------- */
@@ -99,6 +111,12 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
     phone: formData.get("phone") ?? "",
     contactEmail: formData.get("contactEmail") ?? "",
     logoUrl: formData.get("logoUrl") ?? "",
+    addressLine1: formData.get("addressLine1") ?? "",
+    addressLine2: formData.get("addressLine2") ?? "",
+    legalRepresentativeName: formData.get("legalRepresentativeName") ?? "",
+    legalRepresentativeRole: formData.get("legalRepresentativeRole") ?? "",
+    capitalEur: formData.get("capitalEur") ?? "",
+    signatureCity: formData.get("signatureCity") ?? "",
   });
 
   if (!parsed.success) {
@@ -110,6 +128,19 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
   }
 
   const values = parsed.data;
+
+  // Normalisation des champs DC2 : chaîne vide -> NULL en BDD pour rester
+  // sémantiquement « non renseigné » et préserver la nullabilité côté schéma.
+  const capitalEurNum =
+    values.capitalEur && values.capitalEur !== "" ? Number.parseInt(values.capitalEur, 10) : null;
+  const dc2Fields = {
+    addressLine1: values.addressLine1 || null,
+    addressLine2: values.addressLine2 || null,
+    legalRepresentativeName: values.legalRepresentativeName || null,
+    legalRepresentativeRole: values.legalRepresentativeRole || null,
+    capitalEur: capitalEurNum,
+    signatureCity: values.signatureCity || null,
+  } as const;
 
   // 3. UPSERT en BDD
   try {
@@ -124,6 +155,7 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
         phone: values.phone,
         contactEmail: values.contactEmail,
         logoUrl: values.logoUrl || null,
+        ...dc2Fields,
         updatedBy: user.id,
         updatedAt: new Date(),
       })
@@ -137,6 +169,7 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
           phone: values.phone,
           contactEmail: values.contactEmail,
           logoUrl: values.logoUrl || null,
+          ...dc2Fields,
           updatedBy: user.id,
           updatedAt: new Date(),
         },
