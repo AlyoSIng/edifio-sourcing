@@ -29,6 +29,7 @@ import {
   searchArchitectsForShortlist,
   sendArchitectSolicitation,
   sendBulkArchitectSolicitation,
+  sendDossierToArchitectAction,
   type MatchScoreWithArchitect,
   type SearchArchitectsResult,
   type ShortlistMatchOptions,
@@ -581,6 +582,15 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         </div>
       )}
 
+      {/* ── Section "Dossier prêt" (visible si un archi a accepté) ── */}
+      <DossierReadySection
+        tenderId={tenderId}
+        tenderStatus={initialData.tender.status}
+        rows={rows}
+        tenderDocs={initialData.tenderDocs}
+        responseFiles={initialData.responseFiles}
+      />
+
       {/* Liste des architectes */}
       <ol
         className="flex flex-col gap-4"
@@ -840,6 +850,224 @@ function Mini({ label, value }: { label: string; value: string }) {
       <dd className="mt-0.5 text-ink">{value}</dd>
     </div>
   );
+}
+
+// ============================================================================
+// Section "Dossier prêt" — visible si un archi a accepté la cotraitance
+// ============================================================================
+
+interface DossierReadyProps {
+  tenderId: string;
+  tenderStatus: TandemShortlistData["tender"]["status"];
+  rows: ArchitectRow[];
+  tenderDocs: TandemShortlistData["tenderDocs"];
+  responseFiles: TandemShortlistData["responseFiles"];
+}
+
+/**
+ * Statuts à partir desquels la section « Dossier prêt » est rendue.
+ * `architect_accepted` est le déclencheur principal ; les statuts suivants
+ * (`dossier_*`, `submitted`) gardent la section visible avec un état désactivé
+ * sur le bouton d'envoi (cf. `alreadyDiffused`).
+ */
+const DOSSIER_READY_STATUSES: ReadonlyArray<TandemShortlistData["tender"]["status"]> = [
+  "architect_accepted",
+  "dossier_review_required",
+  "dossier_ready",
+  "dossier_diffused",
+  "submitted",
+];
+
+function DossierReadySection({
+  tenderId,
+  tenderStatus,
+  rows,
+  tenderDocs,
+  responseFiles,
+}: DossierReadyProps) {
+  if (!DOSSIER_READY_STATUSES.includes(tenderStatus)) return null;
+  const acceptedArchitect = rows.find((r) => r.responseStatus === "accepted")?.architect ?? null;
+  if (!acceptedArchitect) return null;
+
+  const alreadyDiffused = tenderStatus === "dossier_diffused" || tenderStatus === "submitted";
+  const canSend = !alreadyDiffused && (tenderDocs.length > 0 || responseFiles.length > 0);
+
+  return (
+    <section
+      className="mb-6 rounded-md border border-l-4 border-line border-l-success bg-success-bg p-5"
+      aria-labelledby="dossier-ready-title"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 id="dossier-ready-title" className="font-display text-base font-bold text-ink">
+            Dossier prêt pour <span className="text-success">{acceptedArchitect.cabinet}</span>
+          </h3>
+          <p className="mt-0.5 text-sm text-ink-2">
+            {alreadyDiffused
+              ? "Le dossier a déjà été envoyé à l'architecte."
+              : "Vérifiez les documents puis envoyez le dossier à l'architecte."}
+          </p>
+        </div>
+        <ValidateAndSendDossierButton
+          tenderId={tenderId}
+          architectId={acceptedArchitect.id}
+          canSend={canSend}
+          alreadyDiffused={alreadyDiffused}
+        />
+      </div>
+
+      {/* Documents DCE */}
+      <div className="mt-4">
+        <h4 className="mb-2 font-mono text-xs font-semibold uppercase tracking-wider text-muted">
+          Documents DCE ({tenderDocs.length})
+        </h4>
+        {tenderDocs.length === 0 ? (
+          <p className="text-xs text-muted">Aucun document DCE chargé pour cet AO.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {tenderDocs.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center justify-between gap-3 rounded border border-line bg-white px-3 py-2 text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                    {d.kind}
+                  </span>
+                  <span className="ml-2 text-ink">{d.name}</span>
+                </div>
+                <span className="font-mono text-xs text-muted">
+                  {formatDossierBytes(d.sizeBytes)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Pièces du dossier (DC1/DC2/CERFA) */}
+      <div className="mt-4">
+        <h4 className="mb-2 font-mono text-xs font-semibold uppercase tracking-wider text-muted">
+          Pièces du dossier ({responseFiles.length})
+        </h4>
+        {responseFiles.length === 0 ? (
+          <p className="text-xs text-muted">
+            Aucune pièce générée. Allez sur la page{" "}
+            <a
+              href={`/sourcing/ao/${tenderId}/dossier`}
+              className="text-brand-red underline hover:no-underline"
+            >
+              Dossier de candidature
+            </a>{" "}
+            pour pré-remplir DC1/DC2 et compiler les pièces.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {responseFiles.map((f) => (
+              <li
+                key={f.id}
+                className="flex items-center justify-between gap-3 rounded border border-line bg-white px-3 py-2 text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                    {f.kind}
+                  </span>
+                  <span className="ml-2 text-ink">{f.name}</span>
+                  {f.validated ? (
+                    <span className="ml-2 rounded bg-success-bg px-1.5 py-0.5 text-[10px] font-semibold text-success">
+                      Validé
+                    </span>
+                  ) : null}
+                </div>
+                <span className="font-mono text-xs text-muted">
+                  {formatDossierBytes(f.sizeBytes)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ============================================================================
+// ValidateAndSendDossierButton — bouton "Valider et envoyer le dossier"
+// ============================================================================
+
+function ValidateAndSendDossierButton({
+  tenderId,
+  architectId,
+  canSend,
+  alreadyDiffused,
+}: {
+  tenderId: string;
+  architectId: string;
+  canSend: boolean;
+  alreadyDiffused: boolean;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  function handleClick() {
+    if (!canSend || alreadyDiffused) return;
+    // Garde-fou simple — pas de dépendance UI lourde
+    if (!window.confirm("Envoyer le dossier de candidature à l'architecte ?")) return;
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      const result = await sendDossierToArchitectAction(tenderId, architectId);
+      if (!result.ok) {
+        const detail = (result as { detail?: string }).detail;
+        setError(`${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`);
+        return;
+      }
+      setSuccess("Dossier envoyé à l'architecte.");
+      router.refresh();
+    });
+  }
+
+  const label = alreadyDiffused
+    ? "Dossier déjà envoyé"
+    : isPending
+      ? "Envoi…"
+      : "Valider et envoyer le dossier";
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={!canSend || alreadyDiffused || isPending}
+        className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-line-2"
+      >
+        {label}
+      </button>
+      {!canSend && !alreadyDiffused && (
+        <span className="text-[10px] text-muted">Aucun document à envoyer pour le moment.</span>
+      )}
+      {error ? (
+        <span role="alert" className="text-xs text-error">
+          {error}
+        </span>
+      ) : null}
+      {success ? (
+        <span role="status" aria-live="polite" className="text-xs text-success">
+          {success}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Formate un nombre d'octets en Ko / Mo (parité avec LibraryClient). */
+function formatDossierBytes(bytes: number | null | undefined): string {
+  if (bytes == null) return "—";
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.round(kb)} Ko`;
+  return `${(kb / 1024).toFixed(1)} Mo`;
 }
 
 // ============================================================================

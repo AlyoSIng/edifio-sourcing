@@ -20,7 +20,7 @@
  * le caller utilise `architects.tutoiement` pour pré-remplir.
  */
 
-export type BrevoTemplateKind = "solicitation" | "followup" | "decline_ack";
+export type BrevoTemplateKind = "solicitation" | "followup" | "decline_ack" | "dossier_diffusion";
 export type BrevoRegister = "tu" | "vous";
 
 /**
@@ -40,6 +40,10 @@ export const ENV_VAR_BY_TEMPLATE: Record<
     vous: "BREVO_TEMPLATE_ID_ARCHITECT_FOLLOWUP_VOUS",
   },
   decline_ack: { neutral: "BREVO_TEMPLATE_ID_ARCHITECT_DECLINE_ACKNOWLEDGMENT" },
+  dossier_diffusion: {
+    tu: "BREVO_TEMPLATE_ID_ARCHITECT_DOSSIER_DIFFUSION_TU",
+    vous: "BREVO_TEMPLATE_ID_ARCHITECT_DOSSIER_DIFFUSION_VOUS",
+  },
 };
 
 /**
@@ -54,9 +58,9 @@ export const ENV_VAR_BY_TEMPLATE: Record<
 export function templateNameFor(kind: BrevoTemplateKind, register: BrevoRegister): string {
   if (kind === "decline_ack") return "architect_decline_acknowledgment";
   const suffix = register === "tu" ? "TU" : "VOUS";
-  return kind === "solicitation"
-    ? `architect_solicitation_${suffix}`
-    : `architect_followup_${suffix}`;
+  if (kind === "solicitation") return `architect_solicitation_${suffix}`;
+  if (kind === "dossier_diffusion") return `architect_dossier_diffusion_${suffix}`;
+  return `architect_followup_${suffix}`;
 }
 
 /**

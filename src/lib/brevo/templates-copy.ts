@@ -197,6 +197,55 @@ export const BODY_SOLICITATION_TU_TEMPLATE = `<p>{{ params.greeting }}</p>
 {{{ params.rgpd_block }}}`;
 
 /* -------------------------------------------------------------------------- */
+/*  Diffusion dossier — sujets + corps (Lot 2 short-list "Dossier prêt")      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Sujet du template `architect_dossier_diffusion_VOUS` (variante formelle).
+ * Envoyé à l'architecte cotraitant une fois le dossier de candidature prêt.
+ * Le bloc RGPD reste injecté (cohérence templates architecte) mais cette
+ * clé n'est PAS soumise aux garde-fous `assertRgpdGuardrails` (cf. template-resolver.ts).
+ */
+export const SUBJECT_DOSSIER_DIFFUSION_VOUS = "Dossier de candidature prêt : {{ params.ao_objet }}";
+
+/**
+ * Sujet du template `architect_dossier_diffusion_TU` (variante familière).
+ */
+export const SUBJECT_DOSSIER_DIFFUSION_TU = "Le dossier est prêt : {{ params.ao_objet }}";
+
+/**
+ * Corps du template `architect_dossier_diffusion_VOUS`.
+ * Variables Brevo : greeting, nom_commercial, ao_objet, lien_dossier, rgpd_block.
+ */
+export const BODY_DOSSIER_DIFFUSION_VOUS_TEMPLATE = `<p>{{ params.greeting }}</p>
+
+<p>Merci d'avoir accepté de partir avec <strong>{{ params.nom_commercial }}</strong> sur ce dossier.</p>
+
+<p>Le dossier de candidature pour <strong>{{ params.ao_objet }}</strong> est prêt. Vous pouvez le consulter et le télécharger depuis le lien ci-dessous.</p>
+
+<p><a href="{{ params.lien_dossier }}" style="color:#FF0033;font-weight:bold;">→ Consulter le dossier de candidature</a></p>
+
+<p>Bien cordialement,<br><em>— via edifio Sourcing</em></p>
+
+{{{ params.rgpd_block }}}`;
+
+/**
+ * Corps du template `architect_dossier_diffusion_TU`.
+ * Variables Brevo : greeting, nom_commercial, ao_objet, lien_dossier, rgpd_block.
+ */
+export const BODY_DOSSIER_DIFFUSION_TU_TEMPLATE = `<p>{{ params.greeting }}</p>
+
+<p>Merci d'avoir accepté de partir avec <strong>{{ params.nom_commercial }}</strong> sur ce dossier.</p>
+
+<p>Le dossier de candidature pour <strong>{{ params.ao_objet }}</strong> est prêt. Tu peux le consulter et le télécharger depuis le lien ci-dessous.</p>
+
+<p><a href="{{ params.lien_dossier }}" style="color:#FF0033;font-weight:bold;">→ Consulter le dossier de candidature</a></p>
+
+<p>À très vite,<br><em>— via edifio Sourcing</em></p>
+
+{{{ params.rgpd_block }}}`;
+
+/* -------------------------------------------------------------------------- */
 /*  Map complète (utilisée par resolveBrevoTemplate)                          */
 /* -------------------------------------------------------------------------- */
 
@@ -212,5 +261,13 @@ export const DEFAULT_TEMPLATE_COPY: Record<string, { subject: string; body: stri
   architect_solicitation_TU: {
     subject: SUBJECT_SOLICITATION_TU,
     body: BODY_SOLICITATION_TU_TEMPLATE,
+  },
+  architect_dossier_diffusion_VOUS: {
+    subject: SUBJECT_DOSSIER_DIFFUSION_VOUS,
+    body: BODY_DOSSIER_DIFFUSION_VOUS_TEMPLATE,
+  },
+  architect_dossier_diffusion_TU: {
+    subject: SUBJECT_DOSSIER_DIFFUSION_TU,
+    body: BODY_DOSSIER_DIFFUSION_TU_TEMPLATE,
   },
 };

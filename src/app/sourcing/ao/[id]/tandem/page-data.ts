@@ -26,12 +26,13 @@
  * explicitement (defense in depth applicative).
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { db as defaultDb } from "@/db/client";
 import { architects, type Architect } from "@/db/schema/architects";
+import { responseFiles, type ResponseFile } from "@/db/schema/library";
 import { architectResponses, matchProposals, type ArchitectResponse } from "@/db/schema/selections";
-import { tenders, type Tender } from "@/db/schema/tenders";
+import { tenderDocuments, tenders, type Tender, type TenderDocument } from "@/db/schema/tenders";
 
 type DrizzleClient = typeof defaultDb;
 
@@ -73,6 +74,25 @@ export interface TandemShortlistData {
     /** Statut de la réponse archi, si une sollicitation a déjà été envoyée. */
     responseStatus: ArchitectResponse["status"] | null;
   }>;
+  /**
+   * Documents DCE de l'AO (`tender_documents`). Chargés uniquement quand le
+   * tender a au moins atteint le status `architect_accepted` — sert à la
+   * section « Dossier prêt » affichée après acceptation architecte.
+   * Tableau vide si aucun doc / status antérieur à acceptation.
+   */
+  tenderDocs: Array<
+    Pick<TenderDocument, "id" | "name" | "kind" | "sizeBytes" | "storagePath" | "uploadedAt">
+  >;
+  /**
+   * Pièces de réponse pré-remplies (`response_files` — DC1, DC2, CERFA, etc.).
+   * Même politique de chargement conditionnel que `tenderDocs`.
+   */
+  responseFiles: Array<
+    Pick<
+      ResponseFile,
+      "id" | "name" | "kind" | "sizeBytes" | "storagePath" | "validated" | "createdAt"
+    >
+  >;
 }
 
 export type LoadTandemShortlistError = "tender_not_found" | "invalid_state" | "internal_error";
@@ -183,7 +203,62 @@ export async function loadTandemShortlistData(
       responseStatus: responseByArchitect.get(p.architect.id) ?? null,
     }));
 
-    return { ok: true, data: { tender, proposals } };
+    // 5. Chargement conditionnel des documents — uniquement à partir de
+    //    `architect_accepted` (la section « Dossier prêt » côté UI n'est
+    //    rendue qu'à partir de ce statut). On évite des selects inutiles
+    //    sur les AO encore en `selected_tandem` / `awaiting_architect`.
+    const dossierVisibleStatuses = new Set([
+      "architect_accepted",
+      "dossier_review_required",
+      "dossier_ready",
+      "dossier_diffused",
+      "submitted",
+    ]);
+    let tenderDocs: TandemShortlistData["tenderDocs"] = [];
+    let responseFilesRows: TandemShortlistData["responseFiles"] = [];
+    if (dossierVisibleStatuses.has(tender.status)) {
+      tenderDocs = await db
+        .select({
+          id: tenderDocuments.id,
+          name: tenderDocuments.name,
+          kind: tenderDocuments.kind,
+          sizeBytes: tenderDocuments.sizeBytes,
+          storagePath: tenderDocuments.storagePath,
+          uploadedAt: tenderDocuments.uploadedAt,
+        })
+        .from(tenderDocuments)
+        .where(
+          and(
+            eq(tenderDocuments.tenderId, tenderId),
+            eq(tenderDocuments.organizationId, organizationId),
+          ),
+        )
+        .orderBy(desc(tenderDocuments.uploadedAt));
+
+      responseFilesRows = await db
+        .select({
+          id: responseFiles.id,
+          name: responseFiles.name,
+          kind: responseFiles.kind,
+          sizeBytes: responseFiles.sizeBytes,
+          storagePath: responseFiles.storagePath,
+          validated: responseFiles.validated,
+          createdAt: responseFiles.createdAt,
+        })
+        .from(responseFiles)
+        .where(
+          and(
+            eq(responseFiles.tenderId, tenderId),
+            eq(responseFiles.organizationId, organizationId),
+          ),
+        )
+        .orderBy(desc(responseFiles.createdAt));
+    }
+
+    return {
+      ok: true,
+      data: { tender, proposals, tenderDocs, responseFiles: responseFilesRows },
+    };
   } catch (err) {
     console.error("[tandem-shortlist:load_failed]", err);
     return { ok: false, error: "internal_error" };

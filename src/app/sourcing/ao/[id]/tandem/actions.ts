@@ -878,7 +878,258 @@ export async function searchArchitectsForShortlist(
 }
 
 // ============================================================================
-// 4. sendBulkArchitectSolicitation — envoi groupé de sollicitations
+// 4. sendDossierToArchitectAction — diffusion du dossier prêt à l'archi accepté
+// ============================================================================
+
+export type SendDossierResult =
+  | { ok: true; brevoMessageId: string | null }
+  | {
+      ok: false;
+      error:
+        | "not_authenticated"
+        | "forbidden_domain"
+        | "forbidden"
+        | "invalid_input"
+        | "tender_not_found"
+        | "architect_not_found"
+        | "invalid_state"
+        | "brevo_send_failed"
+        | "internal_error";
+      detail?: string;
+    };
+
+/**
+ * Envoie un mail Brevo à l'architecte ayant accepté la cotraitance avec un
+ * lien vers le dossier de candidature, puis bascule le tender en
+ * `dossier_diffused`.
+ *
+ * Pré-conditions vérifiées (sinon `invalid_state`) :
+ *  - tender existe et appartient à l'org du caller ;
+ *  - tender.status === 'architect_accepted' ;
+ *  - architect existe, appartient à l'org, possède un email ;
+ *  - architect_responses(tenderId, architectId).status === 'accepted'.
+ *
+ * Effets de bord :
+ *  1. Envoi mail Brevo (template `architect_dossier_diffusion_TU|VOUS`).
+ *  2. UPDATE tenders.status = 'dossier_diffused' (uniquement si toujours
+ *     `architect_accepted` — évite la régression en cas de double-clic).
+ *  3. Audit A6 `dossier_diffuse` (best-effort).
+ *  4. revalidatePath de la page Tandem + de la liste AO du jour.
+ *
+ * @param tenderId — UUID du tender (mode Tandem, status `architect_accepted`)
+ * @param architectId — UUID de l'architecte cotraitant accepté
+ */
+export async function sendDossierToArchitectAction(
+  tenderId: string,
+  architectId: string,
+  deps: ActionDeps = {},
+): Promise<SendDossierResult> {
+  const db = deps.db ?? defaultDb;
+  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const auditFn = deps.auditFn ?? audit;
+  const brevoClient = deps.brevoClient ?? getBrevoClient();
+
+  // 1. Auth + domaine
+  const authResult = await requireAlyosUser(authClient);
+  if (!authResult.ok) return authResult;
+  const { orgId } = authResult;
+
+  // 2. Validation UUID
+  if (!UUID_SHAPE.test(tenderId) || !UUID_SHAPE.test(architectId)) {
+    return { ok: false, error: "invalid_input" };
+  }
+
+  let tender: Tender | undefined;
+  let architect: Architect | undefined;
+
+  try {
+    // 3. Lookup tender (filtre tenant) + check status
+    const tenderRows = await db
+      .select()
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, orgId)))
+      .limit(1);
+    tender = tenderRows[0];
+    if (!tender) return { ok: false, error: "tender_not_found" };
+    if (tender.status !== "architect_accepted") {
+      return { ok: false, error: "invalid_state", detail: `tender status: ${tender.status}` };
+    }
+
+    // 4. Lookup architect (filtre tenant) + check email
+    const archRows = await db
+      .select()
+      .from(architects)
+      .where(and(eq(architects.id, architectId), eq(architects.organizationId, orgId)))
+      .limit(1);
+    architect = archRows[0];
+    if (!architect) return { ok: false, error: "architect_not_found" };
+    if (!architect.email) {
+      return { ok: false, error: "invalid_state", detail: "architect_has_no_email" };
+    }
+
+    // 5. Lookup architect_responses → confirme status='accepted'
+    const respRows = await db
+      .select({ status: architectResponses.status })
+      .from(architectResponses)
+      .where(
+        and(
+          eq(architectResponses.tenderId, tenderId),
+          eq(architectResponses.architectId, architectId),
+          eq(architectResponses.organizationId, orgId),
+        ),
+      )
+      .limit(1);
+    if (!respRows[0] || respRows[0].status !== "accepted") {
+      return { ok: false, error: "invalid_state", detail: "architect_response_not_accepted" };
+    }
+  } catch (err) {
+    console.error("[tandem-actions:dossier:db_lookup_fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+
+  // 6. Résolution template (BDD org-scopée → fallback hardcoded)
+  const register = defaultRegisterFromTutoiement(architect.tutoiement);
+  const templateName = templateNameFor("dossier_diffusion", register);
+
+  let resolvedTemplate: Awaited<ReturnType<typeof resolveBrevoTemplate>>;
+  try {
+    resolvedTemplate = await resolveBrevoTemplate(templateName, orgId, db);
+  } catch (err) {
+    return {
+      ok: false,
+      error: "brevo_send_failed",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  // 7. Chargement nom commercial (cohérence avec la sollicitation)
+  let nomCommercial: string | undefined;
+  try {
+    const orgRows = await withTenantContext(orgId, db, (client) =>
+      client
+        .select({ commercialName: organizationProfiles.commercialName })
+        .from(organizationProfiles)
+        .where(eq(organizationProfiles.organizationId, orgId))
+        .limit(1),
+    );
+    const cname = orgRows[0]?.commercialName;
+    if (cname) nomCommercial = cname;
+  } catch {
+    // Non-bloquant
+  }
+
+  // 8. Variables Brevo
+  //    On réutilise `buildBrevoVariables` pour greeting/civilité/rgpd_block,
+  //    et on ajoute `lien_dossier` (lien interne vers la page dossier de l'AO,
+  //    accessible à l'archi via le token de réponse — sera ouvert dans son
+  //    espace authentifié à minima côté Phase 2).
+  const variables = buildBrevoVariables({
+    architect,
+    tender,
+    tenderDepartment: extractDepartment(tender),
+    lienAo: `${getSiteUrl()}/sourcing/ao/${tenderId}/dossier`,
+    // `lien_opposition` reste exposé dans le bloc rgpd injecté — on pose ici
+    // une URL « marker » de cohérence ; pour ce template, le bloc RGPD n'est
+    // pas obligatoire (cf. isRgpdMandatoryKey) mais on l'injecte quand même.
+    lienOpposition: `${getSiteUrl()}/archi/oppose/no-token`,
+    nomCommercial,
+    register,
+  });
+
+  const lienDossier = `${getSiteUrl()}/sourcing/ao/${tenderId}/dossier`;
+  const toName = [variables.archi_prenom, variables.archi_nom].filter(Boolean).join(" ");
+  const senderEmail = process.env.BREVO_SENDER_EMAIL ?? "no-reply@alyosingenierie.fr";
+  const senderName = variables.nom_commercial;
+
+  // 9. Envoi Brevo (mode raw — subject + htmlContent depuis resolvedTemplate)
+  const sendResult = await brevoClient.send({
+    to: { email: architect.email, name: toName || variables.cabinet },
+    sender: { email: senderEmail, name: senderName },
+    subject: resolvedTemplate.subject,
+    htmlContent: resolvedTemplate.body,
+    params: {
+      greeting: variables.greeting,
+      nom_commercial: variables.nom_commercial,
+      civilite: variables.civilite,
+      archi_prenom: variables.archi_prenom,
+      archi_nom: variables.archi_nom,
+      cabinet: variables.cabinet,
+      ao_objet: variables.ao_objet,
+      ao_acheteur: variables.ao_acheteur,
+      ao_departement: variables.ao_departement,
+      ao_cloture: variables.ao_cloture,
+      lien_dossier: lienDossier,
+      rgpd_block: variables.rgpd_block,
+    },
+    customHeader: `tender:${tenderId};archi:${architectId};kind:dossier_diffusion`,
+  });
+
+  if (!sendResult.ok) {
+    return {
+      ok: false,
+      error: "brevo_send_failed",
+      detail: `${sendResult.error}${sendResult.detail ? `: ${sendResult.detail}` : ""}`,
+    };
+  }
+  const brevoMessageId = sendResult.messageId;
+
+  // 10. Trace brevo_messages (post-envoi, best-effort)
+  try {
+    await db.insert(brevoMessages).values({
+      tenderId,
+      architectId,
+      organizationId: orgId,
+      templateName,
+      register,
+      brevoMessageId,
+      sentAt: new Date(),
+    });
+  } catch (err) {
+    console.error("[tandem-actions:dossier:brevo_messages_insert_fail]", err);
+  }
+
+  // 11. Bascule du statut tender (guard : encore `architect_accepted`)
+  try {
+    await db
+      .update(tenders)
+      .set({ status: "dossier_diffused", updatedAt: sql`now()` })
+      .where(
+        and(
+          eq(tenders.id, tenderId),
+          eq(tenders.organizationId, orgId),
+          eq(tenders.status, "architect_accepted"),
+        ),
+      );
+  } catch (err) {
+    console.error("[tandem-actions:dossier:tender_status_update_fail]", err);
+    // Non-bloquant côté UX : le mail est parti — l'admin pourra relancer
+    // depuis la page si nécessaire.
+  }
+
+  // 12. Audit A6 dossier_diffuse (best-effort)
+  await auditFn({
+    action: "dossier_diffuse",
+    subjectType: "tender",
+    subjectId: tenderId,
+    data: {
+      tender_id: tenderId,
+      architect_id: architectId,
+      template_name: templateName,
+      register,
+      brevo_message_id: brevoMessageId,
+    },
+  });
+
+  // 13. Revalidate
+  revalidatePath(`/sourcing/ao/${tenderId}/tandem`);
+  revalidatePath(`/sourcing/ao/${tenderId}/dossier`);
+  revalidatePath("/sourcing/ao-du-jour");
+
+  return { ok: true, brevoMessageId };
+}
+
+// ============================================================================
+// 5. sendBulkArchitectSolicitation — envoi groupé de sollicitations
 // ============================================================================
 
 export interface BulkSolicitInput {
