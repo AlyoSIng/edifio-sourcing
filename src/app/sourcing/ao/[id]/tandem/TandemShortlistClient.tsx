@@ -188,7 +188,8 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         rank: row.rank,
       });
       if (!result.ok) {
-        setLoadError(mapErrorToFr(result.error));
+        const detail = (result as { detail?: string }).detail;
+        setLoadError(`${mapErrorToFr(result.error)}${detail ? ` — ${detail}` : ""}`);
         setPreviewFor(null);
         return;
       }
