@@ -33,17 +33,41 @@
 /* -------------------------------------------------------------------------- */
 
 export interface BrevoTransactionalEmailInput {
-  /** ID Brevo du template (entier). */
-  templateId: number;
   /** Destinataire — email + name (Brevo accepte multi-recipients mais on
    *  reste single-recipient pour les sollicitations archi). */
   to: { email: string; name?: string };
-  /** Variables du template (`params` dans l'API Brevo). */
+  /** Variables du template (`params` dans l'API Brevo).
+   *  En mode raw : Brevo applique le rendu Mustache `{{ params.X }}` sur
+   *  `subject` et `htmlContent` côté Brevo avec ces variables. */
   params: Record<string, string | number | boolean>;
   /** Header `X-Mailin-custom` (libre — utilisé pour join webhook). */
   customHeader?: string;
   /** Reply-to (optionnel — défaut compte Brevo). */
   replyTo?: { email: string; name?: string };
+  /**
+   * Mode raw — sujet de l'email (peut contenir `{{ params.X }}`).
+   * Préféré au mode template : le contenu est source-of-truth côté app
+   * (cf. `DEFAULT_TEMPLATE_COPY` + `resolveBrevoTemplate`), pas dans le
+   * dashboard Brevo. REQUIS en mode raw avec `htmlContent` et `sender`.
+   */
+  subject?: string;
+  /**
+   * Mode raw — corps HTML de l'email (peut contenir `{{ params.X }}`).
+   * REQUIS en mode raw avec `subject` et `sender`.
+   */
+  htmlContent?: string;
+  /**
+   * Mode raw — expéditeur. REQUIS en mode raw (Brevo refuse l'envoi sans
+   * sender quand on n'utilise pas de template, qui porte habituellement
+   * cette information).
+   */
+  sender?: { email: string; name?: string };
+  /**
+   * Mode template (deprecated — kept for backward compat) — ID Brevo du
+   * template (entier). Si présent, Brevo utilise le template stocké côté
+   * dashboard et ignore `subject`/`htmlContent`.
+   */
+  templateId?: number;
 }
 
 export interface BrevoSendResult {
@@ -53,7 +77,13 @@ export interface BrevoSendResult {
 
 export interface BrevoSendError {
   ok: false;
-  error: "missing_api_key" | "invalid_recipient" | "http_error" | "network" | "parse";
+  error:
+    | "missing_api_key"
+    | "invalid_recipient"
+    | "invalid_input"
+    | "http_error"
+    | "network"
+    | "parse";
   status?: number;
   detail?: string;
 }
@@ -94,8 +124,24 @@ export function createBrevoClient(opts: { fetchFn?: FetchFn } = {}): BrevoClient
         };
       }
 
+      // Sélection du mode : templateId → mode template (rétro-compat),
+      // sinon mode raw qui exige subject + htmlContent + sender.
+      const isTemplateMode = typeof input.templateId === "number";
+      const isRawMode =
+        !isTemplateMode &&
+        typeof input.subject === "string" &&
+        typeof input.htmlContent === "string" &&
+        !!input.sender?.email;
+
+      if (!isTemplateMode && !isRawMode) {
+        return {
+          ok: false,
+          error: "invalid_input",
+          detail: "missing templateId or (subject+htmlContent+sender)",
+        };
+      }
+
       const body: Record<string, unknown> = {
-        templateId: input.templateId,
         to: [
           input.to.name
             ? { email: input.to.email, name: input.to.name }
@@ -103,6 +149,14 @@ export function createBrevoClient(opts: { fetchFn?: FetchFn } = {}): BrevoClient
         ],
         params: input.params,
       };
+      if (isTemplateMode) {
+        body.templateId = input.templateId;
+      } else {
+        // Mode raw — Brevo rend `{{ params.X }}` sur subject + htmlContent.
+        body.sender = input.sender;
+        body.subject = input.subject;
+        body.htmlContent = input.htmlContent;
+      }
       if (input.customHeader) {
         body.headers = { "X-Mailin-custom": input.customHeader };
       }

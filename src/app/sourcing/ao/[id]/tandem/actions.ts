@@ -62,7 +62,6 @@ import { toUserProfile } from "@/lib/auth/types";
 import { getBrevoClient, type BrevoClient } from "@/lib/brevo/client";
 import {
   defaultRegisterFromTutoiement,
-  pickBrevoTemplateId,
   templateNameFor,
   type BrevoRegister,
 } from "@/lib/brevo/template-picker";
@@ -698,23 +697,20 @@ export async function sendArchitectSolicitation(
     register,
   });
 
-  let templateId: number;
-  try {
-    templateId = pickBrevoTemplateId("solicitation", register);
-  } catch (err) {
-    return {
-      ok: false,
-      error: "brevo_send_failed",
-      detail: err instanceof Error ? err.message : String(err),
-    };
-  }
-
   // Brevo accepte un nom complet — on reconstruit depuis archi_prenom + archi_nom.
   const toName = [variables.archi_prenom, variables.archi_nom].filter(Boolean).join(" ");
 
+  // Envoi en mode raw : on passe subject + htmlContent issus de resolveBrevoTemplate
+  // (BDD org-scopée → fallback DEFAULT_TEMPLATE_COPY). Plus de templateId Brevo —
+  // la source unique du contenu reste le code (cf. templates-copy.ts).
+  const senderEmail = process.env.BREVO_SENDER_EMAIL ?? "no-reply@alyosingenierie.fr";
+  const senderName = nomCommercial ?? "AlyoS Ingénierie";
+
   const sendResult = await brevoClient.send({
-    templateId,
     to: { email: architect.email, name: toName || variables.cabinet },
+    sender: { email: senderEmail, name: senderName },
+    subject: resolvedTemplate?.subject ?? "Sollicitation architecte",
+    htmlContent: resolvedTemplate?.body ?? "",
     params: {
       greeting: variables.greeting,
       nom_commercial: variables.nom_commercial,
@@ -733,9 +729,6 @@ export async function sendArchitectSolicitation(
     },
     customHeader: `tender:${tenderId};archi:${architectId}`,
   });
-
-  // resolvedTemplate est utilisée pour l'audit (source db/default — traçabilité)
-  void resolvedTemplate;
 
   let brevoMessageId: string | null = null;
   if (!sendResult.ok) {

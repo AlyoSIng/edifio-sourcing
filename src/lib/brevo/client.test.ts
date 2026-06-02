@@ -138,4 +138,63 @@ describe("createBrevoClient.send", () => {
     const body = JSON.parse(captured!.body as string);
     expect(body.headers["X-Mailin-custom"]).toBe("tender:uuid1;archi:uuid2");
   });
+
+  it("envoie en mode raw (subject + htmlContent + sender) sans templateId", async () => {
+    let captured: { url: string; init: RequestInit } | null = null;
+    const fakeFetch: typeof fetch = async (url, init) => {
+      captured = { url: typeof url === "string" ? url : url.toString(), init: init ?? {} };
+      return new Response(JSON.stringify({ messageId: "<msg-raw@brevo>" }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    const client = createBrevoClient({ fetchFn: fakeFetch });
+    const result = await client.send({
+      to: { email: "marie@cabinet-test.fr", name: "Marie Dupont" },
+      sender: { email: "no-reply@alyosingenierie.fr", name: "AlyoS Ingénierie" },
+      subject: "Sujet test {{ params.ao_objet }}",
+      htmlContent: "<p>Bonjour {{ params.archi_prenom }}</p>",
+      params: { archi_prenom: "Marie", ao_objet: "Toiture lycée" },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.messageId).toBe("<msg-raw@brevo>");
+    expect(captured).not.toBeNull();
+    const body = JSON.parse(captured!.init.body as string);
+    // Mode raw : pas de templateId, mais sender + subject + htmlContent.
+    expect(body.templateId).toBeUndefined();
+    expect(body.sender).toEqual({
+      email: "no-reply@alyosingenierie.fr",
+      name: "AlyoS Ingénierie",
+    });
+    expect(body.subject).toBe("Sujet test {{ params.ao_objet }}");
+    expect(body.htmlContent).toBe("<p>Bonjour {{ params.archi_prenom }}</p>");
+    expect(body.params.archi_prenom).toBe("Marie");
+  });
+
+  it("retourne invalid_input si ni templateId ni (subject+htmlContent+sender)", async () => {
+    const client = createBrevoClient({ fetchFn: async () => new Response("{}") });
+    const result = await client.send({
+      to: { email: "x@y.fr" },
+      params: {},
+      // ni templateId ni subject/htmlContent/sender
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("invalid_input");
+      expect(result.detail).toContain("missing templateId");
+    }
+  });
+
+  it("retourne invalid_input si mode raw incomplet (sender manquant)", async () => {
+    const client = createBrevoClient({ fetchFn: async () => new Response("{}") });
+    const result = await client.send({
+      to: { email: "x@y.fr" },
+      params: {},
+      subject: "S",
+      htmlContent: "<p>H</p>",
+      // sender manquant
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("invalid_input");
+  });
 });

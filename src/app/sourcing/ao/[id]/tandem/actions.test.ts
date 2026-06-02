@@ -25,6 +25,7 @@ import {
   type DrizzleClient,
 } from "./actions";
 import type { BrevoClient } from "@/lib/brevo/client";
+import { SUBJECT_SOLICITATION_TU, SUBJECT_SOLICITATION_VOUS } from "@/lib/brevo/templates-copy";
 import { __resetKeyCache } from "@/lib/tandem/jwt";
 
 // ----------------------------------------------------------------------------
@@ -408,17 +409,21 @@ function buildSolicitMockDb(tutoiement: boolean): DrizzleClient {
 }
 
 /**
- * Mock Brevo capturant le templateId utilisé lors de l'envoi.
+ * Mock Brevo capturant le subject utilisé lors de l'envoi.
+ *
+ * Depuis le refacto vers le mode raw (plus de templateId), c'est le `subject`
+ * — copy v3 du template TU vs VOUS — qui distingue les deux registres.
+ * Voir `src/lib/brevo/templates-copy.ts` (SUBJECT_SOLICITATION_TU/VOUS).
  */
-function buildBrevoCaptureMock(): { client: BrevoClient; getLastTemplateId: () => number | null } {
-  let lastTemplateId: number | null = null;
+function buildBrevoCaptureMock(): { client: BrevoClient; getLastSubject: () => string | null } {
+  let lastSubject: string | null = null;
   const client: BrevoClient = {
     send: vi.fn(async (input) => {
-      lastTemplateId = input.templateId;
+      lastSubject = input.subject ?? null;
       return { ok: true, messageId: "msg-test-123" } as const;
     }),
   };
-  return { client, getLastTemplateId: () => lastTemplateId };
+  return { client, getLastSubject: () => lastSubject };
 }
 
 const ALYOS_AUTH = authClientWith({ id: "user-nadia", email: "nadia@alyosingenierie.fr" });
@@ -430,10 +435,9 @@ const VALID_SOLICIT_OPTIONS = {
 };
 
 describe("sendArchitectSolicitation — sélection template TU/VOUS", () => {
-  it("tutoiement=true → pickBrevoTemplateId appelé avec registre 'tu' (templateId TU)", async () => {
-    // Template TU = 10 (cf. beforeAll)
+  it("tutoiement=true → resolveBrevoTemplate retourne SUBJECT_SOLICITATION_TU", async () => {
     const db = buildSolicitMockDb(true);
-    const { client: brevoClient, getLastTemplateId } = buildBrevoCaptureMock();
+    const { client: brevoClient, getLastSubject } = buildBrevoCaptureMock();
 
     const result = await sendArchitectSolicitation(
       VALID_TENDER_ID,
@@ -443,14 +447,12 @@ describe("sendArchitectSolicitation — sélection template TU/VOUS", () => {
     );
 
     expect(result.ok).toBe(true);
-    // templateId TU = 10
-    expect(getLastTemplateId()).toBe(10);
+    expect(getLastSubject()).toBe(SUBJECT_SOLICITATION_TU);
   });
 
-  it("tutoiement=false → pickBrevoTemplateId appelé avec registre 'vous' (templateId VOUS)", async () => {
-    // Template VOUS = 11 (cf. beforeAll)
+  it("tutoiement=false → resolveBrevoTemplate retourne SUBJECT_SOLICITATION_VOUS", async () => {
     const db = buildSolicitMockDb(false);
-    const { client: brevoClient, getLastTemplateId } = buildBrevoCaptureMock();
+    const { client: brevoClient, getLastSubject } = buildBrevoCaptureMock();
 
     const result = await sendArchitectSolicitation(
       VALID_TENDER_ID,
@@ -460,14 +462,13 @@ describe("sendArchitectSolicitation — sélection template TU/VOUS", () => {
     );
 
     expect(result.ok).toBe(true);
-    // templateId VOUS = 11
-    expect(getLastTemplateId()).toBe(11);
+    expect(getLastSubject()).toBe(SUBJECT_SOLICITATION_VOUS);
   });
 
-  it("register='tu' explicite + tutoiement=false → override gagne, templateId TU", async () => {
+  it("register='tu' explicite + tutoiement=false → override gagne, subject TU", async () => {
     // L'override explicite `register='tu'` doit gagner même si l'archi a tutoiement=false.
     const db = buildSolicitMockDb(false);
-    const { client: brevoClient, getLastTemplateId } = buildBrevoCaptureMock();
+    const { client: brevoClient, getLastSubject } = buildBrevoCaptureMock();
 
     const result = await sendArchitectSolicitation(
       VALID_TENDER_ID,
@@ -477,7 +478,6 @@ describe("sendArchitectSolicitation — sélection template TU/VOUS", () => {
     );
 
     expect(result.ok).toBe(true);
-    // L'override force TU = 10
-    expect(getLastTemplateId()).toBe(10);
+    expect(getLastSubject()).toBe(SUBJECT_SOLICITATION_TU);
   });
 });
