@@ -272,7 +272,7 @@ export default async function AoDuJourPage({
 
       {/* Contenu principal */}
       {fetchError ? (
-        <ErrorBanner message={fetchError} />
+        <ErrorBanner message={fetchError} showDetailsInProd={isSuperAdmin(profile)} />
       ) : tendersCount === 0 ? (
         <EmptyState profileName={profileName} isAdmin={isAdmin(profile)} />
       ) : (

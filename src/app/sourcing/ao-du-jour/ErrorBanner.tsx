@@ -29,12 +29,19 @@ export function ErrorBanner({
   message,
   title = "Sourcing indisponible",
   description = "Impossible de charger les AO du jour. Les AO déjà connus restent consultables. Réessayez dans quelques instants — si le problème persiste, contactez l'administrateur.",
+  showDetailsInProd = false,
 }: {
   message: string;
   title?: string;
   description?: string;
+  /**
+   * Si true, affiche le détail technique même en production. À activer
+   * uniquement pour les superadmins (diagnostic ops sans déployer un patch).
+   */
+  showDetailsInProd?: boolean;
 }) {
   const isDev = process.env.NODE_ENV !== "production";
+  const showDetails = isDev || showDetailsInProd;
 
   return (
     <div
@@ -46,10 +53,10 @@ export function ErrorBanner({
       </div>
       <h2 className="font-display text-base font-semibold text-error">{title}</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-ink-2">{description}</p>
-      {isDev ? (
-        // Détails techniques visibles uniquement hors production (dev + CI) —
+      {showDetails ? (
+        // Détails techniques visibles en dev / CI / superadmin uniquement —
         // on évite ainsi de leak des détails infra (host BDD, code SQLSTATE,
-        // stack interne) côté users finaux Vercel prod.
+        // stack interne) côté users finaux Vercel prod (admins / users).
         <p className="mx-auto mt-4 max-w-xl break-words font-mono text-[11px] text-error">
           {message}
         </p>
