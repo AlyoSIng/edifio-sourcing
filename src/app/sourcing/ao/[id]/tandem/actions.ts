@@ -724,6 +724,7 @@ export async function sendArchitectSolicitation(
       ao_cloture: variables.ao_cloture,
       lien_ao: variables.lien_ao,
       lien_opposition: variables.lien_opposition,
+      lien_annonce_officielle: variables.lien_annonce_officielle,
       presentation_societe: variables.presentation_societe,
       rgpd_block: variables.rgpd_block,
     },

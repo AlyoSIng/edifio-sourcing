@@ -80,6 +80,15 @@ export interface BrevoArchitectVariables {
    * (lot D, via `resolveBrevoTemplate`).
    */
   presentation_societe: string;
+  /**
+   * URL absolue de l'annonce officielle de l'AO sur la plateforme source
+   * (BOAMP, place de marché, etc.). Source : `tenders.source_url` (peut être
+   * NULL pour un tender saisi manuellement ou sans annonce publique).
+   * Fallback : chaîne vide — côté template Brevo, encapsuler le rendu dans un
+   * bloc conditionnel Mustache `{{#params.lien_annonce_officielle}}…{{/…}}`
+   * pour ne pas afficher un lien cassé.
+   */
+  lien_annonce_officielle: string;
   rgpd_block: string;
   /** Version texte du bloc RGPD pour la part text/plain (Brevo gère les 2). */
   rgpd_block_text: string;
@@ -91,7 +100,7 @@ export interface BuildVariablesInput {
     /** `title` optionnel (champ Odoo "Civilité" — valeurs libres). */
     title?: string | null;
   };
-  tender: Pick<Tender, "title" | "buyer" | "deadline">;
+  tender: Pick<Tender, "title" | "buyer" | "deadline" | "sourceUrl">;
   /** Département extrait par le matcher (cf. matching.ts `extractDepartment`). */
   tenderDepartment: string | null;
   /** URL absolue de la page tokenisée architecte (`/archi/[token]`). */
@@ -243,6 +252,10 @@ export function buildBrevoVariables(input: BuildVariablesInput): BrevoArchitectV
     lien_ao: input.lienAo,
     lien_opposition: input.lienOpposition,
     presentation_societe: input.presentationSociete ?? PRESENTATION_SOCIETE_HTML_DEFAULT,
+    // sourceUrl est nullable côté BDD (tenders saisis sans annonce publique) → fallback "".
+    // Le template Brevo doit conditionner l'affichage avec un bloc Mustache
+    // `{{#params.lien_annonce_officielle}}…{{/params.lien_annonce_officielle}}`.
+    lien_annonce_officielle: input.tender.sourceUrl ?? "",
     rgpd_block,
     rgpd_block_text,
   };

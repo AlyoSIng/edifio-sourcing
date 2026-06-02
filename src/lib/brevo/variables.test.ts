@@ -126,6 +126,7 @@ describe("buildBrevoVariables — intégration (v2)", () => {
       title: "Rénovation école Jean Moulin",
       buyer: "Mairie de Lyon",
       deadline: new Date("2026-06-15T17:00:00Z"),
+      sourceUrl: "https://www.boamp.fr/avis/detail/26-12345",
     },
     tenderDepartment: "69",
     lienAo: "https://sourcing.alyosingenierie.fr/archi/abc.def.ghi",
@@ -205,6 +206,19 @@ describe("buildBrevoVariables — intégration (v2)", () => {
       tender: { ...baseInput.tender, deadline: null },
     });
     expect(v.ao_cloture).toBe("à confirmer");
+  });
+
+  it("lien_annonce_officielle = tender.sourceUrl quand l'AO a une URL source", () => {
+    const v = buildBrevoVariables(baseInput);
+    expect(v.lien_annonce_officielle).toBe("https://www.boamp.fr/avis/detail/26-12345");
+  });
+
+  it("lien_annonce_officielle = '' quand tender.sourceUrl est null", () => {
+    const v = buildBrevoVariables({
+      ...baseInput,
+      tender: { ...baseInput.tender, sourceUrl: null },
+    });
+    expect(v.lien_annonce_officielle).toBe("");
   });
 
   it("nom_commercial fallback 'AlyoS Ingénierie' si nomCommercial absent", () => {
