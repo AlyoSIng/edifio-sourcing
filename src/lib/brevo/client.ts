@@ -150,8 +150,14 @@ export function createBrevoClient(opts: { fetchFn?: FetchFn } = {}): BrevoClient
             ? { email: input.to.email, name: input.to.name }
             : { email: input.to.email },
         ],
-        params: input.params,
       };
+      // Brevo refuse `params: {}` vide avec "params is blank" — on n'inclut
+      // le champ que s'il contient au moins une variable. En mode raw avec
+      // pré-rendu Node.js, params est vide et c'est OK : Brevo n'a rien à
+      // substituer côté serveur.
+      if (input.params && Object.keys(input.params).length > 0) {
+        body.params = input.params;
+      }
       if (isTemplateMode) {
         body.templateId = input.templateId;
       } else {
