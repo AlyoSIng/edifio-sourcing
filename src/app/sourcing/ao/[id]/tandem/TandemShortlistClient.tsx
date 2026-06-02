@@ -701,18 +701,22 @@ export function TandemShortlistClient({ tenderId, initialData }: Props) {
         )}
       </div>
 
-      {/* Lien vers la gestion du cotraitant de l'AO */}
-      <div className="mt-6 border-t border-line pt-4">
-        <a
-          href={`/sourcing/ao/${tenderId}/tandem/cotraitant`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-red hover:underline"
-        >
-          &#8599; Cotraitant — gestion et documents
-        </a>
-        <p className="mt-0.5 text-xs text-muted">
-          Associez un cotraitant à cet AO et gérez les pièces échangées.
-        </p>
-      </div>
+      {/* Lien vers la gestion du cotraitant de l'AO — visible uniquement
+          quand un architecte a accepté (avant ça, pas de cotraitant à gérer). */}
+      {DOSSIER_READY_STATUSES.includes(initialData.tender.status) &&
+        rows.some((r) => r.responseStatus === "accepted") && (
+          <div className="mt-6 border-t border-line pt-4">
+            <a
+              href={`/sourcing/ao/${tenderId}/tandem/cotraitant`}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-red hover:underline"
+            >
+              &#8599; Cotraitant — gestion et documents
+            </a>
+            <p className="mt-0.5 text-xs text-muted">
+              Associez un cotraitant à cet AO et gérez les pièces échangées.
+            </p>
+          </div>
+        )}
 
       {/* Modale de prévisualisation individuelle */}
       {previewFor ? (
