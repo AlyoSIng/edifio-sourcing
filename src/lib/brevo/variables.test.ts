@@ -208,17 +208,20 @@ describe("buildBrevoVariables — intégration (v2)", () => {
     expect(v.ao_cloture).toBe("à confirmer");
   });
 
-  it("lien_annonce_officielle = tender.sourceUrl quand l'AO a une URL source", () => {
+  it("bloc_annonce_officielle = HTML <p><a>…</a></p> quand sourceUrl présent", () => {
     const v = buildBrevoVariables(baseInput);
-    expect(v.lien_annonce_officielle).toBe("https://www.boamp.fr/avis/detail/26-12345");
+    expect(v.bloc_annonce_officielle).toContain("https://www.boamp.fr/avis/detail/26-12345");
+    expect(v.bloc_annonce_officielle).toContain("<p>");
+    expect(v.bloc_annonce_officielle).toContain("<a href=");
+    expect(v.bloc_annonce_officielle).toContain("Consulter l'annonce officielle");
   });
 
-  it("lien_annonce_officielle = '' quand tender.sourceUrl est null", () => {
+  it("bloc_annonce_officielle = '' quand tender.sourceUrl est null", () => {
     const v = buildBrevoVariables({
       ...baseInput,
       tender: { ...baseInput.tender, sourceUrl: null },
     });
-    expect(v.lien_annonce_officielle).toBe("");
+    expect(v.bloc_annonce_officielle).toBe("");
   });
 
   it("nom_commercial fallback 'AlyoS Ingénierie' si nomCommercial absent", () => {

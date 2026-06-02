@@ -35,10 +35,10 @@
  *    - {{ params.ao_cloture }}         — date clôture FR ("28 mai 2026")
  *    - {{ params.lien_ao }}            — URL page tokenisée CTA obligatoire
  *    - {{ params.lien_opposition }}    — URL opposition RGPD obligatoire
- *    - {{ params.lien_annonce_officielle }} — URL annonce officielle BOAMP / plateforme source
- *      (optionnelle : encapsuler le rendu dans
- *      `{{#params.lien_annonce_officielle}}…{{/params.lien_annonce_officielle}}`
- *      pour ne pas afficher de lien cassé si `tenders.source_url` est NULL).
+ *    - {{{ params.bloc_annonce_officielle }}} — HTML pré-rendu côté Node.js
+ *      (paragraphe `<p><a>→ Consulter l'annonce officielle</a></p>` si
+ *      `tenders.source_url` présent, "" sinon). Brevo ne supporte PAS les
+ *      blocks Mustache conditionnels `{{#X}}{{/X}}` → pré-rendu côté code.
  *    - {{{ params.presentation_societe }}} — bloc HTML (triple-accolade = pas d'échappement)
  *    - {{{ params.rgpd_block }}}         — bloc RGPD art.14 HTML (triple-accolade = pas d'échappement)
  *
@@ -131,7 +131,7 @@ export const PRESENTATION_SOCIETE_TEXT_DEFAULT =
  *
  * Variables Brevo (syntaxe `{{ params.VAR }}`) :
  *   greeting, nom_commercial, ao_objet, ao_acheteur, ao_departement, ao_cloture,
- *   lien_annonce_officielle (optionnelle — bloc conditionnel Mustache),
+ *   bloc_annonce_officielle (HTML pré-rendu côté code, vide si pas de sourceUrl),
  *   presentation_societe, lien_ao, lien_opposition, rgpd_block
  *
  * Note : ce corps HTML est utilisé comme fallback par `resolveBrevoTemplate`
@@ -149,9 +149,7 @@ export const BODY_SOLICITATION_VOUS_TEMPLATE = `<p>{{ params.greeting }}</p>
   <li><strong>Département :</strong> {{ params.ao_departement }}</li>
   <li><strong>Remise des plis :</strong> {{ params.ao_cloture }}</li>
 </ul>
-{{#params.lien_annonce_officielle}}
-<p><a href="{{ params.lien_annonce_officielle }}" style="color:#FF0033;">→ Consulter l'annonce officielle</a></p>
-{{/params.lien_annonce_officielle}}
+{{{ params.bloc_annonce_officielle }}}
 
 {{{ params.presentation_societe }}}
 
@@ -168,7 +166,7 @@ export const BODY_SOLICITATION_VOUS_TEMPLATE = `<p>{{ params.greeting }}</p>
  *
  * Variables Brevo (syntaxe `{{ params.VAR }}`) :
  *   greeting, nom_commercial, ao_objet, ao_acheteur, ao_departement, ao_cloture,
- *   lien_annonce_officielle (optionnelle — bloc conditionnel Mustache),
+ *   bloc_annonce_officielle (HTML pré-rendu côté code, vide si pas de sourceUrl),
  *   presentation_societe, lien_ao, lien_opposition, rgpd_block
  */
 export const BODY_SOLICITATION_TU_TEMPLATE = `<p>{{ params.greeting }}</p>
@@ -182,9 +180,7 @@ export const BODY_SOLICITATION_TU_TEMPLATE = `<p>{{ params.greeting }}</p>
   <li><strong>Département :</strong> {{ params.ao_departement }}</li>
   <li><strong>Remise des plis :</strong> {{ params.ao_cloture }}</li>
 </ul>
-{{#params.lien_annonce_officielle}}
-<p><a href="{{ params.lien_annonce_officielle }}" style="color:#FF0033;">→ Consulter l'annonce officielle</a></p>
-{{/params.lien_annonce_officielle}}
+{{{ params.bloc_annonce_officielle }}}
 
 {{{ params.presentation_societe }}}
 

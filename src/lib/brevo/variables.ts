@@ -84,11 +84,16 @@ export interface BrevoArchitectVariables {
    * URL absolue de l'annonce officielle de l'AO sur la plateforme source
    * (BOAMP, place de marché, etc.). Source : `tenders.source_url` (peut être
    * NULL pour un tender saisi manuellement ou sans annonce publique).
-   * Fallback : chaîne vide — côté template Brevo, encapsuler le rendu dans un
-   * bloc conditionnel Mustache `{{#params.lien_annonce_officielle}}…{{/…}}`
-   * pour ne pas afficher un lien cassé.
+   *
+   * Pré-rendu HTML : si sourceUrl présent → `<p><a href="...">→ Consulter
+   * l'annonce officielle</a></p>`, sinon "" (chaîne vide). Le template Brevo
+   * injecte cette variable via triple-accolade `{{{ params.bloc_annonce_officielle }}}`.
+   *
+   * Pourquoi pré-rendre côté code : le moteur de template Brevo ne supporte pas
+   * les blocs conditionnels Mustache `{{#X}}{{/X}}` (parser error). On contourne
+   * en générant le HTML côté Node.js avant envoi.
    */
-  lien_annonce_officielle: string;
+  bloc_annonce_officielle: string;
   rgpd_block: string;
   /** Version texte du bloc RGPD pour la part text/plain (Brevo gère les 2). */
   rgpd_block_text: string;
@@ -252,10 +257,12 @@ export function buildBrevoVariables(input: BuildVariablesInput): BrevoArchitectV
     lien_ao: input.lienAo,
     lien_opposition: input.lienOpposition,
     presentation_societe: input.presentationSociete ?? PRESENTATION_SOCIETE_HTML_DEFAULT,
-    // sourceUrl est nullable côté BDD (tenders saisis sans annonce publique) → fallback "".
-    // Le template Brevo doit conditionner l'affichage avec un bloc Mustache
-    // `{{#params.lien_annonce_officielle}}…{{/params.lien_annonce_officielle}}`.
-    lien_annonce_officielle: input.tender.sourceUrl ?? "",
+    // Bloc pré-rendu côté Node.js — Brevo ne supporte pas les blocks Mustache
+    // conditionnels (`{{#X}}{{/X}}`). On génère le HTML ici et on l'injecte
+    // dans le template via triple-accolade `{{{ params.bloc_annonce_officielle }}}`.
+    bloc_annonce_officielle: input.tender.sourceUrl
+      ? `<p><a href="${input.tender.sourceUrl}" style="color:#FF0033;">→ Consulter l'annonce officielle</a></p>`
+      : "",
     rgpd_block,
     rgpd_block_text,
   };
