@@ -52,11 +52,26 @@ interface Candidate {
 /**
  * Mock minimaliste de l'API Drizzle utilisée par `runTandemFollowups` :
  *  - chaîne `.select().from().innerJoin()*.where().limit()` → candidates
- *  - chaîne secondaire `.select().from().where().limit()` → tokenRows + oppoRows
+ *  - chaîne secondaire `.select().from()` (sans where) → knownOrgs (sanity)
+ *  - chaîne secondaire `.select().from().where().limit()` → orgProfile / tokenRows / oppoRows
  *  - `.update().set().where()` → no-op (succès)
  *  - `.insert().values()` → no-op (succès)
  *
  * On suit l'ordre des appels via un compteur `selectCallCount`.
+ *
+ * Phase A multi-tenant (2026-06-02) : la séquence de `select` est désormais :
+ *   1. candidats (jointures)
+ *   2. knownOrgs (sanity-check — `.from(organizations)` sans where)
+ *   3..N : orgProfile (1 par org distincte des éligibles)
+ *   N+1.. : tokenRows / oppoRows alternés par item éligible
+ *
+ * Pour éviter la complexité d'un mock séquentiel rigide, on détecte la chaîne
+ * via la présence ou non de `.where()` après `.from()` :
+ *  - `.from(...).limit?` (pas de where) → knownOrgs
+ *  - `.from(...).where(...).limit(...)` → orgProfile ou tokenRows ou oppoRows
+ *
+ * On garde un compteur séparé `postOrgsSelectCount` pour alterner token/oppo
+ * APRÈS avoir consommé la séquence (candidats, knownOrgs, orgProfile).
  */
 function makeMockDb(opts: {
   candidates: Candidate[];
@@ -65,14 +80,15 @@ function makeMockDb(opts: {
   updateFails?: boolean;
 }) {
   let selectCallCount = 0;
+  const distinctOrgIds = Array.from(new Set(opts.candidates.map((c) => c.organizationId)));
+  const orgProfilesEnd = 2 + distinctOrgIds.length; // 1=candidats, 2=knownOrgs, 3..=orgProfiles
   const insertedBrevoMessages: unknown[] = [];
   const updatedResponses: unknown[] = [];
 
   const dbMock = {
     select: vi.fn(() => {
       selectCallCount += 1;
-      // 1er select = liste des candidats. Les suivants (par item) = tokenRows
-      // ou oppoRows. On renvoie un builder différent selon le rang.
+      // 1er select = liste des candidats. Builder à 3 innerJoin successifs.
       if (selectCallCount === 1) {
         return {
           from: () => ({
@@ -88,9 +104,17 @@ function makeMockDb(opts: {
           }),
         };
       }
-      // 2e select = organization_profiles (chargé une fois avant la boucle
-      // pour presentationSociete). Retourne [] → fallback hardcoded.
+      // 2e select = knownOrgs (sanity-check multi-tenant). Forme
+      // `.select(...).from(organizations)` SANS `.where()`. On retourne la
+      // liste des UUIDs vus dans les candidats — sanity-check passe sans warn.
       if (selectCallCount === 2) {
+        return {
+          from: async () => distinctOrgIds.map((id) => ({ id })),
+        };
+      }
+      // 3..(2+N) = orgProfiles (1 par org distincte). Retourne [] pour
+      // simplifier : `buildBrevoVariables` doit gérer profil absent.
+      if (selectCallCount <= orgProfilesEnd) {
         return {
           from: () => ({
             where: () => ({
@@ -99,9 +123,11 @@ function makeMockDb(opts: {
           }),
         };
       }
-      // Appels par item (≥ 3). Ordre : tokenRows (impair) puis oppoRows (pair).
-      // 3=tokenRows, 4=oppoRows, 5=tokenRows, 6=oppoRows, …
-      const isToken = selectCallCount % 2 === 1; // impair = token
+      // Appels par item (> orgProfilesEnd). Ordre : tokenRows puis oppoRows.
+      // Indexé sur la position relative pour rester correct quel que soit
+      // le nombre d'orgs.
+      const postOrgsIndex = selectCallCount - orgProfilesEnd; // 1=token, 2=oppo, 3=token, 4=oppo
+      const isToken = postOrgsIndex % 2 === 1;
       const value = isToken
         ? [{ jwtId: opts.tokenJti ?? "jti-test" }]
         : [{ jti: opts.oppoJti ?? null }].filter((r) => r.jti !== null);

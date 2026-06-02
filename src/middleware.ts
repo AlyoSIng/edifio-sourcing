@@ -334,10 +334,35 @@ function extractClientIp(req: NextRequest): string | null {
 }
 
 /**
- * Stub d'audit log — version étape 3 Gate 6.
+ * Audit log `access_attempt` — limitation Edge runtime documentée.
  *
- * À l'étape 7 (post-décision ORM + première migration), brancher l'insertion
- * réelle dans `audit_logs` (action = `access_attempt`).
+ * Contexte : ce middleware tourne en **Edge Runtime Vercel** (déclaré
+ * implicitement — Next.js force le middleware en Edge). Le helper `audit()`
+ * de `src/lib/audit/index.ts` ne peut PAS être appelé ici parce qu'il importe :
+ *  - `createSupabaseAdminClient` (`@supabase/supabase-js` — incompatible Edge
+ *    pour le service_role : le client ouvre des sockets TCP via Node:net) ;
+ *  - `db/client` (transitif via les schemas Zod du payload audit — `postgres`
+ *    requiert Node:net + Node:crypto fullsize).
+ *
+ * Trois options envisagées :
+ *  1. **Console.warn structuré** (retenu) — JSON-parsable, capté par Vercel
+ *     logs / Datadog. Coût zéro, pas de surface d'attaque supplémentaire.
+ *  2. **Fetch vers `/api/audit/access-attempt`** — overhead 1 fetch par
+ *     requête HTTP du site, latence ajoutée à chaque navigation, risque de
+ *     boucle infinie si la route plante (re-tape middleware → re-tape audit).
+ *     Rejeté pour MVP.
+ *  3. **Branche audit côté `auth/callback`** — déjà tracé via l'action `login`
+ *     (cf. AUDIT_ACTIONS) à la PR future qui branchera Supabase auth callback.
+ *     L'`access_attempt` middleware reste un signal séparé (granularité par
+ *     pathname) qui n'a pas d'équivalent côté callback.
+ *
+ * Décision Board 2026-05-14 (cf. note de suivi `CC_260514_AUDIT_ACCESS_ATTEMPT.md`) :
+ * conserver `console.warn` structuré pour le MVP. Une PR Edge-compatible
+ * (REST direct PostgREST via `fetch` natif Edge, sans SDK Supabase) sera
+ * traitée en Phase 2 si le besoin BDD se confirme côté analytics sécurité.
+ *
+ * Le schéma Zod `accessAttemptSchema` reste un placeholder (cf.
+ * `src/lib/audit/schemas.ts` A13) — sera durci en strict à la PR Phase 2.
  */
 async function logAccessAttempt(payload: {
   email: string | null;
@@ -346,6 +371,8 @@ async function logAccessAttempt(payload: {
   ip: string | null;
   userAgent: string | null;
 }): Promise<void> {
-  // TODO post-ORM : INSERT INTO audit_logs (...)
+  // TODO(Phase 2) — Brancher INSERT audit_logs via PostgREST REST direct
+  // (fetch natif Edge). Cf. JSDoc ci-dessus pour la justification du
+  // console.warn temporaire.
   console.warn("[audit_log:access_attempt]", JSON.stringify(payload));
 }

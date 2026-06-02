@@ -24,7 +24,8 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
  *      d'inviter un externe).
  *   4. Génération mot de passe provisoire + création user avec metadata.
  *   5. Envoi email Resend avec le provisoire.
- *   6. Audit log (stub — TODO post-ORM).
+ *   6. Audit log `membership_change` (operation=`invite`) via helper `audit()`.
+ *      Insertion réelle dans `audit_logs` — best-effort, non bloquant.
  *
  * Réponse JSON :
  *   - 201 { ok: true, user_id, expires_at }

@@ -36,6 +36,7 @@ import { architects } from "@/db/schema/architects";
 import { architectResponses, architectTokens } from "@/db/schema/selections";
 import { brevoMessages } from "@/db/schema/integrations";
 import { organizationProfiles } from "@/db/schema/messaging";
+import { organizations } from "@/db/schema/organizations";
 import { tenders } from "@/db/schema/tenders";
 import type { BrevoClient } from "@/lib/brevo/client";
 import { withTenantContext } from "@/lib/db/with-tenant-context";
@@ -45,10 +46,11 @@ import {
   templateNameFor,
 } from "@/lib/brevo/template-picker";
 import { buildBrevoVariables } from "@/lib/brevo/variables";
-// TODO Phase A : itérer sur toutes les organisations plutôt que ALYOS_ORG_ID en dur.
-// Pour l'instant le cron Tandem est mono-tenant (AlyoS uniquement).
-// Phase B supprimera cette dépendance quand le multi-tenant sera activé.
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+// Phase A multi-tenant (2026-06-02) : on charge la liste des organisations
+// présentes en BDD et on regroupe les profils société par `organizationId`
+// avant la boucle d'envoi. Suppression de la dépendance à `ALYOS_ORG_ID`
+// hardcodé — chaque relance utilise désormais `item.organizationId` (issu
+// de `architect_responses.organization_id`).
 import { extractDepartment } from "@/lib/tandem/matching";
 import { getSiteUrl } from "@/lib/site-url";
 
@@ -129,6 +131,7 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
         buyer: tenders.buyer,
         deadline: tenders.deadline,
         rawData: tenders.rawData,
+        sourceUrl: tenders.sourceUrl,
       },
     })
     .from(architectResponses)
@@ -153,28 +156,66 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
     return age >= FOLLOWUP_THRESHOLD_MS;
   });
 
-  // Chargement une fois pour toute la boucle (présentation société + nom commercial).
-  // withTenantContext pose app.current_organization_id pour FORCE RLS
-  // (cf. ANSWER_260527_CTO_RLS_FORCE_EDGE.md + with-tenant-context.ts).
-  let orgPresentationSociete: string | undefined;
-  let orgNomCommercial: string | undefined;
-  try {
-    const orgRows = await withTenantContext(ALYOS_ORG_ID, db, (client) =>
-      client
-        .select({
-          presentationBlock: organizationProfiles.presentationBlock,
-          commercialName: organizationProfiles.commercialName,
-        })
-        .from(organizationProfiles)
-        .where(eq(organizationProfiles.organizationId, ALYOS_ORG_ID))
-        .limit(1),
-    );
-    const block = orgRows[0]?.presentationBlock;
-    if (block) orgPresentationSociete = block;
-    const cname = orgRows[0]?.commercialName;
-    if (cname) orgNomCommercial = cname;
-  } catch {
-    // Fallback silencieux
+  // Phase A multi-tenant : on charge le profil société de CHAQUE organisation
+  // référencée par au moins un éligible. Évite N+1 (1 query par org au lieu
+  // de 1 par item) tout en restant correct multi-tenant.
+  //
+  // Pourquoi pas un IN(...) global ? `withTenantContext` pose
+  // `app.current_organization_id` à chaque appel — la valeur doit être unique
+  // par requête pour que la policy RLS FORCE soit correcte. On itère donc
+  // une fois par organisation distincte.
+  //
+  // Fallback : si un profil est absent ou si la lecture échoue (RLS, BDD
+  // indisponible), on continue avec `undefined` côté variables Brevo —
+  // `buildBrevoVariables` gère ce cas (valeurs par défaut).
+  type OrgProfile = { presentationSociete?: string; nomCommercial?: string };
+  const orgProfiles = new Map<string, OrgProfile>();
+
+  const distinctOrgIds = Array.from(new Set(eligible.map((c) => c.organizationId)));
+
+  // Sanity-check multi-tenant : on vérifie que chaque organizationId rencontré
+  // existe bien dans la table `organizations`. Une ligne orpheline (org
+  // supprimée hors workflow normal) génère un warn structuré mais on n'arrête
+  // pas le run — l'INSERT brevo_messages remontera une violation FK si besoin.
+  // Évite aussi qu'une faute de schéma silencieuse passe inaperçue en prod.
+  if (distinctOrgIds.length > 0) {
+    try {
+      const knownOrgs = await db.select({ id: organizations.id }).from(organizations);
+      const knownOrgIds = new Set(knownOrgs.map((o) => o.id));
+      for (const orgId of distinctOrgIds) {
+        if (!knownOrgIds.has(orgId)) {
+          console.warn("[tandem-followup:unknown_org]", { organizationId: orgId });
+        }
+      }
+    } catch {
+      // Best-effort — sanity-check non bloquant.
+    }
+  }
+
+  // Charge le profil de chaque org (1 query par org, contexte RLS posé).
+  for (const orgId of distinctOrgIds) {
+    try {
+      const orgRows = await withTenantContext(orgId, db, (client) =>
+        client
+          .select({
+            presentationBlock: organizationProfiles.presentationBlock,
+            commercialName: organizationProfiles.commercialName,
+          })
+          .from(organizationProfiles)
+          .where(eq(organizationProfiles.organizationId, orgId))
+          .limit(1),
+      );
+      const profile: OrgProfile = {};
+      const block = orgRows[0]?.presentationBlock;
+      if (block) profile.presentationSociete = block;
+      const cname = orgRows[0]?.commercialName;
+      if (cname) profile.nomCommercial = cname;
+      orgProfiles.set(orgId, profile);
+    } catch {
+      // Fallback silencieux : profil vide → `buildBrevoVariables` utilise
+      // ses propres defaults.
+      orgProfiles.set(orgId, {});
+    }
   }
 
   const sentArchitectIds: string[] = [];
@@ -249,6 +290,7 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
         buyer: item.tender.buyer,
         deadline: item.tender.deadline,
         rawData: item.tender.rawData,
+        sourceUrl: item.tender.sourceUrl,
       };
       const department = extractDepartment(tenderForBrevo);
 
@@ -260,6 +302,11 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
         ? `${getSiteUrl()}/archi/oppose/${oppoJti}`
         : `${getSiteUrl()}/archi/oppose/_no_token`;
 
+      // Profil société de l'org qui PORTE cette sollicitation (item.organizationId).
+      // Multi-tenant : un même run de cron peut envoyer pour plusieurs orgs,
+      // chacune avec sa présentation et son nom commercial.
+      const itemOrgProfile = orgProfiles.get(item.organizationId) ?? {};
+
       variables = buildBrevoVariables({
         architect: { cabinet: item.architect.cabinet, contactName: item.architect.contactName },
         tender: tenderForBrevo,
@@ -270,8 +317,8 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
         lienAo: `${getSiteUrl()}/archi/`,
         lienOpposition,
         register,
-        presentationSociete: orgPresentationSociete,
-        nomCommercial: orgNomCommercial,
+        presentationSociete: itemOrgProfile.presentationSociete,
+        nomCommercial: itemOrgProfile.nomCommercial,
       });
       void tokenRows; // pour silence linter
     } catch (err) {
