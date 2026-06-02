@@ -39,6 +39,14 @@ export function BECreateForm() {
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
 
+  // Champs DC2 (CERFA 12157 — déclaration du candidat, BE cotraitant)
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [signatureCity, setSignatureCity] = useState("");
+  const [capitalEur, setCapitalEur] = useState("");
+  const [legalRepresentativeName, setLegalRepresentativeName] = useState("");
+  const [legalRepresentativeRole, setLegalRepresentativeRole] = useState("");
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setEditError(null);
@@ -55,6 +63,11 @@ export function BECreateForm() {
       .filter(Boolean);
     const budgetMinValue = budgetMin ? parseInt(budgetMin, 10) : null;
     const budgetMaxValue = budgetMax ? parseInt(budgetMax, 10) : null;
+    const capitalEurValue = capitalEur ? parseInt(capitalEur, 10) : null;
+    if (capitalEur && (capitalEurValue === null || Number.isNaN(capitalEurValue))) {
+      setEditError("Le capital social doit être un entier en euros.");
+      return;
+    }
 
     startTransition(async () => {
       const result = await upsertBE({
@@ -66,6 +79,12 @@ export function BECreateForm() {
         siren: siren.trim() || null,
         zip: zip.trim() || null,
         city: city.trim() || null,
+        addressLine1: addressLine1.trim() || null,
+        addressLine2: addressLine2.trim() || null,
+        capitalEur: capitalEurValue,
+        signatureCity: signatureCity.trim() || null,
+        legalRepresentativeName: legalRepresentativeName.trim() || null,
+        legalRepresentativeRole: legalRepresentativeRole.trim() || null,
         notes: notes.trim() || null,
         tutoiement,
         preferred,
@@ -213,6 +232,113 @@ export function BECreateForm() {
               onChange={(e) => setCity(e.target.value)}
               className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
             />
+          </div>
+        </div>
+
+        {/* -------------------------------------------------------------- */}
+        {/* Section : Données pour DC2 (CERFA 12157)                        */}
+        {/* -------------------------------------------------------------- */}
+        <div className="bg-surface/40 space-y-3 rounded-md border border-line p-3">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">
+              Données pour DC2 (déclaration du candidat)
+            </h3>
+            <p className="mt-0.5 text-[11px] text-muted">
+              Champs administratifs nécessaires au pré-remplissage du CERFA n°12157 (le BE est
+              cotraitant — AlyoS mandataire du groupement).
+            </p>
+          </div>
+
+          {/* Adresse — line1 puis line2 sur deux lignes */}
+          <div>
+            <label htmlFor="new-be-address-line1" className="block text-xs font-medium text-ink">
+              Adresse (ligne 1)
+            </label>
+            <input
+              id="new-be-address-line1"
+              type="text"
+              value={addressLine1}
+              onChange={(e) => setAddressLine1(e.target.value)}
+              placeholder="ex : 12 rue de la Paix"
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
+          </div>
+          <div>
+            <label htmlFor="new-be-address-line2" className="block text-xs font-medium text-ink">
+              Adresse (ligne 2) <span className="text-xs font-normal text-muted">optionnel</span>
+            </label>
+            <input
+              id="new-be-address-line2"
+              type="text"
+              value={addressLine2}
+              onChange={(e) => setAddressLine2(e.target.value)}
+              placeholder="ex : Bâtiment B, 3e étage"
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
+          </div>
+
+          {/* Ville de signature + Capital social */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="new-be-signature-city" className="block text-xs font-medium text-ink">
+                Ville de signature{" "}
+                <span className="text-xs font-normal text-muted">(« Fait à »)</span>
+              </label>
+              <input
+                id="new-be-signature-city"
+                type="text"
+                value={signatureCity}
+                onChange={(e) => setSignatureCity(e.target.value)}
+                placeholder="ex : Paris"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-be-capital-eur" className="block text-xs font-medium text-ink">
+                Capital social (€) <span className="text-xs font-normal text-muted">optionnel</span>
+              </label>
+              <input
+                id="new-be-capital-eur"
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                value={capitalEur}
+                onChange={(e) => setCapitalEur(e.target.value)}
+                placeholder="ex : 50000"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          {/* Représentant légal — nom + qualité */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="new-be-legal-rep-name" className="block text-xs font-medium text-ink">
+                Nom du représentant légal
+              </label>
+              <input
+                id="new-be-legal-rep-name"
+                type="text"
+                value={legalRepresentativeName}
+                onChange={(e) => setLegalRepresentativeName(e.target.value)}
+                placeholder="ex : Jean Dupont"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-be-legal-rep-role" className="block text-xs font-medium text-ink">
+                Qualité du signataire
+              </label>
+              <input
+                id="new-be-legal-rep-role"
+                type="text"
+                value={legalRepresentativeRole}
+                onChange={(e) => setLegalRepresentativeRole(e.target.value)}
+                placeholder="ex : Gérant, Président"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+            </div>
           </div>
         </div>
 

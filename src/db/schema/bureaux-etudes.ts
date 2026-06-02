@@ -54,6 +54,26 @@ export const bureauEtudes = pgTable(
     siret: text("siret"),
     zip: text("zip"),
     city: text("city"),
+    /**
+     * Champs DC2 (CERFA n°12157 — Déclaration du candidat).
+     * Phase 1 Lot C : en cotraitance BE, AlyoS est mandataire d'un groupement
+     * avec des BE cotraitants — chaque BE cotraitant doit produire son propre
+     * DC2. Sa fiche porte donc les champs administratifs requis au
+     * pré-remplissage du CERFA n°12157. Tous nullable — BE existants restent
+     * valides.
+     */
+    /** Adresse du candidat (ligne 1 — rue, siège BE). DC2 §A. */
+    addressLine1: text("address_line1"),
+    /** Adresse du candidat (ligne 2 — complément). DC2 §A. */
+    addressLine2: text("address_line2"),
+    /** Capital social en euros. DC2 §B. */
+    capitalEur: integer("capital_eur"),
+    /** Ville de signature ("Fait à") par défaut sur le DC2. */
+    signatureCity: text("signature_city"),
+    /** Nom du représentant légal — signataire DC2 §G. */
+    legalRepresentativeName: text("legal_representative_name"),
+    /** Qualité du signataire (ex. "Gérant", "Président"). DC2 §G. */
+    legalRepresentativeRole: text("legal_representative_role"),
     /** Effectif salarié (enrichissement). */
     headcount: integer("headcount"),
     /** Taille entreprise (PME | ETI | GE) — enrichissement. */
