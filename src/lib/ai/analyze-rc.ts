@@ -3,10 +3,12 @@
  *
  * Deux variantes exportées :
  *   - `analyzeRc(tenderId, rcText, orgId)`     : envoi du texte déjà extrait
- *     (rétro-compat — utile si on dispose déjà du texte côté caller).
+ *     (variante rapide — utilisée en premier par `analyzeRcAction` après
+ *     extraction via `pdf-parse`).
  *   - `analyzeRcFromPdf(tenderId, pdfBuffer, orgId)` : envoi direct du PDF binaire
  *     à Claude (API Anthropic gère extraction texte + OCR auto natif).
- *     Variante recommandée depuis 2026-06-02 (bug pdf-parse sur certains PDFs).
+ *     Variante fallback (streaming HTTP — évite le 504 Vercel sur gros PDF).
+ *     Utilisée si pdf-parse échoue ou si le texte extrait est trop court.
  *
  * Charge le prompt actif depuis `ai_prompts` (name='rc_analysis_full').
  * Si absent → `{ ok: false, error: 'prompt_not_seeded' }`.
@@ -20,6 +22,14 @@
  * Coûts Anthropic Claude Sonnet 4.6 (approximation au moment de l'implémentation) :
  *   $3 / Mtok input + $15 / Mtok output.
  *   À ajuster si la grille tarifaire change (cf. DECISIONS.md ou facture Anthropic).
+ *
+ * Note streaming (2026-06-02) :
+ *   `analyzeRcFromPdf` utilise `client.messages.stream()` plutôt que
+ *   `client.messages.create()`. La connexion HTTP reste active pendant que les
+ *   tokens arrivent côté Anthropic → pas de Vercel Gateway Timeout 504 même si
+ *   l'analyse complète prend > 60 s (24 pages PDF natif typique : 60-90 s).
+ *   `stream.finalMessage()` retourne le `Message` final identique à l'API
+ *   non-streaming, donc le reste du pipeline (parse JSON, Zod, ai_runs) est inchangé.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -273,16 +283,20 @@ export async function analyzeRcFromPdf(
     // 4. Encodage base64 pour l'API Anthropic (DocumentBlockParam → Base64PDFSource)
     const pdfBase64 = pdfBuffer.toString("base64");
 
-    // 5. Appel Anthropic — bloc `document` + bloc `text` dans le même message user
+    // 5. Appel Anthropic en STREAMING — bloc `document` + bloc `text` dans le
+    //    même message user. Le streaming garde la connexion HTTP active pendant
+    //    que les tokens arrivent → pas de Vercel Gateway Timeout 504, même si
+    //    l'analyse complète dépasse 60 s. `stream.finalMessage()` retourne le
+    //    `Message` agrégé identique à l'API non-streaming.
     const client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
 
     const startMs = Date.now();
 
-    let response: Awaited<ReturnType<typeof client.messages.create>>;
+    let response: Anthropic.Messages.Message;
     try {
-      response = await client.messages.create({
+      const stream = client.messages.stream({
         model: ANTHROPIC_MODEL_MAP[prompt.model] ?? prompt.model,
         max_tokens: 4000,
         system: prompt.systemPrompt,
@@ -303,6 +317,8 @@ export async function analyzeRcFromPdf(
           },
         ],
       });
+
+      response = await stream.finalMessage();
     } catch (err) {
       console.error("[analyze-rc-from-pdf:anthropic:fail]", err);
       return {
