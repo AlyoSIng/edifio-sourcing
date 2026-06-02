@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { isAdmin, toUserProfile } from "@/lib/auth/types";
+import { isAdmin, isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import {
@@ -22,6 +22,7 @@ import { TenderActionsErrorToast } from "./TenderActionsErrorToast";
 import { TenderCard } from "./TenderCard";
 import { TenderFilterToolbar } from "./TenderFilterToolbar";
 import { ProfileTabs } from "./ProfileTabs";
+import { SourcingRerunButton } from "./SourcingRerunButton";
 
 export const metadata = {
   title: "AO du jour — edifio Sourcing",
@@ -238,9 +239,13 @@ export default async function AoDuJourPage({
         />
       ) : null}
 
-      {/* Bouton "Ajouter un AO" — admins uniquement, consultation privée / gré à gré */}
+      {/* Barre d'actions admin — admins uniquement.
+          - "Ajouter un AO" : tous les admins (consultation privée / gré à gré)
+          - "Relancer la recherche" : superadmins uniquement (relance manuelle
+            du cron sourcing — utile quand le cron 06h30 lun-ven a foiré). */}
       {isAdmin(profile) && !fetchError ? (
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
+          {isSuperAdmin(profile) ? <SourcingRerunButton /> : null}
           <Link
             href="/sourcing/ao/nouveau"
             className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2"
