@@ -68,6 +68,25 @@ export interface AnalyzeRcActionResult {
   analysis?: RcAnalysis;
 }
 
+/**
+ * Candidat de document détecté automatiquement sur la page d'annonce source.
+ * Classification heuristique sur le libellé du lien + l'URL + l'extension.
+ */
+export interface DetectedDocCandidate {
+  /** URL absolue du document (normalisée depuis l'URL relative éventuelle). */
+  url: string;
+  /** Type heuristique : RC, DCE (archive), CCAP, CCTP, ou OTHER (avis, formulaires…). */
+  kind: "RC" | "DCE" | "CCAP" | "CCTP" | "OTHER";
+  /** Libellé visible du lien dans la page source (texte du <a>). */
+  label: string;
+  /** Format dérivé de l'extension de l'URL. */
+  format: "pdf" | "zip" | "doc" | "other";
+}
+
+export type DetectTenderDocsResult =
+  | { ok: true; candidates: DetectedDocCandidate[]; warning?: string }
+  | { ok: false; error: string; detail?: string };
+
 // ---------------------------------------------------------------------------
 // Sécurité SSRF : validation URL avant fetch externe
 // ---------------------------------------------------------------------------
@@ -654,6 +673,145 @@ export async function analyzeRcAction(
     return { ok: true, analysis: result.analysis };
   } catch (err) {
     console.error("[dossier:analyze-rc:unhandled]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Action 6 : detectTenderDocsAction
+// ---------------------------------------------------------------------------
+
+/**
+ * Détection heuristique des documents (RC, DCE, CCAP, CCTP…) sur la page
+ * d'annonce officielle stockée dans `tenders.source_url`.
+ *
+ * Approche :
+ *   1. Auth + load tender (tenant-scoped)
+ *   2. Fetch HTTP simple (timeout 15 s) avec UA explicite
+ *   3. Regex extraction des `<a href="…">` pointant sur PDF/ZIP/DOC(X)/7Z/RAR
+ *   4. Normalisation des URLs relatives via `new URL(href, sourceUrl)`
+ *   5. Classification heuristique (label + URL)
+ *   6. Dédup sur URL
+ *
+ * Cas SPA : si la page contient `__NEXT_DATA__`, `<noscript>` ou
+ * `data-reactroot`, on retourne un warning explicite — la page BOAMP est un
+ * SPA Next.js, les liens DCE ne sont pas accessibles côté HTML statique.
+ *
+ * Pas de SSRF check obligatoire : `sourceUrl` provient des tenders posés
+ * par le pipeline scraping légitime (domaines publics connus).
+ *
+ * @param tenderId UUID du tender
+ */
+export async function detectTenderDocsAction(tenderId: string): Promise<DetectTenderDocsResult> {
+  try {
+    // 1. Auth check
+    const auth = await getAuthenticatedProfile();
+    if (!auth) return { ok: false, error: "not_authenticated" };
+
+    // 2. Load tender + sourceUrl (tenant-scoped)
+    const [tender] = await db
+      .select({ sourceUrl: tenders.sourceUrl })
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, auth.orgId)))
+      .limit(1);
+
+    if (!tender) return { ok: false, error: "tender_not_found" };
+    if (!tender.sourceUrl) return { ok: false, error: "no_source_url" };
+
+    const sourceUrl = tender.sourceUrl;
+
+    // 3. Fetch HTML
+    let resp: Response;
+    try {
+      resp = await fetch(sourceUrl, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; edifio-sourcing/1.0)" },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (err) {
+      console.error("[dossier:detect-docs:fetch:fail]", err);
+      return { ok: false, error: "fetch_failed", detail: "timeout ou erreur réseau" };
+    }
+
+    if (!resp.ok) {
+      return { ok: false, error: "fetch_failed", detail: `HTTP ${resp.status}` };
+    }
+
+    const html = await resp.text();
+
+    // 4. Extraire les liens vers PDFs/ZIPs/DOCs
+    const linkRegex = /<a[^>]+href=["']([^"']+\.(pdf|zip|doc|docx|7z|rar))["'][^>]*>([^<]*)<\/a>/gi;
+    const matches = [...html.matchAll(linkRegex)];
+
+    const seen = new Set<string>();
+    const candidates: DetectedDocCandidate[] = [];
+
+    for (const match of matches) {
+      const rawHref = match[1]?.trim() ?? "";
+      const ext = (match[2] ?? "").toLowerCase();
+      const rawLabel = (match[3] ?? "").trim();
+
+      if (!rawHref) continue;
+
+      // 5. Normalisation URL absolue
+      let absoluteUrl: string;
+      try {
+        absoluteUrl = new URL(rawHref, sourceUrl).toString();
+      } catch {
+        continue;
+      }
+
+      // Dédup
+      if (seen.has(absoluteUrl)) continue;
+      seen.add(absoluteUrl);
+
+      // Format dérivé de l'extension
+      let format: DetectedDocCandidate["format"];
+      if (ext === "pdf") format = "pdf";
+      else if (ext === "zip" || ext === "rar" || ext === "7z") format = "zip";
+      else if (ext === "doc" || ext === "docx") format = "doc";
+      else format = "other";
+
+      // Classification heuristique (label + url, case-insensitive)
+      const haystack = `${rawLabel} ${absoluteUrl}`.toLowerCase();
+      const isCcap = /ccap|clauses?_?administratives?/i.test(haystack);
+      const isCctp = /cctp|clauses?_?techniques?/i.test(haystack);
+      const isRc =
+        !isCcap &&
+        !isCctp &&
+        /(?:^|[^a-z])rc(?:[^a-z]|$)|reglement|règlement|consultation/i.test(haystack);
+      const isDce =
+        /(?:^|[^a-z])dce(?:[^a-z]|$)|dossier|consultation_complete/i.test(haystack) ||
+        format === "zip";
+
+      let kind: DetectedDocCandidate["kind"];
+      if (isCcap) kind = "CCAP";
+      else if (isCctp) kind = "CCTP";
+      else if (isRc) kind = "RC";
+      else if (isDce) kind = "DCE";
+      else kind = "OTHER";
+
+      // Label de secours si <a> vide (rare)
+      const label = rawLabel || absoluteUrl.split("/").pop() || "Document";
+
+      candidates.push({ url: absoluteUrl, kind, label, format });
+    }
+
+    // 9. Liste vide → détection SPA probable
+    if (candidates.length === 0) {
+      const looksLikeSpa = /<noscript|__NEXT_DATA__|data-reactroot/i.test(html);
+      if (looksLikeSpa) {
+        return {
+          ok: true,
+          candidates: [],
+          warning:
+            "La page source utilise un rendu dynamique (SPA). Les liens DCE ne sont pas accessibles via une simple requête HTTP. Utilisez l'import manuel ci-dessous.",
+        };
+      }
+    }
+
+    return { ok: true, candidates };
+  } catch (err) {
+    console.error("[dossier:detect-docs:unhandled]", err);
     return { ok: false, error: "internal_error" };
   }
 }

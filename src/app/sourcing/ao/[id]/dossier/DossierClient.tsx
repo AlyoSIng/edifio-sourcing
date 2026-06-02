@@ -29,6 +29,8 @@ import {
   analyzeRcAction,
   importDceFromPastedUrl,
   getRcSignedUrlAction,
+  detectTenderDocsAction,
+  type DetectedDocCandidate,
 } from "./actions";
 
 // ---------------------------------------------------------------------------
@@ -157,6 +159,12 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, sourceUrl }: D
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isLoadingPreview, startPreview] = useTransition();
 
+  // --- États pour l'auto-détection RC + DCE depuis la page d'annonce ---
+  const [isDetecting, startDetect] = useTransition();
+  const [detectError, setDetectError] = useState<string | null>(null);
+  const [detectWarning, setDetectWarning] = useState<string | null>(null);
+  const [detectedCandidates, setDetectedCandidates] = useState<DetectedDocCandidate[] | null>(null);
+
   function handleDownload() {
     setDownloadError(null);
     startDownload(async () => {
@@ -201,6 +209,37 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, sourceUrl }: D
       } else {
         setPreviewError("Impossible de charger l'aperçu. Réessayez.");
       }
+    });
+  }
+
+  function handleDetect() {
+    setDetectError(null);
+    setDetectWarning(null);
+    setDetectedCandidates(null);
+    startDetect(async () => {
+      const result = await detectTenderDocsAction(tenderId);
+      if (!result.ok) {
+        setDetectError(`Erreur : ${result.error}${result.detail ? ` — ${result.detail}` : ""}`);
+        return;
+      }
+      setDetectedCandidates(result.candidates);
+      if (result.warning) {
+        setDetectWarning(result.warning);
+      } else if (result.candidates.length === 0) {
+        setDetectWarning("Aucun lien PDF ou ZIP détecté sur la page.");
+      }
+    });
+  }
+
+  function handleImportCandidate(candidate: DetectedDocCandidate) {
+    // Réutilise le flow standard d'import depuis URL collée (SSRF + content-type PDF).
+    setPasteError(null);
+    startPasteImport(async () => {
+      const result = await importDceFromPastedUrl(tenderId, candidate.url);
+      if (!result.ok) {
+        setPasteError(downloadErrorLabel(result.error));
+      }
+      // succès : revalidatePath rafraîchit la page (RC affiché en carte verte).
     });
   }
 
@@ -281,6 +320,75 @@ function DceSection({ tenderId, dceUrl, rcDocument, platformCode, sourceUrl }: D
   // RC absent → formulaire de téléchargement / upload
   return (
     <section className="space-y-4" aria-label="Obtenir le DCE">
+      {/* Auto-détection RC + DCE depuis l'annonce source */}
+      {sourceUrl && (
+        <div className="rounded-lg border border-line bg-paper-2 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink">Auto-détecter RC et DCE</p>
+              <p className="mt-0.5 text-xs text-muted">
+                Tente d&apos;extraire les liens vers le RC et le DCE depuis la page d&apos;annonce.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDetect}
+              disabled={isDetecting}
+              className="shrink-0 rounded-full bg-brand-red px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isDetecting ? "Détection…" : "Détecter ↗"}
+            </button>
+          </div>
+          {detectError && (
+            <p role="alert" className="mt-2 text-xs text-error">
+              {detectError}
+            </p>
+          )}
+          {detectWarning && <p className="mt-2 text-xs text-warn">{detectWarning}</p>}
+          {detectedCandidates && detectedCandidates.length > 0 && (
+            <div className="mt-3">
+              <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted">
+                {detectedCandidates.length} document(s) détecté(s) :
+              </p>
+              <ul className="space-y-1.5">
+                {detectedCandidates.map((c, idx) => (
+                  <li
+                    key={idx}
+                    className="flex items-center justify-between gap-3 rounded border border-line bg-white px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={`mr-2 inline-block rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${
+                          c.kind === "RC"
+                            ? "bg-error-bg text-error"
+                            : c.kind === "DCE"
+                              ? "bg-success-bg text-success"
+                              : "bg-paper-3 text-muted"
+                        }`}
+                      >
+                        {c.kind}
+                      </span>
+                      <span className="text-ink">{c.label}</span>
+                      <span className="ml-2 font-mono text-[10px] text-muted">
+                        {c.format.toUpperCase()}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleImportCandidate(c)}
+                      disabled={isPasteImporting}
+                      className="shrink-0 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-2 disabled:opacity-50"
+                    >
+                      Importer
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bloc BOAMP informatif (si plateforme = BOAMP et pas d'URL DCE) */}
       {platformCode === "boamp" && !dceUrl && (
         <div className="rounded-lg border border-line bg-paper-2 p-4">
