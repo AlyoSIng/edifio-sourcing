@@ -592,7 +592,25 @@ function AnalysisTriggerSection({
 // Section 3 : Résultats de l'analyse
 // ---------------------------------------------------------------------------
 
-function AnalysisResultSection({ analysis, tenderId }: { analysis: RcAnalysis; tenderId: string }) {
+function AnalysisResultSection({
+  analysis,
+  tenderId,
+  selectedArchitectId,
+}: {
+  analysis: RcAnalysis;
+  tenderId: string;
+  /**
+   * UUID archi sélectionné (Phase 3) — propagé vers la page CERFA via
+   * `?archi=`. NULL si Solo / Tandem sans archi (mandataire = AlyoS).
+   */
+  selectedArchitectId: string | null;
+}) {
+  // Phase 3 — propagation du contexte archi mandataire vers la page CERFA
+  // pour que le DC1 soit pré-rempli depuis sa fiche au lieu d'AlyoS.
+  const cerfaHref = selectedArchitectId
+    ? `/sourcing/ao/${tenderId}/dossier/cerfa?archi=${selectedArchitectId}`
+    : `/sourcing/ao/${tenderId}/dossier/cerfa`;
+
   return (
     <div className="space-y-5">
       {/* Alertes */}
@@ -737,7 +755,7 @@ function AnalysisResultSection({ analysis, tenderId }: { analysis: RcAnalysis; t
       {/* Bouton Préparer les DC (PR-C — activé) */}
       <div className="flex justify-end pt-2">
         <a
-          href={`/sourcing/ao/${tenderId}/dossier/cerfa`}
+          href={cerfaHref}
           className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
         >
           Préparer les DC
@@ -757,8 +775,8 @@ interface DossierClientProps {
   /**
    * Architecte sélectionné pour préparer son dossier (Phase 2 multi-archi).
    * `null` si Solo / Cotraitance BE OU si Tandem sans archi encore sélectionné
-   * (sélecteur affiché côté server au-dessus). Phase 2 : la prop est passée
-   * mais le pré-remplissage DC1/DC2 ne la consomme pas encore (Phase 3).
+   * (sélecteur affiché côté server au-dessus). Phase 3 — l'UUID est propagé
+   * vers la page CERFA (`?archi=`) pour pré-remplir le DC1 mandataire archi.
    */
   selectedArchitect: AcceptedArchitect | null;
 }
@@ -832,7 +850,11 @@ export function DossierClient({ data, selectedArchitect }: DossierClientProps) {
             </span>
             <h2 className="text-sm font-semibold text-ink">Résultats — pièces &amp; critères</h2>
           </div>
-          <AnalysisResultSection analysis={localAnalysis} tenderId={tender.id} />
+          <AnalysisResultSection
+            analysis={localAnalysis}
+            tenderId={tender.id}
+            selectedArchitectId={selectedArchitect?.id ?? null}
+          />
         </div>
       )}
     </div>

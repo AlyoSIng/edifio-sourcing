@@ -22,6 +22,7 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { responseFiles } from "@/db/schema/library";
+import { architectResponses } from "@/db/schema/selections";
 import { tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -81,6 +82,7 @@ export interface ValidateCerfaResult {
     | "not_authenticated"
     | "tender_not_found"
     | "invalid_input"
+    | "architect_not_accepted"
     | "missing_required_fields"
     | "storage_upload_failed"
     | "db_insert_failed"
@@ -113,20 +115,27 @@ async function getAuthenticatedUser() {
  * Workflow :
  *   1. Auth check
  *   2. Vérification que le tender appartient à l'org
+ *   2bis. (Phase 3 Tandem multi-archi) si `architectId` fourni : vérifie que
+ *        cet archi a `architect_responses.status = 'accepted'` pour ce tender
+ *        (defense in depth — un UUID arbitraire ne suffit pas).
  *   3. Validation des champs requis (tous les required + a_completer doivent avoir une value)
  *   4. Sérialisation JSON
  *   5. Upload Supabase Storage : `{orgId}/{tenderId}/cerfa/{kind}_{timestamp}.json`
- *   6. Insert `response_files`
+ *   6. Insert `response_files` (avec `architect_id` si Phase 3)
  *   7. `revalidatePath`
  *
- * @param tenderId  UUID du tender
- * @param cerfaKind 'DC1' | 'DC2'
- * @param fields    État courant des champs (après saisie utilisateur)
+ * @param tenderId    UUID du tender
+ * @param cerfaKind   'DC1' | 'DC2'
+ * @param fields      État courant des champs (après saisie utilisateur)
+ * @param architectId UUID de l'architecte mandataire (Phase 3 Tandem multi-archi).
+ *                    NULL pour Solo / Cotraitance BE. La présence d'un UUID
+ *                    sera validée contre `architect_responses.status='accepted'`.
  */
 export async function validateCerfa(
   tenderId: string,
   cerfaKind: "DC1" | "DC2",
   fields: CerfaField[],
+  architectId: string | null = null,
 ): Promise<ValidateCerfaResult> {
   try {
     // 1. Auth check
@@ -139,6 +148,10 @@ export async function validateCerfa(
       return { ok: false, error: "tender_not_found" };
     }
     if (!VALID_CERFA_KINDS.has(cerfaKind)) {
+      return { ok: false, error: "invalid_input" };
+    }
+    // Phase 3 : si `architectId` fourni, valider la forme UUID (défense profonde).
+    if (architectId != null && !UUID_SHAPE.test(architectId)) {
       return { ok: false, error: "invalid_input" };
     }
 
@@ -158,6 +171,29 @@ export async function validateCerfa(
       .limit(1);
 
     if (!tender) return { ok: false, error: "tender_not_found" };
+
+    // 2bis. Phase 3 : defense in depth — l'archi doit avoir status='accepted'
+    // sur ce tender pour cette org. Un UUID arbitraire (même celui d'un archi
+    // existant) est rejeté s'il n'a pas accepté la sollicitation.
+    if (architectId != null) {
+      const [acceptedRow] = await db
+        .select({ id: architectResponses.id })
+        .from(architectResponses)
+        .where(
+          and(
+            eq(architectResponses.tenderId, tenderId),
+            eq(architectResponses.organizationId, auth.orgId),
+            eq(architectResponses.architectId, architectId),
+            eq(architectResponses.status, "accepted"),
+          ),
+        )
+        .limit(1);
+
+      if (!acceptedRow) {
+        console.warn("[cerfa:validate:archi:not-accepted]", { tenderId, architectId });
+        return { ok: false, error: "architect_not_accepted" };
+      }
+    }
 
     // 3. Validation des champs requis non remplis (sur le tableau validé Zod)
     const missing = validatedFields
@@ -212,6 +248,8 @@ export async function validateCerfa(
         storagePath,
         sizeBytes: jsonBuffer.byteLength,
         validated: true,
+        // Phase 3 Tandem multi-archi — lien optionnel vers l'archi mandataire.
+        architectId,
       });
     } catch (err) {
       console.error("[cerfa:validate:db:fail]", err);

@@ -35,6 +35,50 @@ const minimalInput: PrefillInput = {
   isTandem: false,
 };
 
+/**
+ * Phase 3 — fixture Tandem multi-archi : l'archi devient mandataire.
+ * Tous les champs DC1 sont remplis depuis la fiche archi (siren, adresse,
+ * représentant légal, qualité, téléphone, email, lieu de signature).
+ */
+const tandemArchiInput: PrefillInput = {
+  ...fullInput,
+  selectedArchitect: {
+    id: "00000000-0000-0000-0000-000000000001",
+    cabinet: "Atelier Dubois & Associés",
+    contactName: "Marie Dubois",
+    email: "contact@atelier-dubois.fr",
+    phone: "01 42 00 00 00",
+    siren: "987654321",
+    addressLine1: "12 rue de la Paix",
+    addressLine2: "Bâtiment B",
+    zip: "75002",
+    city: "Paris",
+    signatureCity: "Paris",
+    legalRepresentativeName: "Marie Dubois",
+    legalRepresentativeRole: "Gérante",
+  },
+};
+
+/** Archi sans représentant légal explicite → fallback contactName. */
+const tandemArchiFallbackInput: PrefillInput = {
+  ...fullInput,
+  selectedArchitect: {
+    id: "00000000-0000-0000-0000-000000000002",
+    cabinet: "Cabinet Léger",
+    contactName: "Paul Léger",
+    email: "paul@cabinet-leger.fr",
+    phone: null,
+    siren: null,
+    addressLine1: null,
+    addressLine2: null,
+    zip: null,
+    city: null,
+    signatureCity: null,
+    legalRepresentativeName: null,
+    legalRepresentativeRole: null,
+  },
+};
+
 // ---------------------------------------------------------------------------
 // buildDc1
 // ---------------------------------------------------------------------------
@@ -111,6 +155,132 @@ describe("buildDc1", () => {
     const field = doc.fields.find((f) => f.field_id === "dc1_telephone");
     expect(field?.value).toBe("02 35 00 00 00");
     expect(field?.source).toBe("company_data");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildDc1 — Phase 3 Tandem multi-archi (archi mandataire)
+// ---------------------------------------------------------------------------
+
+describe("buildDc1 — Phase 3 archi mandataire", () => {
+  it("dc1_nom_mandataire = cabinet archi quand selectedArchitect fourni", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_nom_mandataire");
+    expect(field?.value).toBe("Atelier Dubois & Associés");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_siren = siren archi (company_data) quand selectedArchitect fourni", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_siren");
+    expect(field?.value).toBe("987654321");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_adresse = concaténation addressLine1 + addressLine2 + zip + city archi", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_adresse");
+    expect(field?.value).toBe("12 rue de la Paix, Bâtiment B, 75002, Paris");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_representant_legal = legalRepresentativeName archi", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_representant_legal");
+    expect(field?.value).toBe("Marie Dubois");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_qualite = legalRepresentativeRole archi", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_qualite");
+    expect(field?.value).toBe("Gérante");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_telephone = phone archi (company_data) quand renseigné", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_telephone");
+    expect(field?.value).toBe("01 42 00 00 00");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_email = email archi (company_data)", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_email");
+    expect(field?.value).toBe("contact@atelier-dubois.fr");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_lieu_date = signatureCity archi", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_lieu_date");
+    expect(field?.value).toBe("Paris");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_type_candidature reste 'Groupement momentané' quand archi mandataire", () => {
+    const doc = buildDc1(tandemArchiInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_type_candidature");
+    expect(field?.value).toBe("Groupement momentané d'entreprises");
+  });
+
+  it("force le mode Tandem si selectedArchitect fourni même quand isTandem=false", () => {
+    const doc = buildDc1({ ...tandemArchiInput, isTandem: false });
+    const mandataire = doc.fields.find((f) => f.field_id === "dc1_nom_mandataire");
+    const typeField = doc.fields.find((f) => f.field_id === "dc1_type_candidature");
+    expect(mandataire?.value).toBe("Atelier Dubois & Associés");
+    expect(typeField?.value).toBe("Groupement momentané d'entreprises");
+  });
+
+  it("représentant légal fallback sur contactName si legalRepresentativeName null", () => {
+    const doc = buildDc1(tandemArchiFallbackInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_representant_legal");
+    expect(field?.value).toBe("Paul Léger");
+    expect(field?.source).toBe("company_data");
+  });
+
+  it("dc1_siren = a_completer si archi.siren null (mode archi mandataire)", () => {
+    const doc = buildDc1(tandemArchiFallbackInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_siren");
+    expect(field?.value).toBe("");
+    expect(field?.source).toBe("a_completer");
+  });
+
+  it("dc1_adresse vide → a_completer si tous les champs adresse archi sont null", () => {
+    const doc = buildDc1(tandemArchiFallbackInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_adresse");
+    expect(field?.value).toBe("");
+    expect(field?.source).toBe("a_completer");
+  });
+
+  it("dc1_telephone = a_completer si archi.phone null", () => {
+    const doc = buildDc1(tandemArchiFallbackInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_telephone");
+    expect(field?.source).toBe("a_completer");
+  });
+
+  it("dc1_qualite = a_completer si archi.legalRepresentativeRole null", () => {
+    const doc = buildDc1(tandemArchiFallbackInput);
+    const field = doc.fields.find((f) => f.field_id === "dc1_qualite");
+    expect(field?.source).toBe("a_completer");
+    expect(field?.required).toBe(true);
+  });
+
+  it("selectedArchitect=null se comporte comme Solo/Tandem AlyoS classique", () => {
+    const doc = buildDc1({ ...fullInput, selectedArchitect: null });
+    const mandataire = doc.fields.find((f) => f.field_id === "dc1_nom_mandataire");
+    const siren = doc.fields.find((f) => f.field_id === "dc1_siren");
+    expect(mandataire?.value).toBe("AlyoS Ingénierie");
+    expect(siren?.value).toBe("123456789");
+  });
+
+  it("buildDc2 ignore selectedArchitect (DC2 = candidat AlyoS uniquement)", () => {
+    // Le DC2 décrit AlyoS en tant que candidat individuel/membre du groupement.
+    // Phase 3 ne change pas son comportement.
+    const doc = buildDc2(tandemArchiInput);
+    const denomination = doc.fields.find((f) => f.field_id === "dc2_denomination");
+    expect(denomination?.value).toBe("AlyoS Ingénierie");
   });
 });
 

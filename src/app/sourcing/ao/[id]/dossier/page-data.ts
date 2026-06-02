@@ -75,6 +75,10 @@ export interface AcceptedArchitect {
   cabinet: string;
   contactName: string | null;
   email: string;
+  /** Téléphone du cabinet (DC1 §B — Phase 3 mandataire archi). */
+  phone: string | null;
+  /** SIREN 9 chars (DC1 §A — Phase 3 mandataire archi). */
+  siren: string | null;
   legalRepresentativeName: string | null;
   legalRepresentativeRole: string | null;
   addressLine1: string | null;
@@ -183,6 +187,8 @@ export async function loadDossierPageData(
         cabinet: architects.cabinet,
         contactName: architects.contactName,
         email: architects.email,
+        phone: architects.phone,
+        siren: architects.siren,
         legalRepresentativeName: architects.legalRepresentativeName,
         legalRepresentativeRole: architects.legalRepresentativeRole,
         addressLine1: architects.addressLine1,
@@ -214,6 +220,8 @@ export async function loadDossierPageData(
         cabinet: row.cabinet,
         contactName: row.contactName,
         email: row.email,
+        phone: row.phone,
+        siren: row.siren,
         legalRepresentativeName: row.legalRepresentativeName,
         legalRepresentativeRole: row.legalRepresentativeRole,
         addressLine1: row.addressLine1,

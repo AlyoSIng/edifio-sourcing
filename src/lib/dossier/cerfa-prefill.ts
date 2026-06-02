@@ -67,6 +67,32 @@ export interface PrefillInput {
    * Conservé en paramètre pour préparation Phase 2 Solo.
    */
   isTandem: boolean;
+  /**
+   * Architecte sélectionné comme mandataire du groupement (Phase 3 — Tandem
+   * multi-archi). Quand cette valeur est non-null, le DC1 utilise les
+   * coordonnées de l'architecte (qui est mandataire MOE BTP) à la place
+   * d'AlyoS. Null → comportement Solo / Tandem sans archi sélectionné
+   * (AlyoS = mandataire).
+   *
+   * Cas d'usage : page `/sourcing/ao/[id]/dossier/cerfa?archi=<uuid>` —
+   * un architecte ayant accepté la sollicitation a été choisi via le
+   * sélecteur `AcceptedArchitectsSelector`.
+   */
+  selectedArchitect?: {
+    id: string;
+    cabinet: string;
+    contactName: string | null;
+    email: string;
+    phone: string | null;
+    siren: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    zip: string | null;
+    city: string | null;
+    signatureCity: string | null;
+    legalRepresentativeName: string | null;
+    legalRepresentativeRole: string | null;
+  } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,9 +131,41 @@ function field(
  *
  * Champs Tandem : `dc1_nom_mandataire` est affiché uniquement quand
  * `isTandem = true` (groupement momentané d'entreprises).
+ *
+ * Phase 3 — Tandem multi-archi : si `selectedArchitect` est fourni,
+ * l'architecte devient mandataire du groupement et l'ensemble des champs
+ * candidat (mandataire, SIREN, adresse, représentant légal, qualité,
+ * téléphone, email, lieu de signature) est rempli depuis sa fiche au lieu
+ * d'AlyoS. Le mode Tandem (`isTandem`) reste actif (type candidature =
+ * « Groupement momentané d'entreprises »).
  */
 export function buildDc1(input: PrefillInput): CerfaDoc {
-  const { tender, org, orgProfile, isTandem } = input;
+  const { tender, org, orgProfile, isTandem, selectedArchitect } = input;
+
+  /**
+   * Phase 3 — Branching mandataire :
+   *   - `selectedArchitect` non-null → archi = mandataire (Tandem multi-archi)
+   *   - sinon → AlyoS = mandataire (comportement Solo / Tandem sans archi)
+   *
+   * Quand un archi est sélectionné, on force le type de candidature à
+   * « Groupement momentané d'entreprises » (l'archi mandataire implique
+   * Tandem). On reste cohérent avec `isTandem` pour les autres champs.
+   */
+  const isArchiMandataire = selectedArchitect != null;
+  const effectiveIsTandem = isTandem || isArchiMandataire;
+
+  // Adresse archi concaténée à partir des 4 sous-champs (filter Boolean élimine
+  // les NULL/strings vides — pas de virgule double si addressLine2 manque).
+  const archiAdresse = isArchiMandataire
+    ? [
+        selectedArchitect.addressLine1,
+        selectedArchitect.addressLine2,
+        selectedArchitect.zip,
+        selectedArchitect.city,
+      ]
+        .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+        .join(", ")
+    : "";
 
   const fields: CerfaField[] = [
     field(
@@ -121,46 +179,96 @@ export function buildDc1(input: PrefillInput): CerfaDoc {
     field(
       "dc1_type_candidature",
       "Type de candidature",
-      isTandem ? "Groupement momentané d'entreprises" : "Candidat individuel",
+      effectiveIsTandem ? "Groupement momentané d'entreprises" : "Candidat individuel",
       "company_data",
       true,
     ),
   ];
 
-  // Mandataire uniquement en Tandem
-  if (isTandem) {
+  // Mandataire uniquement en Tandem (au sens large : isTandem OU archi sélectionné)
+  if (effectiveIsTandem) {
     fields.push(
       field(
         "dc1_nom_mandataire",
         "Nom du mandataire du groupement",
-        org.name,
+        isArchiMandataire ? selectedArchitect.cabinet : org.name,
         "company_data",
         true,
       ),
     );
   }
 
-  fields.push(
-    field("dc1_siren", "SIREN / SIRET", org.siren ?? "", "company_data", true),
-    field(
-      "dc1_adresse",
-      "Adresse du candidat",
-      orgProfile?.agencyDetails ?? "",
-      "company_data",
-      false,
-    ),
-    field("dc1_representant_legal", "Nom du représentant légal", "", "company_data", true),
-    field("dc1_qualite", "Qualité du signataire (ex. Président, Gérant)", "", "company_data", true),
-    field("dc1_telephone", "Téléphone", orgProfile?.phone ?? "", "company_data", false),
-    field(
-      "dc1_email",
-      "Adresse email de contact",
-      orgProfile?.contactEmail ?? "",
-      "company_data",
-      false,
-    ),
-    field("dc1_lieu_date", "Fait à (lieu et date de signature)", "", "company_data", false),
-  );
+  if (isArchiMandataire) {
+    // Mode Tandem multi-archi : DC1 = données archi mandataire
+    // Fallback `legalRepresentativeName` → `contactName` si la fiche archi
+    // n'expose pas explicitement de représentant légal (ex. import Odoo
+    // historique sans champ DC1). `contactName` reste le contact métier.
+    const representantLegal =
+      selectedArchitect.legalRepresentativeName ?? selectedArchitect.contactName ?? "";
+
+    fields.push(
+      field("dc1_siren", "SIREN / SIRET", selectedArchitect.siren ?? "", "company_data", true),
+      field("dc1_adresse", "Adresse du candidat", archiAdresse, "company_data", false),
+      field(
+        "dc1_representant_legal",
+        "Nom du représentant légal",
+        representantLegal,
+        "company_data",
+        true,
+      ),
+      field(
+        "dc1_qualite",
+        "Qualité du signataire (ex. Président, Gérant)",
+        selectedArchitect.legalRepresentativeRole ?? "",
+        "company_data",
+        true,
+      ),
+      field("dc1_telephone", "Téléphone", selectedArchitect.phone ?? "", "company_data", false),
+      field(
+        "dc1_email",
+        "Adresse email de contact",
+        selectedArchitect.email,
+        "company_data",
+        false,
+      ),
+      field(
+        "dc1_lieu_date",
+        "Fait à (lieu et date de signature)",
+        selectedArchitect.signatureCity ?? "",
+        "company_data",
+        false,
+      ),
+    );
+  } else {
+    // Mode historique : DC1 = données AlyoS (Solo ou Tandem sans archi)
+    fields.push(
+      field("dc1_siren", "SIREN / SIRET", org.siren ?? "", "company_data", true),
+      field(
+        "dc1_adresse",
+        "Adresse du candidat",
+        orgProfile?.agencyDetails ?? "",
+        "company_data",
+        false,
+      ),
+      field("dc1_representant_legal", "Nom du représentant légal", "", "company_data", true),
+      field(
+        "dc1_qualite",
+        "Qualité du signataire (ex. Président, Gérant)",
+        "",
+        "company_data",
+        true,
+      ),
+      field("dc1_telephone", "Téléphone", orgProfile?.phone ?? "", "company_data", false),
+      field(
+        "dc1_email",
+        "Adresse email de contact",
+        orgProfile?.contactEmail ?? "",
+        "company_data",
+        false,
+      ),
+      field("dc1_lieu_date", "Fait à (lieu et date de signature)", "", "company_data", false),
+    );
+  }
 
   return {
     cerfa_kind: "DC1",

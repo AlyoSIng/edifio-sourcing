@@ -19,6 +19,7 @@
 import { useState, useTransition } from "react";
 
 import type { CerfaDoc, CerfaField } from "@/lib/dossier/cerfa-prefill";
+import type { AcceptedArchitect } from "../page-data";
 import { validateCerfa } from "./actions";
 import type { ExistingCerfa } from "./actions";
 
@@ -37,6 +38,13 @@ export interface CerfaFormClientProps {
   existingDc1: ExistingCerfa | null;
   /** Fichier DC2 existant si déjà validé (null sinon). */
   existingDc2: ExistingCerfa | null;
+  /**
+   * Architecte mandataire sélectionné (Phase 3 Tandem multi-archi).
+   * Quand non-null, l'UUID est passé à `validateCerfa` pour lier le
+   * `response_file` à l'archi via `response_files.architect_id`.
+   * Affiche aussi un mini header de contexte au-dessus des formulaires.
+   */
+  selectedArchitect: AcceptedArchitect | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,9 +81,14 @@ interface SingleCerfaFormProps {
   tenderId: string;
   doc: CerfaDoc;
   existingFile: ExistingCerfa | null;
+  /**
+   * UUID de l'archi mandataire (Phase 3) — transmis à `validateCerfa` pour
+   * lier le response_file. `null` si Solo / Tandem sans archi sélectionné.
+   */
+  architectId: string | null;
 }
 
-function SingleCerfaForm({ tenderId, doc, existingFile }: SingleCerfaFormProps) {
+function SingleCerfaForm({ tenderId, doc, existingFile, architectId }: SingleCerfaFormProps) {
   // Initialisation depuis les champs préremplis (ou depuis l'état "déjà validé")
   const [fields, setFields] = useState<CerfaField[]>(doc.fields);
   // Mode édition : true si l'utilisateur clique "Modifier" après validation
@@ -109,7 +122,7 @@ function SingleCerfaForm({ tenderId, doc, existingFile }: SingleCerfaFormProps) 
   function handleValidate() {
     setError(null);
     startTransition(async () => {
-      const result = await validateCerfa(tenderId, doc.cerfa_kind, fields);
+      const result = await validateCerfa(tenderId, doc.cerfa_kind, fields, architectId);
       if (result.ok) {
         setSuccess(true);
         setIsEditing(false);
@@ -263,6 +276,8 @@ function errorLabel(code: string | undefined): string {
       return "Session expirée — reconnectez-vous.";
     case "tender_not_found":
       return "AO introuvable — rechargez la page.";
+    case "architect_not_accepted":
+      return "Architecte non accepté pour cet AO — rechargez la page et resélectionnez.";
     case "storage_upload_failed":
       return "Erreur d'enregistrement dans le stockage — réessayez.";
     case "db_insert_failed":
@@ -278,6 +293,10 @@ function errorLabel(code: string | undefined): string {
 
 /**
  * Affiche DC1 et DC2 en deux cartes empilées (desktop : côte à côte via grid).
+ *
+ * Phase 3 — quand un architecte mandataire est sélectionné, affiche un mini
+ * header de contexte et propage son UUID au submit pour lier le
+ * `response_files.architect_id`.
  */
 export function CerfaFormClient({
   dc1,
@@ -285,11 +304,32 @@ export function CerfaFormClient({
   tenderId,
   existingDc1,
   existingDc2,
+  selectedArchitect,
 }: CerfaFormClientProps) {
+  const architectId = selectedArchitect?.id ?? null;
+
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <SingleCerfaForm tenderId={tenderId} doc={dc1} existingFile={existingDc1} />
-      <SingleCerfaForm tenderId={tenderId} doc={dc2} existingFile={existingDc2} />
+    <div>
+      {selectedArchitect && (
+        <div className="mb-4 rounded-md border border-line bg-paper-2 p-3 text-sm text-ink-2">
+          Dossier CERFA pour <strong className="text-ink">{selectedArchitect.cabinet}</strong>. Le
+          DC1 utilise les informations de cet architecte comme mandataire du groupement.
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <SingleCerfaForm
+          tenderId={tenderId}
+          doc={dc1}
+          existingFile={existingDc1}
+          architectId={architectId}
+        />
+        <SingleCerfaForm
+          tenderId={tenderId}
+          doc={dc2}
+          existingFile={existingDc2}
+          architectId={architectId}
+        />
+      </div>
     </div>
   );
 }

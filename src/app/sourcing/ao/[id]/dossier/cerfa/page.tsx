@@ -18,6 +18,8 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { db } from "@/db/client";
+import { architects } from "@/db/schema/architects";
+import { architectResponses } from "@/db/schema/selections";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { organizations } from "@/db/schema/organizations";
 import { organizationProfiles } from "@/db/schema/messaging";
@@ -28,6 +30,7 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { buildDc1, buildDc2 } from "@/lib/dossier/cerfa-prefill";
+import type { AcceptedArchitect } from "../page-data";
 import { CerfaFormClient } from "./CerfaFormClient";
 import { loadExistingCerfa } from "./actions";
 
@@ -41,11 +44,20 @@ export const metadata = {
 
 interface PageProps {
   params: { id: string };
+  /**
+   * Query params :
+   *   - `archi` : UUID de l'architecte sélectionné comme mandataire du
+   *     groupement (Phase 3 Tandem multi-archi). Si fourni et valide,
+   *     le DC1 est pré-rempli depuis les coordonnées de cet architecte
+   *     au lieu d'AlyoS. UUID invalide / archi non accepté pour cet AO
+   *     → fallback Solo (DC1 = AlyoS, archi ignoré).
+   */
+  searchParams?: { archi?: string };
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-export default async function CerfaPage({ params }: PageProps) {
+export default async function CerfaPage({ params, searchParams }: PageProps) {
   // 1. Auth check défensif
   const supabase = createSupabaseServerClient();
   const {
@@ -143,6 +155,67 @@ export default async function CerfaPage({ params }: PageProps) {
     // 3e. Fichiers CERFA existants (si déjà validés)
     const { dc1: existingDc1, dc2: existingDc2 } = await loadExistingCerfa(tenderId, orgId);
 
+    // 3f. Résolution archi sélectionné (Phase 3 Tandem multi-archi).
+    //     Validation : UUID dans le query param ET architect_responses.status='accepted'
+    //     pour ce tender (defense in depth — un UUID arbitraire ne suffit pas).
+    //     Fallback null si non fourni / invalide / archi non accepté.
+    const archiParam = searchParams?.archi;
+    const requestedArchiId = archiParam && UUID_SHAPE.test(archiParam) ? archiParam : null;
+    let selectedArchitect: AcceptedArchitect | null = null;
+    if (requestedArchiId) {
+      const [archiRow] = await db
+        .select({
+          id: architects.id,
+          cabinet: architects.cabinet,
+          contactName: architects.contactName,
+          email: architects.email,
+          phone: architects.phone,
+          siren: architects.siren,
+          legalRepresentativeName: architects.legalRepresentativeName,
+          legalRepresentativeRole: architects.legalRepresentativeRole,
+          addressLine1: architects.addressLine1,
+          addressLine2: architects.addressLine2,
+          zip: architects.zip,
+          city: architects.city,
+          signatureCity: architects.signatureCity,
+          signedAt: architectResponses.respondedAt,
+        })
+        .from(architectResponses)
+        .innerJoin(architects, eq(architectResponses.architectId, architects.id))
+        .where(
+          and(
+            eq(architectResponses.tenderId, tenderId),
+            eq(architectResponses.organizationId, orgId),
+            eq(architectResponses.status, "accepted"),
+            eq(architects.id, requestedArchiId),
+            eq(architects.organizationId, orgId),
+          ),
+        )
+        .limit(1);
+
+      // Un archi sans email ne peut pas être mandataire (DC1 §B email obligatoire).
+      // Si l'export Odoo a laissé le champ vide, on retombe sur le mode Solo
+      // plutôt que de générer un DC1 incomplet.
+      if (archiRow && archiRow.email != null) {
+        selectedArchitect = {
+          id: archiRow.id,
+          cabinet: archiRow.cabinet,
+          contactName: archiRow.contactName,
+          email: archiRow.email,
+          phone: archiRow.phone,
+          siren: archiRow.siren,
+          legalRepresentativeName: archiRow.legalRepresentativeName,
+          legalRepresentativeRole: archiRow.legalRepresentativeRole,
+          addressLine1: archiRow.addressLine1,
+          addressLine2: archiRow.addressLine2,
+          zip: archiRow.zip,
+          city: archiRow.city,
+          signatureCity: archiRow.signatureCity,
+          signedAt: archiRow.signedAt,
+        };
+      }
+    }
+
     // 4. isTandem : au MVP, seuls les AOs `architect_accepted` accèdent au dossier
     // donc isTandem est toujours true ici.
     // Conservé en variable explicite pour préparation Phase 2 Solo.
@@ -153,6 +226,7 @@ export default async function CerfaPage({ params }: PageProps) {
       org: { name: org?.name ?? "AlyoS Ingénierie", siren: org?.siren ?? null },
       orgProfile: orgProfile ?? null,
       isTandem,
+      selectedArchitect,
     };
 
     // 5. Construction des CERFA préremplis
@@ -178,7 +252,11 @@ export default async function CerfaPage({ params }: PageProps) {
           </a>
           <span aria-hidden>/</span>
           <a
-            href={`/sourcing/ao/${tenderId}/dossier`}
+            href={
+              selectedArchitect
+                ? `/sourcing/ao/${tenderId}/dossier?archi=${selectedArchitect.id}`
+                : `/sourcing/ao/${tenderId}/dossier`
+            }
             className="hover:text-ink hover:underline focus:outline-none"
           >
             Dossier
@@ -222,12 +300,17 @@ export default async function CerfaPage({ params }: PageProps) {
           tenderId={tenderId}
           existingDc1={existingDc1}
           existingDc2={existingDc2}
+          selectedArchitect={selectedArchitect}
         />
 
         {/* Lien vers l'étape suivante */}
         <div className="mt-8 flex justify-end">
           <a
-            href={`/sourcing/ao/${tenderId}/dossier/pieces`}
+            href={
+              selectedArchitect
+                ? `/sourcing/ao/${tenderId}/dossier/pieces?archi=${selectedArchitect.id}`
+                : `/sourcing/ao/${tenderId}/dossier/pieces`
+            }
             className="hover:bg-ink/80 inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-medium text-white transition"
           >
             Pièces complémentaires
