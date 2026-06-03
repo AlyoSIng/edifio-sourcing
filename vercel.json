@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/tandem-followup",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/library-expiry-digest",
+      "schedule": "0 6 * * 1"
     }
   ]
 }
