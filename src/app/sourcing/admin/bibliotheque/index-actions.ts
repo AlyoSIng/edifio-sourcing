@@ -26,6 +26,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { aiPrompts, aiRuns } from "@/db/schema/ai";
 import { libraryItemIndex } from "@/db/schema/library-index";
 import { presentationLibrary } from "@/db/schema/library";
 import { toUserProfile, isAdmin } from "@/lib/auth/types";
@@ -42,6 +43,26 @@ import { indexLibraryItem } from "@/lib/library/index-item";
 const MAX_ITEMS_PER_RUN = 15;
 
 const BUCKET = "company_library";
+
+/**
+ * Cache process-level du prompt_id seedé par la migration 0042. Évite un
+ * SELECT par item indexé. Re-initialisé à chaque cold-start Vercel.
+ */
+let cachedLibraryIndexPromptId: string | null = null;
+
+async function getOrFindLibraryIndexPromptId(): Promise<string> {
+  if (cachedLibraryIndexPromptId) return cachedLibraryIndexPromptId;
+  const [row] = await db
+    .select({ id: aiPrompts.id })
+    .from(aiPrompts)
+    .where(and(eq(aiPrompts.name, "library_index"), eq(aiPrompts.active, true)))
+    .limit(1);
+  if (!row) {
+    throw new Error("ai_prompts row 'library_index' missing — apply migration 0042");
+  }
+  cachedLibraryIndexPromptId = row.id;
+  return row.id;
+}
 
 // ---------------------------------------------------------------------------
 // Types de retour
@@ -207,17 +228,31 @@ export async function indexLibraryBatchAction(): Promise<IndexLibraryResult> {
         continue;
       }
 
-      // 2d. ai_runs audit — désactivé V1.
-      //
-      // ai_runs.prompt_id est NOT NULL et exige un row dans ai_prompts. On
-      // ne seed pas de prompt « library_index » pour ce MVP — l'audit IA
-      // structuré sera posé en V2 quand on versionnera le prompt. Pour le
-      // moment, les métadonnées de cost/tokens sont préservées dans le
-      // payload Claude lui-même (extracted_entities ne contient pas l'audit
-      // mais on peut le retrouver via le log applicatif si besoin).
-      const aiRunId: string | undefined = undefined;
+      // 2d. ai_runs audit structuré (G5 — Steve 2026-06-03). On enregistre
+      //     chaque run Claude dans `ai_runs` avec le prompt_id du seed
+      //     « library_index ». Si l'insert plante (cas tests sans seed), on
+      //     ne casse pas l'indexation — best-effort.
+      let aiRunId: string | undefined;
+      try {
+        const [run] = await db
+          .insert(aiRuns)
+          .values({
+            organizationId: orgId,
+            promptId: await getOrFindLibraryIndexPromptId(),
+            inputHash: hash.slice(0, 64),
+            output: claudeResult.output as never,
+            model: "haiku-4-5",
+            costUsd: String(claudeResult.costUsd),
+            latencyMs: claudeResult.latencyMs,
+            succeeded: true,
+          })
+          .returning({ id: aiRuns.id });
+        aiRunId = run?.id;
+      } catch (err) {
+        console.warn("[library-index:ai_runs:insert:fail]", err);
+      }
       console.info(
-        `[library-index] item=${item.id} tokens_in=${claudeResult.tokensIn} tokens_out=${claudeResult.tokensOut} cost=${claudeResult.costUsd.toFixed(4)}$ latency=${claudeResult.latencyMs}ms`,
+        `[library-index] item=${item.id} tokens_in=${claudeResult.tokensIn} tokens_out=${claudeResult.tokensOut} cost=${claudeResult.costUsd.toFixed(4)}$ latency=${claudeResult.latencyMs}ms ai_run=${aiRunId ?? "n/a"}`,
       );
 
       // 2e. Upsert library_item_index.
@@ -368,8 +403,29 @@ export async function reindexLibraryItemAction(itemId: string): Promise<ReindexL
       };
     }
 
+    // 4b. ai_runs audit (G5 — best-effort).
+    let aiRunIdReindex: string | undefined;
+    try {
+      const [run] = await db
+        .insert(aiRuns)
+        .values({
+          organizationId: orgId,
+          promptId: await getOrFindLibraryIndexPromptId(),
+          inputHash: hash.slice(0, 64),
+          output: claudeResult.output as never,
+          model: "haiku-4-5",
+          costUsd: String(claudeResult.costUsd),
+          latencyMs: claudeResult.latencyMs,
+          succeeded: true,
+        })
+        .returning({ id: aiRuns.id });
+      aiRunIdReindex = run?.id;
+    } catch (err) {
+      console.warn("[library-reindex:ai_runs:insert:fail]", err);
+    }
+
     console.info(
-      `[library-reindex] item=${item.id} tokens_in=${claudeResult.tokensIn} tokens_out=${claudeResult.tokensOut} cost=${claudeResult.costUsd.toFixed(4)}$ latency=${claudeResult.latencyMs}ms`,
+      `[library-reindex] item=${item.id} tokens_in=${claudeResult.tokensIn} tokens_out=${claudeResult.tokensOut} cost=${claudeResult.costUsd.toFixed(4)}$ latency=${claudeResult.latencyMs}ms ai_run=${aiRunIdReindex ?? "n/a"}`,
     );
 
     // 5. Upsert library_item_index.
@@ -386,6 +442,7 @@ export async function reindexLibraryItemAction(itemId: string): Promise<ReindexL
           docType: claudeResult.output.doc_type ?? null,
           extractedEntities: claudeResult.output.extracted_entities,
           indexedBy: profile.id,
+          aiRunId: aiRunIdReindex ?? null,
           modelVersion: claudeResult.modelVersion,
           sourceHash: hash,
         })
@@ -399,6 +456,7 @@ export async function reindexLibraryItemAction(itemId: string): Promise<ReindexL
             extractedEntities: claudeResult.output.extracted_entities,
             indexedAt: new Date(),
             indexedBy: profile.id,
+            aiRunId: aiRunIdReindex ?? null,
             modelVersion: claudeResult.modelVersion,
             sourceHash: hash,
           },
