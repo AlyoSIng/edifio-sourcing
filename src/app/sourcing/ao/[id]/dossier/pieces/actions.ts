@@ -420,6 +420,36 @@ export async function compileDossierAction(
       });
     }
 
+    // 9b. Items bibliothèque supplémentaires (Steve 2026-06-03) — élargissement
+    //     « joindre tous les docs valides ». On joint TOUS les items
+    //     `presentation_library` de l'org dont la validité n'est pas dépassée,
+    //     en plus de ceux déjà matchés par le RC. Filtre :
+    //       - valid_until IS NULL → valide ad vitam
+    //       - valid_until > today (locale UTC) → encore valide
+    //       - exclusion des templates DC1/DC2/DC4 (servent à la génération, pas
+    //         à joindre tels quels au dossier)
+    //       - exclusion du Pouvoir et des matchés (dédup au niveau zip-compile
+    //         via seenLibraryIds, mais on filtre aussi en amont pour économiser
+    //         des downloads inutiles).
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayIso = today.toISOString().slice(0, 10);
+    const matchedLibraryIds = new Set(
+      pieceMatches.map((m) => m.libraryItem?.id).filter((id): id is string => Boolean(id)),
+    );
+    const pouvoirId = pouvoir?.id;
+    const TEMPLATE_KINDS = new Set(["dc1", "dc2", "dc4"]);
+    const extraLibraryItems = libraryItems.filter((item) => {
+      if (TEMPLATE_KINDS.has(item.kind)) return false;
+      if (pouvoirId && item.id === pouvoirId) return false;
+      if (matchedLibraryIds.has(item.id)) return false;
+      if (item.validUntil) {
+        // `valid_until` est typé `date` Drizzle → string "YYYY-MM-DD".
+        if (String(item.validUntil) < todayIso) return false;
+      }
+      return true;
+    });
+
     // 10. Compiler le ZIP (téléchargements depuis Storage via admin client)
     //     Storage admin : RLS bypass intentionnel — auth vérifiée plus haut.
     const supabaseAdmin = createSupabaseAdminClient();
@@ -429,6 +459,7 @@ export async function compileDossierAction(
       pieceMatches,
       forcedLibraryItems,
       tenderDocuments: tenderDocsForZip,
+      extraLibraryItems,
     });
 
     if (zipResult.fileCount === 0) {

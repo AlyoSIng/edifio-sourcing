@@ -80,6 +80,16 @@ export interface ZipCompileInput {
    * Vide si rien à inclure.
    */
   tenderDocuments?: TenderDocumentRef[];
+  /**
+   * Items bibliothèque supplémentaires à inclure systématiquement (Steve
+   * 2026-06-03 — élargissement « joindre tous les docs valides »). Les items
+   * déjà présents dans `forcedLibraryItems` ou matchés via `pieceMatches`
+   * sont dédupliqués côté implémentation (Set sur id).
+   *
+   * L'appelant doit avoir filtré au préalable les items expirés
+   * (`valid_until <= today`) — la lib n'a pas de notion de date.
+   */
+  extraLibraryItems?: PresentationLibraryItem[];
 }
 
 export interface ZipCompileResult {
@@ -242,6 +252,24 @@ export async function compileDossierZip(
       files[`dossier_candidature/pieces/${safeFilename}`] = bytes;
     } else {
       hadDownloadFailures = true;
+    }
+  }
+
+  // 5b. Items bibliothèque supplémentaires (Steve 2026-06-03 — élargissement
+  //     « joindre tous les docs valides »). On dédup via `seenLibraryIds`
+  //     pour ne pas réinclure le Pouvoir ou un doc déjà matché.
+  if (input.extraLibraryItems && input.extraLibraryItems.length > 0) {
+    for (const item of input.extraLibraryItems) {
+      if (seenLibraryIds.has(item.id)) continue;
+      seenLibraryIds.add(item.id);
+
+      const bytes = await downloadFromStorage(supabase, "company_library", item.storagePath);
+      if (bytes) {
+        const safeFilename = sanitizeFilename(item.name);
+        files[`dossier_candidature/pieces/${safeFilename}`] = bytes;
+      } else {
+        hadDownloadFailures = true;
+      }
     }
   }
 

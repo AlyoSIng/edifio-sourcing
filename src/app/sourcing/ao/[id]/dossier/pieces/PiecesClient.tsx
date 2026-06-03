@@ -321,12 +321,12 @@ export function PiecesClient({
   const compileHint: string = (() => {
     switch (compileMode) {
       case "tandem":
-        return "Le ZIP contiendra DC1 + DC2 + Pouvoir + RC + pièces, optimisé pour l'architecte sélectionné.";
+        return "Le ZIP contiendra DC1 + DC2 + Pouvoir + RC + toutes les pièces valides de la bibliothèque (les expirées sont exclues), optimisé pour l'architecte sélectionné.";
       case "cotraitance_be":
-        return "Le ZIP contiendra DC1 + DC2 du BE + Pouvoir + RC + pièces.";
+        return "Le ZIP contiendra DC1 + DC2 du BE + Pouvoir + RC + toutes les pièces valides de la bibliothèque (les expirées sont exclues).";
       case "solo":
       default:
-        return "Le ZIP contiendra DC1 + DC2 + Pouvoir + RC + pièces de la bibliothèque.";
+        return "Le ZIP contiendra DC1 + DC2 + Pouvoir + RC + toutes les pièces valides de la bibliothèque (les expirées sont exclues).";
     }
   })();
 
