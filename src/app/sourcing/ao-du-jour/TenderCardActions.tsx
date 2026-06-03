@@ -188,13 +188,16 @@ export function TenderCardActions({
         return;
       }
       // Après bascule :
-      //  - solo   : reste sur la page AO du jour (revalidatePath côté Server Action)
+      //  - solo   : reste sur la page AO du jour, force le re-fetch pour que
+      //             l'AO traité disparaisse de la liste sans re-navigation
       //  - tandem : redirige vers la page short-list architectes
       //  - conception_realisation : redirige vers la page globale C/R (pipeline Phase 2)
       if (mode === "tandem") {
         router.push(`/sourcing/ao/${tenderId}/tandem`);
       } else if (mode === "conception_realisation") {
         router.push(`/sourcing/conception-realisation`);
+      } else {
+        router.refresh();
       }
     });
   }
@@ -204,17 +207,29 @@ export function TenderCardActions({
       setShowDeferPopover(false);
       startTransition(async () => {
         const result = await deferTenderAction(tenderId, hours);
-        if (!result.ok) emitError(result.error);
+        if (!result.ok) {
+          emitError(result.error);
+          return;
+        }
+        // revalidatePath côté server invalide le cache mais ne force pas
+        // le re-render du Server Component depuis un Client Component
+        // (Next.js 14). router.refresh() déclenche un re-fetch immédiat
+        // pour que la carte traitée disparaisse de la liste.
+        router.refresh();
       });
     },
-    [tenderId],
+    [tenderId, router],
   );
 
   function handleReject(reason: string | null): void {
     setShowRejectModal(false);
     startTransition(async () => {
       const result = await rejectTenderAction(tenderId, reason);
-      if (!result.ok) emitError(result.error);
+      if (!result.ok) {
+        emitError(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
 
