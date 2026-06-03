@@ -291,6 +291,91 @@ Côté edifio, le statut de l'AO bascule à **dossier_diffused**. Le tableau de 
 ## 9. Et ensuite
 Une fois la candidature acceptée par l'acheteur, la phase d'offre commence : **mémoire technique** et **acte d'engagement**. Cette phase fait l'objet d'un autre guide et d'un autre rythme — généralement deux à quatre semaines de travail après la candidature.`;
 
+const GUIDE_9 = `La bibliothèque entreprise est le poste central de tes pièces réutilisables : Kbis, attestations URSSAF / fiscale / RC pro, références, présentation société, RIB, déclarations sur l'honneur, etc. Bien tenue, elle alimente automatiquement tes dossiers de candidature.
+
+## 1. Pourquoi indexer la bibliothèque
+Sans indexation, edifio fait le matching pièces RC ↔ biblio sur le seul nom de fichier. Si tu uploades \`Scan001.pdf\` ou \`DOC_2026_v1.pdf\`, le moteur ne reconnaît rien. Une fois indexé par Claude, chaque doc a un **titre intelligent**, des **mots-clés**, un **résumé** et un **type canonique** — le matching devient vraiment précis.
+
+## 2. Lancer l'indexation
+Sur \`/sourcing/admin/bibliotheque\`, le bandeau **🤖 Indexation IA** propose le bouton **« Indexer la bibliothèque »**. Au clic, Claude Haiku 4.5 traite jusqu'à 15 documents par lot (limite Vercel 60 s). Si tu en as plus, le résumé t'indiquera « X restants — relancez pour continuer ». Recliquez jusqu'à 0 restant.
+
+## 3. Lire ce que Claude a compris
+Chaque item indexé affiche un badge **✓ Indexé ▾** vert à côté de son nom. Au clic, un panneau dépliable montre :
+- **Titre IA** : la description courte que Claude a extraite (souvent meilleure que ton nom de fichier).
+- **Type détecté** : code canonique parmi 24 valeurs (urssaf, kbis, references…).
+- **Résumé** : 1-2 phrases en italique.
+- **Mots-clés** : chips réutilisés pour le matching.
+- **Entités structurées** : SIRET, dates, montants si détectés.
+
+## 4. Ré-indexer un seul item
+À côté du bouton **Supprimer**, le bouton **🤖 Ré-indexer** force une nouvelle analyse Claude pour ce doc, en bypassant le cache hash. Utile si Claude avait mal compris la première fois, ou si tu veux retester après un changement de prompt.
+
+## 5. L'avertissement « ⚠️ Index obsolète »
+Si tu ré-uploades un document sans relancer l'indexation, le badge vert se transforme en **⚠️ Index obsolète** orange. edifio détecte que la dernière indexation est antérieure à la date de modification du fichier. Un clic sur **🤖 Ré-indexer** rafraîchit tout.
+
+## 6. Coût de l'indexation
+Chaque indexation Claude coûte ~2-3 c€. Pour une bibliothèque de 30 docs : ~75 c€ par run complet. Le \`source_hash\` SHA-256 évite les ré-indexations inutiles : si tu cliques sur **Indexer la bibliothèque** sans avoir rien ré-uploadé, tous les items sont marqués \`skipped\` et l'API Claude n'est pas appelée.
+
+## 7. Audit et traçabilité
+Chaque run Claude est enregistré dans \`ai_runs\` (modèle, tokens entrée/sortie, coût USD, latence ms, JSON de sortie). Tu peux retracer le coût total de l'indexation IA mois par mois côté Supabase. La table \`library_item_index\` garde le \`ai_run_id\` lié pour chaque doc.`;
+
+const GUIDE_10 = `Les attestations URSSAF, fiscale et RC pro ont des dates de validité courtes (généralement 6 à 12 mois). Si tu envoies un dossier avec une attestation périmée, c'est un rejet administratif quasi-systématique. edifio surveille pour toi.
+
+## 1. Renseigner la date de validité
+Sur \`/sourcing/admin/bibliotheque\`, chaque catégorie qui a \`hasExpiry: true\` (URSSAF, attestation fiscale, assurance RC, Kbis) expose un champ **Valide jusqu'au** dans le formulaire d'upload. Renseigne-le systématiquement, c'est la base de toutes les alertes.
+
+## 2. Les badges visuels
+À côté du nom de chaque item dans la biblio, edifio affiche un badge :
+- **Expiré** (rouge) — la date est dépassée
+- **J−7** (rouge) — moins d'une semaine
+- **J−30** (orange) — entre une semaine et un mois
+- **Date** (vert) — au-delà d'un mois
+
+## 3. Avertissements dans le flow dossier
+Avant de cliquer **Compiler le dossier** sur la page Pièces, edifio affiche deux bandeaux si nécessaire :
+- **Rouge** : « X documents expirés — exclus du ZIP ». La liste des docs concernés s'affiche avec un lien direct vers la bibliothèque pour renouveler.
+- **Orange** : « X documents expirent dans les 30 jours — inclus dans le ZIP mais à surveiller ». Encore inclus dans le ZIP final, mais visuellement signalés.
+
+## 4. Le mail digest hebdo
+Tous les lundis matin (7 h Paris), un cron Vercel parcourt ta bibliothèque et envoie un mail digest aux admins et superadmins de ton organisation. Le mail liste les docs expirés (à renouveler en priorité) et les docs qui expirent dans les 30 jours (à surveiller). Si rien à signaler, aucun mail n'est envoyé — pas de bruit inutile.
+
+## 5. Mettre à jour une attestation
+Quand tu reçois une nouvelle attestation URSSAF, tu peux soit :
+- **Re-uploader** depuis la biblio (le doc remplace l'ancien et reset la date)
+- **Supprimer** l'ancien et **uploader** le nouveau
+
+Dans les deux cas, pense à mettre à jour la **date de validité** dans le formulaire. Sans ça, edifio ne saura pas que le doc est à nouveau valide.
+
+## 6. Bon réflexe : indexer après chaque ré-upload
+Si tu as activé l'indexation IA, ré-uploader un doc invalide l'index existant (badge **⚠️ Index obsolète**). Pense à cliquer **🤖 Ré-indexer** pour que Claude re-lise le nouveau doc et mette à jour les mots-clés / dates extraites.`;
+
+const GUIDE_11 = `Le tableau Excel **Veille_AO_DD_MM_YYYY.xlsx** est le format de référence pour tracer ton activité commerciale en parallèle d'edifio. Pour t'éviter de re-saisir, edifio exporte automatiquement tous les AO du jour au bon format.
+
+## 1. Où trouver le bouton
+Sur \`/sourcing/ao-du-jour\`, à droite des filtres et des actions admin, le bouton **📥 Export Excel (CSV)** est visible pour tous les admins. Au clic, edifio compile en quelques secondes un fichier \`Veille_AO_DD_MM_YYYY_NAO.csv\`.
+
+## 2. Format du fichier
+Le fichier généré est un **CSV avec séparateur \`;\`** et un **BOM UTF-8** en tête. Excel français le reconnaît natif : double-clic → ouverture directe avec les bonnes colonnes et accents. Si tu utilises Excel anglais, importe via **Données → Texte/CSV → Encodage UTF-8**.
+
+## 3. Les 38 colonnes
+Le CSV reproduit exactement les colonnes de ton modèle \`Veille_AO\` : Métier, Référence AO, MOA, Intitulé, Région, Département, Ville, Date publication, Date limite, Jours restants, Montant, Type procédure, Source, URL fiche, Statut vérification URL, Public/Privé, Priorité, Notes, Architecte 1-2 et 3-5, Réponses, Commentaire, compétences (ARCHI/ECO/B/AC/RT/EL/SSI/PROTECT/PEMD/BIM/PBCVC/ADAP), Plateforme DCE.
+
+## 4. Ce qu'edifio pré-remplit pour toi
+- **#**, **Référence AO**, **MOA**, **Intitulé**, **Département**, **Date publication**, **Date limite**, **Jours restants**, **Montant**, **Type procédure**, **Source**, **URL fiche** : depuis les données BOAMP / plateformes scrapées.
+- **Région** : déduite automatiquement du département via la table NOTRe 2016 (13 régions métropole + 5 DROM-COM).
+- **Public/Privé** : heuristique sur le libellé MOA (CHU/CHR → Para-public, Ville/Mairie/Conseil → Public, SARL/SAS → Privé).
+- **Statut vérification URL** : ✅ Vérifié si \`source_url\` non null.
+- **Architecte 1/2/3-5** : depuis les \`architect_responses\` au statut **accepted**, classés par date de réponse.
+
+## 5. Ce que tu remplis à la main
+- **Métier** (selon ton profil de recherche actif), **Priorité**, **Notes**, **Réponse mandataire**, **Réponse Cotraitant**, **Commentaire**, les 12 cases de **compétences** et **Plateforme DCE**. edifio laisse ces colonnes vides — c'est ta veille à toi.
+
+## 6. Tous profils confondus
+L'export tire **tous les AO** au statut sourced de ton organisation, indépendamment du profil de recherche actif. Tu vois donc d'un coup d'œil toute la veille du jour, pas seulement le profil que tu consultes en ce moment.
+
+## 7. Limite pratique
+Pour rester rapide, l'export est plafonné à **500 lignes** par fichier. Au-delà, Excel commence à ramer et c'est probablement le signe que tes filtres BOAMP sont à resserrer.`;
+
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
     id: "fb000001-0000-0000-0000-000000000001",
@@ -383,5 +468,41 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_8,
     isActive: true,
     displayOrder: 8,
+  },
+  {
+    id: "fb000001-0000-0000-0000-000000000009",
+    slug: "indexation-ia-biblio",
+    title: "Indexer ta bibliothèque entreprise avec Claude IA",
+    description:
+      "Bouton 🤖 Indexer la bibliothèque, panneau dépliable des métadonnées Claude, ré-indexation 1-clic, détection d'index obsolète et audit ai_runs.",
+    type: "doc",
+    durationMin: 7,
+    contentMd: GUIDE_9,
+    isActive: true,
+    displayOrder: 9,
+  },
+  {
+    id: "fb000001-0000-0000-0000-00000000000a",
+    slug: "expirations-biblio",
+    title: "Surveiller les expirations d'attestations dans ta bibliothèque",
+    description:
+      "Badges visuels J−7/J−30, bandeaux d'avertissement avant compile dossier, mail digest hebdo aux admins.",
+    type: "doc",
+    durationMin: 5,
+    contentMd: GUIDE_10,
+    isActive: true,
+    displayOrder: 10,
+  },
+  {
+    id: "fb000001-0000-0000-0000-00000000000b",
+    slug: "export-csv-ao-du-jour",
+    title: "Exporter les AO du jour au format Excel pour ton tableau Veille_AO",
+    description:
+      "Bouton 📥 Export Excel (CSV), 38 colonnes alignées sur ton modèle xlsx, séparateur ; et BOM UTF-8 pour Excel français.",
+    type: "doc",
+    durationMin: 4,
+    contentMd: GUIDE_11,
+    isActive: true,
+    displayOrder: 11,
   },
 ];
