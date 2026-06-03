@@ -21,6 +21,7 @@ import { useRef, useState, useTransition } from "react";
 
 import type { PresentationLibraryItem } from "@/db/schema/library";
 import { deleteLibraryDoc, uploadLibraryDoc } from "./actions";
+import { indexLibraryBatchAction, type IndexLibraryResult } from "./index-actions";
 
 // ---------------------------------------------------------------------------
 // Constantes : catégories de documents
@@ -158,9 +159,14 @@ function ExpiryBadge({ validUntil }: ExpiryBadgeProps) {
 
 interface LibraryClientProps {
   entries: PresentationLibraryItem[];
+  /**
+   * IDs des items déjà indexés par l'IA (chantier E — Steve 2026-06-03).
+   * Utilisé pour afficher un badge « ✓ Indexé » sur chaque item.
+   */
+  indexedItemIds?: string[];
 }
 
-export function LibraryClient({ entries }: LibraryClientProps) {
+export function LibraryClient({ entries, indexedItemIds = [] }: LibraryClientProps) {
   // Groupe les entrées par kind pour accès O(1) dans chaque section
   const byKind = new Map<KindKey, PresentationLibraryItem[]>();
   for (const kind of LIBRARY_KINDS) {
@@ -176,8 +182,87 @@ export function LibraryClient({ entries }: LibraryClientProps) {
     }
   }
 
+  // Set local pour lookup O(1) — mutable pour optimistic update post-indexation.
+  const [indexedSet, setIndexedSet] = useState(new Set(indexedItemIds));
+
+  // État indexation IA (chantier E).
+  const [isIndexing, startIndexing] = useTransition();
+  const [indexResult, setIndexResult] = useState<IndexLibraryResult | null>(null);
+
+  function handleIndex() {
+    setIndexResult(null);
+    startIndexing(async () => {
+      const result = await indexLibraryBatchAction();
+      setIndexResult(result);
+      if (result.ok) {
+        // Optimistic : on ne sait pas exactement quels items ont été indexés,
+        // mais on déclenche un router.refresh côté server via revalidatePath.
+        // Le re-render passera de toute façon par les props server.
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
+      {/* Barre d'actions IA — bouton « Indexer avec IA » + résumé du dernier run */}
+      <section className="flex flex-col gap-2 rounded-lg border border-line bg-paper-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-ink-2">
+          <strong className="text-ink">🤖 Indexation IA</strong>
+          <p className="mt-0.5 text-xs text-muted">
+            Claude analyse chaque doc pour extraire titre, mots-clés et type. Améliore le matching
+            futur avec les RC. ~3-5s par doc, traité par lots de 15.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleIndex}
+          disabled={isIndexing}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-xs font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isIndexing ? "Indexation en cours…" : "Indexer la bibliothèque"}
+        </button>
+      </section>
+
+      {/* Résultat du dernier indexing — feedback transitoire */}
+      {indexResult && (
+        <div
+          role={indexResult.ok ? "status" : "alert"}
+          className={`rounded-md border border-l-4 px-4 py-3 text-sm ${
+            indexResult.ok
+              ? "border-line border-l-success bg-success-bg text-success"
+              : "border-line border-l-error bg-error-bg text-error"
+          }`}
+        >
+          {indexResult.ok ? (
+            <>
+              <strong>Indexation terminée — </strong>
+              {indexResult.indexed} doc{indexResult.indexed > 1 ? "s" : ""} indexé
+              {indexResult.indexed > 1 ? "s" : ""}, {indexResult.skipped} inchangé
+              {indexResult.skipped > 1 ? "s" : ""}, {indexResult.failed} échec
+              {indexResult.failed > 1 ? "s" : ""}.
+              {indexResult.remaining > 0 && (
+                <>
+                  {" "}
+                  {indexResult.remaining} restant{indexResult.remaining > 1 ? "s" : ""} — relancez
+                  pour continuer.
+                </>
+              )}
+              {indexResult.errors && indexResult.errors.length > 0 && (
+                <ul className="mt-2 list-inside list-disc text-xs">
+                  {indexResult.errors.slice(0, 5).map((e, i) => (
+                    <li key={i}>
+                      <strong>{e.name}</strong> : {e.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <>Erreur — {indexResult.error}</>
+          )}
+        </div>
+      )}
+
       {LIBRARY_KINDS.map((kindMeta) => (
         <KindSection
           key={kindMeta.key}
@@ -185,6 +270,8 @@ export function LibraryClient({ entries }: LibraryClientProps) {
           label={kindMeta.label}
           hasExpiry={kindMeta.hasExpiry}
           items={byKind.get(kindMeta.key) ?? []}
+          indexedSet={indexedSet}
+          setIndexedSet={setIndexedSet}
         />
       ))}
     </div>
@@ -200,9 +287,13 @@ interface KindSectionProps {
   label: string;
   hasExpiry: boolean;
   items: PresentationLibraryItem[];
+  /** IDs des items biblio déjà indexés (chantier E). */
+  indexedSet?: Set<string>;
+  /** Setter pour MAJ optimistic en cas d'indexation manuelle future. */
+  setIndexedSet?: (s: Set<string>) => void;
 }
 
-function KindSection({ kindKey, label, hasExpiry, items }: KindSectionProps) {
+function KindSection({ kindKey, label, hasExpiry, items, indexedSet }: KindSectionProps) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -288,6 +379,14 @@ function KindSection({ kindKey, label, hasExpiry, items }: KindSectionProps) {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate text-sm font-medium text-ink">{item.name}</span>
                     {item.validUntil && <ExpiryBadge validUntil={item.validUntil} />}
+                    {indexedSet?.has(item.id) && (
+                      <span
+                        className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700"
+                        title="Doc analysé par Claude — métadonnées extraites"
+                      >
+                        ✓ Indexé
+                      </span>
+                    )}
                   </div>
                   <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[11px] text-muted">
                     <span>{formatBytes(item.sizeBytes)}</span>

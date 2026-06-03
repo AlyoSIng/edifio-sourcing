@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
+import { libraryItemIndex } from "@/db/schema/library-index";
 import { presentationLibrary } from "@/db/schema/library";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -56,6 +57,7 @@ export default async function BibliothequeAdminPage() {
 
   // 2. Chargement des documents (try/catch résilience — règle MEMORY)
   let items: PresentationLibraryItem[] = [];
+  let indexedItemIds: string[] = [];
   let fetchError: string | null = null;
 
   try {
@@ -64,6 +66,19 @@ export default async function BibliothequeAdminPage() {
       .from(presentationLibrary)
       .where(eq(presentationLibrary.organizationId, orgId))
       .orderBy(presentationLibrary.kind, presentationLibrary.createdAt);
+
+    // Items déjà indexés (chantier E — Steve 2026-06-03). Try/catch isolé :
+    // si la migration 0041 n'a pas encore été appliquée en prod, l'erreur
+    // est silencieuse et le badge « ✓ Indexé » ne s'affiche pas.
+    try {
+      const indexRows = await db
+        .select({ libraryItemId: libraryItemIndex.libraryItemId })
+        .from(libraryItemIndex)
+        .where(eq(libraryItemIndex.organizationId, orgId));
+      indexedItemIds = indexRows.map((r) => r.libraryItemId);
+    } catch (err) {
+      console.warn("[bibliotheque:index-load:fail]", err);
+    }
   } catch (err) {
     console.error("[bibliotheque:fetch:fail]", err);
     // NB : message brut non transmis à l'UI (fuite d'info DB en prod).
@@ -91,7 +106,7 @@ export default async function BibliothequeAdminPage() {
           description="Impossible de charger les documents. Réessayez dans quelques instants — si le problème persiste, contactez l'administrateur."
         />
       ) : (
-        <LibraryClient entries={items} />
+        <LibraryClient entries={items} indexedItemIds={indexedItemIds} />
       )}
     </div>
   );
