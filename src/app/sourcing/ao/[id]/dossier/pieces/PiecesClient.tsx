@@ -56,6 +56,15 @@ export interface PiecesClientProps {
    * franchir la frontière Server → Client (les Date natives ne passent pas).
    */
   lastDispatch: { sentAtIso: string; recipientEmail: string } | null;
+  /**
+   * Résumé des items biblio à problème d'expiration (chantier G2.1 — Steve
+   * 2026-06-03). `expired` : déjà périmés → exclus du ZIP, à renouveler.
+   * `expiringSoon` : encore inclus mais ≤ J+30, à surveiller.
+   */
+  expirySummary?: {
+    expired: Array<{ id: string; name: string; validUntilIso: string }>;
+    expiringSoon: Array<{ id: string; name: string; validUntilIso: string }>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +260,7 @@ export function PiecesClient({
   beParam,
   selectedArchitect,
   lastDispatch,
+  expirySummary,
 }: PiecesClientProps) {
   const missingCount = pieceMatches.filter((m) => m.status === "missing").length;
   const partialCount = pieceMatches.filter((m) => m.status === "partial").length;
@@ -478,6 +488,73 @@ export function PiecesClient({
 
       {/* Compilation ZIP */}
       <div className="border-t border-line pt-6">
+        {/* Avertissements expiration biblio (G2.1 — Steve 2026-06-03).
+            Affichés AVANT le hint UX pour que l'admin les voie en premier. */}
+        {expirySummary && expirySummary.expired.length > 0 && (
+          <div
+            role="alert"
+            className="mb-3 rounded-md border border-l-4 border-line border-l-error bg-error-bg px-4 py-3 text-sm text-error"
+          >
+            <strong>
+              {expirySummary.expired.length} document
+              {expirySummary.expired.length > 1 ? "s" : ""} expiré
+              {expirySummary.expired.length > 1 ? "s" : ""}
+            </strong>{" "}
+            — exclu{expirySummary.expired.length > 1 ? "s" : ""} du ZIP. À renouveler dans la
+            bibliothèque :
+            <ul className="mt-1 list-inside list-disc text-xs">
+              {expirySummary.expired.slice(0, 5).map((it) => (
+                <li key={it.id}>
+                  {it.name}{" "}
+                  <span className="font-mono text-[10px] opacity-70">
+                    (valide jusqu&apos;au {it.validUntilIso})
+                  </span>
+                </li>
+              ))}
+              {expirySummary.expired.length > 5 && (
+                <li className="italic">
+                  … et {expirySummary.expired.length - 5} autre
+                  {expirySummary.expired.length - 5 > 1 ? "s" : ""}
+                </li>
+              )}
+            </ul>
+            <a
+              href="/sourcing/admin/bibliotheque"
+              className="mt-2 inline-block text-xs underline hover:opacity-80"
+            >
+              → Aller à la bibliothèque
+            </a>
+          </div>
+        )}
+        {expirySummary && expirySummary.expiringSoon.length > 0 && (
+          <div
+            role="alert"
+            className="mb-3 rounded-md border border-l-4 border-line border-l-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          >
+            <strong>
+              {expirySummary.expiringSoon.length} document
+              {expirySummary.expiringSoon.length > 1 ? "s" : ""} expire
+              {expirySummary.expiringSoon.length > 1 ? "nt" : ""} dans les 30 jours
+            </strong>{" "}
+            — inclus dans le ZIP mais à surveiller :
+            <ul className="mt-1 list-inside list-disc text-xs">
+              {expirySummary.expiringSoon.slice(0, 5).map((it) => (
+                <li key={it.id}>
+                  {it.name}{" "}
+                  <span className="font-mono text-[10px] opacity-70">
+                    (valide jusqu&apos;au {it.validUntilIso})
+                  </span>
+                </li>
+              ))}
+              {expirySummary.expiringSoon.length > 5 && (
+                <li className="italic">
+                  … et {expirySummary.expiringSoon.length - 5} autre
+                  {expirySummary.expiringSoon.length - 5 > 1 ? "s" : ""}
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
         {/* Hint UX — composition du ZIP selon le mode de réponse. */}
         {!downloadUrl && <p className="mb-3 text-xs text-ink-2">{compileHint}</p>}
         {/* Résultat : lien de téléchargement */}

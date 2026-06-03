@@ -33,6 +33,7 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
+import { classifyLibraryExpiry } from "@/lib/library/expiry";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { PiecesClient } from "./PiecesClient";
 import { loadExistingCerfa } from "../cerfa/actions";
@@ -197,6 +198,26 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
       ? matchPiecesWithLibrary(rcAnalysis.pieces_demandees, libraryItems, indexByItemId)
       : [];
 
+    // 4b. Classification des items biblio par état d'expiration (chantier G2.1).
+    //    Steve 2026-06-03 — éviter d'envoyer un dossier avec URSSAF périmée.
+    //    Les items `expired` sont déjà filtrés par compileDossierAction côté
+    //    pipeline ZIP — on les signale ici pour que l'admin pense à les
+    //    renouveler. Les `expiringSoon` (≤ J+30) sont encore inclus mais à
+    //    surveiller.
+    const expiry = classifyLibraryExpiry(libraryItems);
+    const expirySummary = {
+      expired: expiry.expired.map((it) => ({
+        id: it.id,
+        name: it.name,
+        validUntilIso: String(it.validUntil ?? "").slice(0, 10),
+      })),
+      expiringSoon: expiry.expiringSoon.map((it) => ({
+        id: it.id,
+        name: it.name,
+        validUntilIso: String(it.validUntil ?? "").slice(0, 10),
+      })),
+    };
+
     // 5. Si archi sélectionné, charge son cabinet (pour le bouton "Envoyer à
     //    l'archi") + le dernier dispatch (pour afficher « Envoyé le X »).
     let selectedArchitect: { id: string; cabinet: string; email: string | null } | null = null;
@@ -309,6 +330,7 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
           beParam={beParam}
           selectedArchitect={selectedArchitect}
           lastDispatch={lastDispatch}
+          expirySummary={expirySummary}
         />
       </main>
     );
