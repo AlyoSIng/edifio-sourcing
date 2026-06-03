@@ -17,6 +17,7 @@ import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { EmptyState } from "./EmptyState";
 import { ErrorBanner } from "./ErrorBanner";
+import { ExportCsvButton } from "./ExportCsvButton";
 import { formatTodayLongFr } from "./format";
 import { TenderActionsErrorToast } from "./TenderActionsErrorToast";
 import { TenderCard } from "./TenderCard";
@@ -245,6 +246,10 @@ export default async function AoDuJourPage({
             du cron sourcing — utile quand le cron 06h30 lun-ven a foiré). */}
       {isAdmin(profile) && !fetchError ? (
         <div className="mb-3 flex flex-wrap items-start justify-end gap-2">
+          {/* Export CSV — Steve 2026-06-03. Disponible pour tous les admins,
+              tous profils confondus. Ouvre directement dans Excel français
+              (BOM UTF-8 + séparateur ;). */}
+          <ExportCsvButton />
           {isSuperAdmin(profile) ? <SourcingRerunButton /> : null}
           <Link
             href="/sourcing/ao/nouveau"
