@@ -164,14 +164,20 @@ async function loadContextualCerfa(
   }
 
   // --- DC2 : conditions selon le mode ---
+  // Décision Steve 2026-06-03 : DC2 (AlyoS, cotraitant en Tandem) est
+  // archi-agnostique. Les données société d'AlyoS sont identiques pour tous
+  // les archis du même AO — pas besoin de re-saisir / re-générer le DC2 quand
+  // on switch d'archi A à archi B sur le même AO. Seul le DC1 (mandataire,
+  // = archi en Tandem) reste archi-specific.
   let dc2Where;
   if (architectId) {
-    // Tandem : DC2 lié à l'archi sélectionné (DC2 AlyoS cotraitant du contexte).
+    // Tandem : DC2 AlyoS — architect_id NULL ET be_id NULL (= DC2 AlyoS, comme Solo).
     dc2Where = and(
       eq(responseFiles.tenderId, tenderId),
       eq(responseFiles.organizationId, orgId),
       eq(responseFiles.kind, "dc2"),
-      eq(responseFiles.architectId, architectId),
+      isNull(responseFiles.architectId),
+      isNull(responseFiles.beId),
     );
   } else if (beId) {
     // Cotraitance BE : DC2 lié au BE.

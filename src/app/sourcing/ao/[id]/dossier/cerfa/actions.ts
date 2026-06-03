@@ -335,6 +335,16 @@ export async function validateCerfa(
       cerfaKind === "DC1" ? "DC1 — Lettre de candidature" : "DC2 — Déclaration du candidat";
     let insertedId: string;
     try {
+      // Décision Steve 2026-06-03 — réutilisation cross-archi.
+      //
+      //   - DC1 (mandataire) : archi-specific en Tandem → on garde architectId.
+      //   - DC2 (cotraitant AlyoS en Tandem) : AlyoS-data, identique pour
+      //     tous les archis du même AO → architectId forcé à NULL pour que
+      //     le DC2 persiste quand on switch d'archi A à archi B.
+      //   - DC2 (cotraitant BE en Cotraitance BE) : BE-specific → on garde beId.
+      const isDc1 = cerfaKind === "DC1";
+      const persistedArchitectId = isDc1 ? architectId : null;
+
       const inserted = await db
         .insert(responseFiles)
         .values({
@@ -345,8 +355,8 @@ export async function validateCerfa(
           storagePath,
           sizeBytes: pdfBuffer.byteLength,
           validated: true,
-          // Phase 3 Tandem multi-archi — lien optionnel vers l'archi mandataire.
-          architectId,
+          // DC1 uniquement en Tandem — DC2 AlyoS reste archi-agnostique.
+          architectId: persistedArchitectId,
           // Lot B Cotraitance BE — lien optionnel vers le BE cotraitant (DC2).
           beId,
         })

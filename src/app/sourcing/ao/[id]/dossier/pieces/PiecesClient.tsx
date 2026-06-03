@@ -111,11 +111,18 @@ function CerfaStatusCard({
   existing,
   tenderId,
   archiQuery,
+  reusedBadge,
 }: {
   label: string;
   existing: ExistingCerfa | null;
   tenderId: string;
   archiQuery: string;
+  /**
+   * Optionnel : badge « Réutilisé » affiché à droite du « Prêt » quand le
+   * document a été produit pour un autre contexte (ex. DC2 AlyoS persiste
+   * d'un archi à l'autre — Steve 2026-06-03). `null` = pas de badge.
+   */
+  reusedBadge?: string | null;
 }) {
   const isDone = existing !== null;
   return (
@@ -139,7 +146,23 @@ function CerfaStatusCard({
       </div>
       <div className="flex items-center gap-2">
         {isDone ? (
-          <span className="text-xs font-medium text-emerald-700">Prêt</span>
+          <>
+            {reusedBadge && (
+              <span
+                className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                title="Document conservé d'un précédent contexte — données AlyoS identiques"
+              >
+                {reusedBadge}
+              </span>
+            )}
+            <span className="text-xs font-medium text-emerald-700">Prêt</span>
+            <a
+              href={`/sourcing/ao/${tenderId}/dossier/cerfa${archiQuery}`}
+              className="text-xs font-medium text-emerald-700 underline hover:text-emerald-900"
+            >
+              Revoir →
+            </a>
+          </>
         ) : (
           <a
             href={`/sourcing/ao/${tenderId}/dossier/cerfa${archiQuery}`}
@@ -341,6 +364,9 @@ export function PiecesClient({
             existing={existingDc2}
             tenderId={tenderId}
             archiQuery={archiQuery}
+            // Badge « Réutilisé » uniquement en Tandem (DC2 AlyoS persiste
+            // d'un archi à l'autre — Steve 2026-06-03).
+            reusedBadge={compileMode === "tandem" && existingDc2 ? "Réutilisé" : null}
           />
         </div>
         {cerfsIncomplete && (
