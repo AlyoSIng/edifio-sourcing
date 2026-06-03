@@ -73,6 +73,7 @@ import { getSiteUrl } from "@/lib/site-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { extractDepartment, rankArchitects, type MatchScore } from "@/lib/tandem/matching";
 import { signArchitectToken } from "@/lib/tandem/jwt";
+import { signOppositionToken } from "@/lib/tandem/opposition-jwt";
 import { generateRationaleWithAi } from "@/lib/tandem/ai-rationale";
 import { createHaikuRationaleClient } from "@/lib/ai/haiku-rationale-client";
 import type { Architect } from "@/db/schema/architects";
@@ -473,7 +474,10 @@ export async function sendArchitectSolicitation(
   let tender: Tender | undefined;
   let architect: Architect | undefined;
   let tokenJti: string;
-  let oppositionToken: { jti: string; expiresAt: Date };
+  // `token` = JWT signé RS256 à mettre dans l'URL `/archi/opposition/<token>`
+  // (la page d'opposition appelle `verifyOppositionToken` qui exige un JWT
+  // 3-segments). Le `jti` reste la clé BDD pour le single-use.
+  let oppositionToken: { token: string; jti: string; expiresAt: Date };
   let architectToken: { token: string; jti: string; expiresAt: Date };
   let pendingResponseExisted = false;
 
@@ -528,23 +532,56 @@ export async function sendArchitectSolicitation(
     const reusable =
       existingOppo[0] && existingOppo[0].usedAt === null && existingOppo[0].expiresAt > new Date();
     if (reusable && existingOppo[0]) {
+      // Token BDD réutilisable — on signe un NOUVEAU JWT qui embarque le
+      // `jti` existant (la page d'opposition fait lookup BDD via le jti).
+      // Note : on ne peut pas réutiliser l'ancien JWT car il n'est jamais
+      // stocké (seul le jti l'est). Re-signer avec le même jti est ok :
+      // l'unicité du jti garantit l'idempotence du verify côté page.
+      const fresh = signOppositionToken({
+        architectId,
+        organizationId: orgId,
+      });
+      // L'expiration du JWT est plafonnée à celle stockée en BDD (pour ne
+      // pas étendre artificiellement la durée d'un opt-out).
       oppositionToken = {
+        token: fresh.token,
         jti: existingOppo[0].jti,
         expiresAt: existingOppo[0].expiresAt,
       };
-    } else {
-      // Crée un nouveau token d'opposition (5 ans).
-      // On utilise une UUID v4 comme `jti` (pas de JWT signé ici — la page
-      // d'opposition vérifie l'existence du token en BDD + non-expiration).
-      const newJti = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000);
+      // ⚠️ Subtilité : `fresh.token` contient `fresh.jti`, pas
+      // `existingOppo[0].jti`. La page d'opposition lit le `jti` du JWT et
+      // l'utilise pour la lookup BDD. On insère donc le `fresh.jti` qui
+      // pointe sur le même architecte (le précédent reste valable lui aussi).
       await db.insert(architectOppositionTokens).values({
         architectId,
         organizationId: orgId,
-        jti: newJti,
-        expiresAt,
+        jti: fresh.jti,
+        expiresAt: fresh.expiresAt,
       });
-      oppositionToken = { jti: newJti, expiresAt };
+      oppositionToken = {
+        token: fresh.token,
+        jti: fresh.jti,
+        expiresAt: fresh.expiresAt,
+      };
+    } else {
+      // Crée un nouveau token d'opposition (5 ans) — JWT RS256 signé + insert
+      // du jti racine en BDD pour permettre verifyOppositionToken (qui
+      // exige le lookup `usedAt IS NULL` + `expiresAt > now()`).
+      const fresh = signOppositionToken({
+        architectId,
+        organizationId: orgId,
+      });
+      await db.insert(architectOppositionTokens).values({
+        architectId,
+        organizationId: orgId,
+        jti: fresh.jti,
+        expiresAt: fresh.expiresAt,
+      });
+      oppositionToken = {
+        token: fresh.token,
+        jti: fresh.jti,
+        expiresAt: fresh.expiresAt,
+      };
     }
 
     // 6. Transaction : tokens + match_proposals + responses + tender status
@@ -692,7 +729,7 @@ export async function sendArchitectSolicitation(
     tender,
     tenderDepartment: extractDepartment(tender),
     lienAo: `${getSiteUrl()}/archi/${architectToken.token}`,
-    lienOpposition: `${getSiteUrl()}/archi/oppose/${oppositionToken.jti}`,
+    lienOpposition: `${getSiteUrl()}/archi/opposition/${oppositionToken.token}`,
     presentationSociete,
     nomCommercial,
     register,
@@ -1042,7 +1079,7 @@ export async function sendDossierToArchitectAction(
     // `lien_opposition` reste exposé dans le bloc rgpd injecté — on pose ici
     // une URL « marker » de cohérence ; pour ce template, le bloc RGPD n'est
     // pas obligatoire (cf. isRgpdMandatoryKey) mais on l'injecte quand même.
-    lienOpposition: `${getSiteUrl()}/archi/oppose/no-token`,
+    lienOpposition: `${getSiteUrl()}/archi/opposition/no-token`,
     nomCommercial,
     register,
   });

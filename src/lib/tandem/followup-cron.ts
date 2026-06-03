@@ -33,7 +33,11 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import type { db as defaultDb } from "@/db/client";
 import { architects } from "@/db/schema/architects";
-import { architectResponses, architectTokens } from "@/db/schema/selections";
+import {
+  architectOppositionTokens,
+  architectResponses,
+  architectTokens,
+} from "@/db/schema/selections";
 import { brevoMessages } from "@/db/schema/integrations";
 import { organizationProfiles } from "@/db/schema/messaging";
 import { organizations } from "@/db/schema/organizations";
@@ -52,6 +56,7 @@ import { buildBrevoVariables } from "@/lib/brevo/variables";
 // hardcodé — chaque relance utilise désormais `item.organizationId` (issu
 // de `architect_responses.organization_id`).
 import { extractDepartment } from "@/lib/tandem/matching";
+import { signOppositionToken } from "@/lib/tandem/opposition-jwt";
 import { getSiteUrl } from "@/lib/site-url";
 
 type DrizzleClient = typeof defaultDb;
@@ -297,10 +302,36 @@ export async function runTandemFollowups(deps: RunFollowupDeps): Promise<Followu
       // Construit l'URL du lien d'opposition à partir du jti racine — le
       // mail de relance reproduit le même lien d'opposition que la 1re fois
       // (lookup `architect_opposition_tokens` actif).
+      // Relance : on re-signe un nouveau JWT d'opposition. La V1 réutilisait
+      // le `jti` brut (UUID racine) avec la même URL `/archi/oppose/...` — ce
+      // qui produisait un 404 (route inexistante + payload non-JWT). On signe
+      // donc un token frais pour que le lien soit cliquable depuis le mail
+      // de relance lui-même, sans dépendre du mail d'origine.
       const oppoJti = await fetchActiveOppositionJti(db, item.architectId, item.organizationId);
-      const lienOpposition = oppoJti
-        ? `${getSiteUrl()}/archi/oppose/${oppoJti}`
-        : `${getSiteUrl()}/archi/oppose/_no_token`;
+      let lienOpposition: string;
+      if (oppoJti) {
+        // Signature + insert sont enveloppés dans un seul try/catch défensif :
+        // si les clés JWT ne sont pas chargées (CI / tests / blip KMS) ou si
+        // l'insert BDD échoue, on retombe sur le lien neutre `/no-token` qui
+        // affiche `TokenInvalidPage` plutôt qu'un 404 brutal.
+        try {
+          const fresh = signOppositionToken({
+            architectId: item.architectId,
+            organizationId: item.organizationId,
+          });
+          await db.insert(architectOppositionTokens).values({
+            jti: fresh.jti,
+            architectId: item.architectId,
+            organizationId: item.organizationId,
+            expiresAt: fresh.expiresAt,
+          });
+          lienOpposition = `${getSiteUrl()}/archi/opposition/${fresh.token}`;
+        } catch {
+          lienOpposition = `${getSiteUrl()}/archi/opposition/no-token`;
+        }
+      } else {
+        lienOpposition = `${getSiteUrl()}/archi/opposition/no-token`;
+      }
 
       // Profil société de l'org qui PORTE cette sollicitation (item.organizationId).
       // Multi-tenant : un même run de cron peut envoyer pour plusieurs orgs,
@@ -412,7 +443,6 @@ async function fetchActiveOppositionJti(
   architectId: string,
   organizationId: string,
 ): Promise<string | null> {
-  const { architectOppositionTokens } = await import("@/db/schema/selections");
   const rows = await db
     .select({ jti: architectOppositionTokens.jti })
     .from(architectOppositionTokens)
