@@ -27,7 +27,6 @@ interface OrgProfileFormProps {
     | "agencyDetails"
     | "phone"
     | "contactEmail"
-    | "logoUrl"
     | "addressLine1"
     | "addressLine2"
     | "legalRepresentativeName"
@@ -47,7 +46,11 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
   const [agencyDetails, setAgencyDetails] = useState(initial?.agencyDetails ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [contactEmail, setContactEmail] = useState(initial?.contactEmail ?? "");
-  const [logoUrl, setLogoUrl] = useState(initial?.logoUrl ?? "");
+  // Logo : géré côté /sourcing/admin/settings (Personnalisation) — bucket
+  // `org-assets`. Le champ texte qui était ici a été retiré (Steve 2026-06-03)
+  // car redondant et source de confusion. La colonne legacy
+  // `organization_profiles.logo_url` reste en BDD jusqu'à une migration de
+  // nettoyage (V2).
   // Données administratives DC2 (Lot B)
   const [addressLine1, setAddressLine1] = useState(initial?.addressLine1 ?? "");
   const [addressLine2, setAddressLine2] = useState(initial?.addressLine2 ?? "");
@@ -100,7 +103,6 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
     fd.set("agencyDetails", agencyDetails);
     fd.set("phone", phone);
     fd.set("contactEmail", contactEmail);
-    fd.set("logoUrl", logoUrl);
     fd.set("addressLine1", addressLine1);
     fd.set("addressLine2", addressLine2);
     fd.set("legalRepresentativeName", legalRepresentativeName);
@@ -237,15 +239,14 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
               onChange={setContactEmail}
               maxLength={254}
             />
-            <Field
-              id="logoUrl"
-              label="URL du logo (https://…)"
-              type="url"
-              value={logoUrl}
-              onChange={setLogoUrl}
-              maxLength={2048}
-            />
           </div>
+          <p className="mt-3 text-xs text-muted">
+            Pour modifier le logo de l&rsquo;organisation, rends-toi sur{" "}
+            <a href="/sourcing/admin/settings" className="underline hover:text-ink">
+              Personnalisation
+            </a>
+            .
+          </p>
         </section>
 
         {/* Signature + agences */}

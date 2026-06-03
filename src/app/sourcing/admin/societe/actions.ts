@@ -41,12 +41,7 @@ const saveOrgProfileSchema = z.object({
     .refine((v) => v === "" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), {
       message: "Format e-mail invalide",
     }),
-  logoUrl: z
-    .string()
-    .max(2048)
-    .refine((v) => v === "" || /^https?:\/\//.test(v), {
-      message: "L'URL du logo doit commencer par http:// ou https://",
-    }),
+  // `logoUrl` retiré côté form (Steve 2026-06-03) — géré via Personnalisation.
   // ---------------------------------------------------------------- DC2 (Lot B)
   addressLine1: z.string().max(255, "Adresse trop longue"),
   addressLine2: z.string().max(255, "Complément d'adresse trop long"),
@@ -112,7 +107,6 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
     agencyDetails: formData.get("agencyDetails") ?? "",
     phone: formData.get("phone") ?? "",
     contactEmail: formData.get("contactEmail") ?? "",
-    logoUrl: formData.get("logoUrl") ?? "",
     addressLine1: formData.get("addressLine1") ?? "",
     addressLine2: formData.get("addressLine2") ?? "",
     legalRepresentativeName: formData.get("legalRepresentativeName") ?? "",
@@ -158,7 +152,9 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
         agencyDetails: values.agencyDetails,
         phone: values.phone,
         contactEmail: values.contactEmail,
-        logoUrl: values.logoUrl || null,
+        // logoUrl : géré via Personnalisation (organizations.logo_url).
+        // La colonne legacy `organization_profiles.logo_url` n'est plus
+        // écrite — elle sera droppée dans une migration de nettoyage V2.
         ...dc2Fields,
         updatedBy: user.id,
         updatedAt: new Date(),
@@ -172,7 +168,6 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
           agencyDetails: values.agencyDetails,
           phone: values.phone,
           contactEmail: values.contactEmail,
-          logoUrl: values.logoUrl || null,
           ...dc2Fields,
           updatedBy: user.id,
           updatedAt: new Date(),
