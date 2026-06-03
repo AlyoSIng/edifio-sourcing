@@ -23,7 +23,7 @@ import { organizations } from "@/db/schema/organizations";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
 /* -------------------------------------------------------------------------- */
 /*  Types de retour communs                                                    */
@@ -173,10 +173,14 @@ export async function uploadLogoAction(formData: FormData): Promise<BrandingActi
   const storagePath = `logos/${orgId}/logo.${ext}`;
 
   try {
-    const supabase = createSupabaseServerClient();
+    // Storage admin client (service_role) — bypass RLS sur storage.objects.
+    // L'auth est déjà vérifiée par requireAdminUser() ci-dessus, et le path
+    // est scoped sur orgId, donc pas d'escalade possible. Même pattern que
+    // compileDossierAction et validateCerfa (cf. memory feedback storage RLS).
+    const supabaseAdmin = createSupabaseAdminClient();
     const buffer = await file.arrayBuffer();
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from("org-assets")
       .upload(storagePath, new Uint8Array(buffer), {
         contentType: file.type,
@@ -188,7 +192,7 @@ export async function uploadLogoAction(formData: FormData): Promise<BrandingActi
       return { ok: false, error: "internal_error", detail: uploadError.message };
     }
 
-    const { data: urlData } = supabase.storage.from("org-assets").getPublicUrl(storagePath);
+    const { data: urlData } = supabaseAdmin.storage.from("org-assets").getPublicUrl(storagePath);
     const logoUrl = urlData.publicUrl;
 
     await db
@@ -239,14 +243,15 @@ export async function removeLogoAction(): Promise<BrandingActionResult> {
       .set({ logoUrl: null, updatedAt: new Date() })
       .where(eq(organizations.id, orgId));
 
-    // Suppression Storage best-effort (ne bloque pas si echec)
+    // Suppression Storage best-effort (ne bloque pas si echec).
+    // Storage admin (service_role) pour bypass RLS — symétrique à uploadLogo.
     if (currentLogoUrl) {
-      const supabase = createSupabaseServerClient();
+      const supabaseAdmin = createSupabaseAdminClient();
       const url = new URL(currentLogoUrl);
       // Extraire le path depuis l'URL publique Supabase
       const match = url.pathname.match(/\/org-assets\/(.+)$/);
       if (match?.[1]) {
-        await supabase.storage
+        await supabaseAdmin.storage
           .from("org-assets")
           .remove([match[1]])
           .catch((e) => console.warn("[settings:logo:remove:storage-warn]", e));
