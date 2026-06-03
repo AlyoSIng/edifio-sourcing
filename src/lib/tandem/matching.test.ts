@@ -47,6 +47,7 @@ function makeArchitect(overrides: Partial<Architect> = {}): Architect {
     signatureCity: null,
     legalRepresentativeName: null,
     legalRepresentativeRole: null,
+    legalForm: null,
     headcount: null,
     companySize: null,
     companyCreatedAt: null,

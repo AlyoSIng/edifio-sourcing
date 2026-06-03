@@ -103,6 +103,11 @@ export const architects = pgTable(
     legalRepresentativeName: text("legal_representative_name"),
     /** Qualité du signataire (ex. "Gérant", "Président", "Architecte associé"). DC1 §G. */
     legalRepresentativeRole: text("legal_representative_role"),
+    /**
+     * Forme juridique du cabinet archi (SARL, SAS, EURL, SELARL, etc.).
+     * Champ libre TEXT — DC1 §A1 obligatoire (Steve 2026-06-03 / migration 0040).
+     */
+    legalForm: text("legal_form"),
     /** Effectif (enrichissement, hors matching V1). */
     headcount: integer("headcount"),
     /**

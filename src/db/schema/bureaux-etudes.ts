@@ -74,6 +74,11 @@ export const bureauEtudes = pgTable(
     legalRepresentativeName: text("legal_representative_name"),
     /** Qualité du signataire (ex. "Gérant", "Président"). DC2 §G. */
     legalRepresentativeRole: text("legal_representative_role"),
+    /**
+     * Forme juridique du BE (SARL, SAS, EURL, etc.).
+     * Champ libre TEXT — DC2 §B1 obligatoire (Steve 2026-06-03 / migration 0040).
+     */
+    legalForm: text("legal_form"),
     /** Effectif salarié (enrichissement). */
     headcount: integer("headcount"),
     /** Taille entreprise (PME | ETI | GE) — enrichissement. */

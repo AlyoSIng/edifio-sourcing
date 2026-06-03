@@ -45,6 +45,7 @@ faut mettre en gras.
 | Balise | Contenu | Source BDD |
 |---|---|---|
 | `{{alyos_raison_sociale}}` | « AlyoS Ingénierie » | profil organisation |
+| `{{alyos_forme_juridique}}` | « SARL », « SAS », « EURL »… | profil organisation (DC1 §A1 + DC2 §B1) |
 | `{{alyos_siret}}` | SIRET AlyoS | profil organisation |
 | `{{alyos_adresse}}` | adresse complète | profil organisation |
 | `{{alyos_code_postal}}` | code postal AlyoS | profil organisation |
@@ -57,6 +58,7 @@ faut mettre en gras.
 | `{{alyos_effectif}}` | effectif moyen annuel | profil organisation |
 | `{{alyos_ca_n1}}` `{{alyos_ca_n2}}` `{{alyos_ca_n3}}` | chiffres d'affaires N-1/2/3 | profil organisation |
 | `{{archi_cabinet}}` | nom du cabinet archi mandataire | fiche architecte |
+| `{{archi_forme_juridique}}` | « SARL d'architecture », « SELARL »… | fiche architecte (DC1 §A1) |
 | `{{archi_siret}}` | SIRET de l'archi | fiche architecte |
 | `{{archi_adresse}}` | adresse archi | fiche architecte |
 | `{{archi_representant_nom}}` | nom du signataire archi | fiche architecte |

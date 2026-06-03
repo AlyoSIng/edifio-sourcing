@@ -148,6 +148,12 @@ export const organizationProfiles = pgTable("organization_profiles", {
   legalRepresentativeRole: text("legal_representative_role"),
   capitalEur: integer("capital_eur"),
   signatureCity: text("signature_city"),
+  /**
+   * Forme juridique (SA, SARL, SAS, SASU, EURL, SCP, SELARL, etc.).
+   * Champ libre text pour ne pas figer une enum côté schéma — la validation
+   * UI suggère les plus courantes via datalist (Steve 2026-06-03 / mig. 0040).
+   */
+  legalForm: text("legal_form"),
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
