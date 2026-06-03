@@ -438,7 +438,7 @@ function KindSection({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate text-sm font-medium text-ink">{item.name}</span>
                         {item.validUntil && <ExpiryBadge validUntil={item.validUntil} />}
-                        {detail && (
+                        {detail && !detail.sourceHashStale && (
                           <button
                             type="button"
                             onClick={() => toggleDetails(item.id)}
@@ -447,6 +447,17 @@ function KindSection({
                             aria-expanded={isOpen}
                           >
                             ✓ Indexé {isOpen ? "▴" : "▾"}
+                          </button>
+                        )}
+                        {detail?.sourceHashStale && (
+                          <button
+                            type="button"
+                            onClick={() => toggleDetails(item.id)}
+                            className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 transition hover:bg-amber-100"
+                            title="Le document a été ré-uploadé depuis la dernière indexation — relancer l'indexation pour rafraîchir les métadonnées."
+                            aria-expanded={isOpen}
+                          >
+                            ⚠️ Index obsolète {isOpen ? "▴" : "▾"}
                           </button>
                         )}
                       </div>

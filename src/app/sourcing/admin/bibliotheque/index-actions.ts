@@ -475,6 +475,11 @@ export async function loadLibraryIndexDetails(): Promise<LibraryIndexDetail[]> {
     const profile = toUserProfile(user);
     const orgId = await getRequiredOrgId(profile.id);
 
+    // G4 — Steve 2026-06-03 : détection d'obsolescence par comparaison
+    // `presentation_library.updated_at` vs `library_item_index.indexed_at`.
+    // Si l'item a été ré-uploadé après la dernière indexation, l'index est
+    // considéré obsolète. Plus léger que de recalculer le SHA-256 à chaque
+    // page-load.
     const rows = await db
       .select({
         libraryItemId: libraryItemIndex.libraryItemId,
@@ -485,8 +490,10 @@ export async function loadLibraryIndexDetails(): Promise<LibraryIndexDetail[]> {
         extractedEntities: libraryItemIndex.extractedEntities,
         indexedAt: libraryItemIndex.indexedAt,
         modelVersion: libraryItemIndex.modelVersion,
+        itemUpdatedAt: presentationLibrary.updatedAt,
       })
       .from(libraryItemIndex)
+      .innerJoin(presentationLibrary, eq(presentationLibrary.id, libraryItemIndex.libraryItemId))
       .where(eq(libraryItemIndex.organizationId, orgId));
 
     return rows.map((r) => ({
@@ -498,10 +505,10 @@ export async function loadLibraryIndexDetails(): Promise<LibraryIndexDetail[]> {
       extractedEntities: (r.extractedEntities as Record<string, unknown> | null) ?? {},
       indexedAtIso: r.indexedAt.toISOString(),
       modelVersion: r.modelVersion,
-      // V1 : on ne sait pas calculer côté load si le hash est stale sans
-      // re-télécharger le fichier — trop coûteux. On laisse false ici, la
-      // détection d'obsolescence est repoussée à G4 (chantier dédié).
-      sourceHashStale: false,
+      // Stale = item ré-uploadé après dernière indexation. Marge tampon
+      // de 5s pour éviter les faux positifs liés aux timestamps drizzle
+      // (created/updated peuvent être posés à la même milliseconde).
+      sourceHashStale: r.itemUpdatedAt.getTime() > r.indexedAt.getTime() + 5000,
     }));
   } catch (err) {
     console.warn("[index-library:load-details:fail]", err);
