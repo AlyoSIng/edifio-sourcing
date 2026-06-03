@@ -1869,3 +1869,78 @@ appliquée sur prod après Phase β. Pas de bug de code.
 5. Créé `tests/rls/12_tender_briefs_constraints.sql` (7 assertions DDL).  
 6. Ajouté support PG* env vars dans `scripts/backfill-departments.ts`.  
 **Motif** : Complétion des tâches autorisées du sprint 2026-05-28. Défense-en-profondeur Phase 2.
+
+---
+
+## 2026-06-03 — Session marathon dossier IA + biblio IA (16 commits)
+
+**Agent** : Alex (dev) + Yann (ps_operator) + Steve (Board/Ops)
+
+Session intensive : refonte du flow dossier de candidature, indexation IA de la bibliothèque, et 8 chantiers UX de polissage. 16 commits poussés sur `main` dans la journée, 6 migrations BDD (0038 → 0043).
+
+### Chantiers livrés (ordre chronologique)
+
+| Commit | Sujet |
+|---|---|
+| `0daadd2` | fix 404 lien opposition RGPD dans mails archi (URL `/archi/oppose/<jti>` → `/archi/opposition/<jwt-signé>`) |
+| `2b66933` | fix RLS upload logo organisation (`createSupabaseAdminClient` au lieu de cookies user) |
+| `eece7e6` | P1+P2 : 3 catégories biblio supplémentaires (`declaration_honneur`, `_ca`, `_effectifs`) + bouton « Envoyer à l'archi » avec table `dossier_dispatches` |
+| `862363e` | P3 : DC2 archi-agnostique sur même AO (cross-archi). Migration 0039 backfill `UPDATE response_files SET architect_id = NULL WHERE kind='dc2' AND be_id IS NULL` |
+| `fd34942` | Fondation moteur Mustache pour .docx via fflate (anti-split runs Word) — 18 tests Vitest |
+| `19d7e84` | Colonne `legal_form` sur `organization_profiles`, `architects`, `bureaux_etudes` (migration 0040) |
+| `8a6639b` | Inputs Forme juridique dans les 3 écrans admin + module `src/lib/legal-forms.ts` |
+| `227c15a` | F : Export CSV AO du jour (38 colonnes alignées sur xlsx Steve, BOM UTF-8) |
+| `4e0452f` | D : ZIP joint tous docs biblio valides non-expirés en plus des matchés RC |
+| `678a8cf` | E : MVP indexation IA biblio via Claude Haiku 4.5. Table `library_item_index` (migration 0041) |
+| `a7d9dba` | Retrait champ URL logo redondant de la page Société (legacy avant Personnalisation) |
+| `c9f1946` | V2 : `matchPiecesWithLibrary` boosté par `library_item_index` (titre + keywords) |
+| `96a4eab` | G1 : panneau dépliable détails IA + bouton « 🤖 Ré-indexer » par item |
+| `cb44050` | G2.1 : bandeaux rouge/orange « X docs expirés / expirent bientôt » avant Compiler |
+| `830b5b2` | G2.2 : cron Vercel hebdo mail digest expiration biblio aux admins (Resend) |
+| `7fccbd3` | G3 : panneau composition ZIP avant compile |
+| `a7d8533` | G4 : détection « ⚠️ Index obsolète » via `updated_at > indexed_at` |
+| `736d5f8` | G5 : audit `ai_runs` structuré pour chaque run Claude indexation. Migration 0042 seed prompt `library_index` |
+| `bbfd918` | G6 : 14 tests Vitest sur `indexLibraryItem` (mock SDK Anthropic) |
+| `(this)` | G7 : migration 0043 drop colonne legacy `organization_profiles.logo_url` + DECISIONS.md récap |
+
+### ADR-031 — Pivot dossier CERFA : voie A « Mustache .docx »
+
+- **Décision** : Steve a confirmé qu'on n'utilisera plus pdf-lib pour générer DC1/DC2/Pouvoir. À la place, l'admin dépose ses propres modèles `.docx` dans la bibliothèque avec des balises Mustache (`{{archi_cabinet}}`, `{{ao_objet}}`, `{{alyos_siret}}`, etc.). L'app les remplit côté serveur via fflate et sort un `.docx` rempli.
+- **Motif** : le rendu pdf-lib s'éloignait trop des CERFA officiels et empêchait Steve de personnaliser ses templates Word.
+- **État** : fondation posée (`src/lib/dossier/docx-fill.ts` + tests). Intégration au flow CERFA reportée tant que Steve n'a pas converti ses `.doc` en `.docx` avec les balises (cf. handoff `STEVE_260603_TEMPLATES_DOCX_MUSTACHE.md`).
+
+### ADR-032 — Indexation IA biblio comme socle du matching V2
+
+- **Décision** : nouvelle table `library_item_index` (migration 0041) stocke pour chaque item biblio les métadonnées extraites par Claude Haiku 4.5 : `extracted_title`, `keywords[]`, `summary`, `doc_type`, `extracted_entities (jsonb)`, `source_hash sha256`. Bouton « 🤖 Indexer la bibliothèque » dans `/sourcing/admin/bibliotheque` parcourt les items non encore traités, par lots de 15 (timeout Vercel 60s).
+- **Motif** : améliorer drastiquement le matching pieces RC ↔ biblio (V2 chantier, commit `c9f1946`) en élargissant la surface de tokens de `kind + name` à `kind + name + extracted_title + keywords`. Les items avec nom de fichier opaque (`Scan001.pdf`) deviennent matchables.
+- **Coût** : ~2,5 c€ par doc indexé (Haiku 4.5). Protection `source_hash` évite les ré-indexations inutiles si le doc n'a pas changé.
+- **Audit** : migration 0042 seed le prompt `library_index` dans `ai_prompts` pour permettre l'enregistrement structuré dans `ai_runs` (Gate 5 §7).
+
+### ADR-033 — Cron hebdo expiration biblio (vendredi → mail digest aux admins)
+
+- **Décision** : nouveau cron Vercel `/api/cron/library-expiry-digest` programmé lundi 6h UTC (~8h Paris). Pour chaque organisation, calcule via `classifyLibraryExpiry` les items expirés (déjà filtrés du ZIP par `compileDossierAction`) et bientôt expirés (J+30, encore inclus mais à surveiller). Si la liste est non vide pour une org, envoie un mail digest via Resend à tous les admins + superadmins de l'org.
+- **Motif** : éviter d'envoyer un dossier de candidature avec une attestation URSSAF périmée. Détection préventive.
+- **Conformité** : isolation tenant stricte (jamais de cross-org dans un même mail). Anti-XSS sur les noms d'items (`escapeHtml`).
+
+### Migrations prod appliquées par Steve dans la journée
+
+- ✅ 0038 `dossier_dispatches` (envoi dossier à l'archi)
+- ✅ 0039 normalisation DC2 archi-agnostique
+- ✅ 0040 colonne `legal_form` sur 3 tables
+- ✅ 0041 table `library_item_index` (RLS FORCE)
+- ⏳ 0042 seed prompt `library_index` — à appliquer (handoff `OPS_260603_MIGRATION_0042_LIBRARY_INDEX_PROMPT.md`)
+- ⏳ 0043 drop colonne legacy `organization_profiles.logo_url` — à appliquer
+
+### Backlog côté Steve
+
+1. Migrations 0042 + 0043 prod
+2. Convertir ses `.doc` DC1/DC2/Pouvoir en `.docx` + ajouter les ~26 balises Mustache documentées (handoff `STEVE_260603_TEMPLATES_DOCX_MUSTACHE.md`)
+3. Renseigner la forme juridique sur AlyoS + ses archis prioritaires
+4. Lancer une fois l'indexation IA biblio depuis l'admin (~5-10 docs × 5s = ~30-60s)
+5. Tester les 16 features livrées (envoi archi, switch archi, export CSV, indexation, cron digest, etc.)
+
+### Backlog côté Alex (prochaines sessions)
+
+- Intégration du moteur `docx-fill` dans le flow CERFA (remplacement effectif de pdf-lib)
+- G8 — Guides HTML pour les nouvelles features (envoi archi, export CSV, indexation IA, switch archi, forme juridique, expirations biblio)
+- Tests Vitest sur `zip-compile.ts` et `dispatch-actions.ts` (G6 partiel — seul `index-item.ts` couvert)

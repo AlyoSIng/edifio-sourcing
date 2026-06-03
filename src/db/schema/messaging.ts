@@ -131,11 +131,9 @@ export const organizationProfiles = pgTable("organization_profiles", {
   phone: text("phone").notNull().default(""),
   /** Email de contact principal (reply-to ou pied de page). */
   contactEmail: text("contact_email").notNull().default(""),
-  /**
-   * URL du logo — stockée en texte (URL absolue HTTPS ou chemin Supabase
-   * Storage). Pas de type dédié : validation côté application.
-   */
-  logoUrl: text("logo_url"),
+  // `logoUrl` retiré — colonne droppée par la migration 0043 (Steve
+  // 2026-06-03). Le logo est désormais géré par `organizations.logo_url`
+  // (Personnalisation / bucket org-assets).
   /**
    * Données administratives DC2 (CERFA 12157) — Phase 1 Lot B.
    * En cotraitance MOE BTP, AlyoS est cotraitant et doit produire son DC2 ;
