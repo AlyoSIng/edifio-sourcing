@@ -21,7 +21,12 @@ import { useRef, useState, useTransition } from "react";
 
 import type { PresentationLibraryItem } from "@/db/schema/library";
 import { deleteLibraryDoc, uploadLibraryDoc } from "./actions";
-import { indexLibraryBatchAction, type IndexLibraryResult } from "./index-actions";
+import {
+  indexLibraryBatchAction,
+  reindexLibraryItemAction,
+  type IndexLibraryResult,
+  type LibraryIndexDetail,
+} from "./index-actions";
 
 // ---------------------------------------------------------------------------
 // Constantes : catégories de documents
@@ -160,13 +165,16 @@ function ExpiryBadge({ validUntil }: ExpiryBadgeProps) {
 interface LibraryClientProps {
   entries: PresentationLibraryItem[];
   /**
-   * IDs des items déjà indexés par l'IA (chantier E — Steve 2026-06-03).
-   * Utilisé pour afficher un badge « ✓ Indexé » sur chaque item.
+   * Détails d'indexation IA (chantier E + G1 polish). Sérialisé Server → Client
+   * (Date en ISO string). Utilisé pour :
+   *  - afficher le badge « ✓ Indexé » sur chaque item
+   *  - dévoiler un panneau dépliable avec extracted_title, keywords, summary, doc_type
+   *  - permettre la ré-indexation 1-clic d'un item via reindexLibraryItemAction
    */
-  indexedItemIds?: string[];
+  indexDetails?: LibraryIndexDetail[];
 }
 
-export function LibraryClient({ entries, indexedItemIds = [] }: LibraryClientProps) {
+export function LibraryClient({ entries, indexDetails = [] }: LibraryClientProps) {
   // Groupe les entrées par kind pour accès O(1) dans chaque section
   const byKind = new Map<KindKey, PresentationLibraryItem[]>();
   for (const kind of LIBRARY_KINDS) {
@@ -182,8 +190,10 @@ export function LibraryClient({ entries, indexedItemIds = [] }: LibraryClientPro
     }
   }
 
-  // Set local pour lookup O(1) — mutable pour optimistic update post-indexation.
-  const [indexedSet, setIndexedSet] = useState(new Set(indexedItemIds));
+  // Map locale itemId → détails — mutable pour optimistic update après ré-index.
+  const [indexMap, setIndexMap] = useState<Map<string, LibraryIndexDetail>>(
+    () => new Map(indexDetails.map((d) => [d.libraryItemId, d])),
+  );
 
   // État indexation IA (chantier E).
   const [isIndexing, startIndexing] = useTransition();
@@ -270,8 +280,14 @@ export function LibraryClient({ entries, indexedItemIds = [] }: LibraryClientPro
           label={kindMeta.label}
           hasExpiry={kindMeta.hasExpiry}
           items={byKind.get(kindMeta.key) ?? []}
-          indexedSet={indexedSet}
-          setIndexedSet={setIndexedSet}
+          indexMap={indexMap}
+          onItemReindexed={(detail) => {
+            setIndexMap((prev) => {
+              const next = new Map(prev);
+              next.set(detail.libraryItemId, detail);
+              return next;
+            });
+          }}
         />
       ))}
     </div>
@@ -287,13 +303,51 @@ interface KindSectionProps {
   label: string;
   hasExpiry: boolean;
   items: PresentationLibraryItem[];
-  /** IDs des items biblio déjà indexés (chantier E). */
-  indexedSet?: Set<string>;
-  /** Setter pour MAJ optimistic en cas d'indexation manuelle future. */
-  setIndexedSet?: (s: Set<string>) => void;
+  /** Map détaillée { itemId → métadonnées IA } (chantier E + G1). */
+  indexMap?: Map<string, LibraryIndexDetail>;
+  /** Callback après ré-indexation 1-item réussie (MAJ optimistic côté parent). */
+  onItemReindexed?: (detail: LibraryIndexDetail) => void;
 }
 
-function KindSection({ kindKey, label, hasExpiry, items, indexedSet }: KindSectionProps) {
+function KindSection({
+  kindKey,
+  label,
+  hasExpiry,
+  items,
+  indexMap,
+  onItemReindexed,
+}: KindSectionProps) {
+  // Items dont le panneau « détails IA » est ouvert. ID-set local par section.
+  const [openDetailIds, setOpenDetailIds] = useState<Set<string>>(new Set());
+  // ID de l'item en cours de ré-indexation (un seul à la fois — UX claire).
+  const [reindexingId, setReindexingId] = useState<string | null>(null);
+  const [reindexError, setReindexError] = useState<string | null>(null);
+  const [isReindexPending, startReindex] = useTransition();
+
+  function toggleDetails(id: string) {
+    setOpenDetailIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleReindex(id: string) {
+    setReindexError(null);
+    setReindexingId(id);
+    startReindex(async () => {
+      const result = await reindexLibraryItemAction(id);
+      if (result.ok) {
+        onItemReindexed?.(result.details);
+        // Auto-ouvre le panneau détail pour qu'on voie ce que Claude a sorti.
+        setOpenDetailIds((prev) => new Set(prev).add(id));
+      } else {
+        setReindexError(`${id.slice(0, 8)}… : ${result.message ?? result.error}`);
+      }
+      setReindexingId(null);
+    });
+  }
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -354,59 +408,167 @@ function KindSection({ kindKey, label, hasExpiry, items, indexedSet }: KindSecti
         {/* Liste des documents existants */}
         {items.length > 0 ? (
           <ul className="divide-y divide-line" role="list">
-            {items.map((item) => (
-              <li key={item.id} className="flex items-start gap-3 py-2.5">
-                {/* Icône fichier */}
-                <div className="mt-0.5 shrink-0 text-muted" aria-hidden>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    width={16}
-                    height={16}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                </div>
-
-                {/* Infos document */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium text-ink">{item.name}</span>
-                    {item.validUntil && <ExpiryBadge validUntil={item.validUntil} />}
-                    {indexedSet?.has(item.id) && (
-                      <span
-                        className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700"
-                        title="Doc analysé par Claude — métadonnées extraites"
+            {items.map((item) => {
+              const detail = indexMap?.get(item.id);
+              const isOpen = openDetailIds.has(item.id);
+              const isThisReindexing = reindexingId === item.id && isReindexPending;
+              return (
+                <li key={item.id} className="flex flex-col gap-2 py-2.5">
+                  <div className="flex items-start gap-3">
+                    {/* Icône fichier */}
+                    <div className="mt-0.5 shrink-0 text-muted" aria-hidden>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        width={16}
+                        height={16}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        ✓ Indexé
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[11px] text-muted">
-                    <span>{formatBytes(item.sizeBytes)}</span>
-                    <span>Ajouté le {formatDate(item.createdAt)}</span>
-                    {item.notes && <span className="italic">{item.notes}</span>}
-                  </div>
-                </div>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </div>
 
-                {/* Bouton suppression */}
-                <button
-                  type="button"
-                  onClick={() => handleDelete(item.id, item.storagePath, item.name)}
-                  disabled={isPending}
-                  className="shrink-0 rounded px-2 py-1 text-xs font-medium text-error transition hover:bg-error-bg disabled:opacity-50"
-                  aria-label={`Supprimer ${item.name}`}
-                >
-                  Supprimer
-                </button>
-              </li>
-            ))}
+                    {/* Infos document */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-medium text-ink">{item.name}</span>
+                        {item.validUntil && <ExpiryBadge validUntil={item.validUntil} />}
+                        {detail && (
+                          <button
+                            type="button"
+                            onClick={() => toggleDetails(item.id)}
+                            className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 transition hover:bg-emerald-100"
+                            title="Cliquer pour voir les métadonnées extraites par Claude"
+                            aria-expanded={isOpen}
+                          >
+                            ✓ Indexé {isOpen ? "▴" : "▾"}
+                          </button>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[11px] text-muted">
+                        <span>{formatBytes(item.sizeBytes)}</span>
+                        <span>Ajouté le {formatDate(item.createdAt)}</span>
+                        {item.notes && <span className="italic">{item.notes}</span>}
+                      </div>
+                    </div>
+
+                    {/* Actions : ré-indexer + supprimer */}
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleReindex(item.id)}
+                        disabled={isReindexPending}
+                        className="rounded px-2 py-1 text-xs font-medium text-ink-2 transition hover:bg-paper-2 disabled:opacity-50"
+                        title={
+                          detail
+                            ? "Force une nouvelle analyse Claude (bypass cache)"
+                            : "Lance l'analyse Claude pour cet item"
+                        }
+                        aria-label={`Ré-indexer ${item.name}`}
+                      >
+                        {isThisReindexing ? "🤖 …" : "🤖 Ré-indexer"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id, item.storagePath, item.name)}
+                        disabled={isPending}
+                        className="rounded px-2 py-1 text-xs font-medium text-error transition hover:bg-error-bg disabled:opacity-50"
+                        aria-label={`Supprimer ${item.name}`}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Panneau dépliable — détails IA */}
+                  {isOpen && detail && (
+                    <div className="ml-7 rounded-md border border-emerald-100 bg-emerald-50/50 p-3 text-xs text-ink-2">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {detail.extractedTitle && (
+                          <div className="sm:col-span-2">
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                              Titre IA
+                            </span>
+                            <p className="mt-0.5 text-sm font-medium text-ink">
+                              {detail.extractedTitle}
+                            </p>
+                          </div>
+                        )}
+                        {detail.docType && (
+                          <div>
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                              Type détecté
+                            </span>
+                            <p className="mt-0.5">
+                              <code className="rounded bg-white px-1.5 py-0.5 text-[11px] text-ink">
+                                {detail.docType}
+                              </code>
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                            Indexé le
+                          </span>
+                          <p className="mt-0.5">
+                            {new Date(detail.indexedAtIso).toLocaleString("fr-FR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                            {detail.modelVersion && (
+                              <span className="ml-1.5 text-muted">({detail.modelVersion})</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {detail.summary && (
+                        <div className="mt-2">
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                            Résumé
+                          </span>
+                          <p className="mt-0.5 text-sm italic">{detail.summary}</p>
+                        </div>
+                      )}
+                      {detail.keywords.length > 0 && (
+                        <div className="mt-2">
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                            Mots-clés
+                          </span>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {detail.keywords.map((kw) => (
+                              <span
+                                key={kw}
+                                className="rounded-full bg-white px-2 py-0.5 text-[10px] text-ink-2"
+                              >
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {Object.keys(detail.extractedEntities).length > 0 && (
+                        <div className="mt-2">
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                            Entités structurées
+                          </span>
+                          <pre className="mt-1 overflow-x-auto rounded bg-white p-2 text-[11px] text-ink-2">
+                            {JSON.stringify(detail.extractedEntities, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="py-1 text-sm italic text-muted">Aucun document dans cette catégorie.</p>
@@ -416,6 +578,13 @@ function KindSection({ kindKey, label, hasExpiry, items, indexedSet }: KindSecti
         {deleteError && (
           <p role="alert" className="text-sm text-error">
             {deleteError}
+          </p>
+        )}
+
+        {/* Erreur de ré-indexation 1-item (G1). */}
+        {reindexError && (
+          <p role="alert" className="text-sm text-error">
+            Ré-indexation : {reindexError}
           </p>
         )}
 

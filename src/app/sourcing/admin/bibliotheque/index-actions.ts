@@ -279,31 +279,232 @@ export async function indexLibraryBatchAction(): Promise<IndexLibraryResult> {
 }
 
 // ---------------------------------------------------------------------------
+// Action — ré-indexation forcée d'un seul item (G1 Steve 2026-06-03)
+// ---------------------------------------------------------------------------
+
+export type ReindexLibraryItemError =
+  | "not_authenticated"
+  | "forbidden_domain"
+  | "forbidden_role"
+  | "invalid_input"
+  | "item_not_found"
+  | "storage_download_failed"
+  | "anthropic_failed"
+  | "db_upsert_failed"
+  | "internal_error";
+
+export type ReindexLibraryItemResult =
+  | {
+      ok: true;
+      itemId: string;
+      details: LibraryIndexDetail;
+    }
+  | { ok: false; error: ReindexLibraryItemError; message?: string };
+
+const UUID_RE_REINDEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Force une nouvelle indexation Claude pour un seul item biblio.
+ * Bypass la skip-si-hash-identique : utile si l'admin veut re-tester le prompt
+ * ou si Claude avait renvoyé un mauvais résultat.
+ */
+export async function reindexLibraryItemAction(itemId: string): Promise<ReindexLibraryItemResult> {
+  try {
+    // 1. Auth + admin guard (mêmes vérifs que le batch).
+    if (!UUID_RE_REINDEX.test(itemId)) {
+      return { ok: false, error: "invalid_input" };
+    }
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "not_authenticated" };
+    const profile = toUserProfile(user);
+    if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+    if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
+    const orgId = await getRequiredOrgId(profile.id);
+
+    // 2. Récupère l'item.
+    const [item] = await db
+      .select({
+        id: presentationLibrary.id,
+        name: presentationLibrary.name,
+        kind: presentationLibrary.kind,
+        storagePath: presentationLibrary.storagePath,
+      })
+      .from(presentationLibrary)
+      .where(and(eq(presentationLibrary.id, itemId), eq(presentationLibrary.organizationId, orgId)))
+      .limit(1);
+    if (!item) return { ok: false, error: "item_not_found" };
+
+    // 3. Download Storage + hash.
+    const supabaseAdmin = createSupabaseAdminClient();
+    let fileBytes: Uint8Array;
+    try {
+      const { data, error } = await supabaseAdmin.storage.from(BUCKET).download(item.storagePath);
+      if (error || !data) return { ok: false, error: "storage_download_failed" };
+      fileBytes = new Uint8Array(await data.arrayBuffer());
+    } catch (err) {
+      return {
+        ok: false,
+        error: "storage_download_failed",
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+    const hash = createHash("sha256").update(fileBytes).digest("hex");
+
+    // 4. Claude (force — pas de skip hash).
+    const isPdf = item.storagePath.toLowerCase().endsWith(".pdf");
+    const claudeResult = await indexLibraryItem({
+      itemName: item.name,
+      itemKind: item.kind,
+      pdfBytes: isPdf ? fileBytes : undefined,
+    });
+    if (!claudeResult.ok) {
+      return {
+        ok: false,
+        error: "anthropic_failed",
+        message: claudeResult.message ?? claudeResult.error,
+      };
+    }
+
+    console.info(
+      `[library-reindex] item=${item.id} tokens_in=${claudeResult.tokensIn} tokens_out=${claudeResult.tokensOut} cost=${claudeResult.costUsd.toFixed(4)}$ latency=${claudeResult.latencyMs}ms`,
+    );
+
+    // 5. Upsert library_item_index.
+    let indexedAt = new Date();
+    try {
+      const [row] = await db
+        .insert(libraryItemIndex)
+        .values({
+          libraryItemId: item.id,
+          organizationId: orgId,
+          extractedTitle: claudeResult.output.extracted_title ?? null,
+          keywords: claudeResult.output.keywords,
+          summary: claudeResult.output.summary ?? null,
+          docType: claudeResult.output.doc_type ?? null,
+          extractedEntities: claudeResult.output.extracted_entities,
+          indexedBy: profile.id,
+          modelVersion: claudeResult.modelVersion,
+          sourceHash: hash,
+        })
+        .onConflictDoUpdate({
+          target: libraryItemIndex.libraryItemId,
+          set: {
+            extractedTitle: claudeResult.output.extracted_title ?? null,
+            keywords: claudeResult.output.keywords,
+            summary: claudeResult.output.summary ?? null,
+            docType: claudeResult.output.doc_type ?? null,
+            extractedEntities: claudeResult.output.extracted_entities,
+            indexedAt: new Date(),
+            indexedBy: profile.id,
+            modelVersion: claudeResult.modelVersion,
+            sourceHash: hash,
+          },
+        })
+        .returning({ indexedAt: libraryItemIndex.indexedAt });
+      if (row?.indexedAt) indexedAt = row.indexedAt;
+    } catch (err) {
+      return {
+        ok: false,
+        error: "db_upsert_failed",
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    revalidatePath("/sourcing/admin/bibliotheque");
+
+    return {
+      ok: true,
+      itemId: item.id,
+      details: {
+        libraryItemId: item.id,
+        extractedTitle: claudeResult.output.extracted_title ?? null,
+        keywords: claudeResult.output.keywords,
+        summary: claudeResult.output.summary ?? null,
+        docType: claudeResult.output.doc_type ?? null,
+        extractedEntities: claudeResult.output.extracted_entities,
+        indexedAtIso: indexedAt.toISOString(),
+        modelVersion: claudeResult.modelVersion,
+        sourceHashStale: false,
+      },
+    };
+  } catch (err) {
+    console.error("[index-library:reindex-one:fail]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Action lecture — sert à afficher l'état d'indexation
 // ---------------------------------------------------------------------------
 
 /**
- * Retourne les `library_item_id` indexés pour l'org courante (UI badge
- * « ✓ Indexé » sur chaque item). `null` si l'utilisateur n'est pas authentifié.
+ * Détails d'indexation d'un item biblio — sérialisable pour passer un payload
+ * Server → Client (les Date sont remplacées par leur ISO string).
  */
-export async function loadIndexedLibraryItemIds(): Promise<Set<string> | null> {
+export interface LibraryIndexDetail {
+  libraryItemId: string;
+  extractedTitle: string | null;
+  keywords: string[];
+  summary: string | null;
+  docType: string | null;
+  extractedEntities: Record<string, unknown>;
+  indexedAtIso: string;
+  modelVersion: string | null;
+  /** Vrai si le hash stocké ne matche plus celui du fichier Storage actuel. */
+  sourceHashStale: boolean;
+}
+
+/**
+ * Retourne les détails d'indexation pour tous les items de l'organisation.
+ * Le caller (page.tsx) passe ces détails au composant Client qui affiche
+ * (a) le badge « ✓ Indexé » (b) le panneau dépliable au clic.
+ *
+ * Retourne `[]` si l'utilisateur n'est pas authentifié ou si la migration
+ * n'a pas encore été appliquée — dégradation gracieuse.
+ */
+export async function loadLibraryIndexDetails(): Promise<LibraryIndexDetail[]> {
   try {
     const supabase = await createSupabaseServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return null;
+    if (!user) return [];
     const profile = toUserProfile(user);
     const orgId = await getRequiredOrgId(profile.id);
 
     const rows = await db
-      .select({ libraryItemId: libraryItemIndex.libraryItemId })
+      .select({
+        libraryItemId: libraryItemIndex.libraryItemId,
+        extractedTitle: libraryItemIndex.extractedTitle,
+        keywords: libraryItemIndex.keywords,
+        summary: libraryItemIndex.summary,
+        docType: libraryItemIndex.docType,
+        extractedEntities: libraryItemIndex.extractedEntities,
+        indexedAt: libraryItemIndex.indexedAt,
+        modelVersion: libraryItemIndex.modelVersion,
+      })
       .from(libraryItemIndex)
       .where(eq(libraryItemIndex.organizationId, orgId));
 
-    return new Set(rows.map((r) => r.libraryItemId));
+    return rows.map((r) => ({
+      libraryItemId: r.libraryItemId,
+      extractedTitle: r.extractedTitle,
+      keywords: r.keywords ?? [],
+      summary: r.summary,
+      docType: r.docType,
+      extractedEntities: (r.extractedEntities as Record<string, unknown> | null) ?? {},
+      indexedAtIso: r.indexedAt.toISOString(),
+      modelVersion: r.modelVersion,
+      // V1 : on ne sait pas calculer côté load si le hash est stale sans
+      // re-télécharger le fichier — trop coûteux. On laisse false ici, la
+      // détection d'obsolescence est repoussée à G4 (chantier dédié).
+      sourceHashStale: false,
+    }));
   } catch (err) {
-    console.error("[index-library:load-indexed-ids:fail]", err);
-    return new Set();
+    console.warn("[index-library:load-details:fail]", err);
+    return [];
   }
 }

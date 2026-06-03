@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { libraryItemIndex } from "@/db/schema/library-index";
 import { presentationLibrary } from "@/db/schema/library";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -11,6 +10,7 @@ import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 
 import { LibraryClient } from "./LibraryClient";
+import { loadLibraryIndexDetails, type LibraryIndexDetail } from "./index-actions";
 import type { PresentationLibraryItem } from "@/db/schema/library";
 
 export const metadata = {
@@ -57,7 +57,7 @@ export default async function BibliothequeAdminPage() {
 
   // 2. Chargement des documents (try/catch résilience — règle MEMORY)
   let items: PresentationLibraryItem[] = [];
-  let indexedItemIds: string[] = [];
+  let indexDetails: LibraryIndexDetail[] = [];
   let fetchError: string | null = null;
 
   try {
@@ -67,18 +67,10 @@ export default async function BibliothequeAdminPage() {
       .where(eq(presentationLibrary.organizationId, orgId))
       .orderBy(presentationLibrary.kind, presentationLibrary.createdAt);
 
-    // Items déjà indexés (chantier E — Steve 2026-06-03). Try/catch isolé :
-    // si la migration 0041 n'a pas encore été appliquée en prod, l'erreur
-    // est silencieuse et le badge « ✓ Indexé » ne s'affiche pas.
-    try {
-      const indexRows = await db
-        .select({ libraryItemId: libraryItemIndex.libraryItemId })
-        .from(libraryItemIndex)
-        .where(eq(libraryItemIndex.organizationId, orgId));
-      indexedItemIds = indexRows.map((r) => r.libraryItemId);
-    } catch (err) {
-      console.warn("[bibliotheque:index-load:fail]", err);
-    }
+    // Détails d'indexation IA (chantier E + G1). Helper internalement
+    // try/catch isolé : si la migration 0041 n'est pas appliquée, retourne `[]`
+    // et l'UI dégrade silencieusement.
+    indexDetails = await loadLibraryIndexDetails();
   } catch (err) {
     console.error("[bibliotheque:fetch:fail]", err);
     // NB : message brut non transmis à l'UI (fuite d'info DB en prod).
@@ -106,7 +98,7 @@ export default async function BibliothequeAdminPage() {
           description="Impossible de charger les documents. Réessayez dans quelques instants — si le problème persiste, contactez l'administrateur."
         />
       ) : (
-        <LibraryClient entries={items} indexedItemIds={indexedItemIds} />
+        <LibraryClient entries={items} indexDetails={indexDetails} />
       )}
     </div>
   );
