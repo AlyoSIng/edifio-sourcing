@@ -144,6 +144,153 @@ Côté **Contacts > Architectes**, les cabinets partenaires disposent du même c
 ## 8. Tes priorités pour bien démarrer
 Si tu commences avec edifio Sourcing, charge en premier ces cinq pièces : **Kbis**, **Attestation URSSAF**, **Attestation fiscale**, **Attestation d'assurance**, **DC2**. Avec ça, tu peux candidater à 90 % des appels d'offres dès demain.`;
 
+const GUIDE_5 = `Tous les appels d'offres ne se répondent pas de la même façon. edifio Sourcing distingue trois modes de réponse, et chacun change la composition du dossier, le signataire et le rôle d'AlyoS dans le groupement.
+
+## 1. Pourquoi trois modes
+La réalité du marché impose ces trois configurations : parfois tu réponds **seul** (mission technique pure), parfois tu as besoin d'un **architecte** pour porter la maîtrise d'œuvre, parfois tu pilotes un **groupement de bureaux d'études** sur un marché multi-techniques. L'outil colle à cette réalité plutôt que d'imposer un format unique.
+
+## 2. Mode Mandataire (Solo)
+Tu réponds **seul** au nom d'AlyoS Ingénierie. C'est le mode par défaut quand le marché est purement technique : missions BE structure, fluides, thermique, ingénierie d'exploitation. Le DC1 et le DC2 sont remplis au seul nom d'AlyoS. Le signataire est un dirigeant AlyoS, ou le bénéficiaire d'un Pouvoir interne. Le dossier ne contient que tes pièces.
+
+## 3. Mode Cotraitance Tandem
+Tu réponds **avec un architecte** qui devient **mandataire** du groupement. AlyoS est cotraitant pour la part ingénierie. Ce mode s'impose dès qu'un volet maîtrise d'œuvre architecture est demandé (rénovation, restructuration, marché global). Le dossier contient un DC1 commun, un DC2 par membre, un Pouvoir pour l'architecte mandataire. C'est lui qui signe et dépose.
+
+## 4. Mode Cotraitance BE
+Tu pilotes un **groupement de bureaux d'études** : AlyoS est mandataire, d'autres BE sont cotraitants (acoustique, environnement, économiste…). Ce mode s'impose sur les marchés multi-techniques où aucun BE seul n'a toutes les compétences. Le dossier contient un DC1 commun, un DC2 par BE, un Pouvoir pour AlyoS. C'est toi qui signes.
+
+## 5. Choisir le bon mode
+Trois critères suffisent :
+- **Y a-t-il une mission architecture ?** Oui → Tandem. Non → Solo ou Cotraitance BE.
+- **Le marché dépasse-t-il tes compétences seules ?** Oui → Cotraitance BE pour fédérer des partenaires. Non → Solo.
+- **Tes partenaires sont-ils disponibles** sur le calendrier ? Sinon, c'est l'arbitrage entre passer son tour ou répondre Solo en réduisant le périmètre.
+
+## 6. Le statut de l'AO se met à jour
+Dès que tu sélectionnes un mode, le statut de l'AO bascule : **Solo confirmé**, **Tandem en cours** ou **Cotraitance BE en cours**. Le tableau de bord reflète ce choix, et les guides de la candidature s'adaptent.
+
+## 7. Ce que change le mode pour la suite
+Le mode pilote tout l'aval :
+- **DC1 / DC2** : un par membre du groupement.
+- **Pouvoir** : généré pour le mandataire (toi en Solo et Cotraitance BE, l'architecte en Tandem).
+- **ZIP final** : contient les pièces de chaque membre, et son nom inclut le cabinet ou le BE concerné.
+- **Diffusion** : en Tandem, le dossier part par mail à l'architecte mandataire avant dépôt.`;
+
+const GUIDE_6 = `Le règlement de la consultation (RC) est la pièce maîtresse de tout appel d'offres. edifio Sourcing l'analyse pour toi avec Claude et cale automatiquement les pièces de ta bibliothèque sur ce que l'acheteur demande.
+
+## 1. Le RC, ta source de vérité
+Le RC liste les pièces à fournir, les critères de jugement, les échéances, les conditions de signature. Tant que tu n'as pas le RC, tu ne peux pas réellement préparer la candidature. **Commence toujours par lui** avant tout autre document du DCE.
+
+## 2. Importer le RC
+Trois moyens te sont offerts :
+- **Auto-détection** : si le RC est identifiable dans le DCE téléchargé depuis la source officielle, l'outil le récupère seul.
+- **Paste URL** : tu colles l'URL directe du PDF, l'outil le télécharge.
+- **Upload manuel** : tu glisses le PDF depuis ton disque (taille max **32 Mo**).
+
+## 3. L'aperçu PDF intégré
+Une fois importé, le RC s'affiche dans un **aperçu PDF intégré** à la page. Tu navigues page par page sans quitter edifio, ce qui évite les allers-retours avec ton lecteur PDF système.
+
+## 4. Lancer l'analyse IA
+Le bouton **Analyser le RC** déclenche une analyse Claude. **Sonnet** lit le document et structure les informations, **Haiku** vérifie la cohérence des extractions. La durée typique est de **30 à 90 secondes** pour un RC standard de 20 à 40 pages.
+
+## 5. Ce que l'analyse extrait
+Quatre familles d'information :
+- **Pièces demandées** — liste exhaustive (Kbis, DC1, DC2, attestations, références, mémoire technique…).
+- **Critères** — pondération technique / prix, sous-critères.
+- **Échéances** — date limite de remise, durée de validité des offres, début prévisionnel d'exécution.
+- **Alertes** — clauses inhabituelles (caution, exigence d'effectif, géographie imposée).
+
+Chaque champ extrait référence **sa page d'origine** et inclut une **citation courte** : tu peux toujours vérifier.
+
+## 6. Le matching automatique avec ta bibliothèque
+Pour chaque pièce demandée, edifio cherche dans ta **Bibliothèque entreprise** la version correspondante. Quand c'est trouvé, la pièce est cochée et liée. Sinon, elle apparaît en **« à fournir »** et tu sais immédiatement ce qu'il te manque.
+
+## 7. Que faire des pièces non couvertes
+Trois options :
+- **Ajouter à la bibliothèque** si c'est une pièce générique que tu réutiliseras (mémoire RSE, attestation assurance renouvelée…).
+- **Charger en pièce ponctuelle** si c'est spécifique à cet AO (référence ciblée, planning sur mesure).
+- **Recompiler le dossier** une fois les pièces ajoutées, pour que le ZIP final reflète l'état réel.
+
+## 8. Si l'analyse échoue
+Trois causes fréquentes :
+- **PDF non valide** — image scannée non OCRisée, fichier corrompu. Re-télécharge depuis la source.
+- **Polices non standard** — certains RC bloquent l'extraction. Convertis le PDF via un export propre.
+- **Taille au-delà de 32 Mo** — découpe ou compresse le fichier avant import.
+
+Dans tous les cas, l'erreur est tracée et tu peux relancer.`;
+
+const GUIDE_7 = `Une fois le RC analysé et tes pièces matchées, il te reste à produire les trois documents administratifs et à compiler le ZIP final. edifio génère tout, tu n'as plus qu'à vérifier et signer.
+
+## 1. Les trois documents administratifs
+La candidature s'appuie sur trois CERFA et un acte de Pouvoir :
+- **DC1** — *Lettre de candidature et désignation du mandataire* (un seul pour tout le groupement).
+- **DC2** — *Déclaration du candidat* (un par membre du groupement).
+- **Pouvoir** — délégation de signature du mandataire au signataire effectif.
+
+Selon le mode (Solo, Tandem, Cotraitance BE), le périmètre change : qui fournit quoi, qui signe quoi.
+
+## 2. Pré-remplissage automatique selon le mode
+edifio puise dans ta bibliothèque et dans la fiche de chaque cotraitant pour remplir les champs : raison sociale, SIRET, adresse, capital, effectifs, dirigeants. Tu n'as à ressaisir aucune information de base. La génération utilise **pdf-lib** pour produire des PDF natifs téléchargeables.
+
+## 3. En Tandem : un dossier par architecte accepté
+Quand tu lances la cotraitance Tandem, tu sollicites souvent **plusieurs architectes** pour maximiser tes chances. Quand deux ou trois acceptent, edifio génère **un dossier par architecte** : chaque dossier a son propre DC1 (avec l'architecte en mandataire) et son Pouvoir nominatif. Tu choisis ensuite avec qui tu pars en final.
+
+## 4. En Cotraitance BE : un DC2 par bureau d'études
+Le DC1 reste unique (tu es mandataire), mais **chaque BE cotraitant doit fournir son DC2**. edifio génère les DC2 pré-remplis depuis les fiches BE et te signale ceux qui restent à compléter (signataire, lieu, date).
+
+## 5. Compléter les champs « À compléter »
+Quelques champs ne peuvent pas être pré-remplis sans confirmation :
+- **Signataire** — nom et qualité de la personne physique qui signe.
+- **Lieu** — ville de signature (souvent ton siège).
+- **Date** — date de remise prévisionnelle ou date du jour.
+
+Ils sont signalés visuellement avant la génération du PDF.
+
+## 6. Le PDF généré
+Chaque document généré est un **PDF natif** (pas un scan), correctement paginé, avec les cases CERFA cochées. Tu cliques sur **Télécharger** pour récupérer le fichier seul, ou tu passes directement à la compilation du ZIP final.
+
+## 7. Le Pouvoir : ton template docx de la bibliothèque
+Le Pouvoir n'est pas un CERFA mais un acte interne. edifio puise dans ta bibliothèque, **catégorie pouvoir_mandataire**, le template docx que tu as déposé une fois pour toutes. Il est complété avec le mandant, le mandataire, l'objet et la portée du pouvoir, puis converti en PDF.
+
+## 8. Compiler le ZIP final
+Le bouton **Compiler le ZIP** assemble : **RC**, **DC1**, **DC2** (un par membre), **Pouvoir**, et les **pièces communes** issues de la bibliothèque (Kbis, attestations, références…). Tout est rangé dans une arborescence claire que l'acheteur comprend immédiatement.
+
+## 9. Le nom du ZIP est contextualisé
+Le nom du fichier inclut le **cabinet d'architecte** (en Tandem) ou le **BE concerné** (en Cotraitance BE), plus la référence de l'AO. Tu repères tout de suite quel ZIP correspond à quelle configuration quand tu en as plusieurs en parallèle.`;
+
+const GUIDE_8 = `Quand un architecte accepte ta sollicitation Tandem, le dossier passe en phase de **diffusion**. C'est le moment où tu valides le contenu et tu transmets formellement le ZIP à l'architecte qui déposera la candidature en tant que mandataire.
+
+## 1. L'architecte accepte, le statut bascule
+Quand un architecte clique sur **Accepter** depuis la fiche tokenisée envoyée en sollicitation, le statut de l'AO bascule à **architect_accepted**. Tu reçois une notification dans edifio, et le tableau de bord Tandem affiche le dossier comme prêt à être finalisé.
+
+## 2. La section « Dossier prêt »
+Sur la page short-list de l'AO, une nouvelle section apparaît : **Dossier prêt**. Elle regroupe le ZIP compilé pour l'architecte concerné, la liste des pièces incluses, et le bouton de diffusion. Si plusieurs architectes ont accepté, chaque dossier prêt apparaît dans sa propre carte.
+
+## 3. Vérifier les documents du DCE
+Avant de diffuser, prends le temps de revérifier les pièces du DCE côté acheteur : RC, AE, CCAP, CCTP, BPU. L'architecte les recevra **en pièces jointes ou en lien** dans le mail, et il aura besoin d'eux pour finaliser sa partie. Si une pièce du DCE manque, ajoute-la depuis l'onglet **Pièces du marché**.
+
+## 4. Vérifier les pièces du dossier
+Côté ton dossier compilé : ouvre le ZIP, vérifie que le DC1 désigne bien l'architecte mandataire, que ton DC2 AlyoS est à jour, que le Pouvoir est nominatif, et que les attestations URSSAF / fiscale ne sont pas expirées. Une minute de relecture évite un rejet administratif.
+
+## 5. Le bouton « Valider et envoyer le dossier »
+Le bouton **Valider et envoyer le dossier** est l'action irréversible de cette étape. Avant de cliquer, une fenêtre de confirmation récapitule ce qui part : à qui (l'architecte mandataire), avec quel ZIP, et avec quels documents DCE en lien. Tu confirmes, l'envoi part immédiatement.
+
+## 6. Le mail Brevo envoyé à l'architecte
+Le mail s'appuie sur le template Brevo **architect_dossier_diffusion**. Il contient :
+- L'objet du marché et la date limite de remise.
+- Un lien vers la page dossier dans edifio.
+- Le ZIP compilé en pièce jointe (ou lien sécurisé si le ZIP dépasse 10 Mo).
+- Le contact AlyoS référent (toi).
+
+La civilité **tu / vous** suit la préférence de la fiche architecte.
+
+## 7. Le lien vers la page dossier
+Le mail contient un lien tokenisé vers la **page dossier**. L'architecte peut y consulter les pièces, télécharger le ZIP à nouveau s'il le perd, et te signaler une anomalie. Le lien est valide jusqu'à la date de remise.
+
+## 8. Une fois envoyé, le statut bascule à dossier_diffused
+Côté edifio, le statut de l'AO bascule à **dossier_diffused**. Le tableau de bord Tandem range ce dossier dans la colonne **Diffusés**, en attente de la signature et du dépôt par l'architecte. Tu peux suivre la suite depuis cette colonne.
+
+## 9. Et ensuite
+Une fois la candidature acceptée par l'acheteur, la phase d'offre commence : **mémoire technique** et **acte d'engagement**. Cette phase fait l'objet d'un autre guide et d'un autre rythme — généralement deux à quatre semaines de travail après la candidature.`;
+
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
     id: "fb000001-0000-0000-0000-000000000001",
@@ -188,5 +335,53 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_4,
     isActive: true,
     displayOrder: 4,
+  },
+  {
+    id: "fb000001-0000-0000-0000-000000000005",
+    slug: "modes-de-reponse",
+    title: "Choisir ton mode de réponse à un AO",
+    description:
+      "Solo, Tandem, Cotraitance BE : quand utiliser quoi et ce que ça change pour le dossier.",
+    type: "doc",
+    durationMin: 6,
+    contentMd: GUIDE_5,
+    isActive: true,
+    displayOrder: 5,
+  },
+  {
+    id: "fb000001-0000-0000-0000-000000000006",
+    slug: "analyse-rc-pieces",
+    title: "Analyser le RC et compléter ton dossier",
+    description:
+      "Import du RC, analyse IA Claude, matching automatique avec ta bibliothèque entreprise.",
+    type: "doc",
+    durationMin: 8,
+    contentMd: GUIDE_6,
+    isActive: true,
+    displayOrder: 6,
+  },
+  {
+    id: "fb000001-0000-0000-0000-000000000007",
+    slug: "dc1-dc2-pouvoir-zip",
+    title: "Préparer DC1, DC2, Pouvoir et compiler le ZIP final",
+    description:
+      "Génération CERFA pdf-lib, Pouvoir depuis la bibliothèque, compilation du ZIP contextualisé.",
+    type: "doc",
+    durationMin: 9,
+    contentMd: GUIDE_7,
+    isActive: true,
+    displayOrder: 7,
+  },
+  {
+    id: "fb000001-0000-0000-0000-000000000008",
+    slug: "diffusion-dossier-archi",
+    title: "Valider et envoyer le dossier à l'architecte",
+    description:
+      "Page short-list, bouton de diffusion, mail Brevo et bascule du statut en dossier_diffused.",
+    type: "doc",
+    durationMin: 7,
+    contentMd: GUIDE_8,
+    isActive: true,
+    displayOrder: 8,
   },
 ];
