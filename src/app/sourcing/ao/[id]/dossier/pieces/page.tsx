@@ -218,6 +218,45 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
       })),
     };
 
+    // 4c. Aperçu de la composition du ZIP (G3 — Steve 2026-06-03). Reproduit
+    //    le même filtre que compileDossierAction pour montrer à l'admin
+    //    exactement ce qui partira dans le ZIP avant qu'il clique Compiler.
+    //    Catégorise en : forcedItems (Pouvoir), matchedItems (matchés RC),
+    //    extraItems (biblio valide ni template ni déjà cité).
+    const matchedLibraryIds = new Set(
+      pieceMatches.map((m) => m.libraryItem?.id).filter((id): id is string => Boolean(id)),
+    );
+    const pouvoirItem = libraryItems
+      .filter((it) => it.kind === "pouvoir_mandataire")
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
+    const TEMPLATE_KINDS_PREVIEW = new Set(["dc1", "dc2", "dc4"]);
+    const extraItemsPreview = expiry.validLong
+      .concat(expiry.expiringSoon)
+      .filter((it) => {
+        if (TEMPLATE_KINDS_PREVIEW.has(it.kind)) return false;
+        if (pouvoirItem && it.id === pouvoirItem.id) return false;
+        if (matchedLibraryIds.has(it.id)) return false;
+        return true;
+      })
+      .map((it) => ({ id: it.id, name: it.name, kind: it.kind }));
+
+    const matchedItemsPreview = pieceMatches
+      .filter((m) => m.libraryItem && m.status === "available")
+      .map((m) => ({
+        id: m.libraryItem!.id,
+        name: m.libraryItem!.name,
+        pieceLabel: m.piece.nom,
+      }));
+
+    const zipComposition = {
+      hasPouvoir: Boolean(pouvoirItem),
+      pouvoirName: pouvoirItem?.name ?? null,
+      hasRc: rcAnalysis !== null,
+      matchedItems: matchedItemsPreview,
+      extraItems: extraItemsPreview,
+      excludedExpiredCount: expiry.expired.length,
+    };
+
     // 5. Si archi sélectionné, charge son cabinet (pour le bouton "Envoyer à
     //    l'archi") + le dernier dispatch (pour afficher « Envoyé le X »).
     let selectedArchitect: { id: string; cabinet: string; email: string | null } | null = null;
@@ -331,6 +370,7 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
           selectedArchitect={selectedArchitect}
           lastDispatch={lastDispatch}
           expirySummary={expirySummary}
+          zipComposition={zipComposition}
         />
       </main>
     );

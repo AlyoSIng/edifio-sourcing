@@ -65,6 +65,18 @@ export interface PiecesClientProps {
     expired: Array<{ id: string; name: string; validUntilIso: string }>;
     expiringSoon: Array<{ id: string; name: string; validUntilIso: string }>;
   };
+  /**
+   * Aperçu de la composition du ZIP (G3 — Steve 2026-06-03). Précalculé côté
+   * server, affiché dans un panneau dépliable au-dessus du bouton Compiler.
+   */
+  zipComposition?: {
+    hasPouvoir: boolean;
+    pouvoirName: string | null;
+    hasRc: boolean;
+    matchedItems: Array<{ id: string; name: string; pieceLabel: string }>;
+    extraItems: Array<{ id: string; name: string; kind: string }>;
+    excludedExpiredCount: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +273,7 @@ export function PiecesClient({
   selectedArchitect,
   lastDispatch,
   expirySummary,
+  zipComposition,
 }: PiecesClientProps) {
   const missingCount = pieceMatches.filter((m) => m.status === "missing").length;
   const partialCount = pieceMatches.filter((m) => m.status === "partial").length;
@@ -557,6 +570,86 @@ export function PiecesClient({
         )}
         {/* Hint UX — composition du ZIP selon le mode de réponse. */}
         {!downloadUrl && <p className="mb-3 text-xs text-ink-2">{compileHint}</p>}
+        {/* Panneau dépliable « Voir le détail de la composition » (G3). */}
+        {!downloadUrl && zipComposition && (
+          <details className="mb-3 rounded-md border border-line bg-paper-2 px-3 py-2 text-xs text-ink-2">
+            <summary className="cursor-pointer font-medium text-ink">
+              📋 Voir le détail de la composition du ZIP
+            </summary>
+            <div className="mt-3 space-y-2">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                Documents standards
+              </p>
+              <ul className="list-inside list-disc pl-2 text-xs">
+                <li>DC1 — Lettre de candidature</li>
+                <li>DC2 — Déclaration du candidat</li>
+                {zipComposition.hasPouvoir && (
+                  <li>
+                    Pouvoir mandataire
+                    {zipComposition.pouvoirName && (
+                      <span className="text-muted"> ({zipComposition.pouvoirName})</span>
+                    )}
+                  </li>
+                )}
+                {zipComposition.hasRc && <li>Règlement de Consultation (RC) source</li>}
+              </ul>
+
+              {zipComposition.matchedItems.length > 0 && (
+                <>
+                  <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-muted">
+                    Pièces matchées RC ({zipComposition.matchedItems.length})
+                  </p>
+                  <ul className="list-inside list-disc pl-2 text-xs">
+                    {zipComposition.matchedItems.slice(0, 8).map((m) => (
+                      <li key={m.id}>
+                        {m.name}
+                        <span className="ml-1 text-muted">
+                          (pour « {m.pieceLabel.slice(0, 40)}
+                          {m.pieceLabel.length > 40 ? "…" : ""} »)
+                        </span>
+                      </li>
+                    ))}
+                    {zipComposition.matchedItems.length > 8 && (
+                      <li className="italic text-muted">
+                        … et {zipComposition.matchedItems.length - 8} autres
+                      </li>
+                    )}
+                  </ul>
+                </>
+              )}
+
+              {zipComposition.extraItems.length > 0 && (
+                <>
+                  <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-muted">
+                    Autres pièces biblio valides ({zipComposition.extraItems.length})
+                  </p>
+                  <ul className="list-inside list-disc pl-2 text-xs">
+                    {zipComposition.extraItems.slice(0, 12).map((it) => (
+                      <li key={it.id}>
+                        {it.name}
+                        <span className="ml-1 text-muted">[{it.kind}]</span>
+                      </li>
+                    ))}
+                    {zipComposition.extraItems.length > 12 && (
+                      <li className="italic text-muted">
+                        … et {zipComposition.extraItems.length - 12} autres
+                      </li>
+                    )}
+                  </ul>
+                </>
+              )}
+
+              {zipComposition.excludedExpiredCount > 0 && (
+                <p className="mt-2 text-xs italic text-amber-700">
+                  ⚠ {zipComposition.excludedExpiredCount} document
+                  {zipComposition.excludedExpiredCount > 1 ? "s" : ""} expiré
+                  {zipComposition.excludedExpiredCount > 1 ? "s" : ""} exclu
+                  {zipComposition.excludedExpiredCount > 1 ? "s" : ""} (cf. bandeau ci-dessus).
+                </p>
+              )}
+            </div>
+          </details>
+        )}
         {/* Résultat : lien de téléchargement */}
         {downloadUrl ? (
           <div className="flex flex-col gap-3">
