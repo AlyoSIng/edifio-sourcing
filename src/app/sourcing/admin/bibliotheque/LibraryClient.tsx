@@ -31,6 +31,13 @@ import { deleteLibraryDoc, uploadLibraryDoc } from "./actions";
  * Ordre validé par Steve (2026-05-26) : formulaires DC d'abord, puis attestations
  * avec expiration, puis documents de présentation et références, "autre" en dernier.
  *
+ * Étendu 2026-06-03 (Steve) : 3 rubriques « déclarations » ajoutées pour matcher
+ * les pièces que les RC réclament fréquemment et que l'analyse Claude faisait
+ * apparaître en « Manquant » sans qu'on puisse les attacher à la biblio :
+ *  - Déclaration sur l'honneur (art. R2143-7 CCP)
+ *  - Déclaration de chiffre d'affaires global et spécifique
+ *  - Déclaration d'effectifs moyens annuels
+ *
  * Note backward-compat : les documents existants avec un kind hors de cette liste
  * (ex. "bilan", "dc2_vierge", "dc4_vierge") sont automatiquement redirigés vers
  * la section "autre" dans la logique de groupement (cf. byKind fallback ci-dessous).
@@ -44,6 +51,21 @@ export const LIBRARY_KINDS = [
   { key: "urssaf", label: "Attestation URSSAF", hasExpiry: true },
   { key: "attestation_fiscale", label: "Attestation fiscale DGFiP", hasExpiry: true },
   { key: "assurance_rc", label: "Assurance RC professionnelle", hasExpiry: true },
+  {
+    key: "declaration_honneur",
+    label: "Déclaration sur l'honneur (art. R2143-7 CCP)",
+    hasExpiry: false,
+  },
+  {
+    key: "declaration_ca",
+    label: "Déclaration de chiffre d'affaires (global et prestations, 3 derniers exercices)",
+    hasExpiry: false,
+  },
+  {
+    key: "declaration_effectifs",
+    label: "Déclaration d'effectifs moyens annuels et personnel d'encadrement",
+    hasExpiry: false,
+  },
   { key: "rib", label: "RIB bancaire", hasExpiry: false },
   { key: "presentation_entreprise", label: "Présentation de l'entreprise", hasExpiry: false },
   { key: "moyens_humains", label: "Moyens humains et matériels", hasExpiry: false },

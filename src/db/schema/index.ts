@@ -37,3 +37,4 @@ export * from "./be-documents";
 export * from "./superadmin";
 export * from "./shortlist";
 export * from "./tender-cotraitants";
+export * from "./dossier-dispatches";

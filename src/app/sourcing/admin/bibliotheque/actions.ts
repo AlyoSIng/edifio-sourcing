@@ -54,9 +54,10 @@ const BUCKET_NAME = "company_library";
  * `LIBRARY_KINDS` dans `LibraryClient.tsx`.
  * Valider côté serveur empêche toute injection de chemin dans Storage.
  *
- * Catégories actives (liste officielle 2026-05-26) :
+ * Catégories actives (liste officielle 2026-05-26, étendue 2026-06-03) :
  *   dc1, dc2, dc4, pouvoir_mandataire, kbis, urssaf, attestation_fiscale,
- *   assurance_rc, rib, presentation_entreprise, moyens_humains, references,
+ *   assurance_rc, declaration_honneur, declaration_ca, declaration_effectifs,
+ *   rib, presentation_entreprise, moyens_humains, references,
  *   memoire_rse, autre
  *
  * Catégories legacy (backward-compat — ne plus uploader, docs existants conservés) :
@@ -72,6 +73,10 @@ const VALID_KINDS = new Set([
   "urssaf",
   "attestation_fiscale",
   "assurance_rc",
+  // 3 nouvelles déclarations RC (Steve 2026-06-03) — matching pieces page.
+  "declaration_honneur",
+  "declaration_ca",
+  "declaration_effectifs",
   "rib",
   "presentation_entreprise",
   "moyens_humains",

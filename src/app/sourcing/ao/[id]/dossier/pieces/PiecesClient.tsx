@@ -21,6 +21,7 @@ import { useState, useTransition } from "react";
 import type { PieceMatch } from "@/lib/dossier/pieces-match";
 import type { ExistingCerfa } from "../cerfa/actions";
 import { compileDossierAction } from "./actions";
+import { sendDossierToArchitectAction } from "./dispatch-actions";
 
 // ---------------------------------------------------------------------------
 // Types props
@@ -43,6 +44,18 @@ export interface PiecesClientProps {
    * deux est non null). `null` → comportement Solo / Tandem.
    */
   beParam: string | null;
+  /**
+   * Métadonnées de l'archi sélectionné (Steve 2026-06-03) — affichées sur le
+   * bouton « Envoyer à l'archi » + utilisées pour bloquer l'envoi si l'archi
+   * n'a pas d'email. `null` si Solo / Cotraitance BE ou si archi introuvable.
+   */
+  selectedArchitect: { id: string; cabinet: string; email: string | null } | null;
+  /**
+   * Dernier envoi du dossier à cet archi (si existant) — affiche
+   * « Envoyé le DD/MM à HH:MM » sous le bouton. Date sérialisée en ISO pour
+   * franchir la frontière Server → Client (les Date natives ne passent pas).
+   */
+  lastDispatch: { sentAtIso: string; recipientEmail: string } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +180,42 @@ function compileErrorLabel(code: string | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Labels d'erreur envoi à l'archi
+// ---------------------------------------------------------------------------
+
+function sendErrorLabel(code: string | undefined, detail?: string): string {
+  switch (code) {
+    case "not_authenticated":
+      return "Session expirée — reconnectez-vous.";
+    case "invalid_input":
+      return "Paramètres invalides — actualisez la page.";
+    case "tender_not_found":
+      return "Cet AO n'existe plus ou est inaccessible.";
+    case "architect_not_found":
+      return "Architecte introuvable.";
+    case "architect_no_email":
+      return "L'architecte n'a pas d'email renseigné — ajoutez-le sur sa fiche.";
+    case "no_compiled_zip":
+      return "Aucun ZIP compilé pour cet archi — compilez le dossier d'abord.";
+    case "signed_url_failed":
+      return "Impossible de générer le lien de téléchargement — réessayez.";
+    case "brevo_send_failed":
+      return `Échec de l'envoi du mail (${detail ?? "raison inconnue"}) — réessayez.`;
+    default:
+      return "Erreur inattendue lors de l'envoi — réessayez.";
+  }
+}
+
+/** Formate un ISO timestamp en « DD/MM à HH:MM » (fr). */
+function formatSentAt(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const date = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return `${date} à ${time}`;
+}
+
+// ---------------------------------------------------------------------------
 // Composant principal
 // ---------------------------------------------------------------------------
 
@@ -177,6 +226,8 @@ export function PiecesClient({
   pieceMatches,
   archiParam,
   beParam,
+  selectedArchitect,
+  lastDispatch,
 }: PiecesClientProps) {
   const missingCount = pieceMatches.filter((m) => m.status === "missing").length;
   const partialCount = pieceMatches.filter((m) => m.status === "partial").length;
@@ -199,6 +250,32 @@ export function PiecesClient({
   const [compileError, setCompileError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [zipFileCount, setZipFileCount] = useState<number | null>(null);
+
+  // État envoi à l'archi (Steve 2026-06-03). Le dernier envoi server-rendered
+  // est rehydraté en `lastSentAt` ; chaque clic envoi update cette valeur en
+  // optimistic UI puis revalidate la page.
+  const [isSending, startSend] = useTransition();
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [lastSentAtIso, setLastSentAtIso] = useState<string | null>(
+    lastDispatch?.sentAtIso ?? null,
+  );
+
+  const archiHasEmail = Boolean(selectedArchitect?.email);
+  const canSendToArchi = compileMode === "tandem" && archiHasEmail && downloadUrl !== null;
+
+  function handleSendToArchitect() {
+    if (!archiParam || !selectedArchitect) return;
+    if (!confirm(`Envoyer le dossier de candidature à ${selectedArchitect.cabinet} ?`)) return;
+    setSendError(null);
+    startSend(async () => {
+      const result = await sendDossierToArchitectAction(tenderId, archiParam);
+      if (result.ok) {
+        setLastSentAtIso(result.sentAt.toISOString());
+      } else {
+        setSendError(sendErrorLabel(result.error, result.detail));
+      }
+    });
+  }
 
   function handleCompile() {
     setCompileError(null);
@@ -397,6 +474,28 @@ export function PiecesClient({
                 Télécharger le dossier (ZIP)
                 <span aria-hidden>↓</span>
               </a>
+              {/* Envoyer à l'archi (mode Tandem uniquement — Steve 2026-06-03).
+                  Disabled si pas d'archi ou pas d'email archi. */}
+              {compileMode === "tandem" && selectedArchitect && (
+                <button
+                  type="button"
+                  onClick={handleSendToArchitect}
+                  disabled={isSending || !canSendToArchi}
+                  className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={
+                    !archiHasEmail
+                      ? "L'architecte n'a pas d'email — ajoutez-le sur sa fiche"
+                      : `Envoyer le dossier à ${selectedArchitect.cabinet}`
+                  }
+                >
+                  {isSending
+                    ? "Envoi en cours…"
+                    : lastSentAtIso
+                      ? "Renvoyer à l'architecte"
+                      : "Envoyer à l'architecte"}
+                  <span aria-hidden>✉</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleCompile}
@@ -406,6 +505,18 @@ export function PiecesClient({
                 Recompiler
               </button>
             </div>
+            {/* État envoi : confirmation + last sent + erreur */}
+            {sendError && (
+              <p role="alert" className="text-xs text-error">
+                {sendError}
+              </p>
+            )}
+            {lastSentAtIso && !sendError && (
+              <p className="text-xs text-ink-2">
+                ✉ Dossier envoyé à <strong>{selectedArchitect?.email ?? "—"}</strong> le{" "}
+                {formatSentAt(lastSentAtIso)}. Lien valable 7 jours.
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-end gap-2">

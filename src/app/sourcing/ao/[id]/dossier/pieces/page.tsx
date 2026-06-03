@@ -22,6 +22,8 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { db } from "@/db/client";
+import { architects } from "@/db/schema/architects";
+import { dossierDispatches } from "@/db/schema/dossier-dispatches";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { presentationLibrary } from "@/db/schema/library";
 import { toUserProfile } from "@/lib/auth/types";
@@ -168,6 +170,46 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
       ? matchPiecesWithLibrary(rcAnalysis.pieces_demandees, libraryItems)
       : [];
 
+    // 5. Si archi sélectionné, charge son cabinet (pour le bouton "Envoyer à
+    //    l'archi") + le dernier dispatch (pour afficher « Envoyé le X »).
+    let selectedArchitect: { id: string; cabinet: string; email: string | null } | null = null;
+    let lastDispatch: { sentAtIso: string; recipientEmail: string } | null = null;
+    if (archiParam) {
+      const [archi] = await db
+        .select({
+          id: architects.id,
+          cabinet: architects.cabinet,
+          email: architects.email,
+        })
+        .from(architects)
+        .where(and(eq(architects.id, archiParam), eq(architects.organizationId, orgId)))
+        .limit(1);
+      if (archi) {
+        selectedArchitect = archi;
+        const [disp] = await db
+          .select({
+            sentAt: dossierDispatches.sentAt,
+            recipientEmail: dossierDispatches.recipientEmail,
+          })
+          .from(dossierDispatches)
+          .where(
+            and(
+              eq(dossierDispatches.tenderId, tenderId),
+              eq(dossierDispatches.architectId, archiParam),
+              eq(dossierDispatches.organizationId, orgId),
+            ),
+          )
+          .orderBy(desc(dossierDispatches.sentAt))
+          .limit(1);
+        if (disp) {
+          lastDispatch = {
+            sentAtIso: disp.sentAt.toISOString(),
+            recipientEmail: disp.recipientEmail,
+          };
+        }
+      }
+    }
+
     return (
       <main className="mx-auto max-w-5xl px-6 py-8">
         {/* Fil d'Ariane */}
@@ -238,6 +280,8 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
           pieceMatches={pieceMatches}
           archiParam={archiParam}
           beParam={beParam}
+          selectedArchitect={selectedArchitect}
+          lastDispatch={lastDispatch}
         />
       </main>
     );
