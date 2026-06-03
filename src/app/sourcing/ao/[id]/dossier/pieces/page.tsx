@@ -26,6 +26,7 @@ import { architects } from "@/db/schema/architects";
 import { dossierDispatches } from "@/db/schema/dossier-dispatches";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { presentationLibrary } from "@/db/schema/library";
+import { libraryItemIndex } from "@/db/schema/library-index";
 import { toUserProfile } from "@/lib/auth/types";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -162,12 +163,38 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
       .from(presentationLibrary)
       .where(eq(presentationLibrary.organizationId, orgId));
 
+    // 3c-bis. Métadonnées d'indexation IA (chantier E V2 — Steve 2026-06-03).
+    //   On charge `library_item_index` pour cette org et on construit une Map
+    //   { library_item_id → { extracted_title, keywords } } que
+    //   `matchPiecesWithLibrary` consomme pour élargir la surface de matching.
+    //   Try/catch isolé : si la migration 0041 n'est pas encore appliquée,
+    //   on dégrade silencieusement vers l'ancienne logique (kind + name).
+    let indexByItemId = new Map<string, { extractedTitle: string | null; keywords: string[] }>();
+    try {
+      const idxRows = await db
+        .select({
+          libraryItemId: libraryItemIndex.libraryItemId,
+          extractedTitle: libraryItemIndex.extractedTitle,
+          keywords: libraryItemIndex.keywords,
+        })
+        .from(libraryItemIndex)
+        .where(eq(libraryItemIndex.organizationId, orgId));
+      indexByItemId = new Map(
+        idxRows.map((r) => [
+          r.libraryItemId,
+          { extractedTitle: r.extractedTitle, keywords: r.keywords ?? [] },
+        ]),
+      );
+    } catch (err) {
+      console.warn("[pieces-page:index-load:fail]", err);
+    }
+
     // 3d. DC1 / DC2 existants
     const { dc1: existingDc1, dc2: existingDc2 } = await loadExistingCerfa(tenderId, orgId);
 
-    // 4. Matching pièces RC vs bibliothèque
+    // 4. Matching pièces RC vs bibliothèque (boosté par les métadonnées IA si dispo).
     const pieceMatches = rcAnalysis
-      ? matchPiecesWithLibrary(rcAnalysis.pieces_demandees, libraryItems)
+      ? matchPiecesWithLibrary(rcAnalysis.pieces_demandees, libraryItems, indexByItemId)
       : [];
 
     // 5. Si archi sélectionné, charge son cabinet (pour le bouton "Envoyer à

@@ -72,23 +72,61 @@ function commonTokenCount(tokensA: string[], tokensB: string[]): number {
 // ---------------------------------------------------------------------------
 
 /**
+ * Métadonnées d'indexation IA — extrait de `library_item_index` (chantier E).
+ *
+ * Quand disponible, ces champs sont concaténés à la surface de matching de
+ * l'item biblio. Ça élargit considérablement le vocabulaire détecté par
+ * `commonTokenCount` :
+ *   - sans index : tokens = kind + name (souvent juste le nom de fichier)
+ *   - avec index : tokens = kind + name + extracted_title + keywords
+ *
+ * Steve 2026-06-03 — V2 du chantier E.
+ */
+export interface LibraryItemIndexData {
+  /** Titre intelligent extrait par Claude (peut être null). */
+  extractedTitle?: string | null;
+  /** Mots-clés normalisés (lowercase) extraits par Claude. */
+  keywords?: readonly string[];
+}
+
+/**
  * Pour chaque pièce demandée par le RC, identifie le meilleur item de la
  * bibliothèque entreprise et qualifie la correspondance.
  *
- * @param pieces       Pièces extraites par l'analyse RC (Claude Sonnet 4.6)
- * @param libraryItems Items de la `presentation_library` de l'organisation
- * @returns            Tableau de matchings, dans le même ordre que `pieces`
+ * Si `indexByItemId` est fourni, les items indexés bénéficient d'une surface
+ * de matching élargie (titre intelligent + mots-clés Claude), ce qui réduit
+ * fortement les faux négatifs (pièces marquées « manquant » alors qu'un doc
+ * adapté existe en biblio avec un nom de fichier opaque).
+ *
+ * @param pieces         Pièces extraites par l'analyse RC (Claude Sonnet 4.6)
+ * @param libraryItems   Items de la `presentation_library` de l'organisation
+ * @param indexByItemId  Optionnel — map { library_item_id → métadonnées
+ *                       indexées }. Si absent, on retombe sur l'ancienne
+ *                       logique (kind + name seulement).
+ * @returns              Tableau de matchings, dans le même ordre que `pieces`
  */
 export function matchPiecesWithLibrary(
   pieces: RcAnalysis["pieces_demandees"],
   libraryItems: PresentationLibraryItem[],
+  indexByItemId?: Map<string, LibraryItemIndexData>,
 ): PieceMatch[] {
-  // Précalcul des tokens bibliothèque (évite de retokenizer à chaque pièce)
+  // Précalcul des tokens bibliothèque (évite de retokenizer à chaque pièce).
+  // La surface inclut les métadonnées IA si dispo pour l'item.
   const libraryTokens: Array<{ item: PresentationLibraryItem; tokens: string[] }> =
-    libraryItems.map((item) => ({
-      item,
-      tokens: tokenize(`${item.kind} ${item.name}`),
-    }));
+    libraryItems.map((item) => {
+      const surfaceParts = [item.kind, item.name];
+      const idx = indexByItemId?.get(item.id);
+      if (idx) {
+        if (idx.extractedTitle) surfaceParts.push(idx.extractedTitle);
+        if (idx.keywords && idx.keywords.length > 0) {
+          surfaceParts.push(idx.keywords.join(" "));
+        }
+      }
+      return {
+        item,
+        tokens: tokenize(surfaceParts.join(" ")),
+      };
+    });
 
   return pieces.map((piece): PieceMatch => {
     const pieceTokens = tokenize(piece.nom);

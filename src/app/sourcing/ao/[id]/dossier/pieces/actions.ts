@@ -34,6 +34,7 @@ import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { presentationLibrary, responseFiles } from "@/db/schema/library";
+import { libraryItemIndex } from "@/db/schema/library-index";
 import { architectResponses } from "@/db/schema/selections";
 import { tenderBeCotraitants } from "@/db/schema/tender-cotraitants";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
@@ -366,14 +367,41 @@ export async function compileDossierAction(
       .from(presentationLibrary)
       .where(eq(presentationLibrary.organizationId, orgId));
 
-    // 7c. Matcher les pièces RC vs bibliothèque
+    // 7b-bis. Métadonnées d'indexation IA — boost matching V2 (Steve 2026-06-03).
+    //   Mêmes patterns que /pieces/page.tsx : try/catch isolé pour dégrader
+    //   silencieusement si la migration 0041 pas appliquée.
+    let indexByItemId = new Map<string, { extractedTitle: string | null; keywords: string[] }>();
+    try {
+      const idxRows = await db
+        .select({
+          libraryItemId: libraryItemIndex.libraryItemId,
+          extractedTitle: libraryItemIndex.extractedTitle,
+          keywords: libraryItemIndex.keywords,
+        })
+        .from(libraryItemIndex)
+        .where(eq(libraryItemIndex.organizationId, orgId));
+      indexByItemId = new Map(
+        idxRows.map((r) => [
+          r.libraryItemId,
+          { extractedTitle: r.extractedTitle, keywords: r.keywords ?? [] },
+        ]),
+      );
+    } catch (err) {
+      console.warn("[compile-dossier:index-load:fail]", err);
+    }
+
+    // 7c. Matcher les pièces RC vs bibliothèque (boosté par les métadonnées IA si dispo).
     let pieceMatches: ReturnType<typeof matchPiecesWithLibrary> = [];
     if (rcEvent?.data) {
       const extra = (rcEvent.data as { extra?: { rc_analysis?: unknown } }).extra;
       if (extra?.rc_analysis) {
         const parsed = rcAnalysisSchema.safeParse(extra.rc_analysis);
         if (parsed.success) {
-          pieceMatches = matchPiecesWithLibrary(parsed.data.pieces_demandees, libraryItems);
+          pieceMatches = matchPiecesWithLibrary(
+            parsed.data.pieces_demandees,
+            libraryItems,
+            indexByItemId,
+          );
         } else {
           console.warn("[compile-dossier:rc-analysis:schema-mismatch]", parsed.error.flatten());
         }
