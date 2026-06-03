@@ -33,6 +33,7 @@ import { useRouter } from "next/navigation";
 
 import type { Architect } from "@/db/schema/architects";
 import { ARCHITECT_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
+import { COMMON_LEGAL_FORMS } from "@/lib/legal-forms";
 
 import { upsertArchitect, setRgpdOpposition } from "../actions";
 
@@ -84,6 +85,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
   const [legalRepresentativeRole, setLegalRepresentativeRole] = useState(
     architect.legalRepresentativeRole ?? "",
   );
+  const [legalForm, setLegalForm] = useState(architect.legalForm ?? "");
 
   // Drapeaux booléens
   const [tutoiement, setTutoiement] = useState(architect.tutoiement);
@@ -159,6 +161,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
           signatureCity: signatureCity.trim() || null,
           legalRepresentativeName: legalRepresentativeName.trim() || null,
           legalRepresentativeRole: legalRepresentativeRole.trim() || null,
+          legalForm: legalForm.trim() || null,
           notes: notes.trim() || null,
           tutoiement,
           preferred,
@@ -481,6 +484,28 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
                   className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
                 />
               </div>
+            </div>
+
+            {/* Forme juridique (DC1 §A1) — datalist suggestive, saisie libre. */}
+            <div>
+              <label htmlFor="legal-form" className="block text-xs font-medium text-ink">
+                Forme juridique (DC1)
+              </label>
+              <input
+                id="legal-form"
+                type="text"
+                value={legalForm}
+                onChange={(e) => setLegalForm(e.target.value)}
+                list="legal-form-suggestions"
+                maxLength={60}
+                placeholder="SARL d'architecture, SELARL, SAS…"
+                className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+              />
+              <datalist id="legal-form-suggestions">
+                {COMMON_LEGAL_FORMS.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
             </div>
           </div>
 

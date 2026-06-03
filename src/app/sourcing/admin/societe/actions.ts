@@ -59,6 +59,8 @@ const saveOrgProfileSchema = z.object({
       message: "Le capital doit être un entier positif en euros (sans séparateur)",
     }),
   signatureCity: z.string().max(120, "Ville de signature trop longue"),
+  // Forme juridique — champ libre TEXT (cf. migration 0040 + lib/legal-forms.ts).
+  legalForm: z.string().max(60, "Forme juridique trop longue"),
 });
 
 /* -------------------------------------------------------------------------- */
@@ -117,6 +119,7 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
     legalRepresentativeRole: formData.get("legalRepresentativeRole") ?? "",
     capitalEur: formData.get("capitalEur") ?? "",
     signatureCity: formData.get("signatureCity") ?? "",
+    legalForm: formData.get("legalForm") ?? "",
   });
 
   if (!parsed.success) {
@@ -140,6 +143,7 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
     legalRepresentativeRole: values.legalRepresentativeRole || null,
     capitalEur: capitalEurNum,
     signatureCity: values.signatureCity || null,
+    legalForm: values.legalForm || null,
   } as const;
 
   // 3. UPSERT en BDD

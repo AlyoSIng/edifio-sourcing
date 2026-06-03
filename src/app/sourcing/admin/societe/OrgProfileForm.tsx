@@ -16,6 +16,7 @@ import {
   type SaveOrgSiretResult,
 } from "./actions";
 import type { OrganizationProfile } from "@/db/schema/messaging";
+import { COMMON_LEGAL_FORMS } from "@/lib/legal-forms";
 
 interface OrgProfileFormProps {
   initial: Pick<
@@ -33,6 +34,7 @@ interface OrgProfileFormProps {
     | "legalRepresentativeRole"
     | "capitalEur"
     | "signatureCity"
+    | "legalForm"
   > | null;
   /** SIRET de l'organisation (table organizations). Distinct du profil org. */
   initialSiret?: string | null;
@@ -59,6 +61,7 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
     initial?.capitalEur != null ? String(initial.capitalEur) : "",
   );
   const [signatureCity, setSignatureCity] = useState(initial?.signatureCity ?? "");
+  const [legalForm, setLegalForm] = useState(initial?.legalForm ?? "");
   const [result, setResult] = useState<SaveOrgProfileResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -104,6 +107,7 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
     fd.set("legalRepresentativeRole", legalRepresentativeRole);
     fd.set("capitalEur", capitalEur);
     fd.set("signatureCity", signatureCity);
+    fd.set("legalForm", legalForm);
 
     startTransition(async () => {
       const res = await saveOrgProfileAction(fd);
@@ -359,6 +363,15 @@ Agence PACA : 15 avenue du Mistral, 13100 Aix-en-Provence"
                 onChange={setLegalRepresentativeRole}
                 maxLength={120}
               />
+              <Field
+                id="legalForm"
+                label="Forme juridique (DC1/DC2)"
+                value={legalForm}
+                onChange={setLegalForm}
+                maxLength={60}
+                datalistOptions={COMMON_LEGAL_FORMS}
+                placeholder="SARL, SAS, SASU, SCI, SELARL…"
+              />
             </div>
           </div>
         </section>
@@ -422,6 +435,8 @@ function Field({
   onChange,
   type = "text",
   maxLength,
+  datalistOptions,
+  placeholder,
 }: {
   id: string;
   label: string;
@@ -429,7 +444,11 @@ function Field({
   onChange: (v: string) => void;
   type?: string;
   maxLength?: number;
+  /** Si fourni, branche une `<datalist>` HTML pour suggérer des valeurs (saisie libre conservée). */
+  datalistOptions?: readonly string[];
+  placeholder?: string;
 }) {
+  const listId = datalistOptions ? `${id}-suggestions` : undefined;
   return (
     <div>
       <label
@@ -445,8 +464,17 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         maxLength={maxLength}
+        placeholder={placeholder}
+        list={listId}
         className="w-full rounded border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
       />
+      {datalistOptions && (
+        <datalist id={listId}>
+          {datalistOptions.map((opt) => (
+            <option key={opt} value={opt} />
+          ))}
+        </datalist>
+      )}
     </div>
   );
 }

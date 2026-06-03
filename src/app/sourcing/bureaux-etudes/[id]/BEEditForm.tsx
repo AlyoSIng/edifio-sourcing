@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 
 import type { BureauEtudes } from "@/db/schema/bureaux-etudes";
 import { BE_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
+import { COMMON_LEGAL_FORMS } from "@/lib/legal-forms";
 
 import { upsertBE } from "../actions";
 
@@ -62,6 +63,7 @@ export function BEEditForm({ be }: BEEditFormProps) {
   const [legalRepresentativeRole, setLegalRepresentativeRole] = useState(
     be.legalRepresentativeRole ?? "",
   );
+  const [legalForm, setLegalForm] = useState(be.legalForm ?? "");
 
   // Drapeaux
   const [tutoiement, setTutoiement] = useState(be.tutoiement);
@@ -128,6 +130,7 @@ export function BEEditForm({ be }: BEEditFormProps) {
           signatureCity: signatureCity.trim() || null,
           legalRepresentativeName: legalRepresentativeName.trim() || null,
           legalRepresentativeRole: legalRepresentativeRole.trim() || null,
+          legalForm: legalForm.trim() || null,
           notes: notes.trim() || null,
           tutoiement,
           preferred,
@@ -422,6 +425,28 @@ export function BEEditForm({ be }: BEEditFormProps) {
                 className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
               />
             </div>
+          </div>
+
+          {/* Forme juridique (DC2 §B1) — datalist suggestive, saisie libre. */}
+          <div>
+            <label htmlFor="be-legal-form" className="block text-xs font-medium text-ink">
+              Forme juridique (DC2)
+            </label>
+            <input
+              id="be-legal-form"
+              type="text"
+              value={legalForm}
+              onChange={(e) => setLegalForm(e.target.value)}
+              list="be-legal-form-suggestions"
+              maxLength={60}
+              placeholder="SARL, SAS, SASU, EURL…"
+              className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 disabled:opacity-50"
+            />
+            <datalist id="be-legal-form-suggestions">
+              {COMMON_LEGAL_FORMS.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
           </div>
         </div>
 
