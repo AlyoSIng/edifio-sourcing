@@ -220,6 +220,13 @@ export const NAV_ITEMS: NavSection[] = [
         matchPrefix: "/sourcing/admin/users",
         adminOnly: true,
       },
+      {
+        href: "/sourcing/admin/ia-usage",
+        label: "Coûts IA",
+        icon: "sliders",
+        matchPrefix: "/sourcing/admin/ia-usage",
+        superadminOnly: true,
+      },
     ],
   },
 ];
