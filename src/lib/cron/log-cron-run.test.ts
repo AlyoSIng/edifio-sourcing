@@ -12,7 +12,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { reapOrphanedRunningRows, withCronRunLog } from "./log-cron-run";
+import {
+  reapAllOrphanedRunningRows,
+  reapOrphanedRunningRows,
+  withCronRunLog,
+} from "./log-cron-run";
 
 interface InsertRecord {
   values: Record<string, unknown>;
@@ -201,5 +205,25 @@ describe("reapOrphanedRunningRows (self-heal)", () => {
     expect(propagated).toBe(false);
     expect(consoleWarn).toHaveBeenCalled();
     consoleWarn.mockRestore();
+  });
+
+  it("reapAll : UPDATE tous les cron_name confondus (pas de filtre cronName)", async () => {
+    const reapCalls: Array<Record<string, unknown>> = [];
+    const fakeDb = {
+      update: vi.fn(() => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            reapCalls.push(vals);
+          },
+        }),
+      })),
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await reapAllOrphanedRunningRows(fakeDb as any);
+
+    expect(reapCalls).toHaveLength(1);
+    expect(reapCalls[0]!.status).toBe("error");
+    expect(reapCalls[0]!.errorMessage as string).toContain("orpheline");
   });
 });

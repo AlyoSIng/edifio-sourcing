@@ -71,6 +71,32 @@ export async function reapOrphanedRunningRows(db: Db, cronName: string): Promise
 }
 
 /**
+ * Variante reap **tous les cron_names** (pas seulement un). Appelée au load
+ * de la page `/admin/crons` pour que Steve voie l'état clean sans devoir
+ * re-trigger le cron concerné.
+ *
+ * Le seuil reste le même (5 min) — on ne touche pas aux runs vraiment en
+ * cours. Best-effort, ne propage jamais d'erreur.
+ */
+export async function reapAllOrphanedRunningRows(db: Db): Promise<void> {
+  try {
+    const threshold = new Date(Date.now() - ORPHAN_RUNNING_THRESHOLD_MS);
+    await db
+      .update(cronRunLog)
+      .set({
+        status: "error",
+        finishedAt: sql`now()`,
+        durationMs: sql`extract(epoch from (now() - ${cronRunLog.startedAt})) * 1000`,
+        errorMessage:
+          "Run orpheline : Vercel a probablement timeout (FUNCTION_INVOCATION_TIMEOUT) ou crashed avant que finishCronRun ne tourne.",
+      })
+      .where(and(eq(cronRunLog.status, "running"), lt(cronRunLog.startedAt, threshold)));
+  } catch (err) {
+    console.warn("[cron-log:reap-orphans-all:fail]", err);
+  }
+}
+
+/**
  * Insère la row de début. Renvoie un handle à passer à `finishCronRun`.
  *
  * Si l'INSERT rate, on renvoie un handle « ghost » qui sera ignoré par

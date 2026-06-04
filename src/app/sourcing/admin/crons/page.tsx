@@ -13,7 +13,9 @@
 
 import { redirect } from "next/navigation";
 
+import { db } from "@/db/client";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
+import { reapAllOrphanedRunningRows } from "@/lib/cron/log-cron-run";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 
@@ -52,6 +54,11 @@ export default async function CronsPage() {
 
   let fetchError: string | null = null;
   let rows: CronRunRow[] = [];
+
+  // Reap pro-actif des rows running orphelines (> 5 min) — Steve voit
+  // l'état clean au chargement sans devoir re-trigger le cron concerné.
+  // Best-effort : ne casse pas la page si l'UPDATE rate.
+  await reapAllOrphanedRunningRows(db);
 
   try {
     // La table est en RLS FORCE sans policy authenticated — on doit passer
