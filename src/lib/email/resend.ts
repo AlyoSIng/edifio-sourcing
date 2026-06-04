@@ -37,10 +37,19 @@ export interface SendEmailResult {
  * admin/users où l'admin a besoin du feedback).
  */
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY;
+  // 2026-06-04 — Steve a posé `RESEND_API_SOURCING_KEY` sur Vercel pour
+  // distinguer du reste de l'écosystème AlyoS. On lit d'abord ce nom
+  // « sourcing-scoped », puis on retombe sur le nom historique
+  // `RESEND_API_KEY` pour les tests locaux / scripts ops qui le posent
+  // encore comme ça. Les 2 conventions cohabitent sans casser quoi que ce soit.
+  // `??` ne suffit pas : Vercel + Vitest peuvent poser une chaîne vide. On
+  // filtre explicitement les vides avant le fallback.
+  const sourcing = process.env.RESEND_API_SOURCING_KEY;
+  const legacy = process.env.RESEND_API_KEY;
+  const apiKey = sourcing && sourcing.length > 0 ? sourcing : legacy;
   if (!apiKey) {
     throw new Error(
-      "RESEND_API_KEY non configurée. Voir .env.example pour la liste des variables requises.",
+      "RESEND_API_SOURCING_KEY (ou RESEND_API_KEY en local) non configurée. Voir .env.example.",
     );
   }
   const from = params.from ?? process.env.RESEND_FROM_EMAIL;
