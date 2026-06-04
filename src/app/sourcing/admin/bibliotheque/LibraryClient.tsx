@@ -535,6 +535,33 @@ function KindSection({
                         <span>Ajouté le {formatDate(item.createdAt)}</span>
                         {item.notes && <span className="italic">{item.notes}</span>}
                       </div>
+                      {/* Chips matching_keywords pour les fiches métiers. */}
+                      {item.kind === "fiche_metier" && (
+                        <div className="mt-1.5">
+                          {item.matchingKeywords && item.matchingKeywords.length > 0 ? (
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                                Mots-clés :
+                              </span>
+                              {item.matchingKeywords.map((kw, idx) => (
+                                <span
+                                  key={idx}
+                                  className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700"
+                                >
+                                  {kw}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p
+                              className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+                              title="Sans mots-clés, cette fiche n'est jamais incluse automatiquement dans le ZIP du dossier."
+                            >
+                              ⚠ Aucun mot-clé — fiche jamais incluse au ZIP
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions : ré-indexer + supprimer */}

@@ -533,6 +533,65 @@ Tooltip au survol pour le détail (date + fetched + inserted + durée).
 - Si tu ne sais plus quelle est ta « bonne » config et que la baseline 22/05 n'est plus valable → on enregistre un nouveau snapshot dans \`baseline-profiles.ts\` (PR rapide, je m'en occupe).
 - Si la diff montre une régression que tu n'as pas faite manuellement → fouille les logs \`/admin/audit\` pour identifier qui/quand. Possible bug ou autre admin qui a touché.`;
 
+const GUIDE_15 = `Quand tu réponds à un AO, certaines pièces du dossier sont **universelles** (Kbis, attestations, RC pro) et tu les joints toujours. D'autres sont **contextuelles** : tu inclus une fiche de référence patrimoine si l'AO porte sur de la restauration, pas si c'est un gymnase. edifio Sourcing peut maintenant gérer ce tri automatiquement avec les **fiches métiers**.
+
+## 1. Le concept
+Une « fiche métier » est un document de référence que tu joins seulement si l'AO traite d'un sujet précis. Tu l'uploades une fois dans la bibliothèque avec des **mots-clés associés**, et l'app décide tout seul si elle l'inclut dans le ZIP du dossier en fonction de tes mots-clés de **profil de recherche actif**.
+
+Exemple concret :
+- Tu uploades \`fiche_patrimoine.pdf\` avec les mots-clés \`patrimoine, ABF, restauration, étude historique\`.
+- Ton profil de recherche actif a dans ses \`keywords.positive\` les mots \`patrimoine\` et \`école primaire\`.
+- Tu réponds à un AO « Réhabilitation école patrimoine XVIIIe » → la fiche est incluse au ZIP (intersection : « patrimoine »).
+- Tu réponds à un AO « Construction crèche neuve » → la fiche n'est pas incluse (aucune intersection).
+
+## 2. Uploader une fiche métier
+1. Va dans **Configuration > Bibliothèque** (admin uniquement).
+2. Sélectionne la catégorie **« Fiches métiers (sélection auto par mots-clés) »** en haut du formulaire d'upload.
+3. Choisis le fichier (PDF, DOCX, JPG, PNG — max 10 Mo).
+4. Saisis les **mots-clés associés** séparés par des virgules :
+   - \`patrimoine, ABF, restauration\` → court et précis
+   - Max 20 mots-clés par fiche, 80 caractères chacun
+   - Insensible à la casse (« Patrimoine » == « patrimoine »)
+5. Submit. La fiche apparaît dans la section « Fiches métiers » avec ses mots-clés affichés en chips vertes.
+
+## 3. Visualiser les mots-clés sur une fiche
+Sur la page Bibliothèque, chaque fiche métier affiche en dessous de son nom :
+- **Chips vertes** : les mots-clés actuellement associés. Si tu les vois, c'est qu'elle est candidate à l'inclusion auto.
+- **Badge orange « ⚠ Aucun mot-clé — fiche jamais incluse au ZIP »** : tu as oublié de poser des mots-clés. Sans eux, l'app ne saura jamais quand l'inclure et la fiche restera dormante. Action : supprime-la et ré-uploade-la avec des mots-clés.
+
+## 4. Vérifier que ton profil a les bons positives
+Le matching se fait contre les \`keywords.positive\` du **profil de recherche actif par défaut** de l'organisation.
+- Va sur **Configuration > Profils de recherche**.
+- Ouvre ton profil par défaut.
+- Vérifie que la liste des mots-clés positifs contient des mots qui matchent tes fiches métiers. Si tu utilises \`patrimoine\` dans 3 fiches mais que ton profil n'a que \`école\` et \`gymnase\` en positifs, aucune ne sera incluse.
+
+Conseil : utilise les **mêmes vocabulaires** entre tes fiches métiers et ton profil. Si tu écris \`ABF\` sur la fiche, écris aussi \`ABF\` (pas \`bâtiment de France\`) dans le profil.
+
+## 5. Au moment de compiler le dossier
+Tu n'as rien à faire de spécial — c'est automatique. À la compile :
+1. L'app charge ton profil actif par défaut.
+2. Pour chaque fiche métier de ta biblio, elle vérifie : « est-ce qu'au moins un mot-clé de la fiche apparaît dans les positives du profil ? »
+3. Si oui → la fiche est ajoutée au ZIP, dans le même répertoire que les autres pièces.
+4. Si non → la fiche est ignorée silencieusement.
+
+Tu n'as donc qu'une seule chose à gérer : **maintenir tes fiches métiers + leurs mots-clés à jour**. L'app fait le tri pour toi sur chaque AO.
+
+## 6. Et les autres docs de la biblio ?
+Les autres catégories (Kbis, URSSAF, attestations…) gardent leur comportement **inconditionnel** : tant que le doc est valide (pas expiré, pas un template DC1/DC2), il est joint à TOUS les ZIPs. C'est exactement ce que tu veux pour ces pièces administratives universelles.
+
+Seules les **fiches métiers** ont un matching conditionnel par mots-clés.
+
+## 7. Cas d'usage typiques
+- **Fiche par lot métier** : \`fiche_lot_GO.pdf\` (gros œuvre), \`fiche_lot_électricité.pdf\`, \`fiche_lot_chauffage.pdf\` avec leurs mots-clés respectifs. L'app inclut seulement le lot qui matche l'AO.
+- **Fiche par type d'ouvrage** : école, gymnase, crèche, EHPAD, logement social… une fiche par type avec son mot-clé. Tu n'as plus à choisir manuellement à chaque dossier.
+- **Fiche par référence client** : si tu as une réalisation référence sur du patrimoine, tu la mets en fiche métier avec \`patrimoine, restauration\`. Elle s'inclut automatiquement sur les bonnes réponses.
+
+## 8. Quand pas utiliser les fiches métiers
+Si tu as un document que tu veux joindre à **TOUS** tes dossiers (référence générique, présentation cabinet, etc.), utilise la catégorie **« Présentation de l'entreprise »** ou **« Références de marchés »** — inconditionnel. Si tu mets cette pièce en fiche métier sans mots-clés, elle ne sera jamais incluse, et avec un seul mot-clé trop large elle s'incluera partout (ce qui te fait perdre le bénéfice du tri auto).
+
+## 9. Mise à jour des mots-clés d'une fiche existante
+Au MVP, il n'y a pas d'édition inline des mots-clés (limitation connue). Pour modifier : supprime la fiche et ré-uploade-la avec les nouveaux mots-clés. Une fonction d'édition arrivera en V2.`;
+
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
     id: "fb000001-0000-0000-0000-000000000001",
@@ -697,5 +756,17 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_14,
     isActive: true,
     displayOrder: 14,
+  },
+  {
+    id: "fb000001-0000-0000-0000-00000000000f",
+    slug: "fiches-metiers-matching-auto",
+    title: "Fiches métiers : utiliser le matching auto",
+    description:
+      "Une fiche par sujet métier (patrimoine, ABF, gymnase…) + des mots-clés, et l'app décide quelles fiches inclure dans le ZIP selon ton profil de recherche.",
+    type: "doc",
+    durationMin: 8,
+    contentMd: GUIDE_15,
+    isActive: true,
+    displayOrder: 15,
   },
 ];

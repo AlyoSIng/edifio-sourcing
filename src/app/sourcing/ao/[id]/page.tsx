@@ -28,7 +28,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { BriefGenerator } from "@/app/sourcing/ao-du-jour/BriefGenerator";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { toUserProfile } from "@/lib/auth/types";
+import { isAdmin, toUserProfile } from "@/lib/auth/types";
+
+import { BuyerAddressEditor } from "./BuyerAddressEditor";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
@@ -137,6 +139,7 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
         id: tenders.id,
         title: tenders.title,
         buyer: tenders.buyer,
+        buyerAddress: tenders.buyerAddress,
         amount: tenders.amount,
         deadline: tenders.deadline,
         questionsDeadline: tenders.questionsDeadline,
@@ -264,6 +267,11 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
               {tender.title}
             </h1>
             <p className="mt-1 text-base text-ink-2">{tender.buyer}</p>
+            <BuyerAddressEditor
+              tenderId={tender.id}
+              initialAddress={tender.buyerAddress}
+              editable={isAdmin(profile)}
+            />
           </div>
 
           {/* Score ring — affiché à droite du header */}
@@ -471,6 +479,7 @@ type TenderRow = {
   id: string;
   title: string;
   buyer: string;
+  buyerAddress: string | null;
   amount: string | null;
   deadline: Date | null;
   questionsDeadline: Date | null;
