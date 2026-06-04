@@ -61,13 +61,17 @@ import { getSiteUrl } from "@/lib/site-url";
 /**
  * Durée max du pipeline complet (Vercel Pro autorise jusqu'à 300s).
  *
- * Steve 2026-06-04 — passé de 60 → 120s après un FUNCTION_INVOCATION_TIMEOUT
- * observé en déclenchement manuel à 11h35 (fenêtre 72h = beaucoup de records
- * BOAMP + 3 scrapers × N profils). Le tick cron 6h30 quotidien avait moins
- * de backlog et passait à 60s — mais on garde une marge de sécurité pour les
- * slow days.
+ * Steve 2026-06-04 — escalade 60 → 120 → **300** après deux
+ * FUNCTION_INVOCATION_TIMEOUT (60s puis 121.9s) en déclenchement manuel.
+ * Le bottleneck identifié = `runSourcingForProfiles` lui-même (pipeline BOAMP
+ * + dédup + filter + score + insert), pas les scrapers. 300s = max Vercel
+ * Pro, marge confortable même sur les slow days BOAMP.
+ *
+ * Combiné avec le passage des scrapers en vrai fire-and-forget (cf. plus
+ * bas — on ne fait plus `await Promise.all(scraperJobs)`), la route doit
+ * pouvoir répondre 200 même quand le pipeline BOAMP prend 2-3 minutes.
  */
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 /**
  * Vérifie le header `Authorization: Bearer ${CRON_SECRET}`. Retourne `null`
@@ -134,16 +138,23 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
       const batch = await runSourcingForProfiles(profiles, { connector, db });
 
       // 4. Déclencher scraping PLACE + Francmarchés + MarchesPublicsInfo
-      //    (async — résultats via webhook).
+      //    en VRAI fire-and-forget.
       //
-      //    OPTIM 2026-06-04 (timeout 504 observé en manual trigger) : on
-      //    parallélise N profils × 3 plateformes au lieu d'une boucle
-      //    séquentielle d'await. Les triggerScrapeJob sont fire-and-forget
-      //    côté worker Fly.io — paralléliser ne casse rien et fait passer
-      //    de ~30s à ~3s sur la phase scrapers quand l'ack est lent.
+      //    OPTIM 2026-06-04 (504 observé deux fois en manual trigger) :
+      //    on ne `await` plus les ack des triggerScrapeJob. Le POST initial
+      //    vers le worker Fly.io part et le worker prend la main de son
+      //    côté (il poste le webhook quand il a fini). On retourne 200
+      //    dès que `runSourcingForProfiles` est OK, sans bloquer pour les
+      //    cold starts éventuels du worker.
+      //
+      //    Trade-off : on perd le `runId` dans le payload `cron_run_log`.
+      //    Les ack arrivent dans les logs Vercel via les .then/.catch
+      //    détachés ci-dessous, qui s'exécutent en background — Vercel peut
+      //    killer la function après le response, mais le POST initial a
+      //    déjà démarré côté worker.
       const webhookUrl = `${getSiteUrl()}/api/webhooks/scraper-done`;
       const PLATFORMS = ["francmarches", "place", "marchespublicsinfo"] as const;
-      const scraperJobs: Array<Promise<{ platform: string; runId?: string; error?: string }>> = [];
+      let scrapersDispatched = 0;
 
       for (const profile of profiles) {
         const profileFilters = {
@@ -153,34 +164,35 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
         const lastRunAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
         for (const platform of PLATFORMS) {
-          scraperJobs.push(
-            triggerScrapeJob({
-              platform,
-              profileFilters,
-              lastRunAt,
-              profileId: profile.id,
-              orgId: profile.organizationId,
-              webhookUrl,
+          scrapersDispatched++;
+          // Pas de await — la promise vit sa vie. Vercel best-effort
+          // pour les bg promises ; les logs détachés ne sont pas garantis
+          // d'apparaître mais le POST initial est déjà parti.
+          void triggerScrapeJob({
+            platform,
+            profileFilters,
+            lastRunAt,
+            profileId: profile.id,
+            orgId: profile.organizationId,
+            webhookUrl,
+          })
+            .then((ack) => {
+              console.log("[cron:sourcing-run] scraper ack", { platform, runId: ack.runId });
             })
-              .then((ack) => ({ platform, runId: ack.runId }))
-              .catch((err: unknown) => {
-                const message = err instanceof Error ? err.message : String(err);
-                if (!(err instanceof ScraperUnavailableError)) {
-                  console.error("[cron:sourcing-run] scraper error", { platform, message });
-                } else {
-                  console.log("[cron:sourcing-run] scraper unavailable (skip)", {
-                    platform,
-                    message,
-                  });
-                }
-                return { platform, error: message };
-              }),
-          );
+            .catch((err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              if (!(err instanceof ScraperUnavailableError)) {
+                console.error("[cron:sourcing-run] scraper error", { platform, message });
+              } else {
+                console.log("[cron:sourcing-run] scraper unavailable", { platform, message });
+              }
+            });
         }
       }
 
-      const scraperTriggered = await Promise.all(scraperJobs);
-      console.log("[cron:sourcing-run] scrapers triggered", scraperTriggered);
+      console.log("[cron:sourcing-run] scrapers dispatched (fire-and-forget)", {
+        count: scrapersDispatched,
+      });
 
       // 5. Trace structurée des métriques (Vercel logs / Datadog)
       console.log("[cron:sourcing-run] done", {
@@ -192,7 +204,7 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
         duration_ms: batch.durationMs,
       });
 
-      return { ...batch, scraperTriggered };
+      return { ...batch, scrapersDispatched };
     },
     { onError: (err) => notifyCronError(db, "sourcing-run", err) },
   );
