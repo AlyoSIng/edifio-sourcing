@@ -2411,3 +2411,39 @@ régression apparaîtra immédiatement en haut de la page avec le hint
 explicite.** Si tout est aligné (24/9/0/23/3 marketTypes), la
 section affiche « Aligné — config inchangée » en vert et le diagnostic
 se déplace ailleurs (peut-être un changement côté BOAMP).
+
+---
+
+## 2026-06-04 (session soir, suite) — Salve N : guide HTML 14
+
+**Auteur :** Alex (dev) — Steve « ok continue », j'ajoute de la doc plutôt
+que du code marginal.
+
+### Guide 14 — « Diagnostiquer un sourcing à 0 inserted »
+Nouveau guide HTML (slug `debug-sourcing-zero-inserted`, displayOrder
+14, durée lecture 6 min) qui fait le pont entre `/admin/sourcing-debug`
+(salves K + L + M) et l'action concrète à prendre. 7 sections :
+
+1. **Premier réflexe : ouvrir Debug sourcing.** Donne l'ordre de
+   lecture des 3 sections principales.
+2. **Diff vs baseline du 22/05/2026** — explique les 3 statuts
+   (OK/Drift/Régression) et leur phrase de synthèse.
+3. **Profils de recherche actifs** — explique les chips colorées, la
+   bordure rouge si `keywords.positive` est vide, le bandeau d'alerte
+   si aucun profil actif.
+4. **« Pourquoi les records ont été rejetés ? »** — explique les
+   4 causes documentées + le pattern `negative_keyword:X` + le hint
+   d'action par cause.
+5. **Tendance 7 derniers runs** — explique comment lire les barres
+   (jaune = fetched, vert = inserted) et les 3 patterns à identifier.
+6. **Action concrète selon le scénario** — 3 scénarios canoniques :
+   régression positives, config alignée mais 0 inserted, tout
+   filtré sur CPV.
+7. **Quand demander l'aide CTO Sophie** — 3 critères d'escalade.
+
+Steve : `pnpm db:seed:formations` pour publier en prod (idempotent
+UPSERT par id UUID déterministe).
+
+Le guide se range naturellement à la fin de la liste (14e place
+après les 13 existants), accessible depuis `/sourcing/profil/formations`
+côté utilisateur.

@@ -470,6 +470,69 @@ Si le template est mal formé (corruption, balises non parsables), edifio retomb
 ## 7. Fallback rétro-compatible
 Tant qu'il n'y a pas de modèle .docx en biblio, edifio garde l'ancien comportement (PDF pdf-lib). Tu peux donc activer la voie A AO par AO en uploadant le modèle quand tu es prêt. Aucun risque de casser ce qui marche aujourd'hui.`;
 
+const GUIDE_14 = `Un matin, tu regardes ta file AO du jour : elle est vide. Le cron de 6h30 a tourné (la card sur **Crons** est verte) mais rien n'a été ajouté. Comment savoir pourquoi ? Ce guide te donne le réflexe : ouvre **Debug sourcing** et lis les 3 sections dans l'ordre.
+
+## 1. Premier réflexe : ouvrir Debug sourcing
+La page **Admin > Debug sourcing** (réservée superadmin) répond à 3 questions en une visite :
+1. Ta config profil a-t-elle changé depuis la baseline ?
+2. Ton profil actif a-t-il bien des mots-clés ?
+3. Le pipeline BOAMP rejette les records sur quel motif ?
+
+Lis-les dans cet ordre — chaque réponse oriente la suivante.
+
+## 2. Section « Diff vs baseline du 22/05/2026 »
+edifio garde en dur le **snapshot du 22/05** de ton profil AlyoS BTP — la dernière config dont on est sûr qu'elle ramenait des AOs (24 positives + 9 négatives + 0 CPV + 23 départements + market_types moe/services/fournitures).
+
+Trois statuts possibles par ligne :
+- 🟢 **OK** : valeur identique à la baseline.
+- 🟠 **Drift** : valeur différente, potentiellement bénin. Exemple : tu as ajouté des mots-clés positifs (élargissement). À valider si tu l'as fait sciemment.
+- 🔴 **Régression** : valeur INFÉRIEURE à la baseline. C'est probablement la cause du « 0 inserted ». Exemple : tu as perdu 10 mots-clés positifs entre temps, donc 10 sources de matching en moins.
+
+Une phrase de synthèse en haut du tableau te dit immédiatement où tu en es :
+- « Aligné — config inchangée » → la baseline matche, le problème vient d'ailleurs.
+- « Dérive détectée — à valider si intentionnelle » → tu as bougé des trucs récemment, vérifie que c'était voulu.
+- « Régression détectée — probable cause du 0 inserted » → action immédiate sur le profil.
+
+## 3. Section « Profils de recherche actifs »
+Si la diff baseline ne te suffit pas (par exemple parce que tu as un nouveau profil ajouté depuis), descends à la section **« Profils de recherche actifs »**. Elle affiche pour chaque profil active=true :
+- Badge **Par défaut** si applicable.
+- 6 chips colorées : positives (vert), négatives (rouge), exacts, CPV, géo, types de marché. Limite 8 chips affichées + « + N… » pour les longues listes.
+- Bornes montant si présentes.
+- **Bordure rouge à gauche + bandeau « Aucun mot-clé positif »** si \`keywords.positive\` est vide — la cause n°1 du « 0 inserted ». Sans positives, AUCUN record BOAMP ne peut passer le filtre.
+
+S'il n'y a aucun profil actif → bandeau d'alerte rouge avec lien direct vers **Configuration > Profils de recherche**.
+
+## 4. Section « Pourquoi les records ont été rejetés ? »
+Si ton profil a l'air OK et que la diff baseline est verte, descends jusqu'à la décomposition du dernier run. Pour chaque cause de rejet, edifio te donne :
+- Le libellé humain (« CPV hors liste », « Montant sous le seuil minimum »…)
+- Le compteur + le pourcentage du total fetched
+- Une barre de proportion visuelle
+- Un **hint d'action concret** : ce que tu dois ajuster sur le profil pour rééquilibrer.
+
+Les hints connus :
+- **« Aucun mot-clé positif trouvé »** → \`keywords.positive\` est vide. Repopule.
+- **« CPV hors liste »** → la liste \`cpvCodes\` est trop restrictive. Ajoute les codes qui matchent ton activité ou retire le filtre CPV pour ne plus filtrer dessus.
+- **« Montant sous/au-dessus du seuil »** → ajuste \`amountMin\` / \`amountMax\` selon ton marché cible.
+- **« Mot-clé exclu : "X" »** → un mot-clé négatif match ce record. Si tu vois beaucoup de records rejetés sur le même mot-clé négatif, tu surrestreins.
+
+## 5. Section « Tendance — 7 derniers runs OK »
+Mini-graphique CSS qui montre l'évolution sur les 7 dernières runs OK : barres jaunes pour le fetched BOAMP, sur-couche verte pour l'inserted. Tu vois en un coup d'œil :
+- Si fetched chute → BOAMP est plus calme, période creuse.
+- Si fetched stable mais inserted chute → ton profil a régressé.
+- Si tout est stable → tout va bien.
+
+Tooltip au survol pour le détail (date + fetched + inserted + durée).
+
+## 6. Action concrète selon le scénario
+- **Mystère « 0 inserted » avec diff régression sur positives** : va dans Configuration > Profils de recherche, ouvre le profil par défaut, repopule \`keywords.positive\` avec tes 24 mots-clés baseline. Refais un trigger manuel via **Crons > ▶ Déclencher sourcing-run**. Vérifie immédiatement le résultat sur Debug sourcing.
+- **Mystère « 0 inserted » avec diff aligné** : la config marche, mais BOAMP n'a rien renvoyé qui match. Vérifie sur la tendance 7j si c'est exceptionnel ou récurrent. Si récurrent → tes mots-clés sont peut-être trop pointus pour le marché actuel, élargis.
+- **Mystère « tout filtré sur CPV »** : retire le filtre CPV (la baseline ne l'utilisait pas — c'est exactement pour ça) ou ajoute les codes qui manquent.
+
+## 7. Quand demander l'aide CTO Sophie
+- Si la config est alignée baseline ET que la tendance montre 0 inserted depuis > 3 jours → BOAMP a peut-être changé son schéma. Logs Vercel + ouverture issue.
+- Si tu ne sais plus quelle est ta « bonne » config et que la baseline 22/05 n'est plus valable → on enregistre un nouveau snapshot dans \`baseline-profiles.ts\` (PR rapide, je m'en occupe).
+- Si la diff montre une régression que tu n'as pas faite manuellement → fouille les logs \`/admin/audit\` pour identifier qui/quand. Possible bug ou autre admin qui a touché.`;
+
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
     id: "fb000001-0000-0000-0000-000000000001",
@@ -622,5 +685,17 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_13,
     isActive: true,
     displayOrder: 13,
+  },
+  {
+    id: "fb000001-0000-0000-0000-00000000000e",
+    slug: "debug-sourcing-zero-inserted",
+    title: "Diagnostiquer un sourcing à 0 inserted",
+    description:
+      "Le cron a tourné vert mais ta file AO du jour est vide. Le réflexe en 3 étapes : Diff baseline, Profils actifs, Décomposition par cause de rejet.",
+    type: "doc",
+    durationMin: 6,
+    contentMd: GUIDE_14,
+    isActive: true,
+    displayOrder: 14,
   },
 ];
