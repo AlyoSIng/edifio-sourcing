@@ -18,7 +18,7 @@
  */
 
 import { redirect } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { db } from "@/db/client";
@@ -260,7 +260,8 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
     // 5. Si archi sélectionné, charge son cabinet (pour le bouton "Envoyer à
     //    l'archi") + le dernier dispatch (pour afficher « Envoyé le X »).
     let selectedArchitect: { id: string; cabinet: string; email: string | null } | null = null;
-    let lastDispatch: { sentAtIso: string; recipientEmail: string } | null = null;
+    let lastDispatch: { dispatchId: string; sentAtIso: string; recipientEmail: string } | null =
+      null;
     if (archiParam) {
       const [archi] = await db
         .select({
@@ -275,6 +276,7 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
         selectedArchitect = archi;
         const [disp] = await db
           .select({
+            id: dossierDispatches.id,
             sentAt: dossierDispatches.sentAt,
             recipientEmail: dossierDispatches.recipientEmail,
           })
@@ -284,12 +286,15 @@ export default async function PiecesPage({ params, searchParams }: PageProps) {
               eq(dossierDispatches.tenderId, tenderId),
               eq(dossierDispatches.architectId, archiParam),
               eq(dossierDispatches.organizationId, orgId),
+              // H6 — Steve 2026-06-04 : on ignore les dispatches annulés.
+              isNull(dossierDispatches.cancelledAt),
             ),
           )
           .orderBy(desc(dossierDispatches.sentAt))
           .limit(1);
         if (disp) {
           lastDispatch = {
+            dispatchId: disp.id,
             sentAtIso: disp.sentAt.toISOString(),
             recipientEmail: disp.recipientEmail,
           };

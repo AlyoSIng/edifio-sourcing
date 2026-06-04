@@ -21,7 +21,7 @@ import { useState, useTransition } from "react";
 import type { PieceMatch } from "@/lib/dossier/pieces-match";
 import type { ExistingCerfa } from "../cerfa/actions";
 import { compileDossierAction } from "./actions";
-import { sendDossierToArchitectAction } from "./dispatch-actions";
+import { cancelDossierDispatchAction, sendDossierToArchitectAction } from "./dispatch-actions";
 
 // ---------------------------------------------------------------------------
 // Types props
@@ -55,7 +55,7 @@ export interface PiecesClientProps {
    * « Envoyé le DD/MM à HH:MM » sous le bouton. Date sérialisée en ISO pour
    * franchir la frontière Server → Client (les Date natives ne passent pas).
    */
-  lastDispatch: { sentAtIso: string; recipientEmail: string } | null;
+  lastDispatch: { dispatchId: string; sentAtIso: string; recipientEmail: string } | null;
   /**
    * Résumé des items biblio à problème d'expiration (chantier G2.1 — Steve
    * 2026-06-03). `expired` : déjà périmés → exclus du ZIP, à renouveler.
@@ -305,6 +305,14 @@ export function PiecesClient({
   const [lastSentAtIso, setLastSentAtIso] = useState<string | null>(
     lastDispatch?.sentAtIso ?? null,
   );
+  // H6 — Steve 2026-06-04 : id du dernier dispatch actif, pour permettre
+  // l'annulation. Le state suit lastSentAtIso : à chaque nouvel envoi,
+  // l'id devient celui du nouveau dispatch (renvoyé par la Server Action).
+  const [activeDispatchId, setActiveDispatchId] = useState<string | null>(
+    lastDispatch?.dispatchId ?? null,
+  );
+  const [isCancellingDispatch, startCancelDispatch] = useTransition();
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const archiHasEmail = Boolean(selectedArchitect?.email);
   const canSendToArchi = compileMode === "tandem" && archiHasEmail && downloadUrl !== null;
@@ -317,8 +325,34 @@ export function PiecesClient({
       const result = await sendDossierToArchitectAction(tenderId, archiParam);
       if (result.ok) {
         setLastSentAtIso(result.sentAt.toISOString());
+        setActiveDispatchId(result.dispatchId);
       } else {
         setSendError(sendErrorLabel(result.error, result.detail));
+      }
+    });
+  }
+
+  // H6 — annulation soft d'un envoi (le lien signé reste actif côté
+  // Supabase jusqu'à expiration naturelle 7j, mais l'UI considère l'envoi
+  // comme inexistant).
+  function handleCancelDispatch() {
+    if (!activeDispatchId) return;
+    const reason = window.prompt("Motif de l'annulation (optionnel — visible dans l'audit) :", "");
+    if (reason === null) return; // user clicked Cancel
+    setCancelError(null);
+    startCancelDispatch(async () => {
+      const result = await cancelDossierDispatchAction(activeDispatchId, reason);
+      if (result.ok) {
+        setLastSentAtIso(null);
+        setActiveDispatchId(null);
+      } else {
+        setCancelError(
+          result.error === "already_cancelled"
+            ? "Cet envoi a déjà été annulé."
+            : result.error === "dispatch_not_found"
+              ? "Envoi introuvable."
+              : "Annulation impossible — réessaie.",
+        );
       }
     });
   }
@@ -708,9 +742,27 @@ export function PiecesClient({
               </p>
             )}
             {lastSentAtIso && !sendError && (
-              <p className="text-xs text-ink-2">
-                ✉ Dossier envoyé à <strong>{selectedArchitect?.email ?? "—"}</strong> le{" "}
-                {formatSentAt(lastSentAtIso)}. Lien valable 7 jours.
+              <div className="flex flex-wrap items-center gap-2 text-xs text-ink-2">
+                <span>
+                  ✉ Dossier envoyé à <strong>{selectedArchitect?.email ?? "—"}</strong> le{" "}
+                  {formatSentAt(lastSentAtIso)}. Lien valable 7 jours.
+                </span>
+                {activeDispatchId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelDispatch}
+                    disabled={isCancellingDispatch}
+                    className="rounded border border-line bg-white px-2 py-0.5 text-[11px] font-medium text-error transition hover:bg-error-bg disabled:opacity-50"
+                    title="Marquer cet envoi comme annulé (le lien signé reste actif jusqu'à expiration naturelle 7j)"
+                  >
+                    {isCancellingDispatch ? "…" : "Annuler cet envoi"}
+                  </button>
+                )}
+              </div>
+            )}
+            {cancelError && (
+              <p role="alert" className="text-xs text-error">
+                {cancelError}
               </p>
             )}
           </div>

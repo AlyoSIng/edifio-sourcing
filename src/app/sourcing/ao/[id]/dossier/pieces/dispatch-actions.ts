@@ -20,7 +20,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
@@ -271,6 +271,77 @@ export async function sendDossierToArchitectAction(
 }
 
 // ---------------------------------------------------------------------------
+// Action — annuler un envoi dossier (chantier H6, Steve 2026-06-04)
+// ---------------------------------------------------------------------------
+
+export type CancelDispatchError =
+  | "not_authenticated"
+  | "invalid_input"
+  | "dispatch_not_found"
+  | "already_cancelled"
+  | "internal_error";
+
+export type CancelDispatchResult =
+  | { ok: true; cancelledAt: Date }
+  | { ok: false; error: CancelDispatchError };
+
+/**
+ * Annule un envoi dossier (soft delete). Le lien signé Supabase reste valide
+ * jusqu'à expiration naturelle (7j) mais l'UI ne le présente plus comme
+ * « dernier envoi ».
+ *
+ * @param dispatchId UUID du dispatch à annuler
+ * @param reason     Motif optionnel (libre, max 500 chars)
+ */
+export async function cancelDossierDispatchAction(
+  dispatchId: string,
+  reason?: string,
+): Promise<CancelDispatchResult> {
+  try {
+    if (!UUID_RE.test(dispatchId)) return { ok: false, error: "invalid_input" };
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "not_authenticated" };
+    const profile = toUserProfile(user);
+    const orgId = await getRequiredOrgId(profile.id);
+
+    const [existing] = await db
+      .select({
+        id: dossierDispatches.id,
+        tenderId: dossierDispatches.tenderId,
+        cancelledAt: dossierDispatches.cancelledAt,
+      })
+      .from(dossierDispatches)
+      .where(and(eq(dossierDispatches.id, dispatchId), eq(dossierDispatches.organizationId, orgId)))
+      .limit(1);
+    if (!existing) return { ok: false, error: "dispatch_not_found" };
+    if (existing.cancelledAt) return { ok: false, error: "already_cancelled" };
+
+    const now = new Date();
+    const trimmedReason = reason?.trim().slice(0, 500) ?? null;
+    await db
+      .update(dossierDispatches)
+      .set({
+        cancelledAt: now,
+        cancelledBy: profile.id,
+        cancellationReason: trimmedReason,
+      })
+      .where(eq(dossierDispatches.id, dispatchId));
+
+    if (existing.tenderId) {
+      revalidatePath(`/sourcing/ao/${existing.tenderId}/dossier/pieces`);
+    }
+
+    return { ok: true, cancelledAt: now };
+  } catch (err) {
+    console.error("[dispatch:cancel:unhandled]", err);
+    return { ok: false, error: "internal_error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Action lecture — pour afficher « dernier envoi »
 // ---------------------------------------------------------------------------
 
@@ -306,6 +377,8 @@ export async function getLastDispatchAction(
           eq(dossierDispatches.tenderId, tenderId),
           eq(dossierDispatches.architectId, architectId),
           eq(dossierDispatches.organizationId, orgId),
+          // H6 : on ne montre PAS les envois annulés comme dernier dispatch.
+          isNull(dossierDispatches.cancelledAt),
         ),
       )
       .orderBy(desc(dossierDispatches.sentAt))

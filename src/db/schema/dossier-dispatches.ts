@@ -43,6 +43,15 @@ export const dossierDispatches = pgTable(
     brevoMessageId: text("brevo_message_id"),
     /** Registre Brevo utilisé pour le mail ('tu' | 'vous') — audit. */
     brevoTemplateRegister: text("brevo_template_register"),
+    /**
+     * Soft cancel (chantier H6 — Steve 2026-06-04). NULL = envoi actif.
+     * Le lien signé reste valide jusqu'à expiration naturelle (7j) —
+     * Supabase ne révoque pas — mais l'UI ne montre plus l'envoi comme
+     * « dernier dispatch » sur la page Pièces.
+     */
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by").references(() => users.id, { onDelete: "set null" }),
+    cancellationReason: text("cancellation_reason"),
   },
   (table) => ({
     tenderArchiIdx: index("idx_dossier_dispatches_tender_archi").on(
