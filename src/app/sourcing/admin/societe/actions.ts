@@ -53,6 +53,25 @@ const saveOrgProfileSchema = z.object({
     .refine((v) => v === "" || /^\d+$/.test(v), {
       message: "Le capital doit être un entier positif en euros (sans séparateur)",
     }),
+  // CA n-1 / n-2 / n-3 — DC2 §E (Steve 2026-06-04).
+  revenueN1: z
+    .string()
+    .max(20)
+    .refine((v) => v === "" || /^\d+$/.test(v), {
+      message: "Le CA n-1 doit être un entier positif en euros (sans séparateur)",
+    }),
+  revenueN2: z
+    .string()
+    .max(20)
+    .refine((v) => v === "" || /^\d+$/.test(v), {
+      message: "Le CA n-2 doit être un entier positif en euros (sans séparateur)",
+    }),
+  revenueN3: z
+    .string()
+    .max(20)
+    .refine((v) => v === "" || /^\d+$/.test(v), {
+      message: "Le CA n-3 doit être un entier positif en euros (sans séparateur)",
+    }),
   signatureCity: z.string().max(120, "Ville de signature trop longue"),
   // Forme juridique — champ libre TEXT (cf. migration 0040 + lib/legal-forms.ts).
   legalForm: z.string().max(60, "Forme juridique trop longue"),
@@ -112,6 +131,9 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
     legalRepresentativeName: formData.get("legalRepresentativeName") ?? "",
     legalRepresentativeRole: formData.get("legalRepresentativeRole") ?? "",
     capitalEur: formData.get("capitalEur") ?? "",
+    revenueN1: formData.get("revenueN1") ?? "",
+    revenueN2: formData.get("revenueN2") ?? "",
+    revenueN3: formData.get("revenueN3") ?? "",
     signatureCity: formData.get("signatureCity") ?? "",
     legalForm: formData.get("legalForm") ?? "",
   });
@@ -130,12 +152,21 @@ export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgP
   // sémantiquement « non renseigné » et préserver la nullabilité côté schéma.
   const capitalEurNum =
     values.capitalEur && values.capitalEur !== "" ? Number.parseInt(values.capitalEur, 10) : null;
+  const revenueN1Num =
+    values.revenueN1 && values.revenueN1 !== "" ? Number.parseInt(values.revenueN1, 10) : null;
+  const revenueN2Num =
+    values.revenueN2 && values.revenueN2 !== "" ? Number.parseInt(values.revenueN2, 10) : null;
+  const revenueN3Num =
+    values.revenueN3 && values.revenueN3 !== "" ? Number.parseInt(values.revenueN3, 10) : null;
   const dc2Fields = {
     addressLine1: values.addressLine1 || null,
     addressLine2: values.addressLine2 || null,
     legalRepresentativeName: values.legalRepresentativeName || null,
     legalRepresentativeRole: values.legalRepresentativeRole || null,
     capitalEur: capitalEurNum,
+    revenueN1: revenueN1Num,
+    revenueN2: revenueN2Num,
+    revenueN3: revenueN3Num,
     signatureCity: values.signatureCity || null,
     legalForm: values.legalForm || null,
   } as const;

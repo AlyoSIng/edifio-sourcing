@@ -110,6 +110,11 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
   // CA annuel moyen — saisie manuelle (filtre éligibilité Tandem)
   const [annualRevenue, setAnnualRevenue] = useState(architect.annualRevenue?.toString() ?? "");
 
+  // CA n-1 / n-2 / n-3 (DC2 §E — Steve 2026-06-04).
+  const [revenueN1, setRevenueN1] = useState(architect.revenueN1?.toString() ?? "");
+  const [revenueN2, setRevenueN2] = useState(architect.revenueN2?.toString() ?? "");
+  const [revenueN3, setRevenueN3] = useState(architect.revenueN3?.toString() ?? "");
+
   // Collaborations passées — saisie manuelle admin (signal historique matching)
   const [pastCollabs, setPastCollabs] = useState<number>(
     initialPastCollabs ?? architect.pastCollabsCount ?? 0,
@@ -176,6 +181,9 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
           rgpdOppositionDate: architect.rgpdOppositionDate,
           headcount: headcount ? parseInt(headcount, 10) : null,
           annualRevenue: annualRevenue ? parseInt(annualRevenue, 10) : null,
+          revenueN1: revenueN1 ? parseInt(revenueN1, 10) : null,
+          revenueN2: revenueN2 ? parseInt(revenueN2, 10) : null,
+          revenueN3: revenueN3 ? parseInt(revenueN3, 10) : null,
           companySize: architect.companySize,
           companyCreatedAt: architect.companyCreatedAt,
           odooExternalId: architect.odooExternalId,
@@ -621,6 +629,63 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
               />
             </div>
           </div>
+
+          {/* CA n-1 / n-2 / n-3 — DC2 §E Capacité financière (Steve 2026-06-04). */}
+          <fieldset className="mt-4 rounded-md border border-line p-3">
+            <legend className="px-1 text-xs font-medium text-ink">
+              Chiffre d&apos;affaires — 3 derniers exercices
+            </legend>
+            <p className="mb-2 text-[11px] text-muted">
+              Champs DC2 §E. Tous optionnels — peuvent être complétés progressivement.
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label htmlFor="revenueN1" className="block text-xs font-medium text-ink">
+                  CA n-1 (€ HT)
+                </label>
+                <input
+                  id="revenueN1"
+                  type="number"
+                  min={0}
+                  step={10000}
+                  value={revenueN1}
+                  onChange={(e) => setRevenueN1(e.target.value)}
+                  placeholder="ex : 520000"
+                  className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label htmlFor="revenueN2" className="block text-xs font-medium text-ink">
+                  CA n-2 (€ HT)
+                </label>
+                <input
+                  id="revenueN2"
+                  type="number"
+                  min={0}
+                  step={10000}
+                  value={revenueN2}
+                  onChange={(e) => setRevenueN2(e.target.value)}
+                  placeholder="ex : 480000"
+                  className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label htmlFor="revenueN3" className="block text-xs font-medium text-ink">
+                  CA n-3 (€ HT)
+                </label>
+                <input
+                  id="revenueN3"
+                  type="number"
+                  min={0}
+                  step={10000}
+                  value={revenueN3}
+                  onChange={(e) => setRevenueN3(e.target.value)}
+                  placeholder="ex : 460000"
+                  className="focus:ring-brand-red/40 mt-1 w-full rounded-md border border-line bg-white px-3 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </fieldset>
 
           {/* Collaborations passées */}
           <div>

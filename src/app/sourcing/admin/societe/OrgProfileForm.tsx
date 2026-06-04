@@ -34,6 +34,9 @@ interface OrgProfileFormProps {
     | "capitalEur"
     | "signatureCity"
     | "legalForm"
+    | "revenueN1"
+    | "revenueN2"
+    | "revenueN3"
   > | null;
   /** SIRET de l'organisation (table organizations). Distinct du profil org. */
   initialSiret?: string | null;
@@ -65,6 +68,16 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
   );
   const [signatureCity, setSignatureCity] = useState(initial?.signatureCity ?? "");
   const [legalForm, setLegalForm] = useState(initial?.legalForm ?? "");
+  // CA n-1 / n-2 / n-3 (DC2 §E — Steve 2026-06-04).
+  const [revenueN1, setRevenueN1] = useState(
+    initial?.revenueN1 != null ? String(initial.revenueN1) : "",
+  );
+  const [revenueN2, setRevenueN2] = useState(
+    initial?.revenueN2 != null ? String(initial.revenueN2) : "",
+  );
+  const [revenueN3, setRevenueN3] = useState(
+    initial?.revenueN3 != null ? String(initial.revenueN3) : "",
+  );
   const [result, setResult] = useState<SaveOrgProfileResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -108,6 +121,9 @@ export function OrgProfileForm({ initial, initialSiret }: OrgProfileFormProps) {
     fd.set("legalRepresentativeName", legalRepresentativeName);
     fd.set("legalRepresentativeRole", legalRepresentativeRole);
     fd.set("capitalEur", capitalEur);
+    fd.set("revenueN1", revenueN1);
+    fd.set("revenueN2", revenueN2);
+    fd.set("revenueN3", revenueN3);
     fd.set("signatureCity", signatureCity);
     fd.set("legalForm", legalForm);
 
@@ -350,6 +366,24 @@ Agence PACA : 15 avenue du Mistral, 13100 Aix-en-Provence"
                   className="w-full rounded border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
                 />
               </div>
+              <RevenueInput
+                id="revenueN1"
+                label="CA n-1 (€ HT)"
+                value={revenueN1}
+                onChange={setRevenueN1}
+              />
+              <RevenueInput
+                id="revenueN2"
+                label="CA n-2 (€ HT)"
+                value={revenueN2}
+                onChange={setRevenueN2}
+              />
+              <RevenueInput
+                id="revenueN3"
+                label="CA n-3 (€ HT)"
+                value={revenueN3}
+                onChange={setRevenueN3}
+              />
               <Field
                 id="legalRepresentativeName"
                 label="Nom du représentant légal"
@@ -476,6 +510,45 @@ function Field({
           ))}
         </datalist>
       )}
+    </div>
+  );
+}
+
+/**
+ * Sous-composant pour les 3 inputs CA n-1/n-2/n-3 (Steve 2026-06-04).
+ * Évite la duplication des 3 blocs label+input quasi identiques.
+ */
+function RevenueInput({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-1.5 block font-mono text-[11px] uppercase tracking-wider text-ink-2"
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        name={id}
+        type="number"
+        min={0}
+        step={10000}
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="ex : 520000"
+        className="w-full rounded border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
+      />
     </div>
   );
 }
