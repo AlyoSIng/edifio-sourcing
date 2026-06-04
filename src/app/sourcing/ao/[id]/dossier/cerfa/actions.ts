@@ -25,7 +25,7 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { organizations } from "@/db/schema/organizations";
-import { responseFiles } from "@/db/schema/library";
+import { presentationLibrary, responseFiles } from "@/db/schema/library";
 import { architects } from "@/db/schema/architects";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { architectResponses } from "@/db/schema/selections";
@@ -36,6 +36,7 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CerfaField } from "@/lib/dossier/cerfa-prefill";
 import { generateCerfaPdf } from "@/lib/dossier/cerfa-pdf";
+import { cerfaKindToLibraryKind, generateCerfaDocx } from "@/lib/dossier/cerfa-docx-generator";
 
 // ---------------------------------------------------------------------------
 // Constante bucket
@@ -276,30 +277,125 @@ export async function validateCerfa(
       .limit(1);
     const organizationName = org?.name ?? "AlyoS Ingénierie";
 
-    // 5. Génération du PDF formaté via pdf-lib (cf. cerfa-pdf.ts)
-    //    On utilise `field_label` (issu de cerfa-prefill) comme libellé humain
-    //    dans le PDF — il est cohérent avec ce que l'utilisateur a vu en saisie.
-    let pdfBytes: Uint8Array;
-    try {
-      pdfBytes = await generateCerfaPdf({
-        kind: cerfaKind === "DC1" ? "dc1" : "dc2",
-        tenderTitle: tender.title,
-        tenderBuyer: tender.buyer,
-        organizationName,
-        selectedArchitect: archiCabinet ? { cabinet: archiCabinet } : null,
-        selectedBe: beCabinet ? { cabinet: beCabinet } : null,
-        fields: validatedFields.map((f) => ({
-          id: f.field_id,
-          label: f.field_label,
-          value: f.value,
-          source: f.source,
-        })),
-        generatedAt: new Date(),
-      });
-    } catch (err) {
-      console.error("[cerfa:validate:pdf:fail]", err);
-      return { ok: false, error: "internal_error" };
+    // 5. Détection auto template docx Mustache (chantier H1/J3, Steve 2026-06-04).
+    //
+    //    Si l'admin a uploadé un .docx avec balises Mustache dans la
+    //    bibliothèque (catégorie 'dc1' ou 'dc2'), on l'utilise. Sinon
+    //    fallback historique = PDF custom via pdf-lib.
+    //
+    //    Le choix se fait sur le library_item le plus récent du bon kind.
+    //    Le content_type final est différent selon la voie choisie :
+    //      - docx → application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    //      - pdf  → application/pdf
+    const libraryKind = cerfaKindToLibraryKind(cerfaKind);
+    const [templateRow] = await db
+      .select({
+        id: presentationLibrary.id,
+        storagePath: presentationLibrary.storagePath,
+        name: presentationLibrary.name,
+      })
+      .from(presentationLibrary)
+      .where(
+        and(
+          eq(presentationLibrary.organizationId, auth.orgId),
+          eq(presentationLibrary.kind, libraryKind),
+        ),
+      )
+      .orderBy(desc(presentationLibrary.createdAt))
+      .limit(1);
+
+    let outputBytes: Uint8Array;
+    let outputMime: string;
+    let outputExt: "pdf" | "docx";
+    const supabaseAdmin = createSupabaseAdminClient();
+
+    if (templateRow) {
+      try {
+        // 5a. Voie docx — télécharge le template biblio, remplit Mustache.
+        const { data: templateData, error: dlError } = await supabaseAdmin.storage
+          .from(BUCKET)
+          .download(templateRow.storagePath);
+        if (dlError || !templateData) {
+          throw new Error(`download template failed: ${dlError?.message ?? "no data"}`);
+        }
+        const templateBuffer = new Uint8Array(await templateData.arrayBuffer());
+        const result = generateCerfaDocx(templateBuffer, {
+          kind: libraryKind,
+          tenderTitle: tender.title,
+          tenderBuyer: tender.buyer,
+          organizationName,
+          selectedArchitectCabinet: archiCabinet ?? null,
+          selectedBeCabinet: beCabinet ?? null,
+          fields: validatedFields.map((f) => ({
+            field_id: f.field_id,
+            value: f.value,
+          })),
+          generatedAt: new Date(),
+        });
+        outputBytes = result.buffer;
+        outputMime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        outputExt = "docx";
+        console.log("[cerfa:validate:docx:ok]", {
+          template: templateRow.name,
+          substitutions: result.substitutionCount,
+          unknown: result.unknownTokens,
+        });
+      } catch (err) {
+        console.warn("[cerfa:validate:docx:fail-fallback-pdf]", err);
+        // Fallback pdf-lib si le template est cassé.
+        try {
+          outputBytes = await generateCerfaPdf({
+            kind: cerfaKind === "DC1" ? "dc1" : "dc2",
+            tenderTitle: tender.title,
+            tenderBuyer: tender.buyer,
+            organizationName,
+            selectedArchitect: archiCabinet ? { cabinet: archiCabinet } : null,
+            selectedBe: beCabinet ? { cabinet: beCabinet } : null,
+            fields: validatedFields.map((f) => ({
+              id: f.field_id,
+              label: f.field_label,
+              value: f.value,
+              source: f.source,
+            })),
+            generatedAt: new Date(),
+          });
+          outputMime = "application/pdf";
+          outputExt = "pdf";
+        } catch (pdfErr) {
+          console.error("[cerfa:validate:pdf:fail]", pdfErr);
+          return { ok: false, error: "internal_error" };
+        }
+      }
+    } else {
+      // 5b. Voie historique pdf-lib (aucun template biblio dispo).
+      try {
+        outputBytes = await generateCerfaPdf({
+          kind: cerfaKind === "DC1" ? "dc1" : "dc2",
+          tenderTitle: tender.title,
+          tenderBuyer: tender.buyer,
+          organizationName,
+          selectedArchitect: archiCabinet ? { cabinet: archiCabinet } : null,
+          selectedBe: beCabinet ? { cabinet: beCabinet } : null,
+          fields: validatedFields.map((f) => ({
+            id: f.field_id,
+            label: f.field_label,
+            value: f.value,
+            source: f.source,
+          })),
+          generatedAt: new Date(),
+        });
+        outputMime = "application/pdf";
+        outputExt = "pdf";
+      } catch (err) {
+        console.error("[cerfa:validate:pdf:fail]", err);
+        return { ok: false, error: "internal_error" };
+      }
     }
+
+    // Variable legacy `pdfBytes` réutilisée plus bas — on la pointe sur
+    // outputBytes. Le label `pdf` reste OK même en mode docx (les checks de
+    // taille sont identiques).
+    const pdfBytes = outputBytes;
 
     // B-2 : Limite de taille globale du payload (anti-DoS Storage)
     if (pdfBytes.byteLength > MAX_PDF_SIZE_BYTES) {
@@ -307,19 +403,20 @@ export async function validateCerfa(
       return { ok: false, error: "invalid_input" };
     }
 
-    // 6. Upload Supabase Storage (PDF)
-    const filename = `${cerfaKind.toLowerCase()}_${Date.now()}.pdf`;
+    // 6. Upload Supabase Storage (PDF ou DOCX selon voie).
+    const filename = `${cerfaKind.toLowerCase()}_${Date.now()}.${outputExt}`;
     const storagePath = `${auth.orgId}/${tenderId}/cerfa/${filename}`;
 
-    // Storage admin : RLS bypass intentionnel — auth vérifiée L.133
-    const supabaseAdmin = createSupabaseAdminClient();
+    // Storage admin : RLS bypass intentionnel — auth vérifiée L.133.
+    // On réutilise le supabaseAdmin déjà créé pour le téléchargement template
+    // si la voie docx a été prise — sinon, on l'instancie ici.
     // Supabase Storage SDK accepte Uint8Array, Blob, File, Buffer. On caste en
     // Buffer pour rester homogène avec les autres uploads du module.
     const pdfBuffer = Buffer.from(pdfBytes);
     const { error: storageError } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(storagePath, pdfBuffer, {
-        contentType: "application/pdf",
+        contentType: outputMime,
         upsert: false,
       });
 

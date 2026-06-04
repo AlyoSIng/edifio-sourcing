@@ -93,7 +93,11 @@ function makeFakeDb(opts: FakeDbOpts = {}) {
 
 describe("notifyCronError", () => {
   it("envoie un mail aux superadmins quand une erreur survient", async () => {
-    const sendEmailMock = vi.fn(async () => ({ id: "msg-1" }));
+    type SendArgs = { to: string; subject: string; html: string; text: string };
+    const sendEmailMock = vi.fn(async (params: SendArgs) => {
+      void params; // marqueur "intentionally unused"
+      return { id: "msg-1" };
+    });
     const db = makeFakeDb({
       recipientEmails: ["a@alyosingenierie.fr", "b@alyosingenierie.fr"],
       errorRowsCount: 1, // seule la row courante
@@ -104,13 +108,19 @@ describe("notifyCronError", () => {
     });
 
     expect(sendEmailMock).toHaveBeenCalledTimes(2);
-    const firstCall = sendEmailMock.mock.calls[0]![0];
-    expect(firstCall.subject).toContain("test-cron");
-    expect(firstCall.text).toContain("boom");
+    const firstCall = sendEmailMock.mock.calls[0]?.[0] as
+      | { subject: string; text: string }
+      | undefined;
+    expect(firstCall?.subject).toContain("test-cron");
+    expect(firstCall?.text).toContain("boom");
   });
 
   it("skip si une autre erreur a déjà été tracée dans la fenêtre 1h (anti-spam)", async () => {
-    const sendEmailMock = vi.fn(async () => ({ id: "msg-1" }));
+    type SendArgs = { to: string; subject: string; html: string; text: string };
+    const sendEmailMock = vi.fn(async (params: SendArgs) => {
+      void params; // marqueur "intentionally unused"
+      return { id: "msg-1" };
+    });
     const db = makeFakeDb({
       errorRowsCount: 3, // 2 erreurs précédentes + la courante
     });
@@ -126,7 +136,11 @@ describe("notifyCronError", () => {
   });
 
   it("skip si aucun superadmin n'est trouvé (recipients vides)", async () => {
-    const sendEmailMock = vi.fn(async () => ({ id: "msg-1" }));
+    type SendArgs = { to: string; subject: string; html: string; text: string };
+    const sendEmailMock = vi.fn(async (params: SendArgs) => {
+      void params; // marqueur "intentionally unused"
+      return { id: "msg-1" };
+    });
     const db = makeFakeDb({
       recipientEmails: [],
       errorRowsCount: 1,
@@ -143,7 +157,11 @@ describe("notifyCronError", () => {
   });
 
   it("ne propage pas l'exception si la DB rate sur recipients (best-effort)", async () => {
-    const sendEmailMock = vi.fn(async () => ({ id: "msg-1" }));
+    type SendArgs = { to: string; subject: string; html: string; text: string };
+    const sendEmailMock = vi.fn(async (params: SendArgs) => {
+      void params; // marqueur "intentionally unused"
+      return { id: "msg-1" };
+    });
     const db = makeFakeDb({
       recipientsThrows: true,
       errorRowsCount: 1,
@@ -186,7 +204,11 @@ describe("notifyCronError", () => {
   });
 
   it("sérialise un throw non-Error en string pour le subject/text", async () => {
-    const sendEmailMock = vi.fn(async () => ({ id: "msg-1" }));
+    type SendArgs = { to: string; subject: string; html: string; text: string };
+    const sendEmailMock = vi.fn(async (params: SendArgs) => {
+      void params; // marqueur "intentionally unused"
+      return { id: "msg-1" };
+    });
     const db = makeFakeDb({ errorRowsCount: 1 });
 
     // Volontairement throw une string (cas pathologique mais possible).
