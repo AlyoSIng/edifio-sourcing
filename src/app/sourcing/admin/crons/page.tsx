@@ -29,6 +29,12 @@ export const runtime = "nodejs";
 
 const HISTORY_LIMIT = 100;
 
+function formatAvgDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
+  return `${(ms / 60_000).toFixed(1)} min`;
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -79,7 +85,16 @@ export default async function CronsPage() {
   // Agrégats par cron_name (sur les rows chargées).
   const byName = new Map<
     string,
-    { total: number; ok: number; error: number; running: number; lastStartedAt: string | null }
+    {
+      total: number;
+      ok: number;
+      error: number;
+      running: number;
+      lastStartedAt: string | null;
+      /** Somme cumulée des duration_ms des runs status='ok' (pour avg). */
+      okDurationSum: number;
+      okDurationCount: number;
+    }
   >();
   for (const row of rows) {
     const entry = byName.get(row.cron_name) ?? {
@@ -88,10 +103,20 @@ export default async function CronsPage() {
       error: 0,
       running: 0,
       lastStartedAt: null,
+      okDurationSum: 0,
+      okDurationCount: 0,
     };
     entry.total++;
-    if (row.status === "ok") entry.ok++;
-    else if (row.status === "error") entry.error++;
+    if (row.status === "ok") {
+      entry.ok++;
+      // K2 — on calcule la durée moyenne des runs OK pour donner une baseline
+      // visuelle. Les runs error/running n'entrent pas dans l'avg pour ne
+      // pas être biaisée par les timeouts ou les exécutions en cours.
+      if (row.duration_ms !== null) {
+        entry.okDurationSum += row.duration_ms;
+        entry.okDurationCount++;
+      }
+    } else if (row.status === "error") entry.error++;
     else if (row.status === "running") entry.running++;
     if (!entry.lastStartedAt || row.started_at > entry.lastStartedAt) {
       entry.lastStartedAt = row.started_at;
@@ -150,6 +175,14 @@ export default async function CronsPage() {
                 <p className="mt-1 font-mono text-[10px] text-muted">
                   Dernier : {formatDateTime(agg.lastStartedAt)}
                 </p>
+                {agg.okDurationCount > 0 && (
+                  <p
+                    className="mt-0.5 font-mono text-[10px] text-muted"
+                    title={`Moyenne calculée sur ${agg.okDurationCount} run${agg.okDurationCount > 1 ? "s" : ""} OK (les erreurs et runs En cours ne comptent pas).`}
+                  >
+                    Moyenne : {formatAvgDuration(agg.okDurationSum / agg.okDurationCount)}
+                  </p>
+                )}
               </div>
             ))}
           </section>

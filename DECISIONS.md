@@ -2284,3 +2284,51 @@ Rafraîchir toutes les 30s pour suivre une longue exécution.
 - **Cap fenêtre BOAMP** : passer de 72h à 48h (le 72h vient du fix
   bug #P1 daté du 2026-06-01). Réduit le volume fetched donc le temps.
 - Tests E2E Playwright sur le panel trigger cron + voie A CERFA.
+
+---
+
+## 2026-06-04 (session soir, suite) — Salve K : debug + observabilité
+
+**Auteur :** Alex (dev) — Steve « lance tous les éléments J » interprété
+comme « continue avec une nouvelle salve ».
+
+### K1 — Page `/sourcing/admin/sourcing-debug`
+Décomposition `fetched → filtered → inserted` du dernier
+`cron_run_log` `sourcing-run` `status='ok'`. Lit le payload jsonb,
+agrège par raison de filtre (`no_positive_keyword`, `cpv_mismatch`,
+`amount_below_min/above_max`, `negative_keyword:X`) et donne pour
+chaque raison :
+  - Libellé humain (ex. « Aucun mot-clé positif trouvé »)
+  - Compteur + pourcentage du total fetched
+  - Barre de proportion visuelle
+  - Hint d'action (ex. « Vérifie que le profil actif a des
+    keywords.positive. Sans ça, AUCUN record ne peut passer. »)
+
+JOIN sur `search_profiles` pour mapper profileId → name dans le tableau
+détaillé par profil.
+
+**Résout le mystère 1482 fetched / 0 inserted observé au smoke test
+16:23 :** Steve peut maintenant voir d'un coup d'œil quelle raison
+domine sans regarder les logs Vercel.
+
+Entrée sidebar « Debug sourcing » dans la section Admin (superadmin).
+
+### K2 — Durée moyenne par cron sur `/admin/crons`
+Nouvelle ligne dans les cards d'agrégat : « Moyenne : 135 s » (calculée
+sur les runs status='ok' uniquement — les erreurs et runs en cours ne
+biaisent pas l'avg). Format adaptatif : ms / s / min selon échelle.
+Tooltip avec le nombre de runs OK utilisés pour le calcul.
+
+### K3 — DECISIONS.md
+Cette entrée.
+
+### Backlog côté Alex (mis à jour)
+- **Batch INSERT** dans `runSourcingForProfiles` (toujours en backlog)
+- **Cap fenêtre BOAMP 72h → 48h** (toujours, à arbitrer avec Steve sur
+  le risque de manquer des AOs publiés samedi/dimanche)
+- Tests E2E Playwright
+- **Suite logique de K1** : poller le cron `sourcing-run` toutes les
+  N minutes pour produire un graphique de tendance fetched / inserted
+  par jour (utile pour Steve qui veut voir l'évolution semaine sur
+  semaine). À reporter — `/admin/sourcing-debug` actuel suffit pour
+  le diagnostic ponctuel.

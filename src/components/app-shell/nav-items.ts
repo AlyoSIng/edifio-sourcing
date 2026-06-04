@@ -248,6 +248,13 @@ export const NAV_ITEMS: NavSection[] = [
         matchPrefix: "/sourcing/admin/crons",
         superadminOnly: true,
       },
+      {
+        href: "/sourcing/admin/sourcing-debug",
+        label: "Debug sourcing",
+        icon: "sliders",
+        matchPrefix: "/sourcing/admin/sourcing-debug",
+        superadminOnly: true,
+      },
     ],
   },
 ];
