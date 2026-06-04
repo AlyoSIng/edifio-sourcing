@@ -234,6 +234,13 @@ export const NAV_ITEMS: NavSection[] = [
         matchPrefix: "/sourcing/admin/tandem-activity",
         adminOnly: true,
       },
+      {
+        href: "/sourcing/admin/envois",
+        label: "Envois de dossiers",
+        icon: "mail",
+        matchPrefix: "/sourcing/admin/envois",
+        adminOnly: true,
+      },
     ],
   },
 ];
