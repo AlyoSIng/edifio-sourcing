@@ -23,7 +23,12 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { RangeFilter, parseRange, rangeDaysAgo } from "@/app/sourcing/admin/_shared/RangeFilter";
+import {
+  RangeFilter,
+  parseRange,
+  rangeDaysAgo,
+  parseCustomRange,
+} from "@/app/sourcing/admin/_shared/RangeFilter";
 
 export const metadata = {
   title: "Coûts IA · edifio Sourcing",
@@ -35,6 +40,13 @@ export const runtime = "nodejs";
 // ---------------------------------------------------------------------------
 // Helpers de formatage
 // ---------------------------------------------------------------------------
+
+function formatDateForInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function formatUsd(amount: number): string {
   if (amount === 0) return "0 $";
@@ -62,7 +74,7 @@ function formatMonth(yyyyMm: string): string {
 // ---------------------------------------------------------------------------
 
 interface PageProps {
-  searchParams?: { range?: string };
+  searchParams?: { range?: string; from?: string; to?: string };
 }
 
 export default async function IaUsagePage({ searchParams }: PageProps) {
@@ -75,9 +87,16 @@ export default async function IaUsagePage({ searchParams }: PageProps) {
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
-  // Filtre temporel (I1) — défaut 30j si absent ou invalide.
+  // Filtre temporel (I1 + J1 custom).
   const range = parseRange(searchParams?.range);
-  const rangeFrom = rangeDaysAgo(range);
+  const custom = range === "custom" ? parseCustomRange(searchParams?.from, searchParams?.to) : null;
+  // Si on demande custom mais que les params sont invalides → fallback 30j.
+  const effectiveRange: typeof range = range === "custom" && !custom ? "30" : range;
+  const rangeFrom = custom ? custom.from : rangeDaysAgo(effectiveRange);
+  const rangeTo = custom ? custom.to : new Date();
+  const rangeLabel = custom
+    ? `${custom.from.toLocaleDateString("fr-FR")} → ${custom.to.toLocaleDateString("fr-FR")}`
+    : `${range} j`;
 
   // 2. Résolution dynamique de l'org (fallback ALYOS_ORG_ID).
   let orgId: string;
@@ -122,7 +141,7 @@ export default async function IaUsagePage({ searchParams }: PageProps) {
       .from(aiRuns)
       .innerJoin(aiPrompts, eq(aiRuns.promptId, aiPrompts.id))
       .where(
-        sql`${aiRuns.organizationId} = ${orgId} AND ${aiRuns.createdAt} >= ${rangeFrom.toISOString()}`,
+        sql`${aiRuns.organizationId} = ${orgId} AND ${aiRuns.createdAt} >= ${rangeFrom.toISOString()} AND ${aiRuns.createdAt} <= ${rangeTo.toISOString()}`,
       )
       .groupBy(aiPrompts.name)
       .orderBy(desc(sql<string>`coalesce(sum(${aiRuns.costUsd}), 0)`));
@@ -144,7 +163,11 @@ export default async function IaUsagePage({ searchParams }: PageProps) {
         totalCostUsd: sql<string>`coalesce(sum(${aiRuns.costUsd}), 0)::text`,
       })
       .from(aiRuns)
-      .where(gte(aiRuns.createdAt, rangeFrom).append(sql` AND ${aiRuns.organizationId} = ${orgId}`))
+      .where(
+        gte(aiRuns.createdAt, rangeFrom).append(
+          sql` AND ${aiRuns.createdAt} <= ${rangeTo.toISOString()} AND ${aiRuns.organizationId} = ${orgId}`,
+        ),
+      )
       .groupBy(sql`date_trunc('month', ${aiRuns.createdAt})`)
       .orderBy(sql`date_trunc('month', ${aiRuns.createdAt})`);
 
@@ -197,7 +220,12 @@ export default async function IaUsagePage({ searchParams }: PageProps) {
             et par prompt. Données issues de la table <code>ai_runs</code>.
           </p>
         </div>
-        <RangeFilter basePath="/sourcing/admin/ia-usage" current={range} />
+        <RangeFilter
+          basePath="/sourcing/admin/ia-usage"
+          current={range}
+          customFrom={custom ? formatDateForInput(custom.from) : undefined}
+          customTo={custom ? formatDateForInput(custom.to) : undefined}
+        />
       </header>
 
       {fetchError ? (
@@ -216,7 +244,7 @@ export default async function IaUsagePage({ searchParams }: PageProps) {
             />
             <KpiCard label="Runs mois en cours" value={formatInt(currentMonthTotals.runs)} />
             <KpiCard
-              label={`Coût ${range} j (fenêtre)`}
+              label={`Coût ${rangeLabel} (fenêtre)`}
               value={formatUsd(byPrompt.reduce((acc, p) => acc + p.totalCostUsd, 0))}
             />
           </section>

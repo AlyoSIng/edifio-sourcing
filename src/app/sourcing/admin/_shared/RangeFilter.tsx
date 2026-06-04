@@ -11,10 +11,17 @@ import Link from "next/link";
 
 // I4 — helpers extraits dans `./range.ts` pour être testables sans JSX.
 // On les ré-exporte ici pour préserver l'API publique côté pages.
-export { parseRange, rangeDaysAgo, type RangeOption } from "./range";
+export {
+  parseRange,
+  rangeDaysAgo,
+  parseCustomRange,
+  formatDateLocal,
+  type RangeOption,
+} from "./range";
 import type { RangeOption } from "./range";
+import { CustomRangePopover } from "./CustomRangePopover";
 
-const RANGE_OPTIONS: Array<{ value: RangeOption; label: string }> = [
+const RANGE_OPTIONS: Array<{ value: Exclude<RangeOption, "custom">; label: string }> = [
   { value: "7", label: "7 j" },
   { value: "30", label: "30 j" },
   { value: "90", label: "90 j" },
@@ -24,14 +31,19 @@ export function RangeFilter({
   basePath,
   current,
   extraParams,
+  customFrom,
+  customTo,
 }: {
   /** Préfixe URL (ex. `/sourcing/admin/ia-usage`). */
   basePath: string;
   current: RangeOption;
   /** Autres params à conserver dans le href. */
   extraParams?: Record<string, string>;
+  /** Pré-remplir le popover si on est déjà en mode custom (YYYY-MM-DD). */
+  customFrom?: string;
+  customTo?: string;
 }) {
-  const buildHref = (range: RangeOption): string => {
+  const buildHref = (range: Exclude<RangeOption, "custom">): string => {
     const params = new URLSearchParams({ range });
     if (extraParams) {
       for (const [k, v] of Object.entries(extraParams)) {
@@ -62,6 +74,14 @@ export function RangeFilter({
           </Link>
         );
       })}
+      {/* J1 — option personnalisée avec date pickers (Client Component séparé). */}
+      <CustomRangePopover
+        basePath={basePath}
+        current={current}
+        initialFrom={customFrom}
+        initialTo={customTo}
+        extraParams={extraParams}
+      />
     </nav>
   );
 }

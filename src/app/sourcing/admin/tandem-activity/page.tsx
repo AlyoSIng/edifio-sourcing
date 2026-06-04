@@ -12,7 +12,7 @@
  */
 
 import { redirect } from "next/navigation";
-import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
@@ -24,7 +24,12 @@ import { markArchitectNotificationsSeen } from "@/lib/notifications/architect-re
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { RangeFilter, parseRange, rangeDaysAgo } from "@/app/sourcing/admin/_shared/RangeFilter";
+import {
+  RangeFilter,
+  parseRange,
+  rangeDaysAgo,
+  parseCustomRange,
+} from "@/app/sourcing/admin/_shared/RangeFilter";
 import { TandemTable } from "./TandemTable";
 
 export const metadata = { title: "Activité Tandem · edifio Sourcing" };
@@ -39,7 +44,14 @@ export const runtime = "nodejs";
 // ---------------------------------------------------------------------------
 
 interface PageProps {
-  searchParams?: { range?: string };
+  searchParams?: { range?: string; from?: string; to?: string };
+}
+
+function formatDateForInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export default async function TandemActivityPage({ searchParams }: PageProps) {
@@ -68,10 +80,16 @@ export default async function TandemActivityPage({ searchParams }: PageProps) {
     console.warn("[admin-tandem-activity:mark-seen:fail]", err);
   }
 
-  // I1 — fenêtre temporelle dynamique (défaut 90j → conservé pour cette page,
-  // override possible via ?range=7|30|90).
+  // I1 + J1 — fenêtre temporelle dynamique. Override via ?range=7|30|90 ou
+  // ?range=custom&from=YYYY-MM-DD&to=YYYY-MM-DD.
   const range = parseRange(searchParams?.range);
-  const rangeFrom = rangeDaysAgo(range);
+  const custom = range === "custom" ? parseCustomRange(searchParams?.from, searchParams?.to) : null;
+  const effectiveRange: typeof range = range === "custom" && !custom ? "30" : range;
+  const rangeFrom = custom ? custom.from : rangeDaysAgo(effectiveRange);
+  const rangeTo = custom ? custom.to : new Date();
+  const rangeLabel = custom
+    ? `${custom.from.toLocaleDateString("fr-FR")} → ${custom.to.toLocaleDateString("fr-FR")}`
+    : `${range} derniers jours`;
 
   // 2. Agrégats.
   let fetchError: string | null = null;
@@ -87,10 +105,8 @@ export default async function TandemActivityPage({ searchParams }: PageProps) {
     architectCabinet: string;
   }> = [];
 
-  const ninetyDaysAgo = rangeFrom;
-
   try {
-    // 2a. Counts globaux (90 derniers jours).
+    // 2a. Counts globaux (fenêtre temporelle dynamique I1 + J1).
     const countRows = await db
       .select({
         status: architectResponses.status,
@@ -101,7 +117,8 @@ export default async function TandemActivityPage({ searchParams }: PageProps) {
       .where(
         and(
           eq(architectResponses.organizationId, orgId),
-          gte(architectTokens.createdAt, ninetyDaysAgo),
+          gte(architectTokens.createdAt, rangeFrom),
+          lte(architectTokens.createdAt, rangeTo),
         ),
       )
       .groupBy(architectResponses.status);
@@ -130,7 +147,8 @@ export default async function TandemActivityPage({ searchParams }: PageProps) {
         and(
           eq(architectResponses.organizationId, orgId),
           isNotNull(architectResponses.respondedAt),
-          gte(architectTokens.createdAt, ninetyDaysAgo),
+          gte(architectTokens.createdAt, rangeFrom),
+          lte(architectTokens.createdAt, rangeTo),
         ),
       );
     kpis.avgResponseHours = avgRow ? Math.round(Number(avgRow.avgHours)) : 0;
@@ -153,7 +171,8 @@ export default async function TandemActivityPage({ searchParams }: PageProps) {
       .where(
         and(
           eq(architectResponses.organizationId, orgId),
-          gte(architectTokens.createdAt, ninetyDaysAgo),
+          gte(architectTokens.createdAt, rangeFrom),
+          lte(architectTokens.createdAt, rangeTo),
         ),
       )
       .orderBy(desc(architectTokens.createdAt))
@@ -181,11 +200,16 @@ export default async function TandemActivityPage({ searchParams }: PageProps) {
             Activité Tandem
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Vue agrégée des sollicitations architectes sur les {range} derniers jours, avec taux de
-            réponse et délai moyen.
+            Vue agrégée des sollicitations architectes sur {rangeLabel}, avec taux de réponse et
+            délai moyen.
           </p>
         </div>
-        <RangeFilter basePath="/sourcing/admin/tandem-activity" current={range} />
+        <RangeFilter
+          basePath="/sourcing/admin/tandem-activity"
+          current={range}
+          customFrom={custom ? formatDateForInput(custom.from) : undefined}
+          customTo={custom ? formatDateForInput(custom.to) : undefined}
+        />
       </header>
 
       {fetchError ? (
