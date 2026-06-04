@@ -17,6 +17,8 @@ import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 
+import { TriggerPanel } from "./TriggerPanel";
+
 export const metadata = { title: "Crons · edifio Sourcing" };
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -143,6 +145,9 @@ export default async function CronsPage() {
           de <em>« En cours »</em> à <em>OK</em> ou <em>Erreur</em> en fin de run.
         </p>
       </header>
+
+      {/* Polish I3 — déclenchement manuel des 4 crons (superadmin only). */}
+      <TriggerPanel />
 
       {fetchError ? (
         <ErrorBanner
