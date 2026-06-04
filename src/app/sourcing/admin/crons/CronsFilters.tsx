@@ -29,10 +29,12 @@ export interface CronsFiltersProps {
   rows: CronRunRow[];
   /** Liste des cron_names distincts pour générer le toggle dynamiquement. */
   cronNames: string[];
+  /** Si vrai → pastille pulsante « Polling actif » à côté du compteur. */
+  isPolling?: boolean;
   children: (filtered: CronRunRow[]) => React.ReactNode;
 }
 
-export function CronsFilters({ rows, cronNames, children }: CronsFiltersProps) {
+export function CronsFilters({ rows, cronNames, isPolling, children }: CronsFiltersProps) {
   const [nameFilter, setNameFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -94,8 +96,24 @@ export function CronsFilters({ rows, cronNames, children }: CronsFiltersProps) {
           })}
         </nav>
 
-        <span className="ml-auto text-xs text-muted">
-          {filtered.length} / {rows.length} exécution{filtered.length > 1 ? "s" : ""}
+        <span className="ml-auto flex items-center gap-2 text-xs text-muted">
+          {isPolling && (
+            <span
+              className="inline-flex items-center gap-1"
+              title="Au moins une row en cours — le tableau se rafraîchit toutes les 10 s"
+            >
+              <span className="relative inline-block h-2 w-2">
+                <span className="absolute inset-0 animate-ping rounded-full bg-amber-500 opacity-60" />
+                <span className="absolute inset-0 rounded-full bg-amber-500" />
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-amber-700">
+                Auto-refresh
+              </span>
+            </span>
+          )}
+          <span>
+            {filtered.length} / {rows.length} exécution{filtered.length > 1 ? "s" : ""}
+          </span>
         </span>
       </div>
 

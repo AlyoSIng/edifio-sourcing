@@ -7,10 +7,20 @@
  * Encapsule le filtrage (CronsFilters) + l'affichage. Le parent (Server
  * Component) fait le SELECT et passe la liste brute, ce composant gère le
  * filtre + le rendu.
+ *
+ * Auto-refresh (Steve 2026-06-04 16h30+) : quand au moins une row est
+ * `running`, on déclenche un `router.refresh()` toutes les 10 s pour suivre
+ * l'évolution sans cliquer ↻. Le polling s'arrête dès que la dernière row
+ * running disparaît (reaped ou finie OK/erreur).
  */
+
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import type { CronRunRow } from "./crons-types";
 import { CronsFilters } from "./CronsFilters";
+
+const POLL_INTERVAL_MS = 10_000;
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
@@ -59,8 +69,23 @@ function payloadSummary(payload: unknown): string {
 }
 
 export function CronsTable({ rows, cronNames }: { rows: CronRunRow[]; cronNames: string[] }) {
+  const router = useRouter();
+  const hasRunning = rows.some((r) => r.status === "running");
+
+  // Polling auto tant qu'il y a une row running. Le router.refresh() re-fetch
+  // les Server Components et déclenche le reapAllOrphanedRunningRows() du
+  // load. Dès que toutes les running ont disparu (terminées ou reaped),
+  // l'effect se re-monte avec `hasRunning=false` et le polling s'arrête.
+  useEffect(() => {
+    if (!hasRunning) return;
+    const id = setInterval(() => {
+      router.refresh();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [hasRunning, router]);
+
   return (
-    <CronsFilters rows={rows} cronNames={cronNames}>
+    <CronsFilters rows={rows} cronNames={cronNames} isPolling={hasRunning}>
       {(filtered) =>
         filtered.length === 0 ? (
           <p className="text-sm italic text-muted">Aucune exécution ne correspond aux filtres.</p>

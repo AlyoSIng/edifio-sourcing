@@ -2187,3 +2187,100 @@ docx s'active automatiquement, sans flag.
   généraliser (actuellement hardcodé ALYOS_ORG_ID).
 - **Page `/admin/crons` v3** : pagination + filtre par cron_name + filtre
   par status.
+
+---
+
+## 2026-06-04 (session soir) — Stabilisation crons en production
+
+**Auteur :** Alex (dev) — Steve TEISSIER smoke test après salve J.
+**Commits :** `6b4852d` (RESEND naming) → `8eacd01` (timeout fix #1) →
+`821d5ea` (reap proactif) → `edaeeac` (auto-refresh post-trigger) →
+`e7e3e98` (timeout fix #2 A+B) → (à venir) auto-refresh polling.
+**Motif :** smoke test des polish I3 a révélé 3 défauts UX/runtime
+sur le panneau `/admin/crons` qu'on corrige en cascade.
+
+### `6b4852d` — RESEND_API_SOURCING_KEY fallback
+Steve a posé `RESEND_API_SOURCING_KEY` sur Vercel pour scoper la clé au
+module Sourcing. Code lisait historiquement `RESEND_API_KEY`. Fallback
+ajouté dans `sendEmail` : `process.env.RESEND_API_SOURCING_KEY ||
+process.env.RESEND_API_KEY`. Le `??` ne suffit pas (Vitest/Vercel posent
+parfois une chaîne vide) — on filtre explicitement les vides avant le
+fallback. `.env.example` mis à jour avec la convention préférée et le
+fallback en commentaire. 3 tests vitest (clé sourcing prioritaire,
+fallback legacy, throw clair si rien).
+
+### `8eacd01` — Timeout #1 : maxDuration 60 → 120 + reap au trigger
+Premier 504 observé en manual trigger (HTTP 504 / 61.7s
+FUNCTION_INVOCATION_TIMEOUT). Le tick cron 6h30 quotidien tournait à
+<30s habituellement mais le manual trigger à 11h35 cumulait 5h+ de
+backlog. Trois fixes en un commit :
+  - Parallélisation des `triggerScrapeJob` : boucle séquentielle d'await
+    sur N profils × 3 plateformes → `Promise.all` flat. Gain ~25s.
+  - `maxDuration` 60 → 120s.
+  - `reapOrphanedRunningRows(db, cronName)` : au prochain `startCronRun`,
+    on UPDATE en `error` les rows du même cron_name encore en `running`
+    depuis > 5 min (timeout présumé). Self-heal auto-réparant. Best-effort.
+
+### `821d5ea` — Reap pro-actif au load /admin/crons
+Steve a observé que la row 14:26:26 restait « En cours… » même après
+timeout — le reap auto attendait le prochain `startCronRun` du même
+cron, et personne n'allait re-cliquer pour nettoyer. Nouvelle variante
+`reapAllOrphanedRunningRows(db)` (pas de filtre cron_name) appelée
+best-effort en tête de `CronsPage()`. À chaque chargement de la page,
+les zombies sont nettoyés.
+
+### `edaeeac` — router.refresh() après trigger + bouton ↻
+`revalidatePath` côté Server Action invalide le cache SSG mais ne déclenche
+pas le re-fetch côté Client. Ajout de `router.refresh()` à la fin du
+`handleTrigger` dans TriggerPanel, et bouton ↻ Rafraîchir dans
+l'en-tête du panneau pour suivre l'évolution d'une row En cours… sans
+F5 manuel.
+
+### `e7e3e98` — Timeout #2 (A+B) : 120 → 300 + scrapers fire-and-forget
+Deuxième 504 à 121.9s confirmé : le bottleneck = `runSourcingForProfiles`
+lui-même (1482 records BOAMP fetched sur fenêtre 72h, pipeline complet).
+Steve a choisi l'option A+B :
+  - **A** : `maxDuration` 120 → **300s** (max Vercel Pro).
+  - **B** : Scrapers en **vrai fire-and-forget** — on ne `await
+    Promise.all(scraperJobs)` plus. Le POST initial vers le worker
+    Fly.io part, les `.then/.catch` détachés loggent en background
+    (Vercel best-effort, peut killer après response).
+
+Trade-off : le payload `cron_run_log` perd le détail `scraperTriggered`
+(array `{platform, runId}`) au profit d'un compteur `scrapersDispatched`.
+
+**Validé en smoke test 16:23:22 : sourcing-run HTTP 200, 135.2 s, 1482
+records fetched. Pipeline complet tient confortablement dans 300s.**
+
+### Auto-refresh polling sur /admin/crons (en cours)
+UX final : quand au moins une row est `running`, le tableau se rafraîchit
+automatiquement toutes les 10 s via `router.refresh()`. Le polling
+s'arrête dès que la dernière running disparaît (finie OK/erreur ou reaped).
+Pastille pulsante « Auto-refresh » dans les filtres pour signaler
+visuellement que le polling est actif. Sans ça, Steve devait cliquer ↻
+Rafraîchir toutes les 30s pour suivre une longue exécution.
+
+### Observations smoke test
+- `sourcing-run 16:23:22` : 1482 fetched, 0 inserted, tous filtrés par
+  `no_positive_keyword`. À investiguer côté config : le profil de
+  recherche actif n'a peut-être plus de mots-clés positifs. Pas un bug
+  pipeline — c'est le filtre qui marche.
+- Les 3 autres crons (tandem-followup, library-expiry-digest,
+  dossier-zip-cleanup) passent en < 1 s. Pas de souci de performance.
+
+### Backlog Steve (encore)
+1. Vérifier la config du profil de recherche actif (`/sourcing/admin/search-profiles`)
+   pour le `no_positive_keyword` 100%.
+2. Tester l'envoi mail alerting cron : déclencher manuellement une
+   erreur (couper un service amont) → vérifier qu'un mail Resend arrive
+   bien à steve@alyosingenierie.fr.
+3. Tester la voie A CERFA en uploadant un `.docx` Mustache.
+
+### Backlog Alex (futur)
+- **Batch INSERT** dans `runSourcingForProfiles` : un seul
+  `INSERT ... VALUES (...), (...), ...` au lieu de N inserts individuels.
+  Sur 1482 records 100% filtrés ce n'est pas l'enjeu, mais quand 50-100
+  passent les filtres ça peut diviser le temps par 5-10.
+- **Cap fenêtre BOAMP** : passer de 72h à 48h (le 72h vient du fix
+  bug #P1 daté du 2026-06-01). Réduit le volume fetched donc le temps.
+- Tests E2E Playwright sur le panel trigger cron + voie A CERFA.
