@@ -9,25 +9,16 @@
 
 import Link from "next/link";
 
-export type RangeOption = "7" | "30" | "90";
+// I4 — helpers extraits dans `./range.ts` pour être testables sans JSX.
+// On les ré-exporte ici pour préserver l'API publique côté pages.
+export { parseRange, rangeDaysAgo, type RangeOption } from "./range";
+import type { RangeOption } from "./range";
 
 const RANGE_OPTIONS: Array<{ value: RangeOption; label: string }> = [
   { value: "7", label: "7 j" },
   { value: "30", label: "30 j" },
   { value: "90", label: "90 j" },
 ];
-
-export function parseRange(input: string | string[] | undefined): RangeOption {
-  const v = Array.isArray(input) ? input[0] : input;
-  if (v === "7" || v === "30" || v === "90") return v;
-  return "30";
-}
-
-export function rangeDaysAgo(range: RangeOption, now: Date = new Date()): Date {
-  const d = new Date(now.getTime());
-  d.setDate(d.getDate() - Number(range));
-  return d;
-}
 
 export function RangeFilter({
   basePath,
