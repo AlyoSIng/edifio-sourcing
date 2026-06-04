@@ -1944,3 +1944,125 @@ Session intensive : refonte du flow dossier de candidature, indexation IA de la 
 - Intégration du moteur `docx-fill` dans le flow CERFA (remplacement effectif de pdf-lib)
 - G8 — Guides HTML pour les nouvelles features (envoi archi, export CSV, indexation IA, switch archi, forme juridique, expirations biblio)
 - Tests Vitest sur `zip-compile.ts` et `dispatch-actions.ts` (G6 partiel — seul `index-item.ts` couvert)
+
+---
+
+## 2026-06-04 — Salve H + I : polish dashboards, observabilité, tests
+
+**Auteur :** Alex (dev) — exécution Steve TEISSIER.
+**Commits :** `f29ccc4` (I1) → `54110d8` (I2) → `aedb9cf` (I5) → `6356563` (I3) → `4c7dcad` (I4).
+**Motif :** finalisation du backlog interne avant ouverture du dispositif Tandem à
+plus de cabinets ; pré-requis observabilité avant montée en charge.
+
+### Salve I — UX dashboards + observabilité
+
+#### I1 — Filtres temporels + recherche Tandem + export CSV
+- Nouveau Server Component partagé `src/app/sourcing/admin/_shared/RangeFilter.tsx`
+  avec bouton segmenté 7 j / 30 j / 90 j (défaut 30 j), helpers `parseRange` et
+  `rangeDaysAgo` extraits dans `range.ts` pour testabilité.
+- Pages `/sourcing/admin/ia-usage` et `/sourcing/admin/tandem-activity` câblées
+  sur `?range=...` (rangeFrom appliqué aux WHERE clauses des agrégats).
+- Tandem-activity : tableau récent migré dans Client Component `TandemTable.tsx`
+  pour recherche live (cabinet | intitulé AO, lowercase) + export CSV BOM
+  UTF-8 + séparateur `;`. Nom de fichier `Tandem_sollicitations_YYYY_MM_DD.csv`.
+
+#### I2 — Page Envois de dossiers
+- Nouvelle page `/sourcing/admin/envois` (Server Component, dynamic = force-dynamic)
+  qui liste les 200 derniers `dossier_dispatches` de l'organisation.
+- LEFT JOIN sur tenders + architects → l'historique reste lisible même après
+  purge RGPD (fallback `(AO supprimé)` / `(archi supprimé)`).
+- Client Component `EnvoisTable.tsx` : filtre statut Tous / Actifs / Annulés,
+  recherche AO/archi/email, export CSV des lignes filtrées.
+- Indicateur expiration lien signé : « Actif » jusqu'à `signed_url_expires_at`,
+  puis « Expiré ». Statut envoi : « Actif » ou « Annulé le DD/MM » avec motif
+  en tooltip.
+- Entrée sidebar « Envois de dossiers » dans la section Admin.
+
+#### I5 — Recherche live dans la bibliothèque
+- Champ `<input type="search">` au-dessus des 14 catégories de
+  `/sourcing/admin/bibliotheque`. Filtre côté client (volume ~50-150 entries
+  par org, pas de debounce nécessaire) sur 6 champs concaténés :
+  `name | kind | extractedTitle | keywords | summary | docType`.
+- Normalisation lowercase + NFD + suppression diacritiques → insensibilité aux
+  accents (« référence » trouve « reference »).
+- UX : quand la recherche est active, les catégories vides sont masquées pour
+  rester lisible.
+
+#### I3 — Observabilité crons (cron_run_log)
+- Migration **0046_cron_run_log.sql** : table `cron_run_log` (id, cron_name,
+  started_at, finished_at, duration_ms, status check IN ('running','ok','error'),
+  payload jsonb, error_message, error_stack). 2 index : par
+  `started_at DESC` et composite `(cron_name, started_at DESC)`. RLS FORCE
+  sans policy authenticated — service_role only.
+- Schéma Drizzle `src/db/schema/cron-log.ts`, ré-export depuis `schema/index.ts`.
+- Wrapper `src/lib/cron/log-cron-run.ts` exposant `startCronRun`,
+  `finishCronRun`, `withCronRunLog(db, name, runner)`. Best-effort sur le
+  logging : si l'INSERT ou l'UPDATE rate, on warn console et le cron continue
+  normalement (l'observabilité ne doit jamais casser le runtime).
+- Les 4 routes `/api/cron/*` (tandem-followup, library-expiry-digest,
+  dossier-zip-cleanup, sourcing-run) sont wrappées avec `withCronRunLog`.
+  L'auth `CRON_SECRET` reste en premier (timingSafeEqual) ; la signature
+  publique des routes ne change pas.
+- Page `/sourcing/admin/crons` (superadmin only, lecture via
+  `createSupabaseAdminClient`) : 100 dernières runs, agrégats par tâche
+  (OK / erreurs / en cours), tableau détaillé avec durée formatée + aperçu
+  payload + message d'erreur. Entrée sidebar « Crons » section Admin.
+- **⚠ Migration prod à appliquer manuellement avant le prochain tick cron.**
+  Sans la table, les INSERT échoueront silencieusement et les crons
+  tourneront sans traçabilité (mais sans casser).
+
+#### I4 — Tests vitest des helpers de la salve
+- `range.test.ts` (8 cas) : `parseRange` (valeur valide, défaut sur invalide,
+  tableau searchParams Next.js) ; `rangeDaysAgo` (delta correct, invariance
+  du `now`, tolérance DST 1h sur traversée de changement d'heure).
+- `log-cron-run.test.ts` (5 cas) : fake Drizzle minimal pour vérifier INSERT
+  'running' + UPDATE 'ok' avec payload, UPDATE 'error' avec message + stack,
+  exception non propagée par le wrapper, runner exécuté même si l'INSERT
+  initial rate, throw non-Error sérialisé en string.
+- **13 nouveaux tests verts.** Suite globale : 1081 + 13 = 1094 passants,
+  6 fails pré-existants (orchestrator, boamp, sourcing-run pipeline, tandem
+  actions × 3) inchangés — à traiter séparément.
+
+#### I6 — Cleanup dead code
+- Audit de la salve I : tous les exports introduits (`withCronRunLog`,
+  `startCronRun`, `finishCronRun`, `cronRunLog`, `EnvoisTable`, `EnvoiRow`,
+  `TandemTable`, `RangeFilter`, `parseRange`, `rangeDaysAgo`) sont
+  référencés au moins une fois. Aucun dead code introduit, ESLint strict
+  (max-warnings 0) garantit l'absence d'imports inutilisés à chaque commit.
+- La dette historique pré-salve I n'est pas traitée ici — sujet d'un chantier
+  knip dédié si pertinent plus tard.
+
+#### I7 — Guide HTML pilotage admin
+- Ajout du **guide 12 « Piloter l'activité depuis les dashboards admin »**
+  dans `formations-content-fixture.ts` (slug `pilotage-admin-observabilite`,
+  displayOrder 12, durée lecture 6 min). Couvre les 4 dashboards admin,
+  filtres temporels, recherche / export CSV, annulation d'envoi, notifications
+  in-app, recherche biblio, observabilité crons et seuils d'alerte CTO.
+- Steve : `pnpm db:seed:formations` pour publier en prod (idempotent — UPSERT
+  par id UUID déterministe).
+
+#### I6 → I8 — Housekeeping
+- Cette entrée DECISIONS.md (I8).
+
+### Backlog côté Steve
+
+1. **Migration 0046 prod** (`cron_run_log`) avant le prochain tick cron, sinon
+   logging silencieusement absent.
+2. **Seed formations prod** (`pnpm db:seed:formations`) pour publier le guide 12.
+3. Vérifier après 24h sur `/sourcing/admin/crons` que les 4 crons s'enregistrent
+   bien (sourcing-run le matin, dossier-zip-cleanup tôt, tandem-followup en
+   journée, library-expiry-digest le lundi).
+4. **Traiter les 6 fails pré-existants vitest** (orchestrator scoring NaN, boamp
+   URL, sourcing-run pipeline NaN, tandem actions template TU/VOUS × 3) — pas
+   bloquant pour la prod (logique vivante OK) mais bloquant pour la CI à un
+   moment ou un autre.
+
+### Backlog côté Alex (prochaines sessions)
+
+- **H1 (explicitement non livré)** — intégration `docx-fill` dans le flow CERFA
+  (remplacement effectif de pdf-lib). Reporté par Steve sur la salve H ; à
+  reprendre quand le besoin sera prioritaire.
+- Causes-racines des 6 fails pré-existants si on les attaque depuis dev plutôt
+  qu'en marge.
+- Page `/sourcing/admin/crons` v2 : possibilité de déclencher manuellement un
+  cron depuis l'UI (POST avec CRON_SECRET côté Server Action).

@@ -376,6 +376,54 @@ L'export tire **tous les AO** au statut sourced de ton organisation, indépendam
 ## 7. Limite pratique
 Pour rester rapide, l'export est plafonné à **500 lignes** par fichier. Au-delà, Excel commence à ramer et c'est probablement le signe que tes filtres BOAMP sont à resserrer.`;
 
+const GUIDE_12 = `Quand l'usage quotidien d'edifio Sourcing monte en volume, tu as besoin de regarder ton activité de plus haut : combien d'archis tu sollicites, combien de dossiers tu envoies, combien coûte l'IA, est-ce que les crons tournent. Ce guide te montre où regarder.
+
+## 1. Quatre dashboards admin
+Dans le menu **Admin**, quatre pages te donnent une vue agrégée :
+- **Activité Tandem** — tes sollicitations architectes (pending / accepté / décliné / info), taux de réponse, délai moyen.
+- **Coûts IA** *(superadmin)* — dépense Claude par prompt et par mois (Haiku indexation, Sonnet RC analyse, etc.).
+- **Envois de dossiers** — historique des dossiers envoyés aux architectes, actifs et annulés.
+- **Crons** *(superadmin)* — exécutions des tâches planifiées (sourcing matinal, relance J+3, digest expiration biblio, cleanup ZIP).
+
+## 2. Filtrer une période — 7 / 30 / 90 j
+En haut à droite de **Activité Tandem** et **Coûts IA**, un bouton segmenté **7 j / 30 j / 90 j** te permet de zoomer. Par défaut on affiche 30 jours, qui couvre la fenêtre commerciale typique. À 7 jours, tu vois ce qui s'est passé cette semaine. À 90 jours, tu repères les tendances. La sélection passe dans l'URL (\`?range=30\`) — tu peux mettre un favori sur la fenêtre que tu utilises.
+
+## 3. Rechercher dans les sollicitations Tandem
+Sur **Activité Tandem**, le tableau des 30 dernières sollicitations propose un champ **Rechercher un cabinet ou un AO…** : tu tapes deux lettres et la liste se réduit. Pratique quand tu veux voir où en est un cabinet précis sans scroller. Le compteur t'indique combien de lignes restent visibles.
+
+## 4. Exporter en CSV
+Sur **Activité Tandem** comme sur **Envois de dossiers**, un bouton **📥 Export CSV** descend ce que tu vois à l'écran (donc respectant la recherche et le filtre statut en cours). Le format est BOM UTF-8 + séparateur \`;\` — c'est le format Excel français, double-clic ouvre nativement.
+
+## 5. Envois de dossiers : historique complet
+La page **Envois de dossiers** liste les 200 derniers ZIPs envoyés aux architectes. Pour chaque ligne tu vois : AO, archi, email destinataire, date d'envoi, statut du lien signé (Actif jusqu'à J+7 ou Expiré), statut d'envoi (Actif ou Annulé le DD/MM).
+- Filtre **Tous / Actifs / Annulés** pour retrouver rapidement un envoi annulé.
+- Recherche AO / archi / email pour cibler.
+- Survol d'un envoi annulé : le motif que tu avais saisi au moment d'annuler apparaît en tooltip.
+
+## 6. Annuler un envoi
+Sur la page **Pièces** d'un AO, après envoi du dossier à un archi, tu vois la pastille « Envoyé le DD/MM ». Si tu t'es trompé de destinataire ou d'archi, le bouton **Annuler cet envoi** te demande un motif (optionnel mais conseillé) et marque l'envoi comme annulé.
+- **Important** : le lien signé Supabase reste valide jusqu'à expiration naturelle (7 jours) — Supabase Storage ne révoque pas les signed URLs. Annuler protège ton historique et marque clairement la faute mais n'invalide pas le téléchargement. Pour un vrai blocage, il faut renommer le fichier dans Storage — pratique réservée aux fausses manipulations graves.
+
+## 7. Notifications in-app
+Quand un archi répond (acceptation, refus, demande d'infos), un badge rouge apparaît sur l'entrée **Cotraitance** de la barre latérale. Le compteur tombe à 0 quand tu ouvres la page concernée (la page Activité Tandem fait la même chose). C'est la file d'alertes Tandem.
+
+## 8. Recherche live dans la bibliothèque
+La page **Bibliothèque** (Configuration > Bibliothèque) propose un champ **Rechercher** au-dessus des 14 catégories. Il match en temps réel sur le nom du fichier, la catégorie, le titre extrait par l'IA, les mots-clés, le résumé et le type de document détecté. Insensible aux accents : « référence » trouve aussi « reference ». Pratique quand tu cherches le bon CV ou la bonne attestation à mettre dans un dossier.
+
+## 9. Crons (superadmin)
+La page **Crons** liste les 100 dernières exécutions des 4 tâches planifiées Vercel :
+- **sourcing-run** (6h30 jours ouvrés) : collecte BOAMP + déclenche scraping PLACE / Francmarchés.
+- **tandem-followup** (9h tous les jours) : relance J+3 des archis non-réponse.
+- **library-expiry-digest** (8h chaque lundi) : email digest des attestations qui expirent.
+- **dossier-zip-cleanup** (5h30 tous les jours) : supprime les ZIPs orphelins de Storage.
+
+Chaque ligne affiche : tâche, démarré, durée, statut (OK / Erreur / En cours), aperçu de la sortie (compteurs) ou message d'erreur. C'est l'endroit où tu regardes si un cron a planté ou si rien ne s'est passé ce matin.
+
+## 10. Quand alerter le CTO
+- **Crons** : 2 erreurs consécutives sur la même tâche, ou un cron qui n'apparaît plus dans la liste depuis 24h (= il ne s'est pas déclenché du tout).
+- **Activité Tandem** : taux de réponse qui chute à <30 % sur 30j (problème de templates ou de routage).
+- **Coûts IA** : dépense mensuelle qui dépasse 50 € (anomalie sur prompt sourcing).`;
+
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
     id: "fb000001-0000-0000-0000-000000000001",
@@ -504,5 +552,17 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_11,
     isActive: true,
     displayOrder: 11,
+  },
+  {
+    id: "fb000001-0000-0000-0000-00000000000c",
+    slug: "pilotage-admin-observabilite",
+    title: "Piloter l'activité depuis les dashboards admin",
+    description:
+      "Filtres 7/30/90j, recherche dans les sollicitations Tandem, historique des envois de dossiers avec filtre actifs/annulés, recherche live dans la bibliothèque, observabilité des crons (superadmin).",
+    type: "doc",
+    durationMin: 6,
+    contentMd: GUIDE_12,
+    isActive: true,
+    displayOrder: 12,
   },
 ];
