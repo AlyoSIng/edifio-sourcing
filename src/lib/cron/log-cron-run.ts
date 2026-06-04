@@ -100,11 +100,17 @@ export async function finishCronRun(
 /**
  * Helper haut-niveau : `withCronRunLog('cron-name', async () => { ... })`.
  * Capture succès / exception et trace dans cron_run_log.
+ *
+ * Option `onError` : callback appelé après finishCronRun quand le runner
+ * throw. Sert au polish I3 (notification mail superadmin via
+ * `notifyCronError`). Best-effort : si onError throw, on warn console et
+ * on renvoie quand même `{ok: false, error}`.
  */
 export async function withCronRunLog<T>(
   db: Db,
   cronName: string,
   runner: () => Promise<T>,
+  opts: { onError?: (error: unknown) => Promise<void> } = {},
 ): Promise<{ ok: true; result: T } | { ok: false; error: unknown }> {
   const handle = await startCronRun(db, cronName);
   try {
@@ -113,6 +119,13 @@ export async function withCronRunLog<T>(
     return { ok: true, result };
   } catch (error) {
     await finishCronRun(db, handle, { error });
+    if (opts.onError) {
+      try {
+        await opts.onError(error);
+      } catch (notifyErr) {
+        console.warn("[cron-log:onError:fail]", cronName, notifyErr);
+      }
+    }
     return { ok: false, error };
   }
 }

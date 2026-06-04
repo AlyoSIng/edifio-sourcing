@@ -20,6 +20,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/db/client";
 import { withCronRunLog } from "@/lib/cron/log-cron-run";
+import { notifyCronError } from "@/lib/cron/notify-error";
 import { sendEmail } from "@/lib/email/resend";
 import { runLibraryExpiryDigest } from "@/lib/library/expiry-digest";
 import { getSiteUrl } from "@/lib/site-url";
@@ -57,8 +58,11 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
   if (authError) return authError;
 
   // I3 — observabilité cron_run_log.
-  const outcome = await withCronRunLog(db, "library-expiry-digest", async () =>
-    runLibraryExpiryDigest({ db, sendEmail, baseUrl: getSiteUrl() }),
+  const outcome = await withCronRunLog(
+    db,
+    "library-expiry-digest",
+    async () => runLibraryExpiryDigest({ db, sendEmail, baseUrl: getSiteUrl() }),
+    { onError: (err) => notifyCronError(db, "library-expiry-digest", err) },
   );
 
   if (outcome.ok) {

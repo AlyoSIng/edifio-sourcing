@@ -13,6 +13,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/db/client";
 import { withCronRunLog } from "@/lib/cron/log-cron-run";
+import { notifyCronError } from "@/lib/cron/notify-error";
 import { runDossierZipCleanup } from "@/lib/storage/dossier-zip-cleanup";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -39,10 +40,15 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
   if (authError) return authError;
 
   // I3 — observabilité cron_run_log.
-  const outcome = await withCronRunLog(db, "dossier-zip-cleanup", async () => {
-    const supabaseAdmin = createSupabaseAdminClient();
-    return await runDossierZipCleanup({ db, supabaseAdmin });
-  });
+  const outcome = await withCronRunLog(
+    db,
+    "dossier-zip-cleanup",
+    async () => {
+      const supabaseAdmin = createSupabaseAdminClient();
+      return await runDossierZipCleanup({ db, supabaseAdmin });
+    },
+    { onError: (err) => notifyCronError(db, "dossier-zip-cleanup", err) },
+  );
 
   if (outcome.ok) {
     const result = outcome.result;

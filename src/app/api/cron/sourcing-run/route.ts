@@ -48,6 +48,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { searchProfiles } from "@/db/schema/config";
 import { withCronRunLog } from "@/lib/cron/log-cron-run";
+import { notifyCronError } from "@/lib/cron/notify-error";
 
 import { createBoampConnector } from "@/lib/sourcing/connectors/boamp";
 import {
@@ -96,76 +97,84 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
   if (authError) return authError;
 
   // I3 — observabilité cron_run_log (wrappe tout le pipeline).
-  const outcome = await withCronRunLog(db, "sourcing-run", async () => {
-    // 1. Charge tous les profils actifs (1 seule org AlyoS en MVP — petit
-    //    volume, pas de pagination nécessaire). Multi-org viendra Phase 2.
-    const profiles = await db.select().from(searchProfiles).where(eq(searchProfiles.active, true));
+  const outcome = await withCronRunLog(
+    db,
+    "sourcing-run",
+    async () => {
+      // 1. Charge tous les profils actifs (1 seule org AlyoS en MVP — petit
+      //    volume, pas de pagination nécessaire). Multi-org viendra Phase 2.
+      const profiles = await db
+        .select()
+        .from(searchProfiles)
+        .where(eq(searchProfiles.active, true));
 
-    if (profiles.length === 0) {
-      console.log("[cron:sourcing-run] aucun profil actif — skip");
-      return {
-        totalProfiles: 0,
-        results: [],
-        failedProfiles: [],
-        scraperTriggered: [] as Array<{ platform: string; runId?: string; error?: string }>,
-        durationMs: 0,
-      } as const;
-    }
+      if (profiles.length === 0) {
+        console.log("[cron:sourcing-run] aucun profil actif — skip");
+        return {
+          totalProfiles: 0,
+          results: [],
+          failedProfiles: [],
+          scraperTriggered: [] as Array<{ platform: string; runId?: string; error?: string }>,
+          durationMs: 0,
+        } as const;
+      }
 
-    // 2. Connecteur BOAMP (fetch global Node ≥ 20)
-    const connector = createBoampConnector();
+      // 2. Connecteur BOAMP (fetch global Node ≥ 20)
+      const connector = createBoampConnector();
 
-    // 3. Pipeline pour tous les profils
-    const batch = await runSourcingForProfiles(profiles, { connector, db });
+      // 3. Pipeline pour tous les profils
+      const batch = await runSourcingForProfiles(profiles, { connector, db });
 
-    // 4. Déclencher scraping PLACE + Francmarchés (async — résultats via webhook)
-    const scraperTriggered: Array<{ platform: string; runId?: string; error?: string }> = [];
-    const webhookUrl = `${getSiteUrl()}/api/webhooks/scraper-done`;
+      // 4. Déclencher scraping PLACE + Francmarchés (async — résultats via webhook)
+      const scraperTriggered: Array<{ platform: string; runId?: string; error?: string }> = [];
+      const webhookUrl = `${getSiteUrl()}/api/webhooks/scraper-done`;
 
-    for (const profile of profiles) {
-      const profileFilters = {
-        keywords: profile.keywords?.positive ?? [],
-        geoZones: profile.geoZones ?? [],
-      };
-      const lastRunAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      for (const profile of profiles) {
+        const profileFilters = {
+          keywords: profile.keywords?.positive ?? [],
+          geoZones: profile.geoZones ?? [],
+        };
+        const lastRunAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      for (const platform of ["francmarches", "place", "marchespublicsinfo"] as const) {
-        try {
-          const ack = await triggerScrapeJob({
-            platform,
-            profileFilters,
-            lastRunAt,
-            profileId: profile.id,
-            orgId: profile.organizationId,
-            webhookUrl,
-          });
-          scraperTriggered.push({ platform, runId: ack.runId });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          if (!(err instanceof ScraperUnavailableError)) {
-            console.error("[cron:sourcing-run] scraper error", { platform, message });
-          } else {
-            console.log("[cron:sourcing-run] scraper unavailable (skip)", { platform, message });
+        for (const platform of ["francmarches", "place", "marchespublicsinfo"] as const) {
+          try {
+            const ack = await triggerScrapeJob({
+              platform,
+              profileFilters,
+              lastRunAt,
+              profileId: profile.id,
+              orgId: profile.organizationId,
+              webhookUrl,
+            });
+            scraperTriggered.push({ platform, runId: ack.runId });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (!(err instanceof ScraperUnavailableError)) {
+              console.error("[cron:sourcing-run] scraper error", { platform, message });
+            } else {
+              console.log("[cron:sourcing-run] scraper unavailable (skip)", { platform, message });
+            }
+            scraperTriggered.push({ platform, error: message });
           }
-          scraperTriggered.push({ platform, error: message });
         }
       }
-    }
 
-    console.log("[cron:sourcing-run] scrapers triggered", scraperTriggered);
+      console.log("[cron:sourcing-run] scrapers triggered", scraperTriggered);
 
-    // 5. Trace structurée des métriques (Vercel logs / Datadog)
-    console.log("[cron:sourcing-run] done", {
-      total_profiles: batch.totalProfiles,
-      profiles_ok: batch.results.length,
-      profiles_failed: batch.failedProfiles.length,
-      tenders_inserted: batch.results.reduce((acc, r) => acc + r.inserted, 0),
-      tenders_updated: batch.results.reduce((acc, r) => acc + r.updated, 0),
-      duration_ms: batch.durationMs,
-    });
+      // 5. Trace structurée des métriques (Vercel logs / Datadog)
+      console.log("[cron:sourcing-run] done", {
+        total_profiles: batch.totalProfiles,
+        profiles_ok: batch.results.length,
+        profiles_failed: batch.failedProfiles.length,
+        tenders_inserted: batch.results.reduce((acc, r) => acc + r.inserted, 0),
+        tenders_updated: batch.results.reduce((acc, r) => acc + r.updated, 0),
+        duration_ms: batch.durationMs,
+      });
 
-    return { ...batch, scraperTriggered };
-  });
+      return { ...batch, scraperTriggered };
+    },
+    { onError: (err) => notifyCronError(db, "sourcing-run", err) },
+  );
 
   if (outcome.ok) {
     return NextResponse.json({ ok: true, ...outcome.result });

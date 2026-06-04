@@ -33,6 +33,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { getBrevoClient } from "@/lib/brevo/client";
 import { withCronRunLog } from "@/lib/cron/log-cron-run";
+import { notifyCronError } from "@/lib/cron/notify-error";
 import { runTandemFollowups } from "@/lib/tandem/followup-cron";
 
 /** Le cron peut s'étirer si plusieurs centaines d'archis à relancer. */
@@ -77,10 +78,15 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
 
   // I3 — wrap dans withCronRunLog : INSERT row 'running' au début, UPDATE
   // avec status final + duration_ms à la fin (même en cas d'exception).
-  const outcome = await withCronRunLog(db, "tandem-followup", async () => {
-    const brevoClient = getBrevoClient();
-    return await runTandemFollowups({ db, brevoClient });
-  });
+  const outcome = await withCronRunLog(
+    db,
+    "tandem-followup",
+    async () => {
+      const brevoClient = getBrevoClient();
+      return await runTandemFollowups({ db, brevoClient });
+    },
+    { onError: (err) => notifyCronError(db, "tandem-followup", err) },
+  );
 
   if (outcome.ok) {
     const result = outcome.result;
