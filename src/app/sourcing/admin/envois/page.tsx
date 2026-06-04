@@ -112,8 +112,74 @@ export default async function EnvoisPage() {
           Aucun envoi de dossier enregistré pour le moment.
         </p>
       ) : (
-        <EnvoisTable rows={rows} />
+        <>
+          {/* J6 — KPI cards : panorama rapide avant le tableau filtrable. */}
+          <KpiSection rows={rows} />
+          <EnvoisTable rows={rows} />
+        </>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// J6 — KPI section
+// ---------------------------------------------------------------------------
+
+function KpiSection({ rows }: { rows: EnvoiRow[] }) {
+  const now = Date.now();
+  const stats = {
+    total: rows.length,
+    active: 0,
+    cancelled: 0,
+    linkExpired: 0,
+    uniqueArchitects: new Set<string>(),
+    uniqueTenders: new Set<string>(),
+  };
+
+  for (const r of rows) {
+    if (r.cancelledAtIso) stats.cancelled++;
+    else stats.active++;
+
+    if (new Date(r.signedUrlExpiresAtIso).getTime() < now) stats.linkExpired++;
+
+    stats.uniqueArchitects.add(r.architectCabinet);
+    stats.uniqueTenders.add(r.tenderTitle);
+  }
+
+  return (
+    <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <Kpi label="Total envois" value={String(stats.total)} />
+      <Kpi label="Actifs" value={String(stats.active)} colorClass="text-emerald-700" />
+      <Kpi label="Annulés" value={String(stats.cancelled)} colorClass="text-error" />
+      <Kpi label="Liens expirés" value={String(stats.linkExpired)} colorClass="text-ink-2" />
+      <Kpi
+        label="Archis sollicités"
+        value={`${stats.uniqueArchitects.size}`}
+        sublabel={`${stats.uniqueTenders.size} AO`}
+      />
+    </section>
+  );
+}
+
+function Kpi({
+  label,
+  value,
+  sublabel,
+  colorClass,
+}: {
+  label: string;
+  value: string;
+  sublabel?: string;
+  colorClass?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-line bg-white p-3">
+      <p className="font-mono text-[10px] uppercase tracking-wider text-muted">{label}</p>
+      <p className={`mt-1 font-display text-xl font-semibold ${colorClass ?? "text-ink"}`}>
+        {value}
+      </p>
+      {sublabel && <p className="mt-0.5 font-mono text-[10px] text-muted">{sublabel}</p>}
     </div>
   );
 }
