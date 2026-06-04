@@ -2327,8 +2327,41 @@ Cette entrée.
 - **Cap fenêtre BOAMP 72h → 48h** (toujours, à arbitrer avec Steve sur
   le risque de manquer des AOs publiés samedi/dimanche)
 - Tests E2E Playwright
-- **Suite logique de K1** : poller le cron `sourcing-run` toutes les
-  N minutes pour produire un graphique de tendance fetched / inserted
-  par jour (utile pour Steve qui veut voir l'évolution semaine sur
-  semaine). À reporter — `/admin/sourcing-debug` actuel suffit pour
-  le diagnostic ponctuel.
+
+---
+
+## 2026-06-04 (session soir, suite) — Salve L : debug sourcing enrichi
+
+**Auteur :** Alex (dev) — Steve « ok continue ».
+
+### L1 — Section « Profils actifs » sur /admin/sourcing-debug
+SELECT `search_profiles WHERE active=true ORDER BY is_default DESC`, et pour
+chaque profil affiche :
+  - Badge « Par défaut » si applicable
+  - **Avertissement rouge** si `keywords.positive` est vide (la cause
+    n°1 du « 0 inserted »)
+  - 6 chips colorées : positives (vert), négatives (rouge), exacts,
+    CPV, géo, types de marché. Limite 8 chips visibles + « + N… »
+  - Borne montant si présente (min/max)
+
+Cas particulier : si aucun profil actif → bandeau d'alerte rouge avec
+lien direct vers /sourcing/admin/search-profiles.
+
+### L2 — Mini-graphique tendance 7 derniers runs
+Barres CSS pour les 7 derniers `cron_run_log` `sourcing-run`
+`status='ok'`, ordre chronologique (gauche → droite). Hauteur ∝
+`fetched`, sur-couche verte ∝ `inserted/fetched`. Tooltip avec
+date/heure + durée + fetched + inserted. Légende couleur en bas.
+Affiché seulement si ≥ 2 runs (sinon pas de tendance à montrer).
+
+### L3 — DECISIONS.md
+Cette entrée.
+
+### Backlog Alex
+- **Batch INSERT** moteur sourcing (toujours)
+- **Cap fenêtre BOAMP 48h** (toujours, à arbitrer)
+- E2E Playwright
+- Phase 2 multi-tenant
+- **Suite L4** possible : graphique 30j au lieu de 7j si Steve veut
+  voir l'évolution mensuelle. Trivial à étendre — changer `.limit(7)`
+  en `.limit(30)`.
