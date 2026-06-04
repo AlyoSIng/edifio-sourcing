@@ -12,6 +12,7 @@
  * — ce composant n'est qu'une commodité UX.
  */
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { triggerCronAction, type TriggerCronResult } from "./actions";
@@ -51,6 +52,7 @@ const CRONS: CronEntry[] = [
 ];
 
 export function TriggerPanel() {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [activeName, setActiveName] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<TriggerCronResult | null>(null);
@@ -62,16 +64,31 @@ export function TriggerPanel() {
       const result = await triggerCronAction(name);
       setLastResult(result);
       setActiveName(null);
+      // Force le re-fetch des Server Components — la nouvelle row apparaît
+      // immédiatement dans le tableau et la self-heal du load
+      // (reapAllOrphanedRunningRows) re-tourne avec son seuil 5 min.
+      router.refresh();
     });
   }
 
   return (
     <section className="mb-8 rounded-lg border border-line bg-paper-2 p-4">
-      <header className="mb-3 flex items-baseline justify-between">
+      <header className="mb-3 flex items-baseline justify-between gap-2">
         <h2 className="font-display text-base font-semibold text-ink">Déclencher manuellement</h2>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
-          Superadmin
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            disabled={isPending}
+            className="rounded-full border border-line bg-white px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-2 transition hover:bg-paper-2 disabled:opacity-50"
+            title="Recharger le tableau (utile pour suivre une row En cours…)"
+          >
+            ↻ Rafraîchir
+          </button>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+            Superadmin
+          </span>
+        </div>
       </header>
 
       <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
