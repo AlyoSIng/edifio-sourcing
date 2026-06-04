@@ -16,6 +16,11 @@
 import { redirect } from "next/navigation";
 
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
+import {
+  ALYOS_BTP_BASELINE_2026_05_22,
+  compareWithBaseline,
+  type FieldDiff,
+} from "@/lib/sourcing/baseline-profiles";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 
@@ -231,6 +236,9 @@ export default async function SourcingDebugPage() {
         />
       ) : (
         <>
+          {/* M — Diff baseline 22/05 vs profil actuel (matché par nom). */}
+          <BaselineDiffSection profiles={activeProfiles} />
+
           {/* L1 — Profils actifs (toujours affiché, indépendant du dernier run). */}
           <ActiveProfilesSection profiles={activeProfiles} />
 
@@ -254,6 +262,116 @@ export default async function SourcingDebugPage() {
         </>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// L1 — Section profils actifs
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// M — Section diff baseline 22/05
+// ---------------------------------------------------------------------------
+
+function BaselineDiffSection({ profiles }: { profiles: ActiveProfile[] }) {
+  // On matche la baseline sur le nom du profil. Si Steve a renommé son profil,
+  // on tente quand même le matching sur le profil par défaut (heuristique
+  // raisonnable au MVP).
+  const target =
+    profiles.find((p) => p.name === ALYOS_BTP_BASELINE_2026_05_22.name) ??
+    profiles.find((p) => p.is_default) ??
+    null;
+
+  if (!target) return null;
+
+  const current = {
+    name: target.name,
+    positiveCount: (target.keywords?.positive ?? []).length,
+    negativeCount: (target.keywords?.negative ?? []).length,
+    cpvCount: (target.cpv_codes ?? []).length,
+    geoCount: (target.geo_zones ?? []).length,
+    marketTypes: target.market_types ?? [],
+  };
+  const diffs = compareWithBaseline(current);
+
+  const hasRegression = diffs.some((d) => d.severity === "regression");
+  const hasDrift = diffs.some((d) => d.severity === "drift");
+
+  return (
+    <section className="mb-8">
+      <h2 className="mb-3 font-display text-base font-semibold text-ink">
+        Diff vs baseline du 22/05/2026
+      </h2>
+      <p className="mb-3 text-xs text-muted">
+        Comparaison du profil <code>{target.name}</code> avec le snapshot qui matchait des AOs en
+        production (ta note MEMORY).{" "}
+        {hasRegression ? (
+          <span className="font-semibold text-error">
+            Régression détectée — probable cause du « 0 inserted ».
+          </span>
+        ) : hasDrift ? (
+          <span className="font-semibold text-amber-700">
+            Dérive détectée — à valider si intentionnelle.
+          </span>
+        ) : (
+          <span className="font-semibold text-emerald-700">Aligné — config inchangée.</span>
+        )}
+      </p>
+
+      <div className="overflow-x-auto rounded-lg border border-line bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-paper-2">
+            <tr>
+              <th className="px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-ink-2">
+                Champ
+              </th>
+              <th className="px-3 py-2 text-right font-mono text-[11px] uppercase tracking-wider text-ink-2">
+                Baseline (22/05)
+              </th>
+              <th className="px-3 py-2 text-right font-mono text-[11px] uppercase tracking-wider text-ink-2">
+                Actuel
+              </th>
+              <th className="px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-ink-2">
+                Statut
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {diffs.map((d) => (
+              <tr key={d.field}>
+                <td className="px-3 py-2 text-ink">{d.field}</td>
+                <td className="px-3 py-2 text-right font-mono text-[11px] text-ink-2">
+                  {d.baseline}
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-[11px] text-ink-2">
+                  {d.current}
+                </td>
+                <td className="px-3 py-2">
+                  <DiffBadge severity={d.severity} />
+                  {d.hint && <p className="mt-1 text-[11px] text-muted">{d.hint}</p>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function DiffBadge({ severity }: { severity: FieldDiff["severity"] }) {
+  const cfg =
+    severity === "ok"
+      ? { label: "OK", cls: "bg-emerald-50 text-emerald-700" }
+      : severity === "drift"
+        ? { label: "Drift", cls: "bg-amber-50 text-amber-700" }
+        : { label: "Régression", cls: "bg-error-bg text-error" };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cfg.cls}`}
+    >
+      {cfg.label}
+    </span>
   );
 }
 

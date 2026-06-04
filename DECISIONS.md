@@ -2365,3 +2365,49 @@ Cette entrée.
 - **Suite L4** possible : graphique 30j au lieu de 7j si Steve veut
   voir l'évolution mensuelle. Trivial à étendre — changer `.limit(7)`
   en `.limit(30)`.
+
+---
+
+## 2026-06-04 (session soir, suite) — Salve M : diff baseline 22/05
+
+**Auteur :** Alex (dev) — Steve « ok continue », j'exploite la note
+MEMORY `project_alyos_btp_profile_baseline.md` qui demandait
+explicitement de comparer si « cron 6h30 lundi insère 0 ».
+
+### M — Module `baseline-profiles.ts` + section diff
+Encode le snapshot 22/05 17h03 (24 positives + 9 negatives + 0 CPV +
+23 départements + market_types `moe/services/fournitures`) comme
+constante TS `ALYOS_BTP_BASELINE_2026_05_22`.
+
+`compareWithBaseline(current, baseline?)` renvoie un `FieldDiff[]`
+avec sévérité par champ :
+  - **ok** : valeur identique ou compatible
+  - **drift** : valeur différente (potentiellement bénin, à valider)
+  - **régression** : valeur INFÉRIEURE à la baseline (probable cause
+    d'un « 0 inserted » alors que la baseline produisait)
+
+Heuristiques :
+  - positiveCount actuel < baseline → régression
+  - positiveCount actuel > baseline → drift (élargissement)
+  - cpvCount > 0 alors que baseline = 0 → drift (durcit le filtre)
+  - missingMarketTypes > 0 → régression
+  - geoCount < baseline → régression (sourcing géographiquement plus
+    restreint)
+
+Section UI sur `/sourcing/admin/sourcing-debug` (au-dessus de « Profils
+actifs ») : tableau diff baseline vs actuel + badge sévérité + hint
+contextuel par ligne (« 24 mot(s)-clé(s) en moins → moins de matches
+possibles. C'est la cause n°1 du 0 inserted. »).
+
+Matching : nom du profil exact, sinon profil par défaut (heuristique
+MVP — Steve a un seul profil par défaut côté AlyoS).
+
+9 tests vitest sur la matrice de sévérité (toutes les combinaisons).
+Suite globale 73 files, 1162/1162 verte.
+
+**Quand Steve ouvrira /admin/sourcing-debug après le redéploiement,
+si son profil actif a été vidé ou réduit depuis le 22/05, la
+régression apparaîtra immédiatement en haut de la page avec le hint
+explicite.** Si tout est aligné (24/9/0/23/3 marketTypes), la
+section affiche « Aligné — config inchangée » en vert et le diagnostic
+se déplace ailleurs (peut-être un changement côté BOAMP).
