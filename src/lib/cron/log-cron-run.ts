@@ -15,7 +15,7 @@
  * cron lui-même.
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 
 import type { Db } from "@/db/client";
 import { cronRunLog } from "@/db/schema/cron-log";
@@ -27,6 +27,50 @@ export interface CronRunHandle {
 }
 
 /**
+ * Seuil au-delà duquel une row `status='running'` est considérée orpheline
+ * (la function Vercel a probablement été killed sur timeout ou crash hard,
+ * `finishCronRun` n'a jamais tourné). On utilise 5 min qui dépasse confortable-
+ * ment le `maxDuration` plafond Vercel Pro (300s).
+ *
+ * Steve 2026-06-04 — observé sur sourcing-run après FUNCTION_INVOCATION_TIMEOUT :
+ * la row reste en 'running' indéfiniment et fausse les agrégats /admin/crons.
+ */
+const ORPHAN_RUNNING_THRESHOLD_MS = 5 * 60 * 1000;
+
+/**
+ * Self-heal best-effort : à chaque `startCronRun`, on UPDATE les rows du même
+ * cron_name encore en `running` mais dont `started_at` est plus vieux que le
+ * seuil. Statut → 'error' avec error_message explicite. Comme ça les vraies
+ * runs concurrentes (peu probable mais possible si deux ticks se chevauchent)
+ * ne sont pas touchées, mais les zombies sont nettoyés au prochain run.
+ *
+ * Exportée pour testabilité.
+ */
+export async function reapOrphanedRunningRows(db: Db, cronName: string): Promise<void> {
+  try {
+    const threshold = new Date(Date.now() - ORPHAN_RUNNING_THRESHOLD_MS);
+    await db
+      .update(cronRunLog)
+      .set({
+        status: "error",
+        finishedAt: sql`now()`,
+        durationMs: sql`extract(epoch from (now() - ${cronRunLog.startedAt})) * 1000`,
+        errorMessage:
+          "Run orpheline : Vercel a probablement timeout (FUNCTION_INVOCATION_TIMEOUT) ou crashed avant que finishCronRun ne tourne.",
+      })
+      .where(
+        and(
+          eq(cronRunLog.cronName, cronName),
+          eq(cronRunLog.status, "running"),
+          lt(cronRunLog.startedAt, threshold),
+        ),
+      );
+  } catch (err) {
+    console.warn("[cron-log:reap-orphans:fail]", cronName, err);
+  }
+}
+
+/**
  * Insère la row de début. Renvoie un handle à passer à `finishCronRun`.
  *
  * Si l'INSERT rate, on renvoie un handle « ghost » qui sera ignoré par
@@ -35,6 +79,11 @@ export interface CronRunHandle {
 export async function startCronRun(db: Db, cronName: string): Promise<CronRunHandle> {
   const startedAt = new Date();
   const startedAtMs = startedAt.getTime();
+
+  // Self-heal — nettoie les rows running orphelines du même cron avant
+  // d'insérer la nouvelle. Best-effort, n'empêche jamais le run en cours.
+  await reapOrphanedRunningRows(db, cronName);
+
   try {
     const [row] = await db
       .insert(cronRunLog)

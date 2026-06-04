@@ -58,8 +58,16 @@ import {
 import { runSourcingForProfiles } from "@/lib/sourcing/orchestrator";
 import { getSiteUrl } from "@/lib/site-url";
 
-/** Durée max raisonnable pour le pipeline complet (toutes les org, tous profils). */
-export const maxDuration = 60;
+/**
+ * Durée max du pipeline complet (Vercel Pro autorise jusqu'à 300s).
+ *
+ * Steve 2026-06-04 — passé de 60 → 120s après un FUNCTION_INVOCATION_TIMEOUT
+ * observé en déclenchement manuel à 11h35 (fenêtre 72h = beaucoup de records
+ * BOAMP + 3 scrapers × N profils). Le tick cron 6h30 quotidien avait moins
+ * de backlog et passait à 60s — mais on garde une marge de sécurité pour les
+ * slow days.
+ */
+export const maxDuration = 120;
 
 /**
  * Vérifie le header `Authorization: Bearer ${CRON_SECRET}`. Retourne `null`
@@ -125,9 +133,17 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
       // 3. Pipeline pour tous les profils
       const batch = await runSourcingForProfiles(profiles, { connector, db });
 
-      // 4. Déclencher scraping PLACE + Francmarchés (async — résultats via webhook)
-      const scraperTriggered: Array<{ platform: string; runId?: string; error?: string }> = [];
+      // 4. Déclencher scraping PLACE + Francmarchés + MarchesPublicsInfo
+      //    (async — résultats via webhook).
+      //
+      //    OPTIM 2026-06-04 (timeout 504 observé en manual trigger) : on
+      //    parallélise N profils × 3 plateformes au lieu d'une boucle
+      //    séquentielle d'await. Les triggerScrapeJob sont fire-and-forget
+      //    côté worker Fly.io — paralléliser ne casse rien et fait passer
+      //    de ~30s à ~3s sur la phase scrapers quand l'ack est lent.
       const webhookUrl = `${getSiteUrl()}/api/webhooks/scraper-done`;
+      const PLATFORMS = ["francmarches", "place", "marchespublicsinfo"] as const;
+      const scraperJobs: Array<Promise<{ platform: string; runId?: string; error?: string }>> = [];
 
       for (const profile of profiles) {
         const profileFilters = {
@@ -136,29 +152,34 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
         };
         const lastRunAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-        for (const platform of ["francmarches", "place", "marchespublicsinfo"] as const) {
-          try {
-            const ack = await triggerScrapeJob({
+        for (const platform of PLATFORMS) {
+          scraperJobs.push(
+            triggerScrapeJob({
               platform,
               profileFilters,
               lastRunAt,
               profileId: profile.id,
               orgId: profile.organizationId,
               webhookUrl,
-            });
-            scraperTriggered.push({ platform, runId: ack.runId });
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            if (!(err instanceof ScraperUnavailableError)) {
-              console.error("[cron:sourcing-run] scraper error", { platform, message });
-            } else {
-              console.log("[cron:sourcing-run] scraper unavailable (skip)", { platform, message });
-            }
-            scraperTriggered.push({ platform, error: message });
-          }
+            })
+              .then((ack) => ({ platform, runId: ack.runId }))
+              .catch((err: unknown) => {
+                const message = err instanceof Error ? err.message : String(err);
+                if (!(err instanceof ScraperUnavailableError)) {
+                  console.error("[cron:sourcing-run] scraper error", { platform, message });
+                } else {
+                  console.log("[cron:sourcing-run] scraper unavailable (skip)", {
+                    platform,
+                    message,
+                  });
+                }
+                return { platform, error: message };
+              }),
+          );
         }
       }
 
+      const scraperTriggered = await Promise.all(scraperJobs);
       console.log("[cron:sourcing-run] scrapers triggered", scraperTriggered);
 
       // 5. Trace structurée des métriques (Vercel logs / Datadog)

@@ -12,7 +12,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { withCronRunLog } from "./log-cron-run";
+import { reapOrphanedRunningRows, withCronRunLog } from "./log-cron-run";
 
 interface InsertRecord {
   values: Record<string, unknown>;
@@ -48,7 +48,14 @@ function makeFakeDb(opts: { insertReturnsId?: string; insertThrows?: boolean } =
     update: vi.fn(() => ({
       set: (vals: Record<string, unknown>) => ({
         where: () => {
-          updates.push({ set: vals });
+          // Discrimination : le reap de rows orphelines (cf.
+          // reapOrphanedRunningRows) appelle update() AVANT chaque INSERT,
+          // sans champ `payload`. Le finish appelle update() après, AVEC
+          // `payload` (même null). On filtre les updates "reap" pour ne
+          // pas perturber le compte attendu par les tests historiques.
+          if (Object.prototype.hasOwnProperty.call(vals, "payload")) {
+            updates.push({ set: vals });
+          }
           return Promise.resolve(undefined);
         },
       }),
@@ -147,5 +154,52 @@ describe("withCronRunLog", () => {
     expect(updates[0]!.set.status).toBe("error");
     expect(updates[0]!.set.errorMessage).toBe("string-thrown");
     expect(updates[0]!.set.errorStack).toBeNull();
+  });
+});
+
+describe("reapOrphanedRunningRows (self-heal)", () => {
+  it("UPDATE les rows running orphelines en error avec message explicite", async () => {
+    const reapCalls: Array<Record<string, unknown>> = [];
+    const fakeDb = {
+      update: vi.fn(() => ({
+        set: (vals: Record<string, unknown>) => ({
+          where: async () => {
+            reapCalls.push(vals);
+          },
+        }),
+      })),
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await reapOrphanedRunningRows(fakeDb as any, "sourcing-run");
+
+    expect(reapCalls).toHaveLength(1);
+    expect(reapCalls[0]!.status).toBe("error");
+    expect(typeof reapCalls[0]!.errorMessage).toBe("string");
+    expect(reapCalls[0]!.errorMessage as string).toContain("orpheline");
+  });
+
+  it("ne propage pas l'exception si la DB rate (best-effort)", async () => {
+    const fakeDb = {
+      update: vi.fn(() => ({
+        set: () => ({
+          where: () => {
+            throw new Error("DB unavailable");
+          },
+        }),
+      })),
+    };
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    let propagated = false;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await reapOrphanedRunningRows(fakeDb as any, "broken");
+    } catch {
+      propagated = true;
+    }
+    expect(propagated).toBe(false);
+    expect(consoleWarn).toHaveBeenCalled();
+    consoleWarn.mockRestore();
   });
 });
