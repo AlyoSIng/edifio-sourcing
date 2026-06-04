@@ -31,6 +31,15 @@ export const users = pgTable("users", {
   firstname: text("firstname"),
   lastname: text("lastname"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /**
+   * Timestamp de la dernière consultation de la page « Activité Tandem »
+   * (chantier H7 — Steve 2026-06-04). Sert à compter les architect_responses
+   * non encore vus → badge sidebar « X nouvelles réponses ».
+   * NULL = aucun événement déjà vu (premier login).
+   */
+  architectNotificationsSeenAt: timestamp("architect_notifications_seen_at", {
+    withTimezone: true,
+  }),
 });
 
 export type User = typeof users.$inferSelect;

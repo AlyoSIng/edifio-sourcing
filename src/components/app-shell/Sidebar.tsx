@@ -27,9 +27,15 @@ import { isItemActive, NAV_ITEMS, type NavItem } from "./nav-items";
 interface SidebarProps {
   /** Rôle de l'utilisateur connecté pour filtrer `adminOnly`. */
   role: "admin" | "user" | "viewer" | "superadmin";
+  /**
+   * Badges dynamiques posés par le Server Component parent (chantier H7).
+   * Indexés par `href` du nav item. Remplacent / complètent le `badge`
+   * statique défini dans nav-items.ts.
+   */
+  dynamicBadges?: Record<string, string | number>;
 }
 
-export function Sidebar({ role }: SidebarProps) {
+export function Sidebar({ role, dynamicBadges = {} }: SidebarProps) {
   const pathname = usePathname() ?? "/sourcing/ao-du-jour";
   // Le superadmin bénéficie également de l'accès aux items adminOnly.
   const isAdmin = role === "admin" || role === "superadmin";
@@ -81,11 +87,16 @@ export function Sidebar({ role }: SidebarProps) {
                   {section.title}
                 </h2>
                 <ul className="space-y-0.5">
-                  {visible.map((item) => (
-                    <li key={item.href}>
-                      <SidebarLink item={item} active={isItemActive(item, pathname)} />
-                    </li>
-                  ))}
+                  {visible.map((item) => {
+                    const dynBadge = dynamicBadges[item.href];
+                    const itemWithBadge =
+                      dynBadge !== undefined ? { ...item, badge: dynBadge } : item;
+                    return (
+                      <li key={item.href}>
+                        <SidebarLink item={itemWithBadge} active={isItemActive(item, pathname)} />
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             );

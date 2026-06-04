@@ -1,5 +1,8 @@
 import type { UserProfile } from "@/lib/auth/types";
 
+import { db } from "@/db/client";
+import { countNewArchitectResponses } from "@/lib/notifications/architect-responses";
+import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { Footer } from "./Footer";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -33,10 +36,27 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
-export function AppShell({ user, children }: AppShellProps) {
+export async function AppShell({ user, children }: AppShellProps) {
+  // H7 — compteur de nouvelles réponses architectes pour le badge sidebar.
+  // Best-effort : si la BDD rate, on passe 0 et on continue (la page rend
+  // toujours).
+  let newArchitectResponsesCount = 0;
+  if (user.role === "admin" || user.role === "superadmin") {
+    try {
+      const orgId = await getRequiredOrgId(user.id);
+      newArchitectResponsesCount = await countNewArchitectResponses(db, orgId, user.id);
+    } catch (err) {
+      console.warn("[app-shell:notif-count:fail]", err);
+    }
+  }
+  const dynamicBadges: Record<string, string | number> = {};
+  if (newArchitectResponsesCount > 0) {
+    dynamicBadges["/sourcing/admin/tandem-activity"] = newArchitectResponsesCount;
+  }
+
   return (
     <div className="flex min-h-screen bg-paper">
-      <Sidebar role={user.role} />
+      <Sidebar role={user.role} dynamicBadges={dynamicBadges} />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar user={user} />
         <main id="main-content" className="flex-1 px-4 py-6 md:px-8 md:py-8">

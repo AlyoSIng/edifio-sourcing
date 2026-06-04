@@ -20,6 +20,7 @@ import { architectResponses, architectTokens } from "@/db/schema/selections";
 import { tenders } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { markArchitectNotificationsSeen } from "@/lib/notifications/architect-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
@@ -78,6 +79,14 @@ export default async function TandemActivityPage() {
   } catch (err) {
     console.error("[admin-tandem-activity:org:fail]", err);
     orgId = ALYOS_ORG_ID;
+  }
+
+  // H7 — marque les notifications comme vues à l'ouverture de la page.
+  // Best-effort : si l'UPDATE rate, on continue sans casser la page.
+  try {
+    await markArchitectNotificationsSeen(db, user.id);
+  } catch (err) {
+    console.warn("[admin-tandem-activity:mark-seen:fail]", err);
   }
 
   // 2. Agrégats.
