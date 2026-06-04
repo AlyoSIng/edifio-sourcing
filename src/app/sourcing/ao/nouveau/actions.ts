@@ -110,6 +110,7 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
   const title = formData.get("title");
   const description = formData.get("description");
   const buyerName = formData.get("buyerName");
+  const buyerAddress = formData.get("buyerAddress");
   const deadlineRaw = formData.get("deadline");
   const estimatedValueRaw = formData.get("estimatedValue");
   const department = formData.get("department");
@@ -259,6 +260,8 @@ export async function createPrivateTender(formData: FormData): Promise<CreatePri
       platformId,
       title: title.trim(),
       buyer: typeof buyerName === "string" ? buyerName.trim() || "—" : "—",
+      buyerAddress:
+        typeof buyerAddress === "string" && buyerAddress.trim() ? buyerAddress.trim() : null,
       cpv: [],
       amount,
       deadline,

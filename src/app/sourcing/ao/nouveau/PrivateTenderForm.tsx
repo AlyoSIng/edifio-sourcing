@@ -151,6 +151,8 @@ export function PrivateTenderForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [buyerName, setBuyerName] = useState("");
+  // Adresse acheteur (Steve 2026-06-04) — utile pour DC1/DC2 et courriers.
+  const [buyerAddress, setBuyerAddress] = useState("");
   const [deadline, setDeadline] = useState("");
   const [estimatedValue, setEstimatedValue] = useState("");
   const [department, setDepartment] = useState("");
@@ -352,6 +354,25 @@ export function PrivateTenderForm() {
             value={buyerName}
             onChange={(e) => setBuyerName(e.target.value)}
             placeholder="Ex. : Mairie de Lyon"
+            className="focus:border-primary focus:ring-primary w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1"
+          />
+        </div>
+
+        {/* Adresse de l'acheteur — alimente tenders.buyer_address (Steve 2026-06-04). */}
+        <div>
+          <label htmlFor="buyerAddress" className="mb-1 block text-sm font-medium text-ink">
+            Adresse de l&apos;acheteur{" "}
+            <span className="font-normal text-muted">
+              (optionnel — pour les courriers et DC1/DC2)
+            </span>
+          </label>
+          <input
+            id="buyerAddress"
+            name="buyerAddress"
+            type="text"
+            value={buyerAddress}
+            onChange={(e) => setBuyerAddress(e.target.value)}
+            placeholder="Ex. : 1 Place de la Comédie, 69001 Lyon"
             className="focus:border-primary focus:ring-primary w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1"
           />
         </div>

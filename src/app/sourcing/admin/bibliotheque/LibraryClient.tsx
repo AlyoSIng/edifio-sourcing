@@ -734,6 +734,31 @@ function KindSection({
                 className="w-full rounded border border-line bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red disabled:opacity-50"
               />
             </div>
+
+            {/* Mots-clés associés — exclusivement pour kind='fiche_metier'. */}
+            {kindKey === "fiche_metier" && (
+              <div className="sm:col-span-2">
+                <label
+                  htmlFor={`matching-keywords-${kindKey}`}
+                  className="mb-1 block font-mono text-[10px] uppercase tracking-wider text-muted"
+                >
+                  Mots-clés associés (séparés par des virgules)
+                </label>
+                <input
+                  id={`matching-keywords-${kindKey}`}
+                  name="matchingKeywords"
+                  type="text"
+                  disabled={isPending}
+                  placeholder="ex : patrimoine, ABF, restauration, étude historique"
+                  className="w-full rounded border border-line bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red disabled:opacity-50"
+                />
+                <p className="mt-0.5 text-[10px] text-muted">
+                  Cette fiche sera incluse au ZIP du dossier si l&apos;un de ces mots-clés est
+                  présent dans les <strong>keywords positifs</strong> du profil de recherche actif.
+                  Max 20 mots-clés, 80 caractères chacun.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Erreur d'upload */}

@@ -144,6 +144,9 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
   const kind = formData.get("kind");
   const validUntil = formData.get("validUntil");
   const notes = formData.get("notes");
+  // Mots-clés associés (kind='fiche_metier' uniquement, sinon ignoré).
+  // Format reçu : chaîne séparée par virgules « patrimoine, abf, restauration ».
+  const matchingKeywordsRaw = formData.get("matchingKeywords");
 
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: "missing_file" };
@@ -178,6 +181,18 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
   const notesStr =
     typeof notes === "string" && notes.trim() !== "" ? notes.trim().slice(0, 500) : null;
 
+  // Parse matching_keywords : split par virgule, trim, dedup, max 20 keywords,
+  // chaque keyword max 80 chars. Seulement utilisé si kind='fiche_metier'.
+  let matchingKeywords: string[] | null = null;
+  if (kind.trim() === "fiche_metier" && typeof matchingKeywordsRaw === "string") {
+    const parsed = matchingKeywordsRaw
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0 && k.length <= 80);
+    const dedup = Array.from(new Set(parsed)).slice(0, 20);
+    matchingKeywords = dedup.length > 0 ? dedup : null;
+  }
+
   // 3. Chemin de stockage : {orgId}/{kind}/{timestamp}_{sanitizedFilename}
   const timestamp = Date.now();
   const safeFilename = sanitizeFilename(file.name);
@@ -208,6 +223,7 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
       sizeBytes: file.size,
       validUntil: validUntilStr,
       notes: notesStr,
+      matchingKeywords,
     });
   } catch (err) {
     console.error("[bibliotheque:upload:db:fail]", err);
