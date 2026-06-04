@@ -420,9 +420,55 @@ La page **Crons** liste les 100 dernières exécutions des 4 tâches planifiées
 Chaque ligne affiche : tâche, démarré, durée, statut (OK / Erreur / En cours), aperçu de la sortie (compteurs) ou message d'erreur. C'est l'endroit où tu regardes si un cron a planté ou si rien ne s'est passé ce matin.
 
 ## 10. Quand alerter le CTO
-- **Crons** : 2 erreurs consécutives sur la même tâche, ou un cron qui n'apparaît plus dans la liste depuis 24h (= il ne s'est pas déclenché du tout).
+- **Crons** : 2 erreurs consécutives sur la même tâche, ou un cron qui n'apparaît plus dans la liste depuis 24h (= il ne s'est pas déclenché du tout). **Anti-spam** : tu ne reçois pas un mail à chaque échec — si un cron rate 10 fois en 10 minutes, tu reçois 1 mail (premier échec dans la fenêtre 1h glissante), pas 10. C'est volontaire pour ne pas noyer ta boîte.
 - **Activité Tandem** : taux de réponse qui chute à <30 % sur 30j (problème de templates ou de routage).
-- **Coûts IA** : dépense mensuelle qui dépasse 50 € (anomalie sur prompt sourcing).`;
+- **Coûts IA** : dépense mensuelle qui dépasse 50 € (anomalie sur prompt sourcing).
+
+## 11. Plage personnalisée (J1)
+Sur **Activité Tandem** et **Coûts IA**, à côté des boutons 7 / 30 / 90 j, un bouton **Personnalisée** ouvre un petit popover avec 2 date pickers du / au. Pratique pour zoomer sur une période bien précise — une semaine en juin, ou tout un trimestre. Limite haute : 366 jours. La sélection passe dans l'URL (\`?range=custom&from=…&to=…\`) — tu peux la mettre en favori.
+
+## 12. Déclencher un cron à la demande (superadmin)
+Sur **Crons**, un panneau « Déclencher manuellement » te propose 4 boutons (un par cron). Cliquer **▶ Déclencher maintenant** lance la tâche tout de suite sans attendre le tick Vercel. Pratique pour :
+- tester juste après une migration ou une rotation de secret
+- re-jouer un cron qui a planté ce matin sans attendre demain
+- débugger en local quand tu suspectes que c'est le runner qui pose problème
+
+Le résultat (HTTP status, durée, aperçu JSON de la réponse) s'affiche immédiatement sous le panneau. Tu peux refresh la page : la nouvelle row apparaît dans le tableau des 100 dernières exécutions.`;
+
+const GUIDE_13 = `Les CERFA officiels DC1 et DC2 sont des formulaires Word pénibles à remplir à la main. edifio Sourcing peut maintenant les remplir tout seul à partir de **tes propres modèles .docx** — tu gardes la mise en page exacte et tu obtiens un .docx final éditable.
+
+## 1. Pourquoi cette voie A
+Avant : edifio générait un PDF custom via pdf-lib. Résultat propre, mais éloigné du CERFA officiel ; certains acheteurs publics pinaillent. Maintenant tu peux uploader ton propre **modèle Word** avec la mise en page, le logo, l'en-tête, les en-têtes / pieds de page exactement comme tu veux — l'app ne fait que remplacer les balises Mustache.
+
+## 2. Préparer ton modèle Word
+1. Ouvre ton fichier **DC1 ou DC2 vierge** (.docx). Si tu n'as que la version .doc, ouvre-la dans Word puis **Enregistrer sous → Document Word (*.docx)**.
+2. À chaque endroit où tu veux qu'edifio écrive une valeur, tape une balise entre **double accolades** : \`{{archi_cabinet}}\`, \`{{ao_objet}}\`, \`{{org_nom}}\`, etc.
+3. Garde la mise en forme **homogène à l'intérieur d'une balise** — si tu mets une lettre en gras au milieu d'\`{{ao_objet}}\`, Word fragmente la balise en XML et le remplacement peut échouer. L'app sait recoller dans 90 % des cas, mais autant éviter.
+4. Tu peux aussi mettre des balises dans l'en-tête / pied de page : l'app les remplace aussi.
+
+## 3. Les balises disponibles
+- **Contexte AO** : \`{{ao_objet}}\`, \`{{ao_acheteur}}\`, \`{{org_nom}}\`, \`{{archi_cabinet}}\`, \`{{be_cabinet}}\`, \`{{date_jour}}\`, \`{{date_iso}}\`
+- **Tout champ saisi côté CERFA** : utilise le \`field_id\` tel qu'il apparaît dans le pré-remplissage. Exemples : \`{{archi_siret}}\`, \`{{archi_adresse}}\`, \`{{alyos_siret}}\`, \`{{forme_juridique}}\`, …
+- **Référence complète** : voir le handoff \`STEVE_260603_TEMPLATES_DOCX_MUSTACHE.md\` (Cowork t'a posé la liste exhaustive).
+
+Si tu mets une balise inconnue (typo ou champ pas encore mappé), l'app la laisse telle quelle dans le document — tu vois immédiatement quelle balise n'a pas été remplie et tu peux la corriger dans ton modèle.
+
+## 4. Uploader le modèle
+Va dans **Configuration > Bibliothèque** et uploade ton .docx dans la catégorie **DC1** ou **DC2** (ou **Pouvoir mandataire** pour le 3e). Si tu remplaces un ancien modèle, tu peux soit le supprimer soit le laisser : edifio prend toujours **le plus récent** par catégorie.
+
+## 5. Tester
+Ouvre un AO, va dans l'onglet **Dossier > CERFA**, remplis les champs comme d'habitude et clique **Valider DC1** ou **Valider DC2**. Au lieu d'un PDF, edifio te livre maintenant un **.docx** que tu peux télécharger, ouvrir dans Word, vérifier, ajouter ta signature manuscrite scannée, puis exporter en PDF si tu veux.
+
+## 6. Si l'app continue à sortir des PDF
+C'est que le template biblio est introuvable. Vérifie que :
+- Tu as bien uploadé en catégorie **DC1** ou **DC2** (et pas dans « Autres »).
+- Le fichier a bien l'extension **.docx** (pas .doc).
+- Tu es bien connecté avec un compte de la même organisation (AlyoS).
+
+Si le template est mal formé (corruption, balises non parsables), edifio retombe transparent sur le PDF custom — pas de plantage, mais tu auras un PDF au lieu d'un .docx. Regarde les logs Vercel pour le détail (\`[cerfa:validate:docx:fail-fallback-pdf]\`).
+
+## 7. Fallback rétro-compatible
+Tant qu'il n'y a pas de modèle .docx en biblio, edifio garde l'ancien comportement (PDF pdf-lib). Tu peux donc activer la voie A AO par AO en uploadant le modèle quand tu es prêt. Aucun risque de casser ce qui marche aujourd'hui.`;
 
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
@@ -564,5 +610,17 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_12,
     isActive: true,
     displayOrder: 12,
+  },
+  {
+    id: "fb000001-0000-0000-0000-00000000000d",
+    slug: "cerfa-docx-templates",
+    title: "Personnaliser les CERFA DC1/DC2 avec tes propres modèles Word",
+    description:
+      "Voie A : tu uploades ton propre .docx avec des balises Mustache, l'app le remplit à la validation. Plus jamais de PDF mal aligné.",
+    type: "doc",
+    durationMin: 5,
+    contentMd: GUIDE_13,
+    isActive: true,
+    displayOrder: 13,
   },
 ];

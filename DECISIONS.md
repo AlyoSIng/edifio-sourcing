@@ -2066,3 +2066,124 @@ plus de cabinets ; pré-requis observabilité avant montée en charge.
   qu'en marge.
 - Page `/sourcing/admin/crons` v2 : possibilité de déclencher manuellement un
   cron depuis l'UI (POST avec CRON_SECRET côté Server Action).
+
+---
+
+## 2026-06-04 (session après-midi) — Salve J : finition autonome
+
+**Auteur :** Alex (dev) — Steve TEISSIER absent (« fait le reste sans
+t'arrêter »).
+**Commits :** `cbda33f` (dette CI) → `5269e8f` (trigger cron) → `6be71a3`
+(alerting mail) → `8cc8aba` (hardening migrate) → `8ad8dc4` (J1 custom range)
+→ `ea43ed7` (J2 tests) → `3ad4d3c` (J3 docx-fill).
+**Motif :** finir le backlog post-salve I en autonomie, dette CI levée et
+chantiers Steve débloqués (CERFA voie A maintenant câblé, observabilité crons
+opérationnelle bout-en-bout).
+
+### Dette CI vitest (cbda33f)
+Les 6 fails pré-existants identifiés en marge de la salve I sont nettoyés.
+Aucun changement de code applicatif — uniquement de la dette de tests obsolète :
+  - `boamp.test.ts` : test attendait `dateparution >= "YYYY-MM-DDTHH:MM:SS"`
+    mais le connecteur v2.1 envoie maintenant `dateparution >= "YYYY-MM-DD"`
+    (BOAMP champ DATE pas DATETIME).
+  - `orchestrator.test.ts` : la fenêtre est passée de 24h à 72h
+    (`FETCH_WINDOW_MS`) suite au bug #P1 du 2026-06-01.
+  - `sourcing-run/route.test.ts` : depuis I3 (withCronRunLog), le mock db
+    `insert()` accumulait aussi les rows `cron_run_log` dans `mockInserts`.
+    Fix : filtrer par présence du champ `score` + ajouter un `update()` no-op
+    au mock.
+  - `tandem/actions.test.ts × 3` : depuis la PR template Mustache, le subject
+    Brevo est interpolé côté action. Test asserte maintenant sur le préfixe
+    stable + absence de `{{` au lieu du template brut.
+
+Suite globale repassée à 100 % vert.
+
+### Polish I3a — Trigger crons manuel (5269e8f)
+Server Action `triggerCronAction(cronName)` + `TriggerPanel` Client Component
+sur `/sourcing/admin/crons`. Whitelist stricte de 4 cron_name, CRON_SECRET
+ajouté côté serveur dans le header Authorization, `revalidatePath` pour
+rafraîchir le tableau. Superadmin only (double-check côté serveur).
+
+### Polish I3b — Mail alerting cron error (6be71a3)
+`withCronRunLog` gagne un option `onError(error)`. Helper
+`notifyCronError(db, name, err)` qui :
+  - check anti-spam (≤ 1 mail / heure par cron_name)
+  - JOIN users↔memberships pour récupérer les superadmins AlyoS
+  - boucle sendEmail Resend (1 destinataire / appel)
+  - best-effort à tous les étages (warn + continue, ne casse jamais le cron)
+
+Mail HTML avec extrait de stack (500 chars max) et lien direct vers
+`/admin/crons`. Les 4 routes cron passent `{ onError: ... }`.
+
+### Hardening migrate.ts (8cc8aba)
+Clôture partielle de la MEMORY 2026-05-21 (password leaké 2× incident).
+Ajouts non-bloquants :
+  - `findUnsafeUriChars(pwd)` : liste les caractères du password qui
+    nécessitent un encodage URL non-trivial (@ # %  ? [ ] / < > " ' espace
+    backslash). Au démarrage, warn console avec la liste si PG* éclaté ET
+    password contient ces chars.
+  - `maskPasswordInMessage(msg, pwd)` : masque le password (et sa version
+    encodeURIComponent) dans les error messages avant impression console.
+    Wrappé sur le catch top-level qui essaie 2 sources : `process.env.PGPASSWORD`
+    puis l'extraction depuis `DATABASE_URL`.
+
+14 tests vitest sur les 2 helpers. Steve : la rotation prod reste à toi.
+
+### J1 — Filtres date custom (8ad8dc4)
+4e option « Personnalisée » au RangeFilter avec popover 2 date pickers from/to.
+Pages `/admin/ia-usage` et `/admin/tandem-activity` lisent
+`?range=custom&from=YYYY-MM-DD&to=YYYY-MM-DD` et bornent leurs WHERE par
+`>= from AND <= to`. Borne anti-DoS BDD : 366 jours max. Le label KPI passe de
+« Coût N j » à « Coût DD/MM/YYYY → DD/MM/YYYY ». 11 nouveaux tests.
+
+### J2 — Tests notify-error + trigger-cron (ea43ed7)
+Couverture vitest des 2 polish I3 :
+  - `notifyCronError.test.ts` : 6 cas avec fake Drizzle discriminé par
+    compteur de selects (anti-spam, count, recipients) — envoi, anti-spam,
+    recipients vides, DB down, sendEmail rate, throw non-Error.
+  - `actions.test.ts` (triggerCronAction) : 10 cas avec mocks supabase auth
+    + isSuperAdmin + global.fetch — 401, Forbidden, whitelist, CRON_SECRET,
+    POST + Bearer, durée + preview, fetch fail capturé.
+
+### J3 — H1 docx-fill au flow CERFA (3ad4d3c)
+**Pivot voie A** désormais câblé au flow CERFA réel. Si un library_item kind
+`dc1`|`dc2` existe → on l'utilise comme template Mustache et on génère un
+`.docx`. Sinon fallback transparent pdf-lib (rétrocompatibilité totale).
+
+Module `cerfa-docx-generator.ts` pur :
+  - `buildCerfaMustacheParams(input)` : contexte AO + override fields par
+    `field_id`. Clés stables : `ao_objet`, `ao_acheteur`, `org_nom`,
+    `archi_cabinet`, `be_cabinet`, `date_jour`, `date_iso`, + tous les
+    `field_id` validés.
+  - `generateCerfaDocx(buffer, input)` : wrap `fillDocxTemplate`.
+  - `cerfaKindToLibraryKind('DC1'|'DC2')` : mapping.
+
+11 tests vitest avec faux `.docx` minimal (zip + word/document.xml).
+Le storage upload bascule contentType + extension selon la voie choisie.
+
+**Pour activer côté Steve** : uploader un `.docx` avec les balises Mustache
+documentées dans `handoff/STEVE_260603_TEMPLATES_DOCX_MUSTACHE.md`,
+catégorie `dc1` ou `dc2` dans la bibliothèque. Valider un CERFA → la voie
+docx s'active automatiquement, sans flag.
+
+### Backlog côté Steve (encore)
+
+1. **Migration 0046 prod** (`cron_run_log`) — toujours d'actualité
+2. **Seed formations prod** (`pnpm db:seed:formations`) — guide 12
+3. **Uploader les templates `.docx` Mustache** en biblio pour activer la
+   voie A CERFA (sinon le flow continue de tomber sur pdf-lib).
+4. **Rotation PGPASSWORD prod + vérif URI-safe** (le warn signalera tout
+   seul si non-safe).
+5. **Vérifier les mails d'alerte** après un cron error volontaire (peut
+   nécessiter de poser RESEND_API_KEY sur Vercel si pas encore fait).
+
+### Backlog côté Alex (futur)
+
+- **Tests E2E Playwright** sur le flow CERFA voie A (upload template biblio
+  → valider CERFA → vérifier `.docx` généré + téléchargeable + balises
+  substituées).
+- **Sentry / regroupement erreurs front** (gros chantier, ROI moyen).
+- **Phase 2 multi-tenant** : helper `getNotificationRecipients(db, scope)` à
+  généraliser (actuellement hardcodé ALYOS_ORG_ID).
+- **Page `/admin/crons` v3** : pagination + filtre par cron_name + filtre
+  par status.
