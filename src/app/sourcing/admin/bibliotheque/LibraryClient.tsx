@@ -17,7 +17,7 @@
  *  - Spec PR-A module dossier IA (brief Board 2026-05-25)
  */
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 import type { PresentationLibraryItem } from "@/db/schema/library";
 import { deleteLibraryDoc, uploadLibraryDoc } from "./actions";
@@ -175,25 +175,47 @@ interface LibraryClientProps {
 }
 
 export function LibraryClient({ entries, indexDetails = [] }: LibraryClientProps) {
-  // Groupe les entrées par kind pour accès O(1) dans chaque section
-  const byKind = new Map<KindKey, PresentationLibraryItem[]>();
-  for (const kind of LIBRARY_KINDS) {
-    byKind.set(kind.key, []);
-  }
-  for (const item of entries) {
-    const key = item.kind as KindKey;
-    if (byKind.has(key)) {
-      byKind.get(key)!.push(item);
-    } else {
-      // Catégorie inconnue → regroupée sous "autre" pour robustesse
-      byKind.get("autre")!.push(item);
-    }
-  }
-
   // Map locale itemId → détails — mutable pour optimistic update après ré-index.
   const [indexMap, setIndexMap] = useState<Map<string, LibraryIndexDetail>>(
     () => new Map(indexDetails.map((d) => [d.libraryItemId, d])),
   );
+
+  // I5 — Steve 2026-06-04 : recherche live. Filtre par nom de fichier, kind
+  // (catégorie), titre IA, mots-clés, summary, doc_type. Insensible à la
+  // casse et aux accents.
+  const [query, setQuery] = useState("");
+  const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+  const filteredEntries = useMemo(() => {
+    const q = normalize(query.trim());
+    if (!q) return entries;
+    return entries.filter((item) => {
+      const detail = indexMap.get(item.id);
+      const blob = [
+        item.name,
+        item.kind,
+        detail?.extractedTitle ?? "",
+        (detail?.keywords ?? []).join(" "),
+        detail?.summary ?? "",
+        detail?.docType ?? "",
+      ]
+        .map(normalize)
+        .join(" ");
+      return blob.includes(q);
+    });
+  }, [entries, query, indexMap]);
+
+  // Groupe les entrées filtrées par kind pour accès O(1) dans chaque section.
+  const byKind = useMemo(() => {
+    const map = new Map<KindKey, PresentationLibraryItem[]>();
+    for (const kind of LIBRARY_KINDS) map.set(kind.key, []);
+    for (const item of filteredEntries) {
+      const key = item.kind as KindKey;
+      if (map.has(key)) map.get(key)!.push(item);
+      else map.get("autre")!.push(item);
+    }
+    return map;
+  }, [filteredEntries]);
 
   // État indexation IA (chantier E).
   const [isIndexing, startIndexing] = useTransition();
@@ -273,7 +295,49 @@ export function LibraryClient({ entries, indexDetails = [] }: LibraryClientProps
         </div>
       )}
 
-      {LIBRARY_KINDS.map((kindMeta) => (
+      {/* I5 — Recherche live (Steve 2026-06-04). Filtre par nom, kind, titre
+          IA, mots-clés, summary, doc_type. Cache les KindSections vides
+          quand une requête est en cours. */}
+      <section className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Rechercher : nom de fichier, titre IA, mot-clé, type de doc…"
+          className="w-full max-w-xl rounded border border-line bg-white px-3 py-1.5 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
+          aria-label="Rechercher dans la bibliothèque"
+        />
+        {query.trim() && (
+          <>
+            <span className="text-xs text-muted">
+              {filteredEntries.length} / {entries.length} doc
+              {filteredEntries.length > 1 ? "s" : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="text-xs text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+            >
+              Réinitialiser
+            </button>
+          </>
+        )}
+      </section>
+
+      {query.trim() && filteredEntries.length === 0 && (
+        <p className="text-sm italic text-muted">
+          Aucun document ne correspond. Astuce : essaye un mot-clé extrait par l&apos;IA, le type de
+          doc (ex. <code>cv</code>, <code>kbis</code>) ou la catégorie.
+        </p>
+      )}
+
+      {LIBRARY_KINDS.filter((kindMeta) => {
+        // Si une recherche est active, on masque les catégories vides pour
+        // garder l'écran lisible. Sans recherche, on garde tout (placeholder
+        // « ➕ Ajouter un doc » reste utile).
+        if (!query.trim()) return true;
+        return (byKind.get(kindMeta.key) ?? []).length > 0;
+      }).map((kindMeta) => (
         <KindSection
           key={kindMeta.key}
           kindKey={kindMeta.key}
