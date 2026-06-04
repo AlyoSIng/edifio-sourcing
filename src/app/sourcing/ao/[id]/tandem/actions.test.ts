@@ -435,6 +435,13 @@ const VALID_SOLICIT_OPTIONS = {
 };
 
 describe("sendArchitectSolicitation — sélection template TU/VOUS", () => {
+  // Les templates Brevo contiennent des placeholders `{{ao_objet}}` /
+  // `{{ao_departement}}` qui sont interpolés côté action avant l'envoi.
+  // On asserte sur le préfixe stable de chaque variante, qui suffit à
+  // discriminer TU vs VOUS sans dépendre du libellé exact de l'AO.
+  const PREFIX_TU = SUBJECT_SOLICITATION_TU.split("{{")[0]!;
+  const PREFIX_VOUS = SUBJECT_SOLICITATION_VOUS.split("{{")[0]!;
+
   it("tutoiement=true → resolveBrevoTemplate retourne SUBJECT_SOLICITATION_TU", async () => {
     const db = buildSolicitMockDb(true);
     const { client: brevoClient, getLastSubject } = buildBrevoCaptureMock();
@@ -447,7 +454,8 @@ describe("sendArchitectSolicitation — sélection template TU/VOUS", () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(getLastSubject()).toBe(SUBJECT_SOLICITATION_TU);
+    expect(getLastSubject()).toMatch(new RegExp(`^${escapeRegex(PREFIX_TU)}`));
+    expect(getLastSubject()).not.toContain("{{");
   });
 
   it("tutoiement=false → resolveBrevoTemplate retourne SUBJECT_SOLICITATION_VOUS", async () => {
@@ -462,7 +470,8 @@ describe("sendArchitectSolicitation — sélection template TU/VOUS", () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(getLastSubject()).toBe(SUBJECT_SOLICITATION_VOUS);
+    expect(getLastSubject()).toMatch(new RegExp(`^${escapeRegex(PREFIX_VOUS)}`));
+    expect(getLastSubject()).not.toContain("{{");
   });
 
   it("register='tu' explicite + tutoiement=false → override gagne, subject TU", async () => {
@@ -478,6 +487,11 @@ describe("sendArchitectSolicitation — sélection template TU/VOUS", () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(getLastSubject()).toBe(SUBJECT_SOLICITATION_TU);
+    expect(getLastSubject()).toMatch(new RegExp(`^${escapeRegex(PREFIX_TU)}`));
+    expect(getLastSubject()).not.toContain("{{");
   });
 });
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

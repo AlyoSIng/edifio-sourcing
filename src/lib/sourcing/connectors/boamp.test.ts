@@ -92,8 +92,10 @@ describe("createBoampConnector — URL construite", () => {
     const params = parsed.searchParams;
     expect(params.get("limit")).toBe("100");
     expect(params.get("offset")).toBe("0");
-    // v2.1 utilise `dateparution` (pas `datepublication` v2)
-    expect(params.get("where")).toBe('dateparution >= "2026-05-01T00:00:00.000Z"');
+    // v2.1 utilise `dateparution` (pas `datepublication` v2). Le connecteur
+    // découpe l'ISO sur 'T' pour ne garder que la partie YYYY-MM-DD — le
+    // filtre BOAMP fonctionne en granularité jour, pas heure.
+    expect(params.get("where")).toBe('dateparution >= "2026-05-01"');
     // v2.1 utilise `order_by` (pas `sort` v2)
     expect(params.get("order_by")).toBe("dateparution desc");
   });

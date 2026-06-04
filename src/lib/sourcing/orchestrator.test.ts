@@ -227,7 +227,10 @@ describe("runSourcingForProfile", () => {
     );
   });
 
-  it("fenêtre lastRunAt = now - 24h transmise au connecteur", async () => {
+  it("fenêtre lastRunAt = now - 72h transmise au connecteur", async () => {
+    // Décision 2026-06-01 (bug #P1) : fenêtre passée de 24h à 72h pour
+    // recouvrir les AOs publiés à minuit UTC (BOAMP `dateparution` est un
+    // DATE, pas un DATETIME). Voir orchestrator.ts FETCH_WINDOW_MS.
     const profile = makeProfile();
     const { connector, fetchCalls } = makeConnector([]);
     const db = makeMockDb();
@@ -238,8 +241,8 @@ describe("runSourcingForProfile", () => {
     expect(fetchCalls).toHaveLength(1);
     const call = fetchCalls[0] as { profileId: string; lastRunAt: Date };
     expect(call.profileId).toBe(profile.id);
-    // 24h avant fixedNow
-    expect(call.lastRunAt.toISOString()).toBe("2026-05-19T12:00:00.000Z");
+    // 72h avant fixedNow
+    expect(call.lastRunAt.toISOString()).toBe("2026-05-17T12:00:00.000Z");
   });
 
   it("score est calculé et passé à insertTender (mock inspecte les values)", async () => {

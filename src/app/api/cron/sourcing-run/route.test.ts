@@ -88,10 +88,20 @@ vi.mock("@/db/client", () => {
     return chain;
   };
 
+  // No-op `update()` chain pour supporter le wrapper withCronRunLog (I3,
+  // 2026-06-04) qui fait db.update(cronRunLog).set(...).where(eq(...)). Sans
+  // ça, finishCronRun trap silencieusement le throw mais on évite le bruit.
+  const updateImpl = () => ({
+    set: () => ({
+      where: async () => undefined,
+    }),
+  });
+
   return {
     db: {
       select: selectImpl,
       insert: insertImpl,
+      update: updateImpl,
     },
   };
 });
@@ -265,10 +275,17 @@ describe("GET /api/cron/sourcing-run — pipeline", () => {
     expect(body.results[0]?.filtered).toEqual({ no_positive_keyword: 1 });
     expect(body.results[0]?.inserted).toBe(2);
 
-    // Vérifie scores 0-100 sur les INSERT
-    for (const insert of mockInserts) {
-      const value = insert as { score: string };
-      const score = Number(value.score);
+    // Vérifie scores 0-100 sur les INSERT tenders. Depuis l'introduction
+    // de cron_run_log (I3, 2026-06-04), `withCronRunLog` ajoute un INSERT
+    // initial dans la même table de mocks — on filtre par présence du
+    // champ `score` pour ne valider que les rows tender.
+    const tenderInserts = mockInserts.filter(
+      (i): i is { score: string } =>
+        typeof i === "object" && i !== null && "score" in (i as Record<string, unknown>),
+    );
+    expect(tenderInserts.length).toBeGreaterThan(0);
+    for (const insert of tenderInserts) {
+      const score = Number(insert.score);
       expect(score).toBeGreaterThanOrEqual(0);
       expect(score).toBeLessThanOrEqual(100);
     }
