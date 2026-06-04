@@ -227,6 +227,13 @@ export const NAV_ITEMS: NavSection[] = [
         matchPrefix: "/sourcing/admin/ia-usage",
         superadminOnly: true,
       },
+      {
+        href: "/sourcing/admin/tandem-activity",
+        label: "Activité Tandem",
+        icon: "users",
+        matchPrefix: "/sourcing/admin/tandem-activity",
+        adminOnly: true,
+      },
     ],
   },
 ];
