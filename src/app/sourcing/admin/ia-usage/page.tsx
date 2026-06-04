@@ -23,6 +23,7 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
+import { RangeFilter, parseRange, rangeDaysAgo } from "@/app/sourcing/admin/_shared/RangeFilter";
 
 export const metadata = {
   title: "Coûts IA · edifio Sourcing",
@@ -60,7 +61,11 @@ function formatMonth(yyyyMm: string): string {
 // Composant principal
 // ---------------------------------------------------------------------------
 
-export default async function IaUsagePage() {
+interface PageProps {
+  searchParams?: { range?: string };
+}
+
+export default async function IaUsagePage({ searchParams }: PageProps) {
   // 1. Auth + superadmin guard.
   const supabase = createSupabaseServerClient();
   const {
@@ -69,6 +74,10 @@ export default async function IaUsagePage() {
   if (!user) redirect("/login?next=/sourcing/admin/ia-usage");
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
+
+  // Filtre temporel (I1) — défaut 30j si absent ou invalide.
+  const range = parseRange(searchParams?.range);
+  const rangeFrom = rangeDaysAgo(range);
 
   // 2. Résolution dynamique de l'org (fallback ALYOS_ORG_ID).
   let orgId: string;
@@ -102,10 +111,7 @@ export default async function IaUsagePage() {
   };
 
   try {
-    // 3a. byPrompt — agrégé sur 12 derniers mois.
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-
+    // 3a. byPrompt — agrégé sur la fenêtre choisie (range).
     const byPromptRows = await db
       .select({
         promptName: aiPrompts.name,
@@ -116,7 +122,7 @@ export default async function IaUsagePage() {
       .from(aiRuns)
       .innerJoin(aiPrompts, eq(aiRuns.promptId, aiPrompts.id))
       .where(
-        sql`${aiRuns.organizationId} = ${orgId} AND ${aiRuns.createdAt} >= ${twelveMonthsAgo.toISOString()}`,
+        sql`${aiRuns.organizationId} = ${orgId} AND ${aiRuns.createdAt} >= ${rangeFrom.toISOString()}`,
       )
       .groupBy(aiPrompts.name)
       .orderBy(desc(sql<string>`coalesce(sum(${aiRuns.costUsd}), 0)`));
@@ -130,10 +136,7 @@ export default async function IaUsagePage() {
       totalTokensOut: 0,
     }));
 
-    // 3b. byMonth — 6 derniers mois.
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
+    // 3b. byMonth — sur la fenêtre choisie (range).
     const byMonthRows = await db
       .select({
         month: sql<string>`to_char(date_trunc('month', ${aiRuns.createdAt}), 'YYYY-MM')`,
@@ -141,9 +144,7 @@ export default async function IaUsagePage() {
         totalCostUsd: sql<string>`coalesce(sum(${aiRuns.costUsd}), 0)::text`,
       })
       .from(aiRuns)
-      .where(
-        gte(aiRuns.createdAt, sixMonthsAgo).append(sql` AND ${aiRuns.organizationId} = ${orgId}`),
-      )
+      .where(gte(aiRuns.createdAt, rangeFrom).append(sql` AND ${aiRuns.organizationId} = ${orgId}`))
       .groupBy(sql`date_trunc('month', ${aiRuns.createdAt})`)
       .orderBy(sql`date_trunc('month', ${aiRuns.createdAt})`);
 
@@ -186,14 +187,17 @@ export default async function IaUsagePage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <header className="mb-6">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
-          Coûts IA
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Agrégation des appels Claude (analyse RC, indexation biblio, briefs AO, etc.) par mois et
-          par prompt. Données issues de la table <code>ai_runs</code>.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
+            Coûts IA
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            Agrégation des appels Claude (analyse RC, indexation biblio, briefs AO, etc.) par mois
+            et par prompt. Données issues de la table <code>ai_runs</code>.
+          </p>
+        </div>
+        <RangeFilter basePath="/sourcing/admin/ia-usage" current={range} />
       </header>
 
       {fetchError ? (
@@ -212,7 +216,7 @@ export default async function IaUsagePage() {
             />
             <KpiCard label="Runs mois en cours" value={formatInt(currentMonthTotals.runs)} />
             <KpiCard
-              label="Coût 12 derniers mois"
+              label={`Coût ${range} j (fenêtre)`}
               value={formatUsd(byPrompt.reduce((acc, p) => acc + p.totalCostUsd, 0))}
             />
           </section>

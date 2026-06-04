@@ -24,46 +24,25 @@ import { markArchitectNotificationsSeen } from "@/lib/notifications/architect-re
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
+import { RangeFilter, parseRange, rangeDaysAgo } from "@/app/sourcing/admin/_shared/RangeFilter";
+import { TandemTable } from "./TandemTable";
 
 export const metadata = { title: "Activité Tandem · edifio Sourcing" };
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDateTime(d: Date | null): string {
-  if (!d) return "—";
-  return d.toLocaleString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function statusLabel(status: string): { label: string; className: string } {
-  switch (status) {
-    case "pending":
-      return { label: "En attente", className: "bg-amber-50 text-amber-700" };
-    case "accepted":
-      return { label: "Accepté", className: "bg-emerald-50 text-emerald-700" };
-    case "declined":
-      return { label: "Décliné", className: "bg-error-bg text-error" };
-    case "info_requested":
-      return { label: "Demande d'infos", className: "bg-paper-2 text-ink-2" };
-    default:
-      return { label: status, className: "bg-paper-2 text-ink-2" };
-  }
-}
+// `formatDateTime` et `statusLabel` migrés vers TandemTable.tsx (I1 — Client
+// Component pour pouvoir formater par ligne après filtre).
 
 // ---------------------------------------------------------------------------
 // Composant principal
 // ---------------------------------------------------------------------------
 
-export default async function TandemActivityPage() {
+interface PageProps {
+  searchParams?: { range?: string };
+}
+
+export default async function TandemActivityPage({ searchParams }: PageProps) {
   // 1. Auth + admin.
   const supabase = createSupabaseServerClient();
   const {
@@ -89,6 +68,11 @@ export default async function TandemActivityPage() {
     console.warn("[admin-tandem-activity:mark-seen:fail]", err);
   }
 
+  // I1 — fenêtre temporelle dynamique (défaut 90j → conservé pour cette page,
+  // override possible via ?range=7|30|90).
+  const range = parseRange(searchParams?.range);
+  const rangeFrom = rangeDaysAgo(range);
+
   // 2. Agrégats.
   let fetchError: string | null = null;
   const counts = { pending: 0, accepted: 0, declined: 0, infoRequested: 0, total: 0 };
@@ -103,8 +87,7 @@ export default async function TandemActivityPage() {
     architectCabinet: string;
   }> = [];
 
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const ninetyDaysAgo = rangeFrom;
 
   try {
     // 2a. Counts globaux (90 derniers jours).
@@ -192,14 +175,17 @@ export default async function TandemActivityPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <header className="mb-6">
-        <h1 className="font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
-          Activité Tandem
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Vue agrégée des sollicitations architectes sur les 90 derniers jours, avec taux de réponse
-          et délai moyen.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-ink md:text-3xl">
+            Activité Tandem
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            Vue agrégée des sollicitations architectes sur les {range} derniers jours, avec taux de
+            réponse et délai moyen.
+          </p>
+        </div>
+        <RangeFilter basePath="/sourcing/admin/tandem-activity" current={range} />
       </header>
 
       {fetchError ? (
@@ -228,72 +214,22 @@ export default async function TandemActivityPage() {
             <KpiCard label="Délai moyen" value={`${kpis.avgResponseHours} h`} />
           </section>
 
-          {/* Tableau récent */}
+          {/* Tableau récent — Client Component avec recherche + export CSV (I1). */}
           <section>
             <h2 className="mb-3 font-display text-base font-semibold text-ink">
               30 dernières sollicitations
             </h2>
-            {recent.length === 0 ? (
-              <p className="text-sm italic text-muted">
-                Aucune sollicitation Tandem sur les 90 derniers jours.
-              </p>
-            ) : (
-              <div className="overflow-x-auto rounded-lg border border-line bg-white">
-                <table className="w-full text-sm">
-                  <thead className="bg-paper-2">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-ink-2">
-                        AO
-                      </th>
-                      <th className="px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-ink-2">
-                        Architecte
-                      </th>
-                      <th className="px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-ink-2">
-                        Statut
-                      </th>
-                      <th className="px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-ink-2">
-                        Sollicité
-                      </th>
-                      <th className="px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-ink-2">
-                        Répondu
-                      </th>
-                      <th className="px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider text-ink-2">
-                        Relance J+3
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {recent.map((row) => {
-                      const status = statusLabel(row.status);
-                      return (
-                        <tr key={row.id}>
-                          <td className="max-w-[280px] truncate px-3 py-2 text-ink">
-                            {row.tenderTitle}
-                          </td>
-                          <td className="px-3 py-2 text-ink-2">{row.architectCabinet}</td>
-                          <td className="px-3 py-2">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${status.className}`}
-                            >
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 font-mono text-[11px] text-muted">
-                            {formatDateTime(row.createdAt)}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-[11px] text-muted">
-                            {formatDateTime(row.respondedAt)}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-[11px] text-muted">
-                            {row.followupSentAt ? formatDateTime(row.followupSentAt) : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <TandemTable
+              rows={recent.map((r) => ({
+                id: r.id,
+                status: r.status,
+                respondedAtIso: r.respondedAt ? r.respondedAt.toISOString() : null,
+                createdAtIso: r.createdAt.toISOString(),
+                followupSentAtIso: r.followupSentAt ? r.followupSentAt.toISOString() : null,
+                tenderTitle: r.tenderTitle,
+                architectCabinet: r.architectCabinet,
+              }))}
+            />
           </section>
         </>
       )}
