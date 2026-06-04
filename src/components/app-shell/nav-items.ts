@@ -241,6 +241,13 @@ export const NAV_ITEMS: NavSection[] = [
         matchPrefix: "/sourcing/admin/envois",
         adminOnly: true,
       },
+      {
+        href: "/sourcing/admin/crons",
+        label: "Crons",
+        icon: "clock",
+        matchPrefix: "/sourcing/admin/crons",
+        superadminOnly: true,
+      },
     ],
   },
 ];

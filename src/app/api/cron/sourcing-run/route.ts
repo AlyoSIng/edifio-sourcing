@@ -47,6 +47,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/db/client";
 import { searchProfiles } from "@/db/schema/config";
+import { withCronRunLog } from "@/lib/cron/log-cron-run";
 
 import { createBoampConnector } from "@/lib/sourcing/connectors/boamp";
 import {
@@ -94,14 +95,21 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
   const authError = checkCronAuth(req);
   if (authError) return authError;
 
-  try {
+  // I3 — observabilité cron_run_log (wrappe tout le pipeline).
+  const outcome = await withCronRunLog(db, "sourcing-run", async () => {
     // 1. Charge tous les profils actifs (1 seule org AlyoS en MVP — petit
     //    volume, pas de pagination nécessaire). Multi-org viendra Phase 2.
     const profiles = await db.select().from(searchProfiles).where(eq(searchProfiles.active, true));
 
     if (profiles.length === 0) {
       console.log("[cron:sourcing-run] aucun profil actif — skip");
-      return NextResponse.json({ ok: true, totalProfiles: 0, results: [], failedProfiles: [] });
+      return {
+        totalProfiles: 0,
+        results: [],
+        failedProfiles: [],
+        scraperTriggered: [] as Array<{ platform: string; runId?: string; error?: string }>,
+        durationMs: 0,
+      } as const;
     }
 
     // 2. Connecteur BOAMP (fetch global Node ≥ 20)
@@ -156,17 +164,22 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
       duration_ms: batch.durationMs,
     });
 
-    return NextResponse.json({ ok: true, ...batch, scraperTriggered });
-  } catch (err) {
-    console.error("[cron:sourcing-run] unhandled", {
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : null,
-    });
-    return NextResponse.json(
-      { ok: false, message: "Erreur serveur durant le sourcing." },
-      { status: 500 },
-    );
+    return { ...batch, scraperTriggered };
+  });
+
+  if (outcome.ok) {
+    return NextResponse.json({ ok: true, ...outcome.result });
   }
+
+  const err = outcome.error;
+  console.error("[cron:sourcing-run] unhandled", {
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : null,
+  });
+  return NextResponse.json(
+    { ok: false, message: "Erreur serveur durant le sourcing." },
+    { status: 500 },
+  );
 }
 
 /**

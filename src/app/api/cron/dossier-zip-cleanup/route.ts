@@ -12,6 +12,7 @@ import crypto from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/db/client";
+import { withCronRunLog } from "@/lib/cron/log-cron-run";
 import { runDossierZipCleanup } from "@/lib/storage/dossier-zip-cleanup";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -37,10 +38,14 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
   const authError = checkCronAuth(req);
   if (authError) return authError;
 
-  try {
+  // I3 — observabilité cron_run_log.
+  const outcome = await withCronRunLog(db, "dossier-zip-cleanup", async () => {
     const supabaseAdmin = createSupabaseAdminClient();
-    const result = await runDossierZipCleanup({ db, supabaseAdmin });
+    return await runDossierZipCleanup({ db, supabaseAdmin });
+  });
 
+  if (outcome.ok) {
+    const result = outcome.result;
     console.log("[cron:dossier-zip-cleanup] done", {
       total_candidates: result.totalCandidates,
       rows_deleted: result.rowsDeleted,
@@ -48,18 +53,18 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
       storage_failures: result.storageFailures,
       duration_ms: result.durationMs,
     });
-
     return NextResponse.json({ ok: true, ...result });
-  } catch (err) {
-    console.error("[cron:dossier-zip-cleanup] unhandled", {
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : null,
-    });
-    return NextResponse.json(
-      { ok: false, message: "Erreur serveur durant le cleanup." },
-      { status: 500 },
-    );
   }
+
+  const err = outcome.error;
+  console.error("[cron:dossier-zip-cleanup] unhandled", {
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : null,
+  });
+  return NextResponse.json(
+    { ok: false, message: "Erreur serveur durant le cleanup." },
+    { status: 500 },
+  );
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {

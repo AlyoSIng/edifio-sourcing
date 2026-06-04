@@ -32,6 +32,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/db/client";
 import { getBrevoClient } from "@/lib/brevo/client";
+import { withCronRunLog } from "@/lib/cron/log-cron-run";
 import { runTandemFollowups } from "@/lib/tandem/followup-cron";
 
 /** Le cron peut s'étirer si plusieurs centaines d'archis à relancer. */
@@ -74,10 +75,15 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
   const authError = checkCronAuth(req);
   if (authError) return authError;
 
-  try {
+  // I3 — wrap dans withCronRunLog : INSERT row 'running' au début, UPDATE
+  // avec status final + duration_ms à la fin (même en cas d'exception).
+  const outcome = await withCronRunLog(db, "tandem-followup", async () => {
     const brevoClient = getBrevoClient();
-    const result = await runTandemFollowups({ db, brevoClient });
+    return await runTandemFollowups({ db, brevoClient });
+  });
 
+  if (outcome.ok) {
+    const result = outcome.result;
     // Trace structurée Vercel logs — pas de JWT, pas de PII (cabinet ok).
     console.log("[cron:tandem-followup] done", {
       total_candidates: result.totalCandidates,
@@ -87,18 +93,18 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
       duration_ms: result.durationMs,
       failures_sample: result.failures.slice(0, 5),
     });
-
     return NextResponse.json({ ok: true, ...result });
-  } catch (err) {
-    console.error("[cron:tandem-followup] unhandled", {
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : null,
-    });
-    return NextResponse.json(
-      { ok: false, message: "Erreur serveur durant la relance Tandem." },
-      { status: 500 },
-    );
   }
+
+  const err = outcome.error;
+  console.error("[cron:tandem-followup] unhandled", {
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : null,
+  });
+  return NextResponse.json(
+    { ok: false, message: "Erreur serveur durant la relance Tandem." },
+    { status: 500 },
+  );
 }
 
 /** GET — utilisé par Vercel Cron Jobs. */

@@ -19,6 +19,7 @@ import crypto from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/db/client";
+import { withCronRunLog } from "@/lib/cron/log-cron-run";
 import { sendEmail } from "@/lib/email/resend";
 import { runLibraryExpiryDigest } from "@/lib/library/expiry-digest";
 import { getSiteUrl } from "@/lib/site-url";
@@ -55,13 +56,13 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
   const authError = checkCronAuth(req);
   if (authError) return authError;
 
-  try {
-    const result = await runLibraryExpiryDigest({
-      db,
-      sendEmail,
-      baseUrl: getSiteUrl(),
-    });
+  // I3 — observabilité cron_run_log.
+  const outcome = await withCronRunLog(db, "library-expiry-digest", async () =>
+    runLibraryExpiryDigest({ db, sendEmail, baseUrl: getSiteUrl() }),
+  );
 
+  if (outcome.ok) {
+    const result = outcome.result;
     console.log("[cron:library-expiry-digest] done", {
       total_orgs: result.totalOrganizations,
       orgs_with_issues: result.organizationsWithIssues,
@@ -69,18 +70,18 @@ async function handleCronRequest(req: NextRequest): Promise<NextResponse> {
       email_failures: result.totalEmailFailures,
       duration_ms: result.durationMs,
     });
-
     return NextResponse.json({ ok: true, ...result });
-  } catch (err) {
-    console.error("[cron:library-expiry-digest] unhandled", {
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : null,
-    });
-    return NextResponse.json(
-      { ok: false, message: "Erreur serveur durant l'envoi du digest." },
-      { status: 500 },
-    );
   }
+
+  const err = outcome.error;
+  console.error("[cron:library-expiry-digest] unhandled", {
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : null,
+  });
+  return NextResponse.json(
+    { ok: false, message: "Erreur serveur durant l'envoi du digest." },
+    { status: 500 },
+  );
 }
 
 /** GET — utilisé par Vercel Cron Jobs. */

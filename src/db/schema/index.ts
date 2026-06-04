@@ -39,3 +39,4 @@ export * from "./shortlist";
 export * from "./tender-cotraitants";
 export * from "./dossier-dispatches";
 export * from "./library-index";
+export * from "./cron-log";
