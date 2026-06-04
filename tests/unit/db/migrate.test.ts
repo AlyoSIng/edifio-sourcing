@@ -20,7 +20,9 @@ import { describe, expect, it } from "vitest";
 import {
   assertDatabaseUrl,
   buildUrlFromParts,
+  findUnsafeUriChars,
   isPgBouncerPooler,
+  maskPasswordInMessage,
   resolveDbConfig,
   splitAddValueStatements,
 } from "@/db/migrate";
@@ -302,5 +304,80 @@ describe("src/db/migrate -- splitAddValueStatements", () => {
     const s3 = `INSERT INTO "a" ("id") VALUES (gen_random_uuid())`;
     const { otherStmts } = splitAddValueStatements([s1, av, s2, s3]);
     expect(otherStmts).toEqual([s1, s2, s3]);
+  });
+});
+
+// ----------------------------------------------------------------------------
+// Hardening MEMORY 2026-05-21 — password URI-safe + masking
+// ----------------------------------------------------------------------------
+
+describe("src/db/migrate -- findUnsafeUriChars", () => {
+  it("renvoie une liste vide pour un password URI-safe", () => {
+    expect(findUnsafeUriChars("AbCdEf123!*-_~")).toEqual([]);
+    expect(findUnsafeUriChars("MyPassphrase2026")).toEqual([]);
+  });
+
+  it("detecte le @ (separe user de host dans une URL)", () => {
+    expect(findUnsafeUriChars("foo@bar")).toContain("@");
+  });
+
+  it("detecte le # (fragment, tronque l'URL)", () => {
+    expect(findUnsafeUriChars("pass#word")).toContain("#");
+  });
+
+  it("detecte le % (escape introducer, risque de double-encodage)", () => {
+    expect(findUnsafeUriChars("p%ss")).toContain("%");
+  });
+
+  it("detecte le ? (query string, tronque l'URL)", () => {
+    expect(findUnsafeUriChars("pa?ss")).toContain("?");
+  });
+
+  it("detecte [ et ] (ambiguite host IPv6)", () => {
+    const found = findUnsafeUriChars("p[a]ss");
+    expect(found).toContain("[");
+    expect(found).toContain("]");
+  });
+
+  it("detecte / (confusion path)", () => {
+    expect(findUnsafeUriChars("p/ss")).toContain("/");
+  });
+
+  it("detecte l'espace (illegal en URL, doit etre %20)", () => {
+    expect(findUnsafeUriChars("pass word")).toContain(" ");
+  });
+
+  it("renvoie une liste triee + dedupliquee", () => {
+    const found = findUnsafeUriChars("a@b@c#d#e");
+    expect(found).toEqual(["#", "@"]); // tri alpha, sans doublon
+  });
+});
+
+describe("src/db/migrate -- maskPasswordInMessage", () => {
+  it("remplace le password exact par *** dans le message", () => {
+    const msg = "connexion postgres://user:mypass@host:5432/db a echoue";
+    expect(maskPasswordInMessage(msg, "mypass")).toBe(
+      "connexion postgres://user:***@host:5432/db a echoue",
+    );
+  });
+
+  it("remplace aussi la version encodée (encodeURIComponent)", () => {
+    const pwd = "p@ss#word";
+    const encoded = encodeURIComponent(pwd); // p%40ss%23word
+    const msg = `URL: postgres://user:${encoded}@host`;
+    expect(maskPasswordInMessage(msg, pwd)).toBe("URL: postgres://user:***@host");
+  });
+
+  it("no-op si password est vide", () => {
+    expect(maskPasswordInMessage("any message", "")).toBe("any message");
+  });
+
+  it("no-op si password n'apparait pas dans le message", () => {
+    expect(maskPasswordInMessage("connexion echouee", "mypass")).toBe("connexion echouee");
+  });
+
+  it("masque toutes les occurrences (pas seulement la premiere)", () => {
+    const msg = "url=foo:bar urls=foo:bar";
+    expect(maskPasswordInMessage(msg, "bar")).toBe("url=foo:*** urls=foo:***");
   });
 });

@@ -125,6 +125,57 @@ export function isPgBouncerPooler(databaseUrl: string): boolean {
 }
 
 /**
+ * Hardening MEMORY 2026-05-21 (incident BDD prod) — la regle « PGPASSWORD
+ * URI-safe a la source » est documentee. Cette helper offre une verification
+ * non-bloquante (warn console) si le password contient des caracteres dont
+ * l'encodage URL pourrait causer des deboires :
+ *
+ *   - `@` (separe user de host)        → URL ambiguë
+ *   - `#` (fragment)                    → tronque l'URL
+ *   - `%` (escape introducer)           → double-encodage potentiel
+ *   - `?` (query string)                → tronque l'URL
+ *   - `[` `]` (host IPv6)               → ambiguïté
+ *   - `/`                               → confusion path
+ *   - `<` `>` `"`                       → cassent HTML / shell
+ *
+ * Le `encodeURIComponent` dans `buildUrlFromParts` reste l'invariant
+ * primaire qui rend l'URL parsable, mais on alerte explicitement si le
+ * password contient ces chars : la pratique reste d'avoir un password
+ * URI-safe en BDD (rotation Steve post-MVP).
+ *
+ * Renvoie la liste des caracteres « dangereux » detectes (vide si OK).
+ * Exportee pour testabilite.
+ */
+export function findUnsafeUriChars(password: string): string[] {
+  const unsafe = new Set(["@", "#", "%", "?", "[", "]", "/", "<", ">", '"', "'", "\\", " "]);
+  const found = new Set<string>();
+  for (const c of password) {
+    if (unsafe.has(c)) found.add(c);
+  }
+  return Array.from(found).sort();
+}
+
+/**
+ * Masque un password dans un message d'erreur (best-effort). postgres-js peut
+ * inclure l'URL complete dans certains messages (DNS fail, authentication
+ * failed). On remplace toute sous-chaine `:<password>@` par `:***@` pour
+ * eviter qu'un copier-coller de stack trace fuit le secret dans un chat.
+ *
+ * Exportee pour testabilite.
+ */
+export function maskPasswordInMessage(message: string, password: string): string {
+  if (!password || password.length === 0) return message;
+  // 1. Remplacement exact (cas le plus frequent : URL recomposee)
+  let masked = message.split(password).join("***");
+  // 2. Remplacement de la version encodée (encodeURIComponent peut differer)
+  const encoded = encodeURIComponent(password);
+  if (encoded !== password) {
+    masked = masked.split(encoded).join("***");
+  }
+  return masked;
+}
+
+/**
  * Construit une URL postgres canonique a partir d'une config eclatee `PG*`.
  *
  * Pourquoi : workaround bug postgres-js Windows (cf. JSDoc fichier + DECISIONS
@@ -294,6 +345,17 @@ async function main(): Promise<void> {
       "[migrate] Mode env : eclate (PG*) -- conversion en URL interne (workaround postgres-js Windows).",
     );
     connectionUrl = buildUrlFromParts(cfg);
+
+    // Hardening MEMORY 2026-05-21 : warn si le password contient des chars
+    // qui ne sont pas URI-safe a la source. L'encodage interne marche, mais
+    // la pratique reste un password URI-safe-only en BDD (rotation Steve).
+    const unsafe = findUnsafeUriChars(cfg.password);
+    if (unsafe.length > 0) {
+      console.warn(
+        `[migrate] WARNING : PGPASSWORD contient ${unsafe.length} caractere(s) non URI-safe : ${unsafe.join(" ")}. ` +
+          `L'encodage cote wrapper compense, mais la pratique recommandee est un password URI-safe a la source (rotation post-MVP).`,
+      );
+    }
   }
 
   if (isPgBouncerPooler(connectionUrl)) {
@@ -336,7 +398,34 @@ const isDirectRun = process.argv[1]?.replace(/\\/g, "/").endsWith("src/db/migrat
 
 if (isDirectRun) {
   main().catch((err: unknown) => {
-    console.error("[migrate] [FAIL]", err);
+    // Hardening MEMORY 2026-05-21 : masque le password dans le stack trace.
+    // postgres-js peut inclure l'URL complete dans certaines erreurs (DNS
+    // fail, auth fail). On masque avant d'imprimer cote console.
+    //
+    // On essaye 2 sources pour le mask : PGPASSWORD (mode eclate) puis
+    // l'extraction depuis DATABASE_URL (mode URL) en best-effort.
+    const passwords = new Set<string>();
+    if (process.env.PGPASSWORD) passwords.add(process.env.PGPASSWORD);
+    if (process.env.DATABASE_URL) {
+      try {
+        const parsed = new URL(process.env.DATABASE_URL);
+        if (parsed.password) passwords.add(decodeURIComponent(parsed.password));
+      } catch {
+        // ignore
+      }
+    }
+
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error && typeof err.stack === "string" ? err.stack : "";
+    let maskedMessage = message;
+    let maskedStack = stack;
+    for (const pwd of passwords) {
+      maskedMessage = maskPasswordInMessage(maskedMessage, pwd);
+      if (maskedStack) maskedStack = maskPasswordInMessage(maskedStack, pwd);
+    }
+
+    console.error("[migrate] [FAIL]", maskedMessage);
+    if (maskedStack) console.error(maskedStack);
     process.exitCode = 1;
   });
 }
