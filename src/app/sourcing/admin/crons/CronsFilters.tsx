@@ -19,6 +19,11 @@
 import { useState, useMemo } from "react";
 
 import type { CronRunRow } from "./crons-types";
+import { filterCronRows, type StatusFilter } from "./filter-rows";
+
+// I4 — helpers extraits dans `./filter-rows.ts` pour être testables sans JSX.
+// Ré-export pour préserver l'API publique côté pages.
+export { filterCronRows, type StatusFilter } from "./filter-rows";
 
 export interface CronsFiltersProps {
   rows: CronRunRow[];
@@ -27,19 +32,14 @@ export interface CronsFiltersProps {
   children: (filtered: CronRunRow[]) => React.ReactNode;
 }
 
-type StatusFilter = "all" | "ok" | "error" | "running";
-
 export function CronsFilters({ rows, cronNames, children }: CronsFiltersProps) {
   const [nameFilter, setNameFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      if (nameFilter !== "all" && r.cron_name !== nameFilter) return false;
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      return true;
-    });
-  }, [rows, nameFilter, statusFilter]);
+  const filtered = useMemo(
+    () => filterCronRows(rows, nameFilter, statusFilter),
+    [rows, nameFilter, statusFilter],
+  );
 
   return (
     <div className="space-y-3">
