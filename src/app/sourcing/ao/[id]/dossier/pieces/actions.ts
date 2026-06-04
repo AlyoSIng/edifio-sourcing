@@ -33,6 +33,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
+import { searchProfiles } from "@/db/schema/config";
 import { presentationLibrary, responseFiles } from "@/db/schema/library";
 import { libraryItemIndex } from "@/db/schema/library-index";
 import { architectResponses } from "@/db/schema/selections";
@@ -43,6 +44,7 @@ import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
+import { shouldIncludeFicheMetier } from "@/lib/dossier/fiche-metier-match";
 import {
   compileDossierZip,
   type ForcedLibraryItem,
@@ -478,6 +480,47 @@ export async function compileDossierAction(
       return true;
     });
 
+    // 9c. **Fiches métiers** (Steve 2026-06-04). Comportement spécifique :
+    //     les fiches du kind `fiche_metier` ne sont PAS jointes
+    //     inconditionnellement — on les inclut seulement si leurs
+    //     `matching_keywords` intersectent les `keywords.positive` du
+    //     profil de recherche actif par défaut de l'organisation.
+    //
+    //     Rationale : Steve attribue des mots-clés à chaque fiche métier
+    //     (« patrimoine, ABF, étude historique »…). Au moment de
+    //     compiler le dossier d'un AO, on suppose que les mots-clés
+    //     positifs du profil actif décrivent le périmètre métier en cours,
+    //     donc seules les fiches alignées sont pertinentes.
+    //
+    //     Cas particuliers :
+    //       - fiche métier SANS `matching_keywords` → on ne joint pas
+    //         (signal explicite que Steve doit configurer les keywords).
+    //       - profil sans positives → on ne joint aucune fiche métier
+    //         (sourcing n'est pas configuré, pas de signal de matching).
+    let profilePositives: string[] = [];
+    try {
+      const [activeProfile] = await db
+        .select({ keywords: searchProfiles.keywords })
+        .from(searchProfiles)
+        .where(
+          and(
+            eq(searchProfiles.organizationId, orgId),
+            eq(searchProfiles.active, true),
+            eq(searchProfiles.isDefault, true),
+          ),
+        )
+        .limit(1);
+      profilePositives = activeProfile?.keywords?.positive ?? [];
+    } catch (err) {
+      console.warn("[compile-dossier:profile-load:fail]", err);
+    }
+
+    const FICHE_METIER_KIND = "fiche_metier";
+    const finalExtraLibraryItems = extraLibraryItems.filter((item) => {
+      if (item.kind !== FICHE_METIER_KIND) return true; // comportement existant
+      return shouldIncludeFicheMetier(item.matchingKeywords, profilePositives);
+    });
+
     // 10. Compiler le ZIP (téléchargements depuis Storage via admin client)
     //     Storage admin : RLS bypass intentionnel — auth vérifiée plus haut.
     const supabaseAdmin = createSupabaseAdminClient();
@@ -487,7 +530,7 @@ export async function compileDossierAction(
       pieceMatches,
       forcedLibraryItems,
       tenderDocuments: tenderDocsForZip,
-      extraLibraryItems,
+      extraLibraryItems: finalExtraLibraryItems,
     });
 
     if (zipResult.fileCount === 0) {

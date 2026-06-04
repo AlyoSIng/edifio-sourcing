@@ -68,6 +68,7 @@ function makeLibItem(id: string, name: string, kind = "autre"): PresentationLibr
     sizeBytes: null,
     validUntil: null,
     notes: null,
+    matchingKeywords: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };

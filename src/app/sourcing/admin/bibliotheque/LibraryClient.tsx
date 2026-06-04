@@ -77,6 +77,11 @@ export const LIBRARY_KINDS = [
   { key: "moyens_humains", label: "Moyens humains et matériels", hasExpiry: false },
   { key: "references", label: "Références de marchés", hasExpiry: false },
   { key: "memoire_rse", label: "Mémoire RSE / développement durable", hasExpiry: false },
+  {
+    key: "fiche_metier",
+    label: "Fiches métiers (sélection auto par mots-clés)",
+    hasExpiry: false,
+  },
   { key: "autre", label: "Autre document", hasExpiry: false },
 ] as const;
 

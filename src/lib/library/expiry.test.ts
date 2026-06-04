@@ -21,6 +21,7 @@ function makeItem(id: string, validUntilIso: string | null): PresentationLibrary
     sizeBytes: null,
     validUntil: validUntilIso as unknown as string | null,
     notes: null,
+    matchingKeywords: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };

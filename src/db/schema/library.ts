@@ -88,6 +88,14 @@ export const presentationLibrary = pgTable(
     /** Date d'expiration (attestations URSSAF, etc.) — pilote alertes J-30/J-7/J-1 */
     validUntil: date("valid_until"),
     notes: text("notes"),
+    /**
+     * Mots-clés associés à la fiche pour matching automatique à la compile
+     * dossier (Steve 2026-06-04). Sert au kind `fiche_metier` exclusivement
+     * — à la génération du dossier, on inclut les fiches dont au moins un
+     * matching_keyword est présent dans `keywords.positive` du profil de
+     * recherche actif.
+     */
+    matchingKeywords: text("matching_keywords").array(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

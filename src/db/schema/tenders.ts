@@ -46,6 +46,13 @@ export const tenders = pgTable(
       .references(() => platforms.id),
     title: text("title").notNull(),
     buyer: text("buyer").notNull(),
+    /**
+     * Adresse postale de l'acheteur (rue + code postal + ville libre).
+     * Steve 2026-06-04. Utilisée pour les courriers de réponse et le
+     * pré-remplissage des CERFA. Nullable : extraite progressivement du
+     * raw_data BOAMP ou saisie manuellement.
+     */
+    buyerAddress: text("buyer_address"),
     /** Codes CPV principaux + secondaires */
     cpv: text("cpv")
       .array()

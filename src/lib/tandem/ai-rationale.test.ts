@@ -47,6 +47,9 @@ function makeArchitect(overrides: Partial<Architect> = {}): Architect {
     budgetMax: null,
     concoursOnly: false,
     annualRevenue: null,
+    revenueN1: null,
+    revenueN2: null,
+    revenueN3: null,
     ...overrides,
   };
 }

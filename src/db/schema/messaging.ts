@@ -147,6 +147,14 @@ export const organizationProfiles = pgTable("organization_profiles", {
   capitalEur: integer("capital_eur"),
   signatureCity: text("signature_city"),
   /**
+   * Chiffre d'affaires des 3 dernières années (DC2 §E « Capacité financière »).
+   * Steve 2026-06-04. Nullable : peuvent être complétés progressivement
+   * depuis la page « Présentation société ».
+   */
+  revenueN1: integer("revenue_n1"),
+  revenueN2: integer("revenue_n2"),
+  revenueN3: integer("revenue_n3"),
+  /**
    * Forme juridique (SA, SARL, SAS, SASU, EURL, SCP, SELARL, etc.).
    * Champ libre text pour ne pas figer une enum côté schéma — la validation
    * UI suggère les plus courantes via datalist (Steve 2026-06-03 / mig. 0040).

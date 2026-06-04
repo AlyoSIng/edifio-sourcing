@@ -116,6 +116,13 @@ export const architects = pgTable(
      * NULL = inconnu → architecte inclus par défaut.
      */
     annualRevenue: integer("annual_revenue"),
+    /**
+     * Chiffre d'affaires des 3 dernières années (DC2 standard). Steve 2026-06-04.
+     * Nullable : peuvent être complétés progressivement.
+     */
+    revenueN1: integer("revenue_n1"),
+    revenueN2: integer("revenue_n2"),
+    revenueN3: integer("revenue_n3"),
     /** Taille entreprise (PME | ETI | GE) — enrichissement, hors matching V1. */
     companySize: text("company_size"),
     companyCreatedAt: timestamp("company_created_at", { withTimezone: true }),
