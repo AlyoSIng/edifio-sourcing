@@ -29,6 +29,7 @@ import { BriefGenerator } from "@/app/sourcing/ao-du-jour/BriefGenerator";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
+import { findBuyerByName } from "@/lib/buyers/upsert-buyer";
 
 import { BuyerAddressEditor } from "./BuyerAddressEditor";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -167,6 +168,23 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
       .limit(1);
 
     tender = rows[0] ?? null;
+
+    // Q3 — Auto-populate buyer_address depuis l'annuaire si absent.
+    // Steve 2026-06-04 : si le tender n'a pas d'adresse mais qu'un buyer du
+    // même nom existe dans l'annuaire, on affiche l'adresse de l'annuaire.
+    // L'auto-populate est cosmétique côté affichage — on ne PERSISTE PAS la
+    // valeur dans tenders.buyer_address (l'utilisateur peut toujours la
+    // saisir explicitement s'il veut une adresse différente pour ce dossier).
+    if (tender && !tender.buyerAddress && tender.buyer.trim()) {
+      try {
+        const found = await findBuyerByName(db, orgId, tender.buyer);
+        if (found?.address) {
+          tender = { ...tender, buyerAddress: found.address };
+        }
+      } catch (err) {
+        console.warn("[ao-page:buyer-directory-lookup:fail]", err);
+      }
+    }
 
     // Chargement du RC le plus récent pour le widget sidebar
     const [rcDoc] = await db

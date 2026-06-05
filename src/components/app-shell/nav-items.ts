@@ -143,6 +143,14 @@ export const NAV_ITEMS: NavSection[] = [
         icon: "hard-hat",
         matchPrefix: "/sourcing/entreprises",
       },
+      // Annuaire acheteurs (Steve 2026-06-04 — Q4).
+      {
+        href: "/sourcing/admin/acheteurs",
+        label: "Acheteurs",
+        icon: "building",
+        matchPrefix: "/sourcing/admin/acheteurs",
+        adminOnly: true,
+      },
     ],
   },
   {
