@@ -420,7 +420,7 @@ export function BEEditForm({ be }: BEEditFormProps) {
                   id="be-revenue-n1"
                   type="number"
                   min={0}
-                  step={10000}
+                  step={1}
                   value={revenueN1}
                   onChange={(e) => setRevenueN1(e.target.value)}
                   placeholder="ex : 520000"
@@ -435,7 +435,7 @@ export function BEEditForm({ be }: BEEditFormProps) {
                   id="be-revenue-n2"
                   type="number"
                   min={0}
-                  step={10000}
+                  step={1}
                   value={revenueN2}
                   onChange={(e) => setRevenueN2(e.target.value)}
                   placeholder="ex : 480000"
@@ -450,7 +450,7 @@ export function BEEditForm({ be }: BEEditFormProps) {
                   id="be-revenue-n3"
                   type="number"
                   min={0}
-                  step={10000}
+                  step={1}
                   value={revenueN3}
                   onChange={(e) => setRevenueN3(e.target.value)}
                   placeholder="ex : 460000"

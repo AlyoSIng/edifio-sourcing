@@ -542,7 +542,7 @@ function RevenueInput({
         name={id}
         type="number"
         min={0}
-        step={10000}
+        step={1}
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(e.target.value)}

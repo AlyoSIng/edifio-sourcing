@@ -621,7 +621,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
                 id="annualRevenue"
                 type="number"
                 min={0}
-                step={10000}
+                step={1}
                 value={annualRevenue}
                 onChange={(e) => setAnnualRevenue(e.target.value)}
                 placeholder="ex : 500000"
@@ -647,7 +647,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
                   id="revenueN1"
                   type="number"
                   min={0}
-                  step={10000}
+                  step={1}
                   value={revenueN1}
                   onChange={(e) => setRevenueN1(e.target.value)}
                   placeholder="ex : 520000"
@@ -662,7 +662,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
                   id="revenueN2"
                   type="number"
                   min={0}
-                  step={10000}
+                  step={1}
                   value={revenueN2}
                   onChange={(e) => setRevenueN2(e.target.value)}
                   placeholder="ex : 480000"
@@ -677,7 +677,7 @@ export function ArchitectEditForm({ architect, initialPastCollabs }: ArchitectEd
                   id="revenueN3"
                   type="number"
                   min={0}
-                  step={10000}
+                  step={1}
                   value={revenueN3}
                   onChange={(e) => setRevenueN3(e.target.value)}
                   placeholder="ex : 460000"
