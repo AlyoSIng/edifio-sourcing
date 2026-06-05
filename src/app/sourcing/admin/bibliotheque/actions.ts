@@ -81,7 +81,11 @@ const VALID_KINDS = new Set([
   "presentation_entreprise",
   "moyens_humains",
   "references",
+  // Salve R (Steve 2026-06-05) — références avec matching auto.
+  "references_table", // 1 seul tableau Excel par org, filtré au compile
+  "reference_fiche", // fiches A4 individuelles, matching keywords
   "memoire_rse",
+  "fiche_metier", // matching keywords (manquait à la whitelist, bug pré-existant fixé R)
   "autre",
   // Catégories legacy — supprimées de l'UI d'upload mais conservées ici pour
   // que les documents existants en BDD restent valides (pas d'erreur "invalid_kind"
@@ -90,6 +94,19 @@ const VALID_KINDS = new Set([
   "dc2_vierge",
   "dc4_vierge",
 ]);
+
+/**
+ * Kinds qui acceptent un champ `matching_keywords` lors de l'upload.
+ * Salve R : étendu à `reference_fiche` (logique identique à `fiche_metier`).
+ */
+const KINDS_WITH_KEYWORDS = new Set(["fiche_metier", "reference_fiche"]);
+
+/**
+ * Kind « singleton » : un seul item par organisation. À l'upload d'un nouveau,
+ * on supprime les anciens (Storage + BDD) avant d'insérer le nouveau.
+ * Cas d'usage : tableau Excel maître des références.
+ */
+const SINGLETON_KINDS = new Set(["references_table"]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -182,9 +199,10 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
     typeof notes === "string" && notes.trim() !== "" ? notes.trim().slice(0, 500) : null;
 
   // Parse matching_keywords : split par virgule, trim, dedup, max 20 keywords,
-  // chaque keyword max 80 chars. Seulement utilisé si kind='fiche_metier'.
+  // chaque keyword max 80 chars. Utilisé pour les kinds `fiche_metier` et
+  // `reference_fiche` (matching auto à la compile dossier).
   let matchingKeywords: string[] | null = null;
-  if (kind.trim() === "fiche_metier" && typeof matchingKeywordsRaw === "string") {
+  if (KINDS_WITH_KEYWORDS.has(kind.trim()) && typeof matchingKeywordsRaw === "string") {
     const parsed = matchingKeywordsRaw
       .split(",")
       .map((k) => k.trim())
@@ -193,12 +211,64 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
     matchingKeywords = dedup.length > 0 ? dedup : null;
   }
 
-  // 3. Chemin de stockage : {orgId}/{kind}/{timestamp}_{sanitizedFilename}
+  // Validation spécifique pour les tableaux Excel maîtres : on parse le fichier
+  // côté serveur pour vérifier qu'il contient bien une colonne « Mots-clés »
+  // avant de l'accepter en biblio. Sinon, le filtrage à la compile dossier
+  // throw silencieusement et Steve ne saura pas que son tableau est invalide.
+  if (kind.trim() === "references_table") {
+    try {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const { filterReferencesTableXlsx } = await import("@/lib/dossier/references-table-filter");
+      // Dry-run avec un keyword bidon : si la colonne « Mots-clés » est
+      // présente, filterReferencesTableXlsx renvoie sans throw (même si 0
+      // ligne matche). Sinon, elle throw "Colonne « Mots-clés » introuvable".
+      await filterReferencesTableXlsx(buf, ["__validation_dryrun__"]);
+    } catch (err) {
+      console.warn("[bibliotheque:upload:references_table:validation:fail]", err);
+      return { ok: false, error: "references_table_missing_keywords_column" };
+    }
+  }
+
+  // 3. Singleton kinds — supprime l'ancien avant d'insérer le nouveau (best
+  //    effort : si la suppression échoue, on continue l'upload, l'admin peut
+  //    nettoyer manuellement). Évite l'accumulation de N tableaux Excel.
+  if (SINGLETON_KINDS.has(kind.trim())) {
+    try {
+      const oldItems = await db
+        .select({
+          id: presentationLibrary.id,
+          storagePath: presentationLibrary.storagePath,
+        })
+        .from(presentationLibrary)
+        .where(
+          and(
+            eq(presentationLibrary.organizationId, orgId),
+            eq(presentationLibrary.kind, kind.trim()),
+          ),
+        );
+      if (oldItems.length > 0) {
+        const paths = oldItems.map((o) => o.storagePath);
+        await supabaseAdmin.storage.from(BUCKET_NAME).remove(paths);
+        await db
+          .delete(presentationLibrary)
+          .where(
+            and(
+              eq(presentationLibrary.organizationId, orgId),
+              eq(presentationLibrary.kind, kind.trim()),
+            ),
+          );
+      }
+    } catch (err) {
+      console.warn("[bibliotheque:upload:singleton:cleanup:fail]", err);
+    }
+  }
+
+  // 4. Chemin de stockage : {orgId}/{kind}/{timestamp}_{sanitizedFilename}
   const timestamp = Date.now();
   const safeFilename = sanitizeFilename(file.name);
   const storagePath = `${orgId}/${kind.trim()}/${timestamp}_${safeFilename}`;
 
-  // 4. Upload vers Supabase Storage
+  // 5. Upload vers Supabase Storage
   const fileBuffer = await file.arrayBuffer();
   // Storage admin : RLS bypass intentionnel — auth + isAdmin() vérifiés L.122-130
   const { error: storageError } = await supabaseAdmin.storage
@@ -213,7 +283,7 @@ export async function uploadLibraryDoc(formData: FormData): Promise<UploadLibrar
     return { ok: false, error: "storage_upload_failed" };
   }
 
-  // 5. Insert dans la table BDD
+  // 6. Insert dans la table BDD
   try {
     await db.insert(presentationLibrary).values({
       organizationId: orgId,

@@ -90,6 +90,16 @@ export interface ZipCompileInput {
    * (`valid_until <= today`) — la lib n'a pas de notion de date.
    */
   extraLibraryItems?: PresentationLibraryItem[];
+  /**
+   * Salve R (Steve 2026-06-05) — fichiers générés en mémoire à inclure dans
+   * le ZIP sans passer par un téléchargement Storage. Cas d'usage : tableau
+   * Excel des références filtré à la volée par profil de recherche actif.
+   *
+   * Chaque entrée précise son chemin cible (relatif à la racine du ZIP, ex.
+   * `Références/tableau_references.xlsx`). Pas de matching ni dédup —
+   * l'appelant a déjà fait le tri.
+   */
+  inMemoryFiles?: Array<{ targetPath: string; buffer: Uint8Array }>;
 }
 
 export interface ZipCompileResult {
@@ -273,7 +283,19 @@ export async function compileDossierZip(
     }
   }
 
-  // 6. Générer le ZIP
+  // 6. In-memory files (Steve 2026-06-05 — salve R). Pas de téléchargement
+  //    Storage : l'appelant a déjà construit le buffer (ex. tableau Excel
+  //    références filtré à la volée par profil de recherche).
+  if (input.inMemoryFiles && input.inMemoryFiles.length > 0) {
+    for (const f of input.inMemoryFiles) {
+      // Le targetPath est relatif à la racine du ZIP. On le préfixe par
+      // `dossier_candidature/` pour rester cohérent avec les autres entrées.
+      const safePath = `dossier_candidature/${f.targetPath.replace(/^\/+/, "")}`;
+      files[safePath] = f.buffer;
+    }
+  }
+
+  // 7. Générer le ZIP
   const fileCount = Object.keys(files).length;
 
   if (fileCount === 0) {

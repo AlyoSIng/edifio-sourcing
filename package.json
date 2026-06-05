@@ -47,6 +47,7 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "drizzle-orm": "0.39.3",
+    "exceljs": "^4.4.0",
     "fflate": "^0.8.3",
     "next": "14.2.35",
     "pdf-lib": "^1.17.1",

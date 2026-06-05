@@ -592,6 +592,76 @@ Si tu as un document que tu veux joindre à **TOUS** tes dossiers (référence g
 ## 9. Mise à jour des mots-clés d'une fiche existante
 Au MVP, il n'y a pas d'édition inline des mots-clés (limitation connue). Pour modifier : supprime la fiche et ré-uploade-la avec les nouveaux mots-clés. Une fonction d'édition arrivera en V2.`;
 
+const GUIDE_16 = `Tu as un historique de **références** de marchés AlyoS — parfois plusieurs centaines de lignes. Tu n'as pas envie de joindre toute la liste à chaque dossier (l'acheteur n'a pas le temps de la lire) ni de re-trier à la main à chaque AO. edifio Sourcing fait le filtrage tout seul, à partir de **mots-clés**, sur deux formats au choix : un **tableau Excel** maître ou des **fiches A4** individuelles.
+
+## 1. Les deux flux complémentaires
+| Flux | Format | Quand l'utiliser |
+|---|---|---|
+| **A — Tableau Excel maître** | Un seul \`.xlsx\` (1 ligne = 1 référence + colonne « Mots-clés ») | Quand tu as 30 à 500 références listées dans un tableau de pilotage interne |
+| **B — Fiches référence A4** | N fichiers \`.pdf\`/\`.docx\` (1 fichier = 1 référence) | Quand tu as des fiches détaillées avec photos, plans, retour client |
+
+Les deux flux peuvent coexister. À la compile du dossier, l'app inclut le tableau Excel filtré ET les fiches A4 matchantes dans un sous-dossier \`Références/\` du ZIP.
+
+## 2. Préparer ton tableau Excel maître
+1. Une feuille (la 1ère du fichier sera scannée).
+2. 1ère ligne = en-têtes de colonnes (texte). L'app a besoin de trouver une colonne nommée **« Mots-clés »** (les variantes « Mots cles », « Keywords », « MOTS-CLÉS » sont reconnues — case et accents tolérés).
+3. À partir de la 2e ligne, une référence par ligne. Toutes les autres colonnes (Référence, Acheteur, Montant, Année, etc.) sont conservées telles quelles dans le ZIP — elles sont juste filtrées par les mots-clés.
+4. Dans la cellule « Mots-clés », sépare les termes par **virgule**, **point-virgule** OU **retour à la ligne** — les trois sont acceptés. Exemple : \`patrimoine, ABF, restauration\` ou \`patrimoine; restauration\`.
+
+Exemple de tableau :
+
+| Référence | Acheteur | Mots-clés | Montant |
+|---|---|---|---|
+| R001 | Mairie de Lyon | patrimoine, restauration | 450 000 € |
+| R002 | CC Sud | scolaire, école primaire | 280 000 € |
+| R003 | Ville de Bron | voirie, espaces verts | 175 000 € |
+
+## 3. Uploader le tableau Excel
+1. Va dans **Configuration > Bibliothèque** (admin uniquement).
+2. Catégorie **« Tableau Excel des références (1 seul fichier, filtré auto par profil) »**.
+3. Choisis ton fichier \`.xlsx\` et submit.
+4. À l'upload, l'app **valide** que la colonne « Mots-clés » est bien présente. Si elle ne la trouve pas, tu reçois un message d'erreur explicite — corrige et ré-uploade.
+5. Un seul tableau par organisation : un nouvel upload **remplace** l'ancien (l'ancien fichier Storage est supprimé automatiquement).
+
+## 4. Préparer tes fiches référence A4
+Pour les références que tu veux présenter en fiche détaillée (photo, plan, mémoire de chantier) :
+1. Une fiche par référence (PDF ou DOCX, format A4 recommandé).
+2. Uploade dans la catégorie **« Fiches référence A4 (sélection auto par mots-clés) »**.
+3. Saisis les mots-clés associés séparés par des virgules (max 20 mots-clés, 80 caractères chacun).
+4. C'est la même mécanique que les fiches métiers (cf. Guide 15) — chips vertes affichées sur la card.
+
+## 5. Au moment de compiler le dossier
+Tu n'as rien à faire — c'est automatique :
+1. L'app charge ton profil de recherche actif et récupère ses **keywords positifs**.
+2. Pour le **tableau Excel** : elle parcourt chaque ligne, normalise la cellule « Mots-clés » (insensible casse + accents), garde les lignes dont au moins un mot-clé intersecte les positives du profil. Le tableau résultant est inclus au ZIP sous \`Références/tableau_references_filtre.xlsx\`. Si zéro ligne ne matche → pas de fichier (le ZIP n'embarque pas un tableau vide).
+3. Pour les **fiches A4** : même logique — chaque fiche dont les matching_keywords intersectent le profil est incluse dans \`Références/\`.
+
+L'acheteur reçoit donc un sous-dossier \`Références/\` contenant uniquement les références pertinentes pour son AO — propre, court, ciblé.
+
+## 6. Bonnes pratiques de mots-clés
+- **Vocabulaire cohérent** entre tes références et ton profil de recherche actif. Si tu écris \`ABF\` dans le tableau, écris aussi \`ABF\` (pas \`Bâtiment de France\`) dans les positives du profil.
+- **Pas de mots-clés trop génériques** (\`construction\`, \`marché\`) qui matcheraient toutes les références.
+- **Pas de mots-clés trop spécifiques** (\`Mairie de Lyon\`) qui ne matcheraient qu'un AO sur 1000.
+- **Granularité métier + ouvrage** : combine \`patrimoine\` + \`école\` + \`gymnase\` + \`logement social\` + \`voirie\` etc. Idem pour les compétences : \`étude historique\`, \`OPC\`, \`énergétique\`.
+
+## 7. Vérifier que ton profil a les bons positives
+- Va sur **Configuration > Profils de recherche**.
+- Ouvre ton profil actif par défaut.
+- Vérifie que les positives recouvrent les mots-clés utilisés dans ton tableau Excel et tes fiches A4.
+
+Conseil : tiens à jour un **lexique partagé** quelque part (Notion, doc Word) entre profil et bibliothèque. Si tu décides un jour d'utiliser \`MOE\` à la place de \`maîtrise d'œuvre\`, propage la modif partout.
+
+## 8. Mise à jour du tableau Excel
+Pas de versioning ni de diff au MVP — un nouvel upload écrase l'ancien :
+1. Ouvre ton tableau Excel local, modifie les lignes, sauvegarde.
+2. Retourne dans **Bibliothèque > Tableau Excel des références** et re-submit.
+3. L'app valide la colonne « Mots-clés », supprime l'ancien tableau du Storage et insère le nouveau.
+
+## 9. Cas typiques
+- **Tableau seul** : tu n'as pas de fiches A4 détaillées, juste une liste de marchés. L'acheteur reçoit le tableau filtré, c'est suffisant.
+- **Fiches A4 seules** : tu as une vingtaine de fiches projet riches mais pas de tableau récap. L'app inclut uniquement les fiches matchantes.
+- **Les deux** : référentiel exhaustif en Excel + fiches détaillées pour les 10-20 références phares. L'acheteur a la vue d'ensemble + le détail des plus marquantes.`;
+
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
     id: "fb000001-0000-0000-0000-000000000001",
@@ -768,5 +838,17 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_15,
     isActive: true,
     displayOrder: 15,
+  },
+  {
+    id: "fb000001-0000-0000-0000-000000000010",
+    slug: "references-matching-auto",
+    title: "Références : matching auto via tableau Excel + fiches A4",
+    description:
+      "Tableau Excel maître (filtré auto par profil) + fiches A4 individuelles avec matching keywords. L'acheteur reçoit un dossier Références/ ciblé.",
+    type: "doc",
+    durationMin: 8,
+    contentMd: GUIDE_16,
+    isActive: true,
+    displayOrder: 16,
   },
 ];

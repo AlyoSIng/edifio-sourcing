@@ -76,6 +76,16 @@ export const LIBRARY_KINDS = [
   { key: "presentation_entreprise", label: "Présentation de l'entreprise", hasExpiry: false },
   { key: "moyens_humains", label: "Moyens humains et matériels", hasExpiry: false },
   { key: "references", label: "Références de marchés", hasExpiry: false },
+  {
+    key: "references_table",
+    label: "Tableau Excel des références (1 seul fichier, filtré auto par profil)",
+    hasExpiry: false,
+  },
+  {
+    key: "reference_fiche",
+    label: "Fiches référence A4 (sélection auto par mots-clés)",
+    hasExpiry: false,
+  },
   { key: "memoire_rse", label: "Mémoire RSE / développement durable", hasExpiry: false },
   {
     key: "fiche_metier",
@@ -535,8 +545,9 @@ function KindSection({
                         <span>Ajouté le {formatDate(item.createdAt)}</span>
                         {item.notes && <span className="italic">{item.notes}</span>}
                       </div>
-                      {/* Chips matching_keywords pour les fiches métiers. */}
-                      {item.kind === "fiche_metier" && (
+                      {/* Chips matching_keywords pour les fiches métiers ET
+                          les fiches référence A4 (même logique de matching). */}
+                      {(item.kind === "fiche_metier" || item.kind === "reference_fiche") && (
                         <div className="mt-1.5">
                           {item.matchingKeywords && item.matchingKeywords.length > 0 ? (
                             <div className="flex flex-wrap items-center gap-1">
@@ -762,8 +773,9 @@ function KindSection({
               />
             </div>
 
-            {/* Mots-clés associés — exclusivement pour kind='fiche_metier'. */}
-            {kindKey === "fiche_metier" && (
+            {/* Mots-clés associés — pour fiche_metier ET reference_fiche
+                (même logique : matching via positives du profil actif). */}
+            {(kindKey === "fiche_metier" || kindKey === "reference_fiche") && (
               <div className="sm:col-span-2">
                 <label
                   htmlFor={`matching-keywords-${kindKey}`}
@@ -776,13 +788,43 @@ function KindSection({
                   name="matchingKeywords"
                   type="text"
                   disabled={isPending}
-                  placeholder="ex : patrimoine, ABF, restauration, étude historique"
+                  placeholder={
+                    kindKey === "reference_fiche"
+                      ? "ex : patrimoine, scolaire, voirie, restauration"
+                      : "ex : patrimoine, ABF, restauration, étude historique"
+                  }
                   className="w-full rounded border border-line bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red disabled:opacity-50"
                 />
                 <p className="mt-0.5 text-[10px] text-muted">
-                  Cette fiche sera incluse au ZIP du dossier si l&apos;un de ces mots-clés est
-                  présent dans les <strong>keywords positifs</strong> du profil de recherche actif.
-                  Max 20 mots-clés, 80 caractères chacun.
+                  {kindKey === "reference_fiche" ? "Cette fiche référence" : "Cette fiche"} sera
+                  incluse au ZIP du dossier si l&apos;un de ces mots-clés est présent dans les{" "}
+                  <strong>keywords positifs</strong> du profil de recherche actif. Max 20 mots-clés,
+                  80 caractères chacun.
+                </p>
+              </div>
+            )}
+
+            {/* Aide spécifique pour le tableau Excel maître des références. */}
+            {kindKey === "references_table" && (
+              <div className="rounded-md border border-blue-100 bg-blue-50/50 p-2.5 text-[11px] text-blue-800 sm:col-span-2">
+                <p className="font-medium">📊 Format attendu du tableau Excel</p>
+                <ul className="ml-4 mt-1 list-disc space-y-0.5">
+                  <li>
+                    Une feuille, 1<sup>re</sup> ligne = en-têtes de colonnes
+                  </li>
+                  <li>
+                    Une colonne nommée <strong>Mots-clés</strong> (case + accents tolérés)
+                  </li>
+                  <li>
+                    Mots-clés séparés par <code>,</code>, <code>;</code> ou retour à la ligne
+                  </li>
+                  <li>
+                    Un seul tableau par organisation — un nouvel upload remplace l&apos;existant
+                  </li>
+                </ul>
+                <p className="mt-1.5">
+                  À la compile du dossier, l&apos;app filtre les lignes dont les mots-clés
+                  intersectent le profil actif et joint un tableau allégé au ZIP.
                 </p>
               </div>
             )}
@@ -837,6 +879,8 @@ function uploadErrorLabel(code: string | undefined): string {
       return "Erreur lors de l'upload vers le stockage — réessayez.";
     case "db_insert_failed":
       return "Erreur d'enregistrement en base — le fichier a été supprimé du stockage.";
+    case "references_table_missing_keywords_column":
+      return "Tableau Excel invalide : la colonne « Mots-clés » est introuvable dans la 1ʳᵉ ligne. Ajoute une colonne d'en-tête « Mots-clés » et remplis-la pour chaque référence.";
     default:
       return "Erreur inattendue — réessayez ou contactez l'administrateur.";
   }

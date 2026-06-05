@@ -45,6 +45,8 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/sup
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
 import { shouldIncludeFicheMetier } from "@/lib/dossier/fiche-metier-match";
+import { shouldIncludeReferenceFiche } from "@/lib/dossier/reference-fiche-match";
+import { filterReferencesTableXlsx } from "@/lib/dossier/references-table-filter";
 import {
   compileDossierZip,
   type ForcedLibraryItem,
@@ -515,11 +517,54 @@ export async function compileDossierAction(
       console.warn("[compile-dossier:profile-load:fail]", err);
     }
 
+    // Salve R (Steve 2026-06-05) — étendu : on filtre aussi les fiches
+    // référence A4 (`reference_fiche`) selon le même critère matching keywords,
+    // et on isole le tableau Excel maître (`references_table`) du flow
+    // standard pour le traiter à part (filtrage en mémoire).
     const FICHE_METIER_KIND = "fiche_metier";
+    const REFERENCE_FICHE_KIND = "reference_fiche";
+    const REFERENCES_TABLE_KIND = "references_table";
+
+    // Isoler le tableau Excel maître (au maximum 1 — singleton côté upload).
+    const referencesTableItem = extraLibraryItems.find((it) => it.kind === REFERENCES_TABLE_KIND);
+
     const finalExtraLibraryItems = extraLibraryItems.filter((item) => {
-      if (item.kind !== FICHE_METIER_KIND) return true; // comportement existant
-      return shouldIncludeFicheMetier(item.matchingKeywords, profilePositives);
+      if (item.kind === REFERENCES_TABLE_KIND) return false; // traité séparément
+      if (item.kind === FICHE_METIER_KIND) {
+        return shouldIncludeFicheMetier(item.matchingKeywords, profilePositives);
+      }
+      if (item.kind === REFERENCE_FICHE_KIND) {
+        return shouldIncludeReferenceFiche(item.matchingKeywords, profilePositives);
+      }
+      return true; // comportement existant pour tout le reste
     });
+
+    // Génération du tableau Excel filtré (in-memory). Best-effort — si la
+    // lecture / filtration échoue, on log et on continue le ZIP sans le
+    // tableau (pas bloquant pour le dossier complet).
+    const inMemoryFiles: Array<{ targetPath: string; buffer: Uint8Array }> = [];
+    if (referencesTableItem && profilePositives.length > 0) {
+      try {
+        const supabaseAdminForTable = createSupabaseAdminClient();
+        const { data: tableData, error: tableErr } = await supabaseAdminForTable.storage
+          .from("company_library")
+          .download(referencesTableItem.storagePath);
+        if (tableErr || !tableData) {
+          console.warn("[compile-dossier:references-table:download:fail]", tableErr);
+        } else {
+          const tableBuffer = new Uint8Array(await tableData.arrayBuffer());
+          const filtered = await filterReferencesTableXlsx(tableBuffer, profilePositives);
+          if (filtered.buffer && filtered.keptRows > 0) {
+            inMemoryFiles.push({
+              targetPath: "Références/tableau_references_filtre.xlsx",
+              buffer: filtered.buffer,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[compile-dossier:references-table:filter:fail]", err);
+      }
+    }
 
     // 10. Compiler le ZIP (téléchargements depuis Storage via admin client)
     //     Storage admin : RLS bypass intentionnel — auth vérifiée plus haut.
@@ -531,6 +576,7 @@ export async function compileDossierAction(
       forcedLibraryItems,
       tenderDocuments: tenderDocsForZip,
       extraLibraryItems: finalExtraLibraryItems,
+      inMemoryFiles,
     });
 
     if (zipResult.fileCount === 0) {
