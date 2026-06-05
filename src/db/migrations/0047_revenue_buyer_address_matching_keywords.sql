@@ -31,10 +31,10 @@ ALTER TABLE "architects" ADD COLUMN IF NOT EXISTS "revenue_n1" integer;
 ALTER TABLE "architects" ADD COLUMN IF NOT EXISTS "revenue_n2" integer;
 ALTER TABLE "architects" ADD COLUMN IF NOT EXISTS "revenue_n3" integer;
 
--- bureau_etudes
-ALTER TABLE "bureau_etudes" ADD COLUMN IF NOT EXISTS "revenue_n1" integer;
-ALTER TABLE "bureau_etudes" ADD COLUMN IF NOT EXISTS "revenue_n2" integer;
-ALTER TABLE "bureau_etudes" ADD COLUMN IF NOT EXISTS "revenue_n3" integer;
+-- bureaux_etudes
+ALTER TABLE "bureaux_etudes" ADD COLUMN IF NOT EXISTS "revenue_n1" integer;
+ALTER TABLE "bureaux_etudes" ADD COLUMN IF NOT EXISTS "revenue_n2" integer;
+ALTER TABLE "bureaux_etudes" ADD COLUMN IF NOT EXISTS "revenue_n3" integer;
 
 -- organization_profiles (DC2 AlyoS)
 ALTER TABLE "organization_profiles" ADD COLUMN IF NOT EXISTS "revenue_n1" integer;
