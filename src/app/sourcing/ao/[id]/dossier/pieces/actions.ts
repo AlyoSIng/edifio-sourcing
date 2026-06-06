@@ -46,6 +46,7 @@ import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
 import { shouldIncludeFicheMetier } from "@/lib/dossier/fiche-metier-match";
 import { shouldIncludeReferenceFiche } from "@/lib/dossier/reference-fiche-match";
+import { shouldIncludeCv } from "@/lib/dossier/cv-match";
 import { filterReferencesTableXlsx } from "@/lib/dossier/references-table-filter";
 import {
   compileDossierZip,
@@ -517,13 +518,15 @@ export async function compileDossierAction(
       console.warn("[compile-dossier:profile-load:fail]", err);
     }
 
-    // Salve R (Steve 2026-06-05) — étendu : on filtre aussi les fiches
-    // référence A4 (`reference_fiche`) selon le même critère matching keywords,
-    // et on isole le tableau Excel maître (`references_table`) du flow
-    // standard pour le traiter à part (filtrage en mémoire).
+    // Salves R+S (Steve 2026-06-05) — étendu : on filtre aussi les fiches
+    // référence A4 (`reference_fiche`) et les CV (`cv`) selon le même critère
+    // matching keywords, et on isole le tableau Excel maître
+    // (`references_table`) du flow standard pour le traiter à part (filtrage
+    // en mémoire).
     const FICHE_METIER_KIND = "fiche_metier";
     const REFERENCE_FICHE_KIND = "reference_fiche";
     const REFERENCES_TABLE_KIND = "references_table";
+    const CV_KIND = "cv";
 
     // Isoler le tableau Excel maître (au maximum 1 — singleton côté upload).
     const referencesTableItem = extraLibraryItems.find((it) => it.kind === REFERENCES_TABLE_KIND);
@@ -535,6 +538,9 @@ export async function compileDossierAction(
       }
       if (item.kind === REFERENCE_FICHE_KIND) {
         return shouldIncludeReferenceFiche(item.matchingKeywords, profilePositives);
+      }
+      if (item.kind === CV_KIND) {
+        return shouldIncludeCv(item.matchingKeywords, profilePositives);
       }
       return true; // comportement existant pour tout le reste
     });

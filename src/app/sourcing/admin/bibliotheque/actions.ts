@@ -86,6 +86,8 @@ const VALID_KINDS = new Set([
   "reference_fiche", // fiches A4 individuelles, matching keywords
   "memoire_rse",
   "fiche_metier", // matching keywords (manquait à la whitelist, bug pré-existant fixé R)
+  // Salve S (Steve 2026-06-05) — CV intervenants avec matching auto.
+  "cv", // CV individuels des intervenants, matching keywords
   "autre",
   // Catégories legacy — supprimées de l'UI d'upload mais conservées ici pour
   // que les documents existants en BDD restent valides (pas d'erreur "invalid_kind"
@@ -97,9 +99,10 @@ const VALID_KINDS = new Set([
 
 /**
  * Kinds qui acceptent un champ `matching_keywords` lors de l'upload.
- * Salve R : étendu à `reference_fiche` (logique identique à `fiche_metier`).
+ * Salve R : étendu à `reference_fiche`. Salve S : étendu à `cv`.
+ * Logique identique à `fiche_metier`.
  */
-const KINDS_WITH_KEYWORDS = new Set(["fiche_metier", "reference_fiche"]);
+const KINDS_WITH_KEYWORDS = new Set(["fiche_metier", "reference_fiche", "cv"]);
 
 /**
  * Kind « singleton » : un seul item par organisation. À l'upload d'un nouveau,

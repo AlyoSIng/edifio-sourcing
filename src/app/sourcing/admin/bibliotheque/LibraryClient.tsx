@@ -92,6 +92,11 @@ export const LIBRARY_KINDS = [
     label: "Fiches métiers (sélection auto par mots-clés)",
     hasExpiry: false,
   },
+  {
+    key: "cv",
+    label: "CV des intervenants (sélection auto par mots-clés)",
+    hasExpiry: false,
+  },
   { key: "autre", label: "Autre document", hasExpiry: false },
 ] as const;
 
@@ -545,9 +550,11 @@ function KindSection({
                         <span>Ajouté le {formatDate(item.createdAt)}</span>
                         {item.notes && <span className="italic">{item.notes}</span>}
                       </div>
-                      {/* Chips matching_keywords pour les fiches métiers ET
-                          les fiches référence A4 (même logique de matching). */}
-                      {(item.kind === "fiche_metier" || item.kind === "reference_fiche") && (
+                      {/* Chips matching_keywords pour les fiches métiers,
+                          les fiches référence A4 et les CV (même logique). */}
+                      {(item.kind === "fiche_metier" ||
+                        item.kind === "reference_fiche" ||
+                        item.kind === "cv") && (
                         <div className="mt-1.5">
                           {item.matchingKeywords && item.matchingKeywords.length > 0 ? (
                             <div className="flex flex-wrap items-center gap-1">
@@ -773,9 +780,9 @@ function KindSection({
               />
             </div>
 
-            {/* Mots-clés associés — pour fiche_metier ET reference_fiche
+            {/* Mots-clés associés — pour fiche_metier, reference_fiche et cv
                 (même logique : matching via positives du profil actif). */}
-            {(kindKey === "fiche_metier" || kindKey === "reference_fiche") && (
+            {(kindKey === "fiche_metier" || kindKey === "reference_fiche" || kindKey === "cv") && (
               <div className="sm:col-span-2">
                 <label
                   htmlFor={`matching-keywords-${kindKey}`}
@@ -791,15 +798,21 @@ function KindSection({
                   placeholder={
                     kindKey === "reference_fiche"
                       ? "ex : patrimoine, scolaire, voirie, restauration"
-                      : "ex : patrimoine, ABF, restauration, étude historique"
+                      : kindKey === "cv"
+                        ? "ex : patrimoine, BIM, REVIT, OPC, énergétique"
+                        : "ex : patrimoine, ABF, restauration, étude historique"
                   }
                   className="w-full rounded border border-line bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red disabled:opacity-50"
                 />
                 <p className="mt-0.5 text-[10px] text-muted">
-                  {kindKey === "reference_fiche" ? "Cette fiche référence" : "Cette fiche"} sera
-                  incluse au ZIP du dossier si l&apos;un de ces mots-clés est présent dans les{" "}
-                  <strong>keywords positifs</strong> du profil de recherche actif. Max 20 mots-clés,
-                  80 caractères chacun.
+                  {kindKey === "reference_fiche"
+                    ? "Cette fiche référence"
+                    : kindKey === "cv"
+                      ? "Ce CV"
+                      : "Cette fiche"}{" "}
+                  sera inclus(e) au ZIP du dossier si l&apos;un de ces mots-clés est présent dans
+                  les <strong>keywords positifs</strong> du profil de recherche actif. Max 20
+                  mots-clés, 80 caractères chacun.
                 </p>
               </div>
             )}

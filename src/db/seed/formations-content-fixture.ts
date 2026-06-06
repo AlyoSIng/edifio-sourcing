@@ -662,6 +662,62 @@ Pas de versioning ni de diff au MVP — un nouvel upload écrase l'ancien :
 - **Fiches A4 seules** : tu as une vingtaine de fiches projet riches mais pas de tableau récap. L'app inclut uniquement les fiches matchantes.
 - **Les deux** : référentiel exhaustif en Excel + fiches détaillées pour les 10-20 références phares. L'acheteur a la vue d'ensemble + le détail des plus marquantes.`;
 
+const GUIDE_17 = `Sur la plupart des dossiers de candidature, l'acheteur veut connaître l'équipe qui répondra au marché : qui sont les chefs de projet, les architectes, les BET, les conducteurs de travaux mobilisés ? On joint donc des **CV** des intervenants — mais pas TOUS les CV de l'entreprise à chaque dossier. Tu veux celui qui correspond à l'AO. edifio Sourcing automatise cette sélection comme pour les fiches métiers et les fiches référence.
+
+## 1. Le concept
+Tu uploades une fois pour toutes les CV de tes intervenants dans la bibliothèque (un fichier par personne, format A4 PDF ou DOCX) avec des **mots-clés associés** qui décrivent leurs spécialités. À la compile du dossier, edifio Sourcing inclut automatiquement dans le ZIP les CV dont au moins un mot-clé intersecte les **keywords positifs** du profil de recherche actif.
+
+Exemple concret :
+- Tu uploades \`cv_jean_dupont_archi_patrimoine.pdf\` avec mots-clés \`patrimoine, ABF, restauration, monuments historiques\`.
+- Tu uploades \`cv_marie_martin_archi_scolaire.pdf\` avec mots-clés \`scolaire, crèche, périscolaire, ERP\`.
+- Tu uploades \`cv_paul_durand_bim_manager.pdf\` avec mots-clés \`BIM, IFC, REVIT, maquette numérique\`.
+- Pour un AO « Réhabilitation d'une école patrimoine en BIM », l'app inclut \`cv_jean_dupont\` (patrimoine) et \`cv_paul_durand\` (BIM), pas \`cv_marie_martin\` (scolaire neuf — pas dans le profil).
+
+## 2. Uploader un CV
+1. Va dans **Configuration > Bibliothèque** (admin uniquement).
+2. Catégorie **« CV des intervenants (sélection auto par mots-clés) »**.
+3. Choisis le fichier (PDF, DOCX, JPG, PNG — max 50 Mo).
+4. Saisis les **mots-clés associés** séparés par des virgules :
+   - Spécialité métier : \`patrimoine, ABF, scolaire, EHPAD, logement social\`
+   - Compétences techniques : \`BIM, REVIT, IFC, énergétique, RT2020, RE2020\`
+   - Rôles : \`OPC, mandataire, conducteur d'opération, AMO\`
+   - Max 20 mots-clés, 80 caractères chacun
+5. Submit. Le CV apparaît dans la section avec ses chips vertes.
+
+## 3. Bonnes pratiques de mots-clés sur les CV
+- **Vocabulaire métier + outil + rôle** : sur le CV d'un BET structure expert patrimoine, tag-le avec \`patrimoine\` (domaine) + \`structure\` (lot) + \`BET\` (rôle).
+- **N'utilise pas le NOM du collaborateur comme mot-clé** : ça ne matche jamais avec le profil de recherche.
+- **Évite les mots trop génériques** comme \`architecte\` ou \`ingénieur\` qui matcheraient quasiment tous les AO.
+- **Ouvre des slots de spécialisation** pour des AO récurrents : si tu réponds régulièrement à des AO « gymnase », assure-toi qu'au moins 1-2 CV est tagué \`gymnase\`.
+
+## 4. Vérifier la cohérence avec ton profil de recherche
+Le matching se fait contre les \`keywords.positive\` du **profil de recherche actif par défaut**. Va sur **Configuration > Profils de recherche** et vérifie que ton vocabulaire est aligné entre profil et CV. Si tu écris \`maquette numérique\` sur tes CV mais \`BIM\` dans le profil, aucun CV BIM ne sera inclus.
+
+## 5. Au moment de compiler le dossier
+Tu n'as rien à faire de spécial. À la compile :
+1. L'app charge le profil actif et ses keywords positifs.
+2. Pour chaque CV de la biblio, vérifie l'intersection avec les keywords.
+3. Si intersection → CV ajouté au ZIP dans le même dossier que les autres pièces.
+4. Si pas d'intersection → CV ignoré silencieusement.
+
+Le ZIP final contient donc une **équipe ciblée** pour l'AO, pas le trombinoscope complet de la boîte.
+
+## 6. Cas typiques de tagage
+- **Archi senior patrimoine** : \`patrimoine, ABF, monuments historiques, restauration, étude historique\`
+- **Archi scolaire/petite enfance** : \`scolaire, école, crèche, périscolaire, ERP, accessibilité\`
+- **Archi logement** : \`logement social, logement collectif, bailleur, ZAC, neuf, réhabilitation\`
+- **BIM Manager** : \`BIM, IFC, REVIT, ARCHICAD, maquette numérique, coordination BIM\`
+- **BET structure** : \`structure, béton armé, charpente, métal, bois, fondations spéciales\`
+- **BET fluides énergétique** : \`fluides, CVC, plomberie, électricité, énergétique, RE2020\`
+- **Économiste** : \`économie de la construction, DPGF, BPU, coût\`
+- **OPC** : \`OPC, ordonnancement, pilotage, coordination chantier\`
+
+## 7. Mise à jour des mots-clés d'un CV existant
+Au MVP, pas d'édition inline des mots-clés (même limitation que pour les fiches métiers et les fiches référence). Pour modifier : supprime + ré-uploade avec les nouveaux mots-clés. Une fonction d'édition arrivera en V2.
+
+## 8. Bien penser au cas Tandem multi-archi
+Si tu réponds en Tandem avec un archi externe et que cet archi t'a fourni son CV, ajoute-le en biblio (avec les mots-clés métier qui le caractérisent). Ses mots-clés se cumulent à ceux de tes propres CV — au moment de la compile, l'app inclut TOUS les CV matchants, peu importe leur origine (tes équipes ou ton cotraitant).`;
+
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
     id: "fb000001-0000-0000-0000-000000000001",
@@ -850,5 +906,17 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_16,
     isActive: true,
     displayOrder: 16,
+  },
+  {
+    id: "fb000001-0000-0000-0000-000000000011",
+    slug: "cv-matching-auto",
+    title: "CV : sélection auto des intervenants par mots-clés",
+    description:
+      "Upload des CV de tes intervenants avec leurs spécialités en mots-clés. L'app inclut au dossier uniquement les CV pertinents pour l'AO.",
+    type: "doc",
+    durationMin: 7,
+    contentMd: GUIDE_17,
+    isActive: true,
+    displayOrder: 17,
   },
 ];
