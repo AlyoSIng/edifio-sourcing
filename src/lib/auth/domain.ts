@@ -2,12 +2,22 @@
  * Garde de domaine email — restriction d'accès à `@alyosingenierie.fr`
  * et `@edifio.fr` (éditeur).
  *
- * Source de vérité : `specs/middleware_domain_gate.md` §2 (matrice 12 cas C1-C12).
- * Extension Board 2026-05-27 : `@edifio.fr` autorisé en plus de `@alyosingenierie.fr`
- * pour permettre au compte `contact@edifio.fr` (superadmin éditeur) d'accéder à
- * l'application.
+ * @deprecated **ADR-014 (2026-06-05)** — La garde de domaine a été retirée du
+ * middleware racine et des routes admin/users suite à l'ouverture multi-tenant
+ * (org PROTECT + orgs futures). La fonction reste exportée pour :
+ *   1. Conserver la batterie de tests `domain.test.ts` (12 cas C1-C12) qui
+ *      protègent contre les régressions si on devait re-introduire un filtre.
+ *   2. Permettre à des callers externes (intégrations futures, scripts ops)
+ *      de vérifier l'appartenance à un domaine edifio si besoin.
  *
- * Conditions d'acceptation :
+ * **Ne PAS l'utiliser dans une nouvelle garde-fou de sécurité** : le modèle
+ * d'auth est passé à l'invitation pure (admin-create only, RLS BDD scopée par
+ * `organization_id` via memberships).
+ *
+ * Source de vérité initiale : `specs/middleware_domain_gate.md` §2 (matrice 12
+ * cas C1-C12). Source de la dépréciation : `specs/adr_014_levee_filtre_middleware.md`.
+ *
+ * Conditions d'acceptation (conservées) :
  * - normalisation lowercase systématique avant comparaison (C11)
  * - match strict via `endsWith(domain)` (pas de regex tolérante)
  *   → rejette les domaines cousins `@alyosingenierie.com` (C10)
@@ -16,7 +26,6 @@
  * - rejette toute valeur falsy (null, undefined, chaîne vide)
  *
  * Cette fonction est **pure** et reste testable hors contexte Next.js / Supabase.
- * Toute évolution doit être reportée dans la spec et validée par [CTO Sophie].
  */
 
 /**

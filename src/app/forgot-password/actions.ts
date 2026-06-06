@@ -1,7 +1,9 @@
 "use server";
 
 import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
+// ADR-014 (Steve 2026-06-05) — `isAuthorizedEmail` retiré : ouverture multi-tenant.
+// La garde-fou est désormais l'existence d'un user en BDD (anti-énumération préservée
+// par le retour `status: "sent"` quel que soit l'email envoyé).
 import { computeProvisionalExpiresAt } from "@/lib/auth/password";
 import { generateProvisionalPassword } from "@/lib/auth/password-server";
 import type { UserMetadata } from "@/lib/auth/types";
@@ -74,8 +76,8 @@ export async function requestPasswordResetAction(
     }
 
     const email = emailRaw.trim().toLowerCase();
-    if (!EMAIL_REGEX.test(email) || !isAuthorizedEmail(email)) {
-      console.warn("[forgot-password:filtered]", { reason: "format_or_domain", email });
+    if (!EMAIL_REGEX.test(email)) {
+      console.warn("[forgot-password:filtered]", { reason: "invalid_format", email });
       return { status: "sent" };
     }
 

@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
+// ADR-014 (Steve 2026-06-05) — `isAuthorizedEmail` retiré : ouverture multi-tenant.
+// La garde de rôle (`isAdmin`) et l'existence du user cible en BDD font office
+// de garde-fou. Un admin de PROTECT peut regénérer le mot de passe de ses users.
 import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
 import { computeProvisionalExpiresAt } from "@/lib/auth/password";
 import { generateProvisionalPassword } from "@/lib/auth/password-server";
@@ -51,9 +53,7 @@ export async function POST(
     if (!caller || !caller.email) {
       return jsonError(401, "Authentification requise.");
     }
-    if (!isAuthorizedEmail(caller.email)) {
-      return jsonError(403, "Accès réservé aux membres AlyoS.");
-    }
+    // ADR-014 : pas de filtre domaine sur le caller — seule la garde de rôle reste.
     const callerProfile = toUserProfile(caller);
     if (!isAdmin(callerProfile)) {
       return jsonError(403, "Réservé aux administrateurs.");
@@ -76,11 +76,11 @@ export async function POST(
     }
     const target = targetData.user;
     const targetEmail = target.email ?? "";
-    if (!targetEmail || !isAuthorizedEmail(targetEmail)) {
-      // Garde-fou — un user externe ne devrait pas exister, mais defense
-      // in depth si quelqu'un a inséré une ligne hors flow normal.
-      return jsonError(403, "Cet utilisateur n'appartient pas au domaine AlyoS.");
+    if (!targetEmail) {
+      return jsonError(404, "Utilisateur introuvable (email manquant).");
     }
+    // ADR-014 : pas de filtre domaine sur le user cible — n'importe quel
+    // user invité par un admin peut voir son mot de passe regénéré.
 
     // ---------- 3. Génération + update ----------
     // GARDE-FOU SÉCURITÉ (Board Q1/B 2026-05-12) : ne JAMAIS logger

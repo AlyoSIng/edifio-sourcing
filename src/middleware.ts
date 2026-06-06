@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import {
   isAdminRoute,
   isProtectedApiRoute,
@@ -18,17 +17,25 @@ import {
 } from "@/lib/auth/types";
 
 /**
- * Middleware racine — garde de domaine `@alyosingenierie.fr` + gates
- * `must_change_password` et `admin`.
+ * Middleware racine — garde auth + gates `must_change_password` et `admin`.
  *
  * Source de vérité initiale : `specs/middleware_domain_gate.md` §3.1.
  * Extension Board 2026-05-11 (pivot password) :
  *   - redirection forcée vers /reset-password si `must_change_password === true`
  *   - garde `admin` sur `/sourcing/admin/*` et `/api/admin/*`
  *
+ * **Évolution Board 2026-06-05 (ADR-014) — ouverture multi-tenant** :
+ *   - Suppression du filtre domaine `@alyosingenierie.fr` (modèle invitation
+ *     pure : seul l'admin de chaque org peut créer un compte, donc tout user
+ *     présent dans `auth.users` est un user volontairement provisionné).
+ *   - Les signups publics Supabase Auth sont DÉSACTIVÉS côté config Supabase
+ *     Studio (Authentication > Email > "Enable signups" → OFF). C'est ce
+ *     verrou qui empêche un email random sur internet d'avoir un compte.
+ *   - La RLS BDD + Storage scopée par `organization_id` garantit qu'un user
+ *     sans `memberships` ne voit aucune donnée (defense in depth).
+ *
  * Garde-fou Board (CLAUDE.md — Limites strictes) : la désactivation de ce
- * middleware est INTERDITE. La garde de domaine reste la base, les nouvelles
- * règles s'empilent par-dessus.
+ * middleware reste INTERDITE. Auth + gates restent obligatoires.
  *
  * Pattern cookies : API `getAll` / `setAll` de `@supabase/ssr` 0.6+.
  */
@@ -136,47 +143,22 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       return redirectToLogin(req, pathname);
     }
 
-    // ---------- 5. Garde domaine `@alyosingenierie.fr` (INCHANGÉE) ----------
+    // ---------- 5. Audit d'accès (ADR-014 — plus de filtre domaine) ----------
+    // Le filtre `@alyosingenierie.fr` a été supprimé suite à la décision Board
+    // 2026-06-05 (ADR-014) actant le passage en multi-tenant avec invitation
+    // pure. La protection contre les comptes orphelins est assurée par :
+    //   1. Désactivation des signups publics Supabase Auth (admin-create only)
+    //   2. RLS BDD scopée par `organization_id` (un user sans memberships ne
+    //      voit aucune donnée — defense in depth)
+    // On garde le log access_attempt pour la traçabilité sécurité.
     const email = user.email ?? null;
-    const allowed = isAuthorizedEmail(email);
-
     void logAccessAttempt({
       email: email?.toLowerCase() ?? null,
       pathname,
-      allowed,
+      allowed: true, // toujours autorisé à ce stade (ADR-014)
       ip: extractClientIp(req),
       userAgent: req.headers.get("user-agent"),
     });
-
-    if (!allowed) {
-      await supabase.auth.signOut();
-
-      if (isProtectedApiRoute(pathname)) {
-        // Option A : on propage les cookies effacés par `signOut` (cf. setAll
-        // de createServerClient ci-dessus) à la réponse 403 finale. Sans ça,
-        // les cookies sb-* restent côté browser jusqu'à expiration naturelle —
-        // viole `specs/middleware_domain_gate.md` §2 C4 « session invalidée
-        // immédiatement ». Ré-appliqué le 2026-05-16 après refactor du helper
-        // E2E signInWith (route /api/test/seed-session) qui dé-couple la pose
-        // de session côté E2E du chemin form-login + middleware.
-        const apiResponse = new NextResponse(
-          JSON.stringify({
-            error: "forbidden_domain",
-            message: "Accès réservé aux membres AlyoS Ingénierie.",
-          }),
-          {
-            status: 403,
-            headers: { "content-type": "application/json" },
-          },
-        );
-        propagateAuthCookies(supabaseResponse, apiResponse);
-        return apiResponse;
-      }
-
-      const redirectResponse = NextResponse.redirect(new URL("/forbidden", req.url));
-      propagateAuthCookies(supabaseResponse, redirectResponse);
-      return redirectResponse;
-    }
 
     // ---------- 6. Gate must_change_password ----------
     // Extension pivot password : si le user est sur un provisoire (must_change=true),

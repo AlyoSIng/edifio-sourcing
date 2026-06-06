@@ -154,7 +154,7 @@ Filtres en boucle : Camille (`qa`) garantit les tests verts, Hugo (`reviewer`) r
 - Pousser un secret en clair dans le repo (`.env.local` jamais committé)
 - Déployer en production sans validation Gate 9
 - Communiquer avec un service tiers payant non autorisé
-- **Désactiver le middleware de domaine `@alyosingenierie.fr`** (même temporairement)
+- **Désactiver les gardes du middleware racine** : auth (`getUser`) + `must_change_password` + rôles admin / superadmin. Le filtre de domaine `@alyosingenierie.fr` initial a été retiré par **ADR-014 (Board 2026-06-05 — ouverture multi-tenant PROTECT)**, mais TOUTES les autres gardes restent obligatoires.
 - **Modifier le schéma BDD sans `drizzle-kit generate` puis revue CTO** *(décision ORM actée 2026-05-18 — toute migration passe désormais par Drizzle ; cf. `specs/adr_013_orm_drizzle.md`)*
 
 ## Commandes utiles

@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
+// ADR-014 (Steve 2026-06-05) — `isAuthorizedEmail` retiré : ouverture multi-tenant.
+// L'admin de chaque org peut désormais inviter n'importe quel email — la garde est
+// la garde de rôle (`isAdmin`) qui reste en place ci-dessous.
 import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
 import { computeProvisionalExpiresAt } from "@/lib/auth/password";
 import { generateProvisionalPassword } from "@/lib/auth/password-server";
@@ -49,9 +51,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!caller || !caller.email) {
       return jsonError(401, "Authentification requise.");
     }
-    if (!isAuthorizedEmail(caller.email)) {
-      return jsonError(403, "Accès réservé aux membres AlyoS.");
-    }
+    // ADR-014 : le filtre `isAuthorizedEmail(caller.email)` a été retiré.
+    // Seule la garde de rôle reste appliquée — un admin de PROTECT pourra
+    // inviter des users `@protect-marseille.com`, un admin AlyoS des
+    // `@alyosingenierie.fr`, etc.
     const callerProfile = toUserProfile(caller);
     if (!isAdmin(callerProfile)) {
       return jsonError(403, "Réservé aux administrateurs.");
@@ -71,12 +74,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!email || !EMAIL_REGEX.test(email)) {
       return jsonError(400, "Adresse email invalide.");
     }
-    if (!isAuthorizedEmail(email)) {
-      return jsonError(
-        400,
-        "L'email doit appartenir au domaine @alyosingenierie.fr ou @edifio.fr.",
-      );
-    }
+    // ADR-014 : pas de filtre domaine sur l'email cible — l'admin invite
+    // qui il veut dans son org (et la garde RLS BDD scope automatiquement
+    // les accès du user invité à sa seule org via memberships).
     if (!firstName || !lastName) {
       return jsonError(400, "Prénom et nom requis.");
     }
