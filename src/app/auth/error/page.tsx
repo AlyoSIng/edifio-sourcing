@@ -101,7 +101,7 @@ function describeError(code: string): ErrorDescription {
       return {
         title: "Erreur côté Supabase",
         message:
-          "Une erreur technique côté serveur d'authentification est survenue. Réessaye dans quelques instants — si le problème persiste, contacte l'équipe IT AlyoS.",
+          "Une erreur technique côté serveur d'authentification est survenue. Réessaye dans quelques instants — si le problème persiste, contacte l'éditeur à contact@edifio.fr.",
         actionLabel: "Retour à la connexion",
         actionHref: "/login",
       };
@@ -109,7 +109,7 @@ function describeError(code: string): ErrorDescription {
       return {
         title: "Erreur d'authentification",
         message:
-          "Une erreur est survenue pendant l'authentification. Réessaye depuis la page de connexion. Si le problème persiste, contacte l'équipe IT AlyoS.",
+          "Une erreur est survenue pendant l'authentification. Réessaye depuis la page de connexion. Si le problème persiste, contacte l'éditeur à contact@edifio.fr.",
         actionLabel: "Retour à la connexion",
         actionHref: "/login",
       };

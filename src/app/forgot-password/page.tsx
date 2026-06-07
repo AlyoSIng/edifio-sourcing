@@ -28,8 +28,7 @@ export default function ForgotPasswordPage() {
           Mot de passe oublié ?
         </h1>
         <p className="mb-6 text-center text-sm text-ink-2">
-          Saisissez votre email AlyoS — nous vous enverrons un nouveau mot de passe provisoire par
-          email.
+          Saisissez votre email — nous vous enverrons un nouveau mot de passe provisoire.
         </p>
 
         <ForgotPasswordForm />
