@@ -66,7 +66,9 @@ export default function AuthErrorPage({
           </Link>
         </div>
         <p className="mt-6 text-center text-xs text-muted">
-          <span className="font-mono text-[10px]">© AlyoS Ingénierie {year} — Outil interne</span>
+          <span className="font-mono text-[10px]">
+            © edifio {year} · édité par AlyoS Ingénierie
+          </span>
         </p>
       </div>
     </main>

@@ -98,7 +98,7 @@ function ArchitectPageContent({ data, token }: { data: ArchitectPageData; token:
         />
       </div>
       <footer className="mt-10 border-t border-line pt-4 text-center text-xs text-muted">
-        edifio Sourcing — AlyoS Ingénierie. Outil interne.
+        edifio Sourcing · édité par AlyoS Ingénierie
       </footer>
     </main>
   );

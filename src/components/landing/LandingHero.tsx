@@ -17,7 +17,9 @@ import Link from "next/link";
 export function LandingHero() {
   return (
     <section className="mx-auto max-w-[880px] px-8 pb-24 pt-20 text-center">
-      <span className="pill-eyebrow mb-6">Outil interne — AlyoS Ingénierie</span>
+      <span className="pill-eyebrow mb-6">
+        Sourcing AO publics BTP — édité par AlyoS Ingénierie
+      </span>
 
       <h1 className="marketing-h1 mb-6 text-ink">
         De l&apos;avis publié à l&apos;opportunité gagnée,

@@ -12,7 +12,9 @@ import { EdifioLogo } from "@/components/EdifioLogo";
  *
  * Bottom-bar : copyright dynamique + identifiant version.
  *
- * Naming strict CLAUDE.md : copyright = « © AlyoS Ingénierie {year} — Outil interne ».
+ * Naming ouverture multi-tenant (ADR-014 2026-06-05) : copyright = « © edifio {year}
+ * · édité par AlyoS Ingénierie ». L'app n'est plus un outil interne — elle sert
+ * désormais plusieurs organisations clientes (AlyoS, PROTECT, ...).
  */
 export function LandingFooter() {
   const year = new Date().getFullYear();
@@ -26,8 +28,9 @@ export function LandingFooter() {
               <EdifioLogo onDarkBg />
             </div>
             <p className="text-[13.5px] leading-[1.6] text-white/70">
-              Outil interne AlyoS Ingénierie — sourcing automatique d&apos;appels d&apos;offres
-              publics BTP, cotraitance architecte et préparation IA des dossiers.
+              edifio Sourcing — plateforme SaaS de sourcing automatique d&apos;appels d&apos;offres
+              publics BTP, cotraitance architecte et préparation IA des dossiers. Édité par AlyoS
+              Ingénierie.
             </p>
           </div>
 
@@ -67,7 +70,7 @@ export function LandingFooter() {
         </div>
 
         <div className="flex flex-col gap-2 border-t border-white/10 pt-6 font-mono text-[12px] md:flex-row md:justify-between">
-          <span>© AlyoS Ingénierie {year} — Outil interne, hébergement strict UE</span>
+          <span>© edifio {year} · édité par AlyoS Ingénierie · hébergement strict UE</span>
           <span>edifio Sourcing v1.0 — AO publics, du sourcing au pli</span>
         </div>
       </div>

@@ -113,11 +113,12 @@ export function renderWelcomeProvisionalPassword(props: WelcomeProps): RenderedE
     </a>
   </p>
   <p style="font-size:12px; color:#555;">
-    Si vous n'attendiez pas ce message, contactez l'équipe IT AlyoS.
+    Si vous n'attendiez pas ce message, contactez l'administrateur de votre organisation
+    ou l'éditeur à contact@edifio.fr.
   </p>
   <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">
   <p style="font-size:11px; color:#888;">
-    © AlyoS Ingénierie — Outil interne edifio Sourcing
+    © edifio · édité par AlyoS Ingénierie
   </p>
 </body>
 </html>`;

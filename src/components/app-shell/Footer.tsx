@@ -1,7 +1,11 @@
 /**
  * Footer mono global de l'AppShell.
  *
- * Source : naming strict CLAUDE.md — « © AlyoS Ingénierie {year} — Outil interne ».
+ * Mise à jour ADR-014 (Steve 2026-06-05) — ouverture multi-tenant :
+ * suppression de « Outil interne » et passage à « © edifio » (marque produit
+ * éditée par AlyoS Ingénierie) puisque l'app sert désormais plusieurs
+ * organisations clientes (PROTECT, ...) en plus d'AlyoS.
+ *
  * Server Component pur — l'année est calculée côté serveur au build/render.
  */
 export function Footer() {
@@ -9,7 +13,7 @@ export function Footer() {
   return (
     <footer className="border-t border-line bg-white px-4 py-4 text-center md:px-6">
       <p className="font-mono text-[10px] text-muted">
-        © AlyoS Ingénierie {year} — Outil interne · via edifio Sourcing
+        © edifio {year} · édité par AlyoS Ingénierie
       </p>
     </footer>
   );

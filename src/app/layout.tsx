@@ -30,8 +30,10 @@ export const metadata: Metadata = {
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
   ),
   title: "edifio Sourcing",
-  description: "Outil interne AlyoS Ingénierie — sourcing automatique de marchés publics BTP",
-  // Robots : on bloque l'indexation tant qu'on est en preview AlyoS interne.
+  description:
+    "edifio Sourcing — plateforme SaaS de sourcing automatique de marchés publics BTP, copilote IA pour la candidature en mandataire ou cotraitance. Édité par AlyoS Ingénierie.",
+  // Robots : indexation toujours bloquée tant que le site marketing edifio.fr
+  // public ne sert pas de point d'entrée. À réactiver post-ouverture publique.
   robots: { index: false, follow: false },
   // ── PWA / favicon ────────────────────────────────────────────────────────
   // apple-touch-icon.png (180×180) est généré par scripts/generate-pwa-icons.mjs

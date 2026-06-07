@@ -57,21 +57,16 @@ export default function Login({
                 edifio <span className="font-medium text-muted">Sourcing</span>
               </p>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[1px] text-muted">
-                Outil interne AlyoS Ingénierie
+                Sourcing automatique de marchés publics BTP
               </p>
             </div>
-          </div>
-
-          <div className="mb-5 rounded-sm bg-paper-2 px-3 py-2 text-center text-xs text-muted">
-            Accès réservé aux emails <code className="font-mono text-ink">@alyosingenierie.fr</code>
-            .
           </div>
 
           <h1 className="mb-1 text-center font-display text-xl font-semibold text-ink">
             Connectez-vous
           </h1>
           <p className="mb-6 text-center text-sm text-muted">
-            Saisissez votre email AlyoS et votre mot de passe.
+            Saisissez votre email et votre mot de passe.
           </p>
 
           {noticeMessage ? (
@@ -102,7 +97,7 @@ export default function Login({
         </div>
 
         <p className="mt-6 text-center font-mono text-[10px] text-muted">
-          © AlyoS Ingénierie {year} — Outil interne
+          © edifio {year} · édité par AlyoS Ingénierie
         </p>
       </div>
     </main>

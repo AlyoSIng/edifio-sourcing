@@ -34,7 +34,7 @@ import { LandingSuiteSection } from "@/components/landing/LandingSuiteSection";
 export const metadata: Metadata = {
   title: "edifio Sourcing — AO publics, du sourcing au pli",
   description:
-    "Outil interne AlyoS Ingénierie. Sourcing automatique de marchés publics BTP, copilote IA pour répondre en Mandataire ou en Co-traitant.",
+    "edifio Sourcing — plateforme SaaS de sourcing automatique des marchés publics BTP, copilote IA pour répondre en Mandataire ou en Co-traitant. Édité par AlyoS Ingénierie.",
   openGraph: {
     title: "edifio Sourcing",
     description: "AO publics, du sourcing au pli",

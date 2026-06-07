@@ -31,17 +31,15 @@ export default function About() {
           À propos d&apos;edifio Sourcing
         </h1>
         <p className="text-[16px] leading-[1.6] text-ink-2">
-          edifio Sourcing est un outil interne AlyoS Ingénierie dédié au sourcing automatique de
-          marchés publics du BTP. L&apos;application orchestre la veille (BOAMP, PLACE,
+          edifio Sourcing est l&apos;outil SaaS de sourcing automatique de marchés publics du BTP
+          édité par AlyoS Ingénierie. L&apos;application orchestre la veille (BOAMP, PLACE,
           Francmarchés, MP.info), la sélection assistée des AO, la sollicitation des architectes
           cotraitants et la préparation du dossier de candidature avec un copilote IA.
         </p>
         <p className="text-[16px] leading-[1.6] text-ink-2">
-          MVP réservé aux collaborateurs d&apos;AlyoS Ingénierie (adresses email{" "}
-          <code className="rounded-xs bg-paper-2 px-1.5 py-0.5 font-mono text-sm text-ink">
-            @alyosingenierie.fr
-          </code>
-          ). Mentions légales et politique RGPD posées à l&apos;arrivée en production (Gate 9).
+          Plateforme multi-organisations sur invitation : chaque cabinet a son espace isolé (RLS
+          stricte), ses utilisateurs invités par son administrateur, et son profil de recherche
+          configurable. Hébergement strict UE.
         </p>
         <Link
           href="/"
@@ -52,7 +50,7 @@ export default function About() {
       </section>
 
       <footer className="border-t border-line px-8 py-6 text-center font-mono text-xs text-muted">
-        © AlyoS Ingénierie {year} — Outil interne
+        © edifio {year} · édité par AlyoS Ingénierie
       </footer>
     </main>
   );
