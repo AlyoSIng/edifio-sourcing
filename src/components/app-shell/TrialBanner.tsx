@@ -56,14 +56,14 @@ export function TrialBanner({ state }: TrialBannerProps) {
 
 function bannerMessage(state: TrialState): string {
   if (state.status === "expired")
-    return "Votre essai a expiré. Contactez contact@edifio.fr pour activer un abonnement.";
+    return "Votre essai a expiré. Contactez sebastien@edifio.fr pour activer un abonnement.";
   if (state.status === "cancelled")
-    return "Votre abonnement est annulé. Contactez contact@edifio.fr pour le réactiver.";
+    return "Votre abonnement est annulé. Contactez sebastien@edifio.fr pour le réactiver.";
 
   // status === 'trial'
   if (state.daysLeft === null) return "Période d'essai en cours.";
   if (state.daysLeft <= 0)
-    return "Votre essai gratuit a expiré aujourd'hui — contactez contact@edifio.fr pour souscrire.";
+    return "Votre essai gratuit a expiré aujourd'hui — contactez sebastien@edifio.fr pour souscrire.";
   if (state.daysLeft === 1)
     return "Votre essai gratuit se termine demain. Souscrivez pour ne pas perdre l'accès.";
   if (state.daysLeft <= 3)

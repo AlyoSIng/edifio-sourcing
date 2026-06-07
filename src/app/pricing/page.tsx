@@ -9,10 +9,10 @@ export const metadata = {
 /**
  * Page tarifs publique (Steve 2026-06-05, Stripe minimal MVP).
  *
- * Affiche le pack Solo à 99 €/mois HT + un CTA mailto vers contact@edifio.fr.
+ * Affiche le pack Solo à 99 €/mois HT + un CTA mailto vers sebastien@edifio.fr.
  * Pas de checkout self-service au MVP — la souscription se fait via :
- *   1. Le client envoie un mail à contact@edifio.fr
- *   2. Steve / contact@edifio.fr crée le customer + subscription dans Stripe Dashboard
+ *   1. Le client envoie un mail à sebastien@edifio.fr
+ *   2. Steve / sebastien@edifio.fr crée le customer + subscription dans Stripe Dashboard
  *   3. Stripe envoie l'invoice email automatiquement
  *   4. Steve marque `subscription_status = 'active'` dans
  *      /sourcing/superadmin/organizations/[id]/billing
@@ -75,10 +75,10 @@ export default function PricingPage() {
 
           <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
             <a
-              href="mailto:contact@edifio.fr?subject=Souscription%20Pack%20Solo%20edifio%20Sourcing&body=Bonjour,%0A%0AJe%20souhaite%20souscrire%20au%20Pack%20Solo%20(99%E2%82%AC%20HT/mois)%20d'edifio%20Sourcing.%0A%0ANom%20du%20cabinet%20:%0ASIRET%20:%0AContact%20principal%20:%0A%0AMerci%20de%20me%20transmettre%20la%20procédure.%0A%0ACordialement"
+              href="mailto:sebastien@edifio.fr?subject=Souscription%20Pack%20Solo%20edifio%20Sourcing&body=Bonjour,%0A%0AJe%20souhaite%20souscrire%20au%20Pack%20Solo%20(99%E2%82%AC%20HT/mois)%20d'edifio%20Sourcing.%0A%0ANom%20du%20cabinet%20:%0ASIRET%20:%0AContact%20principal%20:%0A%0AMerci%20de%20me%20transmettre%20la%20procédure.%0A%0ACordialement"
               className="rounded-full bg-brand-red px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
             >
-              ✉️ Souscrire — contact@edifio.fr
+              ✉️ Souscrire — sebastien@edifio.fr
             </a>
             <Link
               href="/login"

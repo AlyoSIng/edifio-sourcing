@@ -114,7 +114,7 @@ export function renderWelcomeProvisionalPassword(props: WelcomeProps): RenderedE
   </p>
   <p style="font-size:12px; color:#555;">
     Si vous n'attendiez pas ce message, contactez l'administrateur de votre organisation
-    ou l'éditeur à contact@edifio.fr.
+    ou l'éditeur à sebastien@edifio.fr.
   </p>
   <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">
   <p style="font-size:11px; color:#888;">

@@ -43,8 +43,11 @@ export default function Forbidden() {
         <p className="mb-8 text-ink-2">
           Si vous pensez qu&apos;il s&apos;agit d&apos;une erreur, contactez l&apos;administrateur
           de votre organisation ou l&apos;éditeur à{" "}
-          <a href="mailto:contact@edifio.fr" className="font-medium text-brand-red hover:underline">
-            contact@edifio.fr
+          <a
+            href="mailto:sebastien@edifio.fr"
+            className="font-medium text-brand-red hover:underline"
+          >
+            sebastien@edifio.fr
           </a>
           .
         </p>
@@ -57,7 +60,7 @@ export default function Forbidden() {
             ← Retour à l&apos;accueil
           </Link>
           <a
-            href="mailto:contact@edifio.fr"
+            href="mailto:sebastien@edifio.fr"
             className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
           >
             Contacter le support

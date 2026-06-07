@@ -1,8 +1,8 @@
 /**
  * Tables du module Superadmin — edifio Sourcing
  *
- * Décision Board 2026-05-27 : 3e rôle `superadmin` réservé à l'éditeur edifio
- * (contact@edifio.fr + steissier@alyosingenierie.fr).
+ * Décision Board 2026-05-27 : 3e rôle `superadmin` réservé à l'éditeur edifio.
+ * Mise à jour Steve 2026-06-05 : compte canonique unique = sebastien@edifio.fr.
  *
  * Périmètre fonctionnel de ces tables :
  *   - support_tickets           : tickets d'aide soumis par les utilisateurs

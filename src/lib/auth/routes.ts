@@ -48,8 +48,8 @@ export const ADMIN_API_PREFIX = "/api/admin" as const;
 
 /**
  * Préfixe des routes UI superadmin — exige role superadmin.
- * Réservé à l'éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
- * Décision Board 2026-05-27.
+ * Réservé à l'éditeur edifio. Compte canonique unique : sebastien@edifio.fr
+ * (Steve 2026-06-05, facturation AlyoS désormais active).
  */
 export const SUPERADMIN_PREFIX = "/sourcing/superadmin" as const;
 
@@ -127,8 +127,8 @@ export function isAdminRoute(pathname: string): boolean {
 
 /**
  * Retourne `true` si le pathname requiert le rôle `superadmin`.
- * Réservé à l'éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
- * Décision Board 2026-05-27.
+ * Réservé à l'éditeur edifio. Compte canonique unique : sebastien@edifio.fr
+ * (Steve 2026-06-05, facturation AlyoS désormais active).
  */
 export function isSuperAdminRoute(pathname: string): boolean {
   return pathname.startsWith(SUPERADMIN_PREFIX) || pathname.startsWith(SUPERADMIN_API_PREFIX);

@@ -11,7 +11,7 @@ export const metadata = {
  * ou d'abonnement annulé. Le middleware/layout redirige ici les utilisateurs
  * non-superadmin de l'org concernée.
  *
- * Le superadmin (`contact@edifio.fr`, role 'superadmin') reste autorisé à
+ * Le superadmin (`sebastien@edifio.fr`, role 'superadmin') reste autorisé à
  * accéder à l'app pour gérer le statut billing depuis
  * `/sourcing/superadmin/organizations/[id]/billing`.
  */
@@ -47,10 +47,10 @@ export default function TrialExpiredPage() {
             Voir les offres
           </Link>
           <a
-            href="mailto:contact@edifio.fr?subject=Souscription%20edifio%20Sourcing"
+            href="mailto:sebastien@edifio.fr?subject=Souscription%20edifio%20Sourcing"
             className="rounded-full bg-brand-red px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-red-dark"
           >
-            ✉️ Contacter contact@edifio.fr
+            ✉️ Contacter sebastien@edifio.fr
           </a>
         </div>
 

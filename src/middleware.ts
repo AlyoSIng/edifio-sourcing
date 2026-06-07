@@ -220,8 +220,8 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     }
 
     // ---------- 8. Gate superadmin ----------
-    // Réservé à l'éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
-    // Décision Board 2026-05-27.
+    // Réservé à l'éditeur edifio. Compte canonique unique : sebastien@edifio.fr
+    // (Steve 2026-06-05, suite décision facturation AlyoS).
     if (isSuperAdminRoute(pathname) && !isSuperAdmin(profile)) {
       if (isProtectedApiRoute(pathname)) {
         return new NextResponse(

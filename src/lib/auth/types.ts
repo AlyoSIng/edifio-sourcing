@@ -14,7 +14,7 @@ import type { User } from "@supabase/supabase-js";
 
 /**
  * Rôles applicatifs — match strict des valeurs en BDD.
- * - superadmin : éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
+ * - superadmin : éditeur edifio (sebastien@edifio.fr, unique depuis 2026-06-05).
  *                Inclut tous les droits admin + accès /sourcing/superadmin.
  *                Décision Board 2026-05-27.
  * - admin      : full access AlyoS (admin pages, audit, gestion membres)
@@ -107,7 +107,7 @@ export function isAdmin(profile: UserProfile): boolean {
 
 /**
  * Type guard : l'utilisateur a-t-il le rôle superadmin ?
- * Le superadmin est l'éditeur edifio (contact@edifio.fr + steissier@alyosingenierie.fr).
+ * Le superadmin est l'éditeur edifio (sebastien@edifio.fr, unique depuis 2026-06-05).
  * Il dispose de tous les droits admin + accès exclusif à /sourcing/superadmin.
  * Décision Board 2026-05-27.
  */

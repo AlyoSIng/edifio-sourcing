@@ -7,7 +7,7 @@
  *
  * **Multi-tenant (ADR-014 — Steve 2026-06-05)** : depuis l'ouverture à
  * PROTECT et au-delà, un user peut avoir plusieurs memberships (typique
- * pour `contact@edifio.fr` superadmin sur AlyoS ET PROTECT, ou plus tard
+ * pour `sebastien@edifio.fr` superadmin sur AlyoS ET PROTECT, ou plus tard
  * pour un user qui change d'org). Le choix de l'org par défaut doit être
  * déterministe :
  *   - Ordre par `created_at ASC` → la 1ère membership créée gagne.
