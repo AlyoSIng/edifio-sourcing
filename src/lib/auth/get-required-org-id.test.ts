@@ -19,11 +19,14 @@ let mockSelectResult: { organizationId: string }[] = [];
 // Mock de @/db/client avant tout import du module sous test
 vi.mock("@/db/client", () => {
   // Reproduit la chain fluent utilisée dans getRequiredOrgId :
-  //   db.select({ organizationId: ... }).from(memberships).where(...).limit(1)
+  //   db.select({ organizationId: ... }).from(memberships).where(...)
+  //     .orderBy(memberships.createdAt).limit(1)
+  // L'ordre orderBy a été ajouté ADR-014 (multi-tenant déterministe).
   const chain = {
     select: () => chain,
     from: () => chain,
     where: () => chain,
+    orderBy: () => chain,
     limit: async () => mockSelectResult,
   };
   return { db: chain };
