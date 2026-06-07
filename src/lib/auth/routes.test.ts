@@ -23,15 +23,17 @@ import {
  * publiques + nouveau préfixe admin).
  */
 describe("constantes", () => {
-  it("PUBLIC_ROUTES contient les 7 routes publiques de la spec étendue", () => {
+  it("PUBLIC_ROUTES contient les routes publiques (étendu /pricing + /trial-expired ADR-014/T-billing)", () => {
     expect(PUBLIC_ROUTES).toEqual([
       "/",
       "/about",
+      "/pricing",
       "/login",
       "/auth/callback",
       "/forbidden",
       "/forgot-password",
       "/reset-password",
+      "/trial-expired",
     ]);
   });
 

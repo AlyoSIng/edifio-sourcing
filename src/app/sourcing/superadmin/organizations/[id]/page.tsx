@@ -120,12 +120,22 @@ export default async function SuperadminOrgDetailPage({ params }: { params: { id
             </p>
           )}
         </div>
-        <Link
-          href="/sourcing/superadmin/organizations"
-          className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
-        >
-          ← Retour aux organisations
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {org && (
+            <Link
+              href={`/sourcing/superadmin/organizations/${org.id}/billing`}
+              className="rounded-full border border-line bg-white px-3 py-1 text-xs font-medium text-ink hover:bg-paper-2"
+            >
+              💳 Facturation
+            </Link>
+          )}
+          <Link
+            href="/sourcing/superadmin/organizations"
+            className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+          >
+            ← Retour aux organisations
+          </Link>
+        </div>
       </div>
 
       {/* Erreur de chargement */}

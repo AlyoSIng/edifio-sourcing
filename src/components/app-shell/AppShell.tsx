@@ -34,9 +34,16 @@ import { Topbar } from "./Topbar";
 interface AppShellProps {
   user: UserProfile;
   children: React.ReactNode;
+  /**
+   * Bandeau trial / abonnement injecté par le layout `/sourcing` (Steve
+   * 2026-06-05, Stripe minimal MVP). Affiché entre la Topbar et le `<main>`
+   * pour informer l'utilisateur de l'état de son abonnement. Null si
+   * statut 'active' / 'none' / trial > 15 j.
+   */
+  trialBanner?: React.ReactNode;
 }
 
-export async function AppShell({ user, children }: AppShellProps) {
+export async function AppShell({ user, children, trialBanner }: AppShellProps) {
   // H7 — compteur de nouvelles réponses architectes pour le badge sidebar.
   // Best-effort : si la BDD rate, on passe 0 et on continue (la page rend
   // toujours).
@@ -59,6 +66,7 @@ export async function AppShell({ user, children }: AppShellProps) {
       <Sidebar role={user.role} dynamicBadges={dynamicBadges} />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar user={user} />
+        {trialBanner}
         <main id="main-content" className="flex-1 px-4 py-6 md:px-8 md:py-8">
           {children}
         </main>

@@ -17,6 +17,7 @@
 export const PUBLIC_ROUTES = [
   "/",
   "/about",
+  "/pricing",
   "/login",
   "/auth/callback",
   "/forbidden",
@@ -27,6 +28,10 @@ export const PUBLIC_ROUTES = [
   // plus bas). On la met dans PUBLIC_ROUTES pour ne pas la traiter comme
   // protégée par défaut.
   "/reset-password",
+  // /trial-expired : page de verrou affichée quand le trial est expiré.
+  // Public car l'utilisateur peut y être redirigé en session active depuis
+  // n'importe quelle route protégée. Pas de données sensibles.
+  "/trial-expired",
 ] as const;
 
 /** Préfixe des routes UI protégées (sourcing app authentifiée). */

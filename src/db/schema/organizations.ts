@@ -52,6 +52,24 @@ export const organizations = pgTable(
      * Nullable : utilise Space Grotesk (défaut DS edifio).
      */
     fontFamily: varchar("font_family", { length: 50 }),
+    /**
+     * Cycle de vie facturation (migration 0049, Steve 2026-06-05).
+     * Stripe minimal MVP : statut + dates + customer id Stripe créés
+     * manuellement dans le Dashboard. Pas de webhook ni SDK serveur.
+     */
+    trialStartedAt: timestamp("trial_started_at", { withTimezone: true }),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+    /**
+     * Statut de souscription :
+     *   'none'      — pas encore inscrit en trial
+     *   'trial'     — période d'essai en cours
+     *   'active'    — abonnement payant actif
+     *   'expired'   — trial expiré sans souscription → app verrouillée
+     *   'cancelled' — abonnement annulé → app verrouillée
+     */
+    subscriptionStatus: text("subscription_status").notNull().default("none"),
+    /** Référence customer Stripe (`cus_XXX`), NULL tant que pas de facturation. */
+    stripeCustomerId: text("stripe_customer_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
