@@ -125,6 +125,35 @@ et les opérations système via deux sub-agents :
 8. **`ps_operator`** : connecter le repo à Vercel (compte AlyoS), preview deploy
    sur la branche `feat/sourcing-mvp`. URL preview servira aux premiers tests.
 
+## ⚠️ Migration vers le monorepo `alyos-suivi-chantier` (juillet 2026)
+
+Une migration de `edifio-sourcing` vers le monorepo `alyos-suivi-chantier` (Suivi + ACT) est planifiée pour le **samedi 18 juillet 2026**.
+
+### Sub-agent reviewer obligatoire
+
+Pendant toute la durée de la migration (à partir du 8 juin 2026), **toute PR concernant le code à porter** doit être validée par le sub-agent **`suivi_act_reviewer`** AVANT d'être soumise à Sébastien (équipe Suivi+ACT, lead migration).
+
+→ Voir `.claude/agents/suivi_act_reviewer.md` pour le prompt système complet (8 garde-fous, conventions de code, 10 arbitrages Q1-Q10, 12 bugs historiques à éviter).
+
+### Décisions structurantes actées (positions Suivi+ACT)
+
+| # | Sujet | Position |
+|---|---|---|
+| Q1 | BDD partagée ou séparée | ✅ Partagée, projet Supabase unique |
+| Q2 | ORM | ✅ supabase-js direct (pas Drizzle dans le monorepo final) |
+| Q3 | Billing model | ✅ Adopter le modèle 0115 (drop 0049 Sourcing) |
+| Q4 | Cron sourcing : Fly.io ou Vercel | ⚖️ Bench à faire Lot 5 |
+| Q5 | Calendrier bascule | ✅ Samedi 18 juillet 2026, 8h-11h |
+| Q6 | Pack groupé Suivi + ACT + Sourcing | ⚖️ Décision Sébastien |
+| Q7 | Vitest | ✅ Introduire avec la migration |
+| Q8 | Workflow migrations BDD | ✅ Garder manuel (Sébastien applique) |
+| Q9 | (cf. Q4) | ⚖️ Bench |
+| Q10 | Planning | ✅ Visio cadrage 8-14 juin → kickoff 1er juillet → bascule 18 juillet → post-mortem 25 juillet |
+
+### Brief de migration
+
+Voir `docs/brief_migration_sourcing_to_monorepo.md` (v2, 964 lignes, ~32 pages) pour le détail complet du plan.
+
 ## Délégation & autonomie — niveau ÉQUILIBRÉ (décision Board 2026-05-21)
 
 - 🟢 **Zone verte (faire sans demander)** : travail dans une spec validée — code, tests,
