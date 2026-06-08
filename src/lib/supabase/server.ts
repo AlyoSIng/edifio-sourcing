@@ -1,5 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
+import { cookies } from "next/headers";
 
 /**
  * Client Supabase serveur — pour Server Actions, Route Handlers et Server
