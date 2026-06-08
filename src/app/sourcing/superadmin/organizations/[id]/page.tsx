@@ -49,7 +49,8 @@ const ROLE_LABEL: Record<string, string> = {
 
 // ─── Métadonnées dynamiques ───────────────────────────────────────────────────
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return {
     title: `Organisation ${params.id.slice(0, 8)}… — Superadmin — edifio Sourcing`,
   };
@@ -57,7 +58,8 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
-export default async function SuperadminOrgDetailPage({ params }: { params: { id: string } }) {
+export default async function SuperadminOrgDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { id } = params;
 
   // Garde 1 — session

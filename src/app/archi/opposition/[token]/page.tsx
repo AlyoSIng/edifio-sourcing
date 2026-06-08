@@ -43,11 +43,13 @@ export const metadata = {
 };
 
 interface PageProps {
-  params: { token: string };
-  searchParams: { done?: string };
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ done?: string }>;
 }
 
-export default async function OppositionPage({ params, searchParams }: PageProps) {
+export default async function OppositionPage(props: PageProps) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // 1. Si `?done=1` (post-opposition), affiche la confirmation.
   if (searchParams.done === "1") {
     return <OppositionDonePage />;

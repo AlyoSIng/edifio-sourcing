@@ -46,10 +46,11 @@ export interface CotraitantItemData {
 // ---------------------------------------------------------------------------
 
 interface PageProps {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }
 
-export default async function CotraitantPage({ params }: PageProps) {
+export default async function CotraitantPage(props: PageProps) {
+  const params = await props.params;
   const { token } = params;
 
   // Validation format UUID (empêche les scans de chemins arbitraires)

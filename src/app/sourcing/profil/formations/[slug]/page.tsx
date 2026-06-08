@@ -20,7 +20,8 @@ export const dynamic = "force-dynamic";
 
 // ─── Metadata dynamique ───────────────────────────────────────────────────────
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   try {
     const rows = await db
       .select({ title: formations.title })
@@ -92,7 +93,8 @@ function ErrorBanner() {
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
-export default async function FormationDetailPage({ params }: { params: { slug: string } }) {
+export default async function FormationDetailPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   let formation: typeof formations.$inferSelect | undefined;
   let hasTest = false;
 

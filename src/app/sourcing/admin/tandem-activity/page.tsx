@@ -44,7 +44,7 @@ export const runtime = "nodejs";
 // ---------------------------------------------------------------------------
 
 interface PageProps {
-  searchParams?: { range?: string; from?: string; to?: string };
+  searchParams?: Promise<{ range?: string; from?: string; to?: string }>;
 }
 
 function formatDateForInput(d: Date): string {
@@ -54,7 +54,8 @@ function formatDateForInput(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export default async function TandemActivityPage({ searchParams }: PageProps) {
+export default async function TandemActivityPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   // 1. Auth + admin.
   const supabase = createSupabaseServerClient();
   const {

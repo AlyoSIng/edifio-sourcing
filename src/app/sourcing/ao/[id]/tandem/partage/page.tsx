@@ -65,7 +65,8 @@ export interface ShareForDisplay {
 // Page
 // ---------------------------------------------------------------------------
 
-export default async function PartageCotraitantPage({ params }: { params: { id: string } }) {
+export default async function PartageCotraitantPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // 1. Auth
   const supabase = createSupabaseServerClient();
   const {

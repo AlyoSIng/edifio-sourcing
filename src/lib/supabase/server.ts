@@ -1,5 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 
 /**
  * Client Supabase serveur — pour Server Actions, Route Handlers et Server
@@ -19,7 +19,7 @@ import { cookies } from "next/headers";
  * réutilise pas ce helper dans le middleware.
  */
 export function createSupabaseServerClient() {
-  const cookieStore = cookies();
+  const cookieStore = cookies() as unknown as UnsafeUnwrappedCookies;
 
   return createServerClient(
     requireEnv("NEXT_PUBLIC_SUPABASE_URL"),

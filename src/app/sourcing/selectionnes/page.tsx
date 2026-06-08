@@ -28,11 +28,10 @@ export const metadata = {
  */
 export const dynamic = "force-dynamic";
 
-export default async function SelectionnesPage({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>;
+export default async function SelectionnesPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const searchParams = await props.searchParams;
   // Auth check défensif (le middleware a normalement déjà filtré).
   const supabase = createSupabaseServerClient();
   const {

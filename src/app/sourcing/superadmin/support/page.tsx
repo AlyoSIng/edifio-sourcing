@@ -44,11 +44,10 @@ type StatusFilter = "all" | "open" | "in_progress" | "closed";
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
-export default async function SuperadminSupportPage({
-  searchParams,
-}: {
-  searchParams: { status?: string };
+export default async function SuperadminSupportPage(props: {
+  searchParams: Promise<{ status?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   // Garde 1 — session
   const supabase = createSupabaseServerClient();
   const {
@@ -226,7 +225,6 @@ function TicketCard({ ticket, authorEmail }: { ticket: SupportTicket; authorEmai
           {badgeLabel}
         </span>
       </div>
-
       {/* Corps */}
       <div className="px-4 py-4">
         <h3 className="mb-2 text-sm font-semibold text-ink">{ticket.subject}</h3>

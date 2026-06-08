@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -16,7 +17,7 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ArchitectNouveauPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -30,9 +31,9 @@ export default async function ArchitectNouveauPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <nav aria-label="Fil d'Ariane" className="mb-4 text-xs text-muted">
-        <a href="/sourcing/architectes" className="hover:underline">
+        <Link href="/sourcing/architectes" className="hover:underline">
           Architectes
-        </a>
+        </Link>
         {" / "}
         <span className="text-ink">Nouveau</span>
       </nav>

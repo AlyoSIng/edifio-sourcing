@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
 
 import { MIN_LENGTH } from "@/lib/auth/constants";
 import { passwordErrorLabel, validatePasswordStrength } from "@/lib/auth/password";
@@ -23,7 +23,7 @@ import { initialResetPasswordState, type ResetPasswordState } from "./types";
  * Action est la source de vérité (défense en profondeur).
  */
 export function ResetPasswordForm() {
-  const [state, formAction] = useFormState<ResetPasswordState, FormData>(
+  const [state, formAction] = useActionState<ResetPasswordState, FormData>(
     updatePasswordAction,
     initialResetPasswordState,
   );

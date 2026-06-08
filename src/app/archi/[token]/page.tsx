@@ -47,10 +47,11 @@ export const metadata = {
 };
 
 interface PageProps {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }
 
-export default async function ArchitectTokenPage({ params }: PageProps) {
+export default async function ArchitectTokenPage(props: PageProps) {
+  const params = await props.params;
   // Résilience runtime : on encapsule tout l'I/O dans un try/catch. En CI
   // sans DATABASE_URL ou en cas de blip Supabase, on rend ErrorBanner au lieu
   // d'un 500 brutal.

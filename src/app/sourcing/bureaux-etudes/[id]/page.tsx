@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
+import Link from "next/link";
 
 import { db } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
@@ -36,7 +37,8 @@ export async function generateMetadata() {
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-export default async function BEFichePage({ params }: { params: { id: string } }) {
+export default async function BEFichePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -72,9 +74,9 @@ export default async function BEFichePage({ params }: { params: { id: string } }
   return (
     <div className="mx-auto max-w-3xl">
       <nav aria-label="Fil d'Ariane" className="mb-4 text-xs text-muted">
-        <a href="/sourcing/bureaux-etudes" className="hover:underline">
+        <Link href="/sourcing/bureaux-etudes" className="hover:underline">
           Bureaux d&rsquo;Études
-        </a>
+        </Link>
         {" / "}
         <span className="text-ink">{be?.cabinet ?? params.id}</span>
       </nav>

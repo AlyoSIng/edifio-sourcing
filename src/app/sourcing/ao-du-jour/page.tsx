@@ -63,11 +63,10 @@ export const dynamic = "force-dynamic";
  *    la largeur, conforme M-A (la grille 3 colonnes de la PR n°4 n'est pas
  *    dans la maquette définitive).
  */
-export default async function AoDuJourPage({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>;
+export default async function AoDuJourPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const searchParams = await props.searchParams;
   // Auth check défensif (le middleware a normalement déjà filtré).
   const supabase = createSupabaseServerClient();
   const {

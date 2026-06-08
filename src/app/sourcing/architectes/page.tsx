@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
+import Link from "next/link";
 
 import { db } from "@/db/client";
 import { shortlistCriteria } from "@/db/schema/shortlist";
@@ -51,7 +52,8 @@ interface SearchParams {
   rgpdOpposition?: string;
 }
 
-export default async function ArchitectesPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ArchitectesPage(props: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   // Auth check défensif (le middleware a normalement déjà filtré).
   const supabase = createSupabaseServerClient();
   const {
@@ -172,22 +174,22 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
         {adminUser ? (
           <div className="flex shrink-0 flex-wrap items-start gap-2">
             {/* Bouton création manuelle d'un architecte */}
-            <a
+            <Link
               href="/sourcing/architectes/nouveau"
               className="hover:bg-brand-red/90 focus:ring-brand-red/40 inline-flex h-8 items-center rounded-full bg-brand-red px-3 text-xs font-medium text-white focus:outline-none focus:ring-2"
             >
               + Ajouter un architecte
-            </a>
+            </Link>
             {/* Badge critères short-list actifs — Tandem Phase 1 */}
             {hasShortlistCriteria ? (
-              <a
+              <Link
                 href="/sourcing/admin/shortlist"
                 title="Critères de short-list configurés — cliquer pour modifier"
                 className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
               >
                 <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                 Short-list active
-              </a>
+              </Link>
             ) : null}
             <PappersEnrichButton />
             <CsvImportButton />
@@ -353,12 +355,12 @@ function FilterBar({
         Filtrer
       </button>
       {/* Lien reset — efface tous les filtres */}
-      <a
+      <Link
         href="/sourcing/architectes"
         className="inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-xs text-muted hover:text-ink"
       >
         Réinitialiser
-      </a>
+      </Link>
     </form>
   );
 }

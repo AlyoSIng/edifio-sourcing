@@ -41,10 +41,11 @@ export const metadata = {
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default async function TandemCotraitantPage({ params }: PageProps) {
+export default async function TandemCotraitantPage(props: PageProps) {
+  const params = await props.params;
   // Auth check défensif
   const supabase = createSupabaseServerClient();
   const {

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
+import Link from "next/link";
 
 import { db } from "@/db/client";
 import { companies } from "@/db/schema/companies";
@@ -28,7 +29,8 @@ export async function generateMetadata() {
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-export default async function EntrepriseFichePage({ params }: { params: { id: string } }) {
+export default async function EntrepriseFichePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -62,9 +64,9 @@ export default async function EntrepriseFichePage({ params }: { params: { id: st
   return (
     <div className="mx-auto max-w-3xl">
       <nav aria-label="Fil d'Ariane" className="mb-4 text-xs text-muted">
-        <a href="/sourcing/entreprises" className="hover:underline">
+        <Link href="/sourcing/entreprises" className="hover:underline">
           Entreprises / Majors
-        </a>
+        </Link>
         {" / "}
         <span className="text-ink">{company?.name ?? params.id}</span>
       </nav>
