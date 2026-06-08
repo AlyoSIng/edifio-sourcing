@@ -1,0 +1,238 @@
+name: ci-e2e-preview
+
+# -----------------------------------------------------------------------------
+# Workflow Playwright E2E contre la preview Vercel.
+#
+# Pourquoi un workflow distinct du job `ci-e2e` de `ci.yml` ?
+#   - `ci-e2e` (ci.yml) tourne Playwright contre un webServer LOCAL au runner
+#     (`pnpm build && pnpm start`) avec un environnement E2E réduit (pas de
+#     `DATABASE_URL`). Il couvre middleware + auth + routes statiques.
+#   - `ci-e2e-preview` (ce workflow) tourne Playwright contre la PREVIEW
+#     Vercel déjà déployée pour le commit de la PR. Bénéfices :
+#       * On teste exactement le binaire qui partira en prod.
+#       * Le serveur dispose de `DATABASE_URL` (Supabase preview) + RESEND
+#         + toutes les vars Vercel — donc les pages métier (TenderCard,
+#         admin profil, sidebar mobile) sont entièrement exercées.
+#       * Les routes E2E gated (`/api/test/seed-session`) sont ouvertes
+#         côté Vercel preview via `E2E_TEST_ROUTES_ENABLED=1` (à poser dans
+#         l'environnement « Preview » du projet Vercel — voir
+#         `docs/E2E_CI_PREVIEW_VERCEL.md`).
+#
+# Dette signalée dans la recette PR #115/#116 (Camille) :
+#   « Playwright non exécutable en local sans infra — à valider en CI
+#     obligatoire avant merge ». Ce workflow solde cette dette.
+#
+# Pré-requis côté Vercel (à configurer une fois par Steve) :
+#   - L'env « Preview » du projet `edifio-sourcing` expose :
+#       NEXT_PUBLIC_APP_ENV=preview
+#       E2E_TEST_ROUTES_ENABLED=1
+#       DATABASE_URL=<Supabase preview connection>
+#       NEXT_PUBLIC_SUPABASE_URL=<...>
+#       NEXT_PUBLIC_SUPABASE_ANON_KEY=<...>
+#       SUPABASE_SERVICE_ROLE_KEY=<...>
+#       RESEND_API_KEY / RESEND_FROM_EMAIL
+#
+# Pré-requis côté GitHub (secrets repo ou env « preview ») :
+#   - PREVIEW_SUPABASE_URL          (= NEXT_PUBLIC_SUPABASE_URL preview)
+#   - PREVIEW_SUPABASE_ANON_KEY     (= NEXT_PUBLIC_SUPABASE_ANON_KEY preview)
+#   - PREVIEW_SUPABASE_SERVICE_ROLE_KEY (= SUPABASE_SERVICE_ROLE_KEY preview)
+#       → utilisé côté runner par les helpers `e2e/helpers/password.ts` qui
+#         attaquent l'admin SDK Supabase directement (création/suppression
+#         users de test). Sans cette clé, les specs auth-password / admin
+#         crashent en setup.
+#
+# Skip via label : poser le label `skip-e2e-preview` sur la PR fait sauter
+# le job (utile pour PR docs-only, refactors purement front statique, etc.).
+# -----------------------------------------------------------------------------
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    branches: [main]
+
+# Annule les runs en cours sur la même PR si un nouveau commit arrive.
+concurrency:
+  group: ci-e2e-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+# Permissions minimales :
+#   - contents:read pour checkout
+#   - deployments:read pour lire l'URL preview Vercel via l'API GitHub
+#   - pull-requests:read pour lire les labels (skip-e2e-preview)
+permissions:
+  contents: read
+  deployments: read
+  pull-requests: read
+
+jobs:
+  e2e-on-preview:
+    name: ci-e2e-preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    # Skip-conditions :
+    #   - PR draft : on attend ready_for_review (Playwright est cher en runner-min).
+    #   - Label `skip-e2e-preview` posé manuellement.
+    #   - Fork PR : les secrets ne sont pas exposés, le job échouerait à coup
+    #     sûr. Vercel preview n'est de toute façon pas créé pour les forks
+    #     externes par défaut. On filtre `head.repo.full_name == base.repo.full_name`.
+    if: >-
+      github.event.pull_request.draft == false &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-e2e-preview') &&
+      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
+
+    env:
+      # Côté runner Playwright on attaque la preview en HTTP. Les vars NEXT_PUBLIC_*
+      # ne sont PAS utilisées par le client browser (la preview Vercel les a déjà
+      # inlinées dans son bundle) — mais elles SONT utilisées par les helpers
+      # `e2e/helpers/password.ts` qui font des appels admin Supabase directs.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PREVIEW_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PREVIEW_SUPABASE_SERVICE_ROLE_KEY }}
+
+      # Hack assumé : poser un DATABASE_URL bidon côté runner pour que les
+      # specs qui font `test.skip(!hasDatabase, ...)` (admin-profil,
+      # sidebar-mobile, tender-actions, tandem) ne se skippent PAS sur
+      # preview. Le runner n'utilise JAMAIS cette URL — c'est la preview
+      # Vercel qui parle à la vraie BDD via son DATABASE_URL configuré côté
+      # Vercel. La valeur est un placeholder reconnaissable, jamais une
+      # vraie connection string.
+      DATABASE_URL: "postgresql://e2e-preview-flag@unused.local/edifio-sourcing"
+
+      # E2E_TEST_ROUTES_ENABLED côté runner sert UNIQUEMENT au logging de
+      # cohérence (les helpers vérifient l'env pour produire des erreurs
+      # explicites). La VRAIE gate est côté serveur Vercel preview (cf.
+      # `src/lib/auth/test-routes.ts`).
+      E2E_TEST_ROUTES_ENABLED: "1"
+
+      # Mode Playwright « cible distante » — le webServer du config est
+      # désactivé (cf. playwright.config.ts § skipWebServer). On parle à la
+      # preview Vercel déjà UP.
+      PLAYWRIGHT_SKIP_WEB_SERVER: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------------
+      # Étape 1 — Attendre que Vercel ait créé un deployment Preview pour ce
+      # commit ET qu'il soit en state `success`.
+      #
+      # Méthode : on lit l'API GitHub `repos/{repo}/deployments` filtrée sur
+      # le SHA de tête de PR (`github.event.pull_request.head.sha`) et
+      # environment commençant par `Preview` (Vercel publie un deployment
+      # par push). Puis on poll `deployment_statuses` jusqu'à `success` ou
+      # `failure`. `environment_url` du status success contient l'URL preview
+      # complète (ex. https://edifio-sourcing-git-feat-x-alyosing.vercel.app).
+      #
+      # Robustesse :
+      #   - 90 itérations × 10 s = 15 min max d'attente (>> les 10 min de la
+      #     consigne, pour absorber les builds Vercel longs sur infra chargée).
+      #   - On distingue 3 fins : success (URL extraite), failure (sortie 1),
+      #     timeout (sortie 1 avec message clair).
+      #   - L'API Vercel n'est PAS appelée — pas besoin de VERCEL_TOKEN.
+      # ---------------------------------------------------------------------
+      - name: Wait for Vercel preview deployment
+        id: wait-vercel
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          PREVIEW_URL=""
+          for i in $(seq 1 90); do
+            # Liste tous les deployments pour ce SHA.
+            DEPLOYMENTS=$(gh api "repos/$REPO/deployments?sha=$PR_HEAD_SHA&per_page=20" --jq '[.[] | select(.environment | startswith("Preview"))]')
+            DEPLOYMENT_COUNT=$(echo "$DEPLOYMENTS" | jq 'length')
+            if [ "$DEPLOYMENT_COUNT" -eq 0 ]; then
+              echo "Attempt $i: no Vercel Preview deployment yet for SHA $PR_HEAD_SHA"
+              sleep 10
+              continue
+            fi
+            # Prend le plus récent (les deployments sont triés desc par created_at).
+            DEPLOY_ID=$(echo "$DEPLOYMENTS" | jq -r '.[0].id')
+            STATUSES=$(gh api "repos/$REPO/deployments/$DEPLOY_ID/statuses" --jq '.[0]')
+            STATE=$(echo "$STATUSES" | jq -r '.state // "pending"')
+            case "$STATE" in
+              success)
+                PREVIEW_URL=$(echo "$STATUSES" | jq -r '.environment_url // empty')
+                if [ -z "$PREVIEW_URL" ] || [ "$PREVIEW_URL" = "null" ]; then
+                  echo "::error::Deployment success but environment_url is empty"
+                  exit 1
+                fi
+                echo "Vercel preview ready: $PREVIEW_URL"
+                echo "preview_url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+              failure|error)
+                echo "::error::Vercel preview deployment FAILED (state=$STATE) — aborting E2E"
+                exit 1
+                ;;
+              *)
+                echo "Attempt $i: deployment $DEPLOY_ID state=$STATE — polling..."
+                sleep 10
+                ;;
+            esac
+          done
+          echo "::error::Timeout waiting for Vercel preview (15 min)"
+          exit 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Cache des binaires Chromium — clé identique à `ci-e2e` pour partager.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Chromium (with system deps)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Chromium system deps (cache hit path)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+
+      # Sanity-check des secrets — un fail explicite vaut mieux qu'un crash
+      # opaque dans les helpers Supabase.
+      - name: Verify required secrets are set
+        run: |
+          set -e
+          [ -n "$NEXT_PUBLIC_SUPABASE_URL" ] || { echo "::error::secret PREVIEW_SUPABASE_URL manquant"; exit 1; }
+          [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] || { echo "::error::secret PREVIEW_SUPABASE_ANON_KEY manquant"; exit 1; }
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::secret PREVIEW_SUPABASE_SERVICE_ROLE_KEY manquant"; exit 1; }
+          echo "OK — Supabase preview secrets disponibles"
+
+      - name: Run E2E against Vercel preview
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.wait-vercel.outputs.preview_url }}
+        run: |
+          echo "Targeting preview: $PLAYWRIGHT_BASE_URL"
+          pnpm test:e2e
+
+      # En cas d'échec : on uploade le rapport HTML + traces pour debug local.
+      # Pattern aligné sur `ci-e2e` (ci.yml).
+      - name: Upload Playwright report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-preview-pr-${{ github.event.pull_request.number }}
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
