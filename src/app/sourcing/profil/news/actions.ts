@@ -6,22 +6,23 @@
  * Actions disponibles :
  *   - `markNewsReadAction` : marque un article comme lu (UPSERT user_news_reads)
  *
- * Double garde d'authentification sur chaque action :
+ * Garde d'authentification sur chaque action (ADR-014 retire la garde domaine) :
  *   1. Session Supabase valide
- *   2. Domaine autorisé (`isAuthorizedEmail`)
  *
  * Décision Board 2026-05-27 — module profil utilisateur edifio Sourcing.
  */
 
 import { db } from "@/db/client";
 import { userNewsReads } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ─── Guard interne ────────────────────────────────────────────────────────────
 
 /**
- * Vérifie la double garde (session + domaine) pour les utilisateurs AlyoS standard.
+ * Vérifie la garde de session pour un utilisateur authentifié.
+ * ADR-014 (2026-06-05) : garde domaine retirée — ouverture multi-tenant.
+ * Le nom `requireAlyosUser` est conservé historiquement ; sémantiquement
+ * c'est désormais « tout user authentifié, peu importe son domaine ».
  * Retourne l'ID de l'utilisateur connecté, ou une erreur.
  */
 async function requireAlyosUser(): Promise<{ userId: string } | { error: string }> {
@@ -31,7 +32,6 @@ async function requireAlyosUser(): Promise<{ userId: string } | { error: string 
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Non authentifié." };
-  if (!isAuthorizedEmail(user.email)) return { error: "Domaine non autorisé." };
 
   return { userId: user.id };
 }

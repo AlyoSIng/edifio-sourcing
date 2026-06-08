@@ -10,7 +10,7 @@
  *
  * Pattern de sécurité (identique à `actions.ts` du même dossier) :
  *  1. Auth check Supabase (`getUser()`)
- *  2. Defense-in-depth : domaine `@alyosingenierie.fr` + rôle `admin`
+ *  2. Defense-in-depth : rôle `admin` (ADR-014 retire la garde domaine)
  *  3. Validation Zod côté serveur (jamais trust client)
  *  4. Opération Drizzle (list / create / update / delete / setDefault)
  *  5. Audit A3 `search_profile_change` best-effort
@@ -31,7 +31,6 @@ import { z } from "zod";
 
 import { db as defaultDb } from "@/db/client";
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import {
@@ -178,8 +177,8 @@ async function requireAlyosAdmin(
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
 
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
   const orgId = await getRequiredOrgId(user.id);

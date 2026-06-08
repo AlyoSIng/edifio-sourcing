@@ -57,8 +57,6 @@ import { organizationProfiles } from "@/db/schema/messaging";
 import { withTenantContext } from "@/lib/db/with-tenant-context";
 import { tenders } from "@/db/schema/tenders";
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { toUserProfile } from "@/lib/auth/types";
 import { getBrevoClient, type BrevoClient } from "@/lib/brevo/client";
 import {
   defaultRegisterFromTutoiement,
@@ -180,8 +178,7 @@ async function requireAlyosUser(
     data: { user },
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const orgId = await getRequiredOrgId(user.id);
   return { ok: true, userId: user.id, orgId };
 }

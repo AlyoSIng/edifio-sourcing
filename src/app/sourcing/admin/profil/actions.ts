@@ -10,7 +10,7 @@
  *
  * Pattern aligné sur `src/app/sourcing/ao-du-jour/actions.ts` (PR n°5) :
  *  1. Auth check `await createSupabaseServerClient().auth.getUser()`
- *  2. Defense-in-depth : domain `@alyosingenierie.fr` + role `admin`
+ *  2. Defense-in-depth : role `admin` (ADR-014 retire la garde domaine)
  *  3. Parse Zod du payload côté serveur (jamais trust client)
  *  4. Lookup profil actif AlyoS via `getActiveSearchProfile(ALYOS_ORG_ID)`
  *  5. UPDATE Drizzle via `updateSearchProfile(...)` + RETURNING *
@@ -36,7 +36,6 @@ import { revalidatePath } from "next/cache";
 
 import { db as defaultDb } from "@/db/client";
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import {
@@ -120,8 +119,8 @@ async function requireAlyosAdmin(
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
 
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 
   const orgId = await getRequiredOrgId(user.id);
