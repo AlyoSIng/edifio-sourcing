@@ -30,7 +30,7 @@ export async function updateUserRoleAction(
   newRole: "admin" | "user",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   // Guard 1 — vérification de la session de l'acteur
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user: actor },
   } = await supabase.auth.getUser();
@@ -91,7 +91,7 @@ export async function updateUserSuperadminAction(
   newRole: "superadmin" | "admin",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   // Guard 1 — vérification de la session de l'acteur
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user: actor },
   } = await supabase.auth.getUser();

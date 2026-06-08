@@ -39,7 +39,7 @@ const ROADMAP_PDF_KEY = "roadmap_pdf_url";
 
 export default async function SuperadminRoadmapPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

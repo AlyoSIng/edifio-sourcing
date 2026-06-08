@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProfilLayout({ children }: { children: React.ReactNode }) {
   // Garde défensive — session (le middleware a déjà traité la case absente)
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

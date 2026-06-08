@@ -205,7 +205,7 @@ export async function matchArchitectsForTender(
   deps: ActionDeps = {},
 ): Promise<MatchActionResult> {
   const db = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -370,7 +370,7 @@ export async function persistMatchProposals(
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
   if (!Array.isArray(matches) || matches.length === 0) return { ok: true };
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return { ok: false, error: authResult.error };
   const { orgId } = authResult;
@@ -451,7 +451,7 @@ export async function sendArchitectSolicitation(
   deps: ActionDeps = {},
 ): Promise<SolicitActionResult> {
   const db = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
   const brevoClient = deps.brevoClient ?? getBrevoClient();
 
@@ -870,7 +870,7 @@ export async function searchArchitectsForShortlist(
   deps: ActionDeps = {},
 ): Promise<SearchArchitectsResult> {
   const db = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   // Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -973,7 +973,7 @@ export async function sendDossierToArchitectAction(
   deps: ActionDeps = {},
 ): Promise<SendDossierResult> {
   const db = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
   const brevoClient = deps.brevoClient ?? getBrevoClient();
 
@@ -1215,7 +1215,7 @@ export async function sendBulkArchitectSolicitation(
   items: BulkSolicitInput[],
   deps: ActionDeps = {},
 ): Promise<BulkSolicitResult> {
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   // Auth + domaine
   const authResult = await requireAlyosUser(authClient);

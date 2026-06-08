@@ -68,7 +68,7 @@ type AdminAuthResult =
   | { ok: true; orgId: string };
 
 async function requireAdminUser(): Promise<AdminAuthResult> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

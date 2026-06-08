@@ -47,7 +47,7 @@ interface PageProps {
 export default async function TandemCotraitantPage(props: PageProps) {
   const params = await props.params;
   // Auth check défensif
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

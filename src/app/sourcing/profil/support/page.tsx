@@ -38,7 +38,7 @@ const STATUS_CLASSES: Record<string, string> = {
 };
 
 export default async function ProfilSupportPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -24,7 +24,7 @@ export const metadata = {
 
 export default async function ProfilNewsPage() {
   // Récupération de l'utilisateur courant (layout a déjà gardé la session)
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

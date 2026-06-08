@@ -40,7 +40,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function AdminProfilPage() {
   // 1. Auth check (le middleware aurait déjà redirigé sinon)
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

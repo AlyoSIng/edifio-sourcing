@@ -37,7 +37,7 @@ export const metadata = {
 
 export default async function CotraitancePipelinePage() {
   // Auth check défensif (le middleware a normalement déjà filtré).
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

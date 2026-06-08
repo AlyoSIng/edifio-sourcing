@@ -47,7 +47,7 @@ const TIER_LABEL: Record<string, string> = {
 
 export default async function SuperadminOrganizationsPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

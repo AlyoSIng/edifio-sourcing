@@ -53,7 +53,7 @@ export async function triggerSourcingRunAction(): Promise<
   | { ok: false; error: string }
 > {
   // Guard superadmin
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

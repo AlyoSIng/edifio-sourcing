@@ -46,7 +46,7 @@ export async function POST(
   const params = await props.params;
   try {
     // ---------- 1. Vérification admin ----------
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const {
       data: { user: caller },
     } = await supabase.auth.getUser();

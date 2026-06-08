@@ -43,7 +43,7 @@ const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     // ---------- 1. Vérification admin ----------
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const {
       data: { user: caller },
     } = await supabase.auth.getUser();

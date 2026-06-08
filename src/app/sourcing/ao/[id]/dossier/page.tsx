@@ -87,7 +87,7 @@ export default async function DossierPage(props: PageProps) {
   const searchParams = await props.searchParams;
   const params = await props.params;
   // Auth check défensif (le middleware a normalement déjà filtré)
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

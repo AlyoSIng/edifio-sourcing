@@ -51,7 +51,7 @@ export interface TriggerCronResult {
 
 export async function triggerCronAction(cronName: string): Promise<TriggerCronResult> {
   // 1. Auth + superadmin.
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

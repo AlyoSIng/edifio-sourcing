@@ -63,7 +63,7 @@ export default async function SuperadminOrgDetailPage(props: { params: Promise<{
   const { id } = params;
 
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -73,7 +73,7 @@ async function getAuthenticatedContext(): Promise<
   | { ok: true; userId: string; orgId: string }
   | { ok: false; error: "not_authenticated" | "forbidden_domain" }
 > {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

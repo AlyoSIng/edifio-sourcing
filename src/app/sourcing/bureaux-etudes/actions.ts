@@ -181,7 +181,7 @@ export async function upsertBE(
   id?: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<UpsertBEResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
@@ -239,7 +239,7 @@ export async function upsertBE(
  * Upsert par `(organizationId, email)` si email présent, sinon INSERT.
  */
 export async function importBEFromCsv(formData: FormData): Promise<ImportBEResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) {
@@ -434,7 +434,7 @@ export async function uploadBeDocument(
   expiresAt?: Date | null,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<BeDocumentActionResult<{ id: string }>> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -520,7 +520,7 @@ export async function deleteBeDocument(
   documentId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<BeDocumentActionResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -597,7 +597,7 @@ export async function getBeDocumentUrl(
   documentId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<BeDocumentActionResult<{ url: string }>> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   const { orgId: urlOrgId } = authResult;
@@ -645,7 +645,7 @@ export async function listBeDocuments(
   beId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<BeDocumentRow[]> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return [];
   const { orgId: listOrgId } = authResult;
@@ -714,7 +714,7 @@ export type EnrichSingleResult =
  * @param beId UUID du bureau d'études à enrichir
  */
 export async function enrichSingleBEFromPappers(beId: string): Promise<EnrichSingleResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -886,7 +886,7 @@ export async function deleteBEAction(
   beId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<DeleteBEResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);

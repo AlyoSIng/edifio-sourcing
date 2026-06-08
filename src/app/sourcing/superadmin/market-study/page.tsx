@@ -39,7 +39,7 @@ const MARKET_STUDY_KEY = "market_study_url";
 
 export default async function SuperadminMarketStudyPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
