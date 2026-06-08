@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 
 import { formatCountdownMinSec } from "@/lib/auth/password";
 
@@ -25,7 +26,7 @@ import { useCountdown } from "./useCountdown";
  * centralisée dans la Server Action.
  */
 export function LoginForm({ next }: { next?: string }) {
-  const [state, formAction] = useFormState<LoginState, FormData>(
+  const [state, formAction] = useActionState<LoginState, FormData>(
     signInWithPasswordAction,
     initialLoginState,
   );
