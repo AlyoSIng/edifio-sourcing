@@ -12,10 +12,16 @@ import { readFileSync, writeFileSync } from "node:fs";
 const FILES = [
   "src/app/sourcing/entreprises/[id]/page.tsx",
   "src/app/sourcing/entreprises/page.tsx",
+  "src/app/sourcing/entreprises/nouveau/page.tsx",
+  "src/app/sourcing/entreprises/nouveau/CompanyCreateForm.tsx",
   "src/app/sourcing/bureaux-etudes/[id]/page.tsx",
   "src/app/sourcing/bureaux-etudes/page.tsx",
+  "src/app/sourcing/bureaux-etudes/nouveau/page.tsx",
+  "src/app/sourcing/bureaux-etudes/nouveau/BECreateForm.tsx",
   "src/app/sourcing/architectes/[id]/page.tsx",
   "src/app/sourcing/architectes/page.tsx",
+  "src/app/sourcing/architectes/nouveau/page.tsx",
+  "src/app/sourcing/architectes/nouveau/ArchitectCreateForm.tsx",
 ];
 
 const IMPORT_LINE = `import Link from "next/link";\n`;
