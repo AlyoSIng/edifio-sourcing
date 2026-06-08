@@ -49,12 +49,12 @@
     "drizzle-orm": "0.39.3",
     "exceljs": "^4.4.0",
     "fflate": "^0.8.3",
-    "next": "15.5.19",
+    "next": "15.5.18",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "postgres": "3.4.9",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.0.0",
