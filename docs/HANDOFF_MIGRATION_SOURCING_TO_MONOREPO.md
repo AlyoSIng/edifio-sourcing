@@ -609,4 +609,465 @@ Lot 12   25 juillet      Post-mortem
 
 ---
 
-<!-- SECTIONS 6-10 + ANNEXES : ajoutées au commit suivant -->
+## 6. Sub-agents équipe Sourcing
+
+> Documentés dans `.claude/agents/*.md`. Tous invoquables côté monorepo en copiant les fichiers `.md` dans le `.claude/agents/` du repo `alyos-suivi-chantier`.
+
+### 6.1 Sub-agents disponibles
+
+| Agent | Rôle | Périmètre | Outils |
+|---|---|---|---|
+| **Alex** (`dev`) | Développeur senior full-stack | Code applicatif, tests, migrations BDD, doc technique. **Pas Git, pas système.** | Read, Edit, Write, Glob, Grep, Bash |
+| **Yann** (`ps_operator`) | Opérations Windows / PowerShell | Git (commit + push), déploiement, scripts ops PowerShell. **Pas de code applicatif.** | Bash (PowerShell), Read, Glob |
+| **Hugo** (`reviewer`) | Reviewer interne | Relit chaque PR avant merge, audit sécurité + correctness + robustesse | Read, Glob, Grep |
+| **Camille** (`qa`) | QA / recette | Vérifie tests verts (vitest + Playwright + pgTAP), audit recette systematic | Read, Glob, Grep, Bash |
+| **dev_tandem** | Variante dev pour le module Tandem | Spécifique cotraitance (JWT, opposition tokens, multi-archi) | Read, Edit, Write, Glob, Grep, Bash |
+| **suivi_act_reviewer** | Reviewer posture Suivi+ACT | Filtre chaque PR portable AVANT soumission Sébastien. 8 garde-fous, 10 arbitrages Q1-Q10. | Read, Glob, Grep |
+
+### 6.2 Comment les invoquer côté monorepo
+
+**Au kickoff 1er juillet matin** :
+
+1. Copier `.claude/agents/{dev,ps_operator,reviewer,qa,dev_tandem}.md` du repo `edifio-sourcing` vers `.claude/agents/` du repo `alyos-suivi-chantier`.
+2. Adapter le prompt système de `dev.md` pour pointer vers la nouvelle racine projet et le contexte CLAUDE.md du monorepo (différent du Sourcing-only).
+3. Le sub-agent `suivi_act_reviewer` n'a PAS besoin d'être copié côté monorepo — il est conçu pour vivre côté Sourcing et filtrer les PR partantes.
+
+**Pendant la migration** :
+- Sébastien peut invoquer **Alex** sur le repo monorepo pour les ports de modules (copie du sub-agent dev).
+- Hugo / Camille peuvent être invoqués indépendamment pour review/qa.
+- Yann reste côté Sourcing pour gérer les commits sur les 2 repos.
+
+### 6.3 Sub-agent `suivi_act_reviewer` (déjà installé)
+
+Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migration): sub-agent suivi_act_reviewer + claude.md update`).
+
+**Rôle** : appliquer 8 garde-fous + 10 arbitrages Q1-Q10 + 12 bugs historiques à éviter — décrit en détail dans `.claude/agents/suivi_act_reviewer.md` (~250 lignes).
+
+**Workflow** : chaque PR Sourcing portable (i.e. qui touche du code à migrer le 18 juillet) doit passer la review `suivi_act_reviewer` AVANT d'être soumise à Sébastien. Sébastien arbitre les éventuels écarts en zone orange (CTO) ou rouge (Board).
+
+**Exemples reviews effectuées** :
+- PR #116 (refactor async createSupabaseServerClient) — APPROUVÉ AVEC 1 NETTOYAGE (cf. `gates/REVIEW_SUIVI_ACT_PR116.md`)
+- À venir : chaque PR Lot 2 et suivants.
+
+---
+
+## 7. Comptes externes / providers tiers
+
+### 7.1 Supabase
+
+| Projet | Région | Plan | Ref ID | Action migration |
+|---|---|---|---|---|
+| **Sourcing prod** | Frankfurt eu-central-1 | Pro 25 €/mois | `<sourcing-ref>` (1Password : « Supabase Sourcing prod ») | Q2 visio = adopter Paris monorepo → **migration inter-région nécessaire** (pg_dump/pg_restore + downtime 1-3 h) OU acceptation cross-region (latence ~30 ms) |
+| **Suivi+ACT prod** | Paris eu-west-3 | Pro | `vlhirdzvewzqgtnhcjft` (1Password Sébastien) | Cible des migrations Sourcing renumérotées 0138+ |
+
+**Pré-bascule J-7 + J-1** : pg_dump des deux projets via `scripts/migration/backup-*-db.ps1` (Direct connection port 5432, refus pooler 6543).
+
+**Post-bascule** : décision Q1 = projet Suivi+ACT Paris devient l'unique référence. Le projet Sourcing Frankfurt est mis en read-only puis décommissionné (économie 25 €/mois).
+
+### 7.2 Vercel
+
+| Projet | Plan | Action migration |
+|---|---|---|
+| **edifio-sourcing** (compte AlyoSIng) | Pro EU 20 €/mois | Décommissionné après bascule DNS 18 juillet. Conserver `.env.production` exporté via `export-vercel-env.ps1` dans 1Password. |
+| **alyos-suivi-chantier** (compte Sébastien probable) | Pro | Cible. Configurer `sourcing.edifio.fr` côté monorepo Vercel + redéployer branche `feat/sourcing-merge` → `main` au moment du switch DNS. |
+
+**Pré-bascule J-7 + J-1** : `vercel env pull` via `export-vercel-env.ps1 -ProjectName "edifio-sourcing"` pour sauvegarder les ENV Sourcing.
+
+### 7.3 Domaines + DNS
+
+- **Registrar** : **OVH** (compte AlyoS, géré par Steve).
+- **Domaine** : `edifio.fr` (zone DNS OVH).
+- **Sous-domaine actuel Sourcing** : `sourcing.edifio.fr` (probable — à confirmer côté DNS OVH ; Sourcing prod initialement sur `https://edifio-sourcing.vercel.app`).
+- **Bascule DNS J0** : repointer `sourcing.edifio.fr` du projet Vercel `edifio-sourcing` vers le projet Vercel `alyos-suivi-chantier`.
+- **Procédure** : 1 manipulation côté OVH zone DNS (changer le CNAME `sourcing` vers la nouvelle URL Vercel monorepo) + 5-30 min de propagation TTL.
+
+**MEMORY** : consignes DNS par clic exact dans le panel OVH (cf. `feedback_dns_consignes.md`).
+
+### 7.4 Anthropic API
+
+- **Clé** : `ANTHROPIC_API_KEY` (compte AlyoS).
+- **Modèles utilisés** : Sonnet 4.6 (analyse RC PDF natif, brief AO) + Haiku 4.5 (indexation biblio).
+- **Consommation audit semaine 29 mai – 5 juin** : ~0,14 € (très faible — MVP avec ~10 AlyoS + tests dev).
+- **SDK** : Sourcing `@anthropic-ai/sdk@0.98` vs monorepo `@anthropic-ai/sdk@0.32` → **bump SDK côté monorepo** ou downgrade Sourcing (à arbitrer Lot 6, recommandation : bump monorepo).
+- **Action portage** : intégration avec wrapper `common/ai/` du monorepo (retry + audit + ratelimit Upstash).
+
+### 7.5 Brevo
+
+- **Clé** : `BREVO_API_KEY`.
+- **Sender** : `BREVO_SENDER_EMAIL` + `BREVO_SENDER_NAME="edifio Sourcing"` → à actualiser post-bascule en « edifio Suite ».
+- **Templates** : 7 templates Brevo + 4 templates Resend par organisation (table `message_templates`).
+- **Coût** : ~25 €/mois.
+- **Action portage** : adoption du module `common/email/` monorepo. Templates `tutoiement TU vs VOUS` (Gate 4) conservés via `lib/brevo/template-picker.ts`.
+
+### 7.6 Resend
+
+- **Clé** : `RESEND_API_KEY`.
+- **Sender** : `RESEND_SENDER_EMAIL`.
+- **Usage** : emails admin (mot de passe provisoire 16 car., alertes cron, notifications system).
+- **Coût** : 0-20 €/mois selon volume.
+- **Action portage** : conservation OU fusion avec Brevo via module `common/email/` (Sébastien arbitre Lot 6).
+
+### 7.7 Fly.io worker Playwright
+
+- **Org** : Fly.io EU (compte AlyoS).
+- **Worker** : image Docker dédiée (hors du repo Sourcing) qui reçoit `POST /v1/scrape` et lance Playwright headless sur les 6 plateformes régionales (PLACE, francmarches, mp_info, etc.).
+- **Webhook** : retour résultats vers `/api/webhooks/scrape` du Next.js.
+- **Coût** : ~10-15 €/mois (toujours up).
+- **Action Q4 visio = bench POC chromium-min avant 25 juin** :
+  - Si POC OK (<50s + <500Mo) → cron Vercel + décommissionnement Fly.io.
+  - Si POC KO → conserver Fly.io, migration de l'org Fly vers org commune Suivi+ACT (ou maintien dédié — Sébastien arbitre).
+
+### 7.8 Pappers API
+
+- **Clé** : `PAPPERS_API_KEY`.
+- **Usage** : enrichissement Sirene/SIRET sur saisie architecte / BE / cotraitant.
+- **Coût** : pay-per-call, consommation à la demande.
+- **Action portage** : conservation telle quelle (lib `lib/pappers/*` portable).
+
+### 7.9 Stripe
+
+- **Compte** : SAS edifio (SIREN 105 534 515) — différent d'AlyoS Ingénierie.
+- **Statut Sourcing actuel** : MVP minimal Option C (migration 0049), à jeter (cf. §3.9).
+- **Statut monorepo** : schémas BDD prêts (migration 0115 `organization_billing_lifecycle`), mais Checkout + webhooks « reste à faire » (Sprint 9.E).
+- **Action portage Q6 visio = B-en-2-temps acté Steve** (cf. §4.2).
+
+### 7.10 Upstash Redis (monorepo only)
+
+- **Plan** : `@upstash/redis` + `@upstash/ratelimit`.
+- **Usage monorepo** : cache + ratelimit anti-abus sur Server Actions sensibles.
+- **Action portage** : réutiliser pour les Server Actions Sourcing sensibles (ex. `/api/cron/sourcing-run` ratelimit, `/api/admin/users` invitation, `/api/archi/[token]/respond` réponse cotraitant).
+
+### 7.11 Total infra mensuelle
+
+**Audit 5 juin 2026** :
+- Supabase Sourcing : 25 € → 0 € post-bascule
+- Vercel Sourcing : 20 € → 0 € post-bascule
+- Brevo : 25 € (conservé)
+- Resend : 0-20 € (conservé ou fusionné)
+- Anthropic : 0,14 € audit semaine (conservé)
+- Fly.io : 10-15 € → potentiellement 0 € si Q4 = Vercel
+- Pappers : à la demande
+- Stripe : 0 € (commission 1,4 % + 0,25 €/transaction CB EU)
+- Upstash : (à porter sur usage Sourcing)
+
+**Total Sourcing pré-bascule** : ~86-121 €/mois (AlyoS + PROTECT MVP).
+**Total post-bascule estimé** : économie nette ~45-60 €/mois (Supabase + Vercel Sourcing décommissionnés ; Fly.io éventuellement coupé).
+
+### 7.12 1Password — coffres référencés
+
+| Coffre | Contenu critique |
+|---|---|
+| « Supabase Sourcing prod » | PGPASSWORD direct connection + SUPABASE_SERVICE_ROLE_KEY |
+| « Supabase Suivi+ACT prod » | PGPASSWORD direct connection + SUPABASE_SERVICE_ROLE_KEY |
+| « Vercel AlyoSIng » | Token CLI vercel + .env.production.backup post-bascule |
+| « Anthropic » | ANTHROPIC_API_KEY |
+| « Brevo » | BREVO_API_KEY |
+| « Resend » | RESEND_API_KEY |
+| « Fly.io » | API token + connexion machine |
+| « OVH » | Identifiants compte registrar (zone DNS) |
+| « Stripe SAS edifio » | Secret key + webhook signing secret |
+| « Pappers » | API key |
+
+**Action** : Steve transfère les accès nécessaires (sauf Stripe qui reste SAS edifio uniquement) à Sébastien post-bascule. Le compte 1Password lui-même reste géré par Steve.
+
+---
+
+## 8. Risques migration
+
+> Inventaire consolidé des risques techniques majeurs. Pour chaque risque : probabilité, impact, mitigation actuelle.
+
+### 8.1 Risques résolus par Lot 1 / 1.5 (filet déjà tendu)
+
+| Risque | Statut | Mitigation |
+|---|---|---|
+| **Mismatch versions Next 14 vs 15** | ✅ Résolu | Lot 1 mergé (PR #115). Sourcing.main désormais Next 15.5.18 + React 19, aligné monorepo. |
+| **Auth/session breaking par async cookies Next 15** | ✅ Résolu | Lot 1.5 mergé (PR #116). `createSupabaseServerClient` async + propagation `await` sur 157 sites. Recette QA 1218/1218 verte. Middleware intact (cf. recette §S8). |
+| **Codemod `params` Promise échoué silencieusement** | ✅ Résolu | Recette S3 OK : 18 fichiers `params: Promise<…>` + 7 `searchParams: Promise<…>` validés manuellement. Aucun `params: {` synchrone résiduel. |
+| **`useFormState` orphelin React 19** | ✅ Résolu | S4 OK : aucun import / call, juste 1 commentaire JSDoc résiduel ProfileForm.tsx ligne 98. |
+| **Backup BDD prod foiré (pooler PgBouncer)** | ✅ Mitigé | Scripts ops PR #117 refusent PGPORT=6543 et PGUSER `postgres.*`. Direct connection forcée. |
+
+### 8.2 Risques actifs — phase de portage Lot 2-10
+
+| # | Risque | Probabilité | Impact | Mitigation actuelle | Action restante |
+|---|---|---|---|---|---|
+| R1 | **Refonte Drizzle → supabase-js casse silencieusement** | Élevée | Très élevé | Tests vitest portés + tests E2E sur flows critiques (compile ZIP, login multi-tenant, cotraitance archi) | Chaque loader réécrit Lot 2 doit avoir son test vitest passant AVANT merge. Garde-fou : Camille (qa). |
+| R2 | **Bug RLS lors fusion schémas** (collision policies, organization_id mal scopé) | Moyenne | Très élevé | Suite pgTAP exhaustive existante (13 fichiers, ~600 assertions) | Porter pgTAP intégralement Lot 7. Test cross-tenant AlyoS ⊥ PROTECT obligatoire. |
+| R3 | **Cron `sourcing-run` plante après bascule Fly.io → cron Vercel** | Moyenne | Élevé | POC chromium-min `spike/cron-vercel-chromium` livrable AVANT 25 juin | Si POC KO → conserver Fly.io (plan B). Smoke test obligatoire J0 + monitoring 7 jours suivants. |
+| R4 | **Cron sourcing 60% échec semaine 29 mai – 5 juin (incident historique)** | Faible mais résiduel | Élevé | Probablement résolu par migrations 0047/0048 du 5 juin | Confirmer monitoring continu + résoudre formellement AVANT 18 juillet. **Bloqueur potentiel de bascule.** |
+| R5 | **Stripe transition Sourcing 0049 → 0115 perd des dates trial** | Faible | Moyen | Script de migration explicite à écrire Lot 6 + validation manuelle | Validation : AlyoS active conservée, PROTECT trial avec bonne date de fin. **Cas test à écrire.** |
+| R6 | **Régression UX au upgrade Next 15 / React 19** | Faible | Moyen | Lot 1 livré 1 semaine avant migration → fenêtre de prod test | Smoke test manuel par Steve : 3 parcours (login provisoire → reset → ao-du-jour ; admin/users invite ; archi `/archi/[token]`) — recommandé. |
+| R7 | **Conflits naming `organizations.contract_summary` vs `subscription_status`** | Élevée | Faible | Audit Lot 0 + script de fusion documenté | Catalogue Drizzle §3 documente les 4 collisions. Sébastien arbitre Lot 2. |
+| R8 | **Performance régresse** (Drizzle prepared statements perdus) | Faible | Moyen | Bench avant/après sur 3 requêtes critiques | À mesurer Lot 5 (compile dossier, indexation biblio, cron sourcing). |
+| R9 | **Suivi+ACT freeze partiel pendant Lots 2-5** | Élevée (intentionnelle) | Faible | Concertation calendrier amont (CR visio §5) | Communication équipe Sébastien en amont. |
+| R10 | **Coût IA explose pendant tests** | Faible | Faible | Limite ENV dev (Anthropic dev key avec quota) | Check `ai_runs.cost_usd` quotidien Lot 6. Audit hebdo semaine 1-14 juillet. |
+
+### 8.3 Risques migration BDD inter-région (Q1 + Q2)
+
+| Risque | Probabilité | Impact | Mitigation |
+|---|---|---|---|
+| **pg_dump → pg_restore Frankfurt → Paris** : downtime 1-3 h selon volume | Élevée (intentionnelle) | Moyen | Mesurer durée pg_dump complet sur backup J-7 (11 juillet) pour calibrer la fenêtre J0. |
+| **Encodage UTF-8 sur restore** : caractères français dans données accentués | Faible | Élevé (corruption) | Tester restore vers projet Supabase staging avant J0. Validation : SELECT échantillon sur 5 tables avec caractères français. |
+| **FK auth.users cross-projet** : les FK Sourcing vers `auth.users.id` Frankfurt ne fonctionneront plus après migration Paris (UUIDs différents) | Élevée | Très élevé | **Plan d'action obligatoire** : mapping UUIDs Frankfurt → Paris à écrire en script. Migration utilisateurs Supabase Auth via API (export `auth.users` + recreate dans projet Paris en conservant les UUIDs si possible). |
+| **Storage Frankfurt → Paris** : 4 buckets à migrer (company_library, response_files, tender_documents, app-assets) | Moyenne | Élevé | Script `backup-supabase-storage.ps1` + script inverse à coder. Validation : SELECT random 10 fichiers post-restore. |
+
+### 8.4 Risques sécurité (post-incident 21/05)
+
+| Risque | Statut | Mitigation |
+|---|---|---|
+| **Secrets non rotés** (password BDD prod, API keys) | 🟡 Reporté post-MVP | Rotation prévue avant mise en service réelle. Cf. §3.8. |
+| **`.env.production.backup` en clair sur disque** | ✅ Mitigé | Script `export-vercel-env.ps1` affiche bandeau sécurité + propose `age` encryption. Hugo a recommandé option `-Encrypt` automatique avant J-7. |
+| **Hardening `migrate.ts` masking erreurs postgres-js** | 🟡 À faire avant mise en service réelle | Documenté MEMORY `followup_post_mvp_security_rotations.md`. |
+| **Audit log 5 ans corruption** | ✅ Mitigé | Triggers `reject_audit_mutation` IMMUTABLE actifs. **À reposer SQL natif intact côté monorepo** — sinon perte garantie 5 ans. |
+
+### 8.5 Risques DNS / continuité de service
+
+| Risque | Probabilité | Impact | Mitigation |
+|---|---|---|---|
+| **TTL DNS trop long ralentit bascule** | Moyenne | Moyen | Réduire TTL CNAME `sourcing.edifio.fr` à 300s (5 min) **48h avant J0** (15 juillet matin) côté OVH. |
+| **Rollback DNS après bascule** | Moyenne | Élevé | Procédure documentée `scripts/migration/README.md` §Rollback. 5-30 min selon TTL. |
+| **Smoke tests J0 fail → décision rollback** | Possible | Très élevé | Critères de rollback explicites : ZIP non généré OU login impossible OU données absentes. Décision par Steve à 10h30. |
+
+---
+
+## 9. Procédure de bascule J0
+
+> Référence opérationnelle : `scripts/migration/README.md` (152 lignes, livré PR #117) pour les commandes PowerShell exactes. Ce qui suit est la **séquence consolidée J-7 → J0 → J+7**.
+
+### 9.1 J-7 (samedi 11 juillet 2026) — Répétition générale
+
+**Objectif** : valider toute la chaîne backup + restore + smoke en conditions réelles avant J0.
+
+| Heure | Action | Acteur | Sortie |
+|---|---|---|---|
+| 09h00 | Backup Sourcing BDD (Direct connection Frankfurt) | Steve (PowerShell) | `backups/sourcing-prod-2026-07-11-0900.dump` |
+| 09h15 | Backup Suivi+ACT BDD (filet de sécurité) | Steve (PowerShell) | `backups/suiviact-prod-2026-07-11-0915.dump` |
+| 09h30 | Backup Vercel ENV preview + production | Steve (PowerShell) | `backups/edifio-sourcing/2026-07-11/.env.production.backup` |
+| 09h45 | Backup Storage Sourcing 4 buckets | Steve (PowerShell) | `backups/storage/edifio-sourcing/{company_library,response_files,tender_documents,app-assets}/...` |
+| 10h00 | Restore test BDD sur projet Supabase staging | Steve | Validation `SELECT count(*)` sur tables clés AlyoS + PROTECT |
+| 10h30 | Smoke test E2E sur preview Vercel `feat/sourcing-merge` | Steve + Sébastien | 3 parcours critiques verts |
+| 11h00 | Mesure durée pg_dump complète | Steve | Calibrage fenêtre J0 (objectif <60 min) |
+
+**Critères GO/NO-GO post-J-7** :
+- ✅ Restore staging réussit (5 tables validées)
+- ✅ Smoke test 3 parcours vert
+- ✅ Durée pg_dump <60 min
+- Si KO sur l'un → décaler bascule à un samedi ultérieur, Sébastien arbitre.
+
+### 9.2 J-1 (vendredi 17 juillet 2026 soir) — Backup officiel + freeze
+
+| Heure | Action | Acteur |
+|---|---|---|
+| 17h00 | Code freeze sur `edifio-sourcing.main` : pas de merge sauf fix critique | Tous |
+| 17h30 | Backup officiel Sourcing BDD + Vercel ENV + Storage (re-jeu des scripts J-7) | Steve |
+| 18h00 | Communication AlyoS + PROTECT : « migration demain matin 8h-11h, indisponibilité possible » | Steve |
+| 18h30 | Réduction TTL DNS CNAME `sourcing.edifio.fr` à 300s côté OVH | Steve (pas-à-pas MEMORY) |
+| 19h00 | Validation finale branche `feat/sourcing-merge` côté monorepo : merge sur `main` + déploiement production Vercel | Sébastien |
+| 19h30 | Smoke test final sur URL Vercel monorepo (pas encore sur sourcing.edifio.fr) | Steve + Sébastien |
+
+### 9.3 J0 (samedi 18 juillet 2026, 8h-11h) — Bascule effective
+
+| Heure | Action | Acteur | Critère succès |
+|---|---|---|---|
+| **08h00** | Annonce démarrage bascule dans Slack équipe | Steve | — |
+| **08h05** | Freeze écritures `sourcing.edifio.fr` (mode read-only via env var + banner UI) | Sébastien | Banner visible sur le repo Sourcing |
+| **08h15** | Dump-restore final BDD Sourcing → BDD Suivi+ACT Paris (si Q1 = Option A séparée → ce step nul si BDD partagée déjà en place depuis Lot 2) | Steve | `pg_restore` exit 0, tables `sourcing.*` présentes |
+| **08h30** | Application des migrations Sourcing 0138-0144 sur projet Suivi+ACT (Sébastien applique en Studio manuel selon Q8) | Sébastien | Toutes migrations OK, RLS actif `\dn` shows `sourcing` schema |
+| **08h45** | Re-seed des plateformes + ai_prompts + formations 17 guides | Sébastien | `SELECT count(*) FROM sourcing.platforms = 5`, idem ai_prompts, formations |
+| **09h00** | **Bascule DNS Vercel** — `sourcing.edifio.fr` repointé vers projet `alyos-suivi-chantier` | Steve (OVH panel par clic exact) | `dig CNAME sourcing.edifio.fr` retourne la nouvelle URL |
+| **09h05-09h35** | Propagation DNS (TTL 300s → propagation rapide) | — | `curl -sI https://sourcing.edifio.fr` retourne du HTML monorepo |
+| **09h30** | Smoke tests utilisateurs (Steve + un membre PROTECT volontaire) | Steve + utilisateur PROTECT | 5 parcours verts (cf. §9.4) |
+| **10h30** | Décision GO/NO-GO continuation OU rollback | Steve | Si GO → poursuite ; si NO-GO → §9.5 |
+| **10h45** | Décommissionnement deploy Vercel `edifio-sourcing` (URL vercel.app inactive) | Sébastien | Statut "removed" sur dashboard Vercel |
+| **11h00** | Communication clients (AlyoS + PROTECT + observateurs) : « migration réussie, aucune action nécessaire » | Steve | Email Resend envoyé |
+
+### 9.4 Smoke tests obligatoires J0 (5 parcours, 30 min)
+
+| Parcours | Détail | Critère succès |
+|---|---|---|
+| **P1 — Login AlyoS** | Login `steissier@alyosingenierie.fr` → voit ses AO sourcés du jour | Dashboard `/sourcing/ao-du-jour` charge avec ≥1 AO |
+| **P2 — Login PROTECT** | Login user PROTECT → voit SES AO sourcés (différents de AlyoS) | Pas d'AO AlyoS visible (test isolation RLS multi-tenant) |
+| **P3 — Compile dossier complet** | Sur 1 AO sélectionné AlyoS : analyzeRcAction → cerfa validé → matching pieces → compile ZIP | ZIP téléchargé contient DC1+DC2+RC+pieces |
+| **P4 — Page publique cotraitant** | Ouvrir lien `/archi/[token]` envoyé à un architecte de test (JWT signing OK) | Page charge, formulaire visible, signature JWT OK |
+| **P5 — Page billing superadmin** | Login superadmin → `/sourcing/superadmin/organizations/{id}/billing` | Page accessible, trial_status correct pour AlyoS + PROTECT |
+
+**Critères rollback** : si l'un de ces 5 parcours fail à 10h30 → rollback obligatoire (§9.5).
+
+### 9.5 Plan de rollback (si bascule échoue à 10h30)
+
+**Critère de déclenchement** : ≥1 smoke test critique fail (ZIP non généré, login impossible, données absentes, JWT public KO).
+
+| Étape | Action | Délai | Acteur |
+|---|---|---|---|
+| 1 | Décision rollback annoncée Slack équipe | T0 | Steve |
+| 2 | Repointer DNS `sourcing.edifio.fr` → ancien projet Vercel `edifio-sourcing` | T+2 min (OVH panel) | Steve |
+| 3 | Si BDD partagée Q1=A : aucune action BDD (le DNS bascule suffit, anciennes pages re-tapent sur les rows partagées) | — | — |
+| 4 | Si BDD séparée Q1=B : restore `.dump` Sourcing sur projet Sourcing Frankfurt **PAS NÉCESSAIRE** (Frankfurt intact, pas touché par migration) | — | — |
+| 5 | Désactiver le mode read-only du repo Sourcing (banner + env var) | T+5 min | Sébastien |
+| 6 | Propagation DNS rollback (TTL 300s) | T+5 à T+35 min | — |
+| 7 | Smoke test post-rollback sur Sourcing original | T+35 min | Steve |
+| 8 | Communication clients : « migration reportée, service nominal » | T+45 min | Steve |
+| 9 | Post-mortem express équipe Sourcing + Sébastien | Lundi 20 juillet | Tous |
+| 10 | Retentative bascule samedi 25 juillet (ou samedi suivant) | J+7 | Tous |
+
+**Délai de retour à la normale** : 5-30 min selon TTL DNS (TTL 300s réduit cf. §9.2).
+
+### 9.6 J+7 (samedi 25 juillet 2026) — Post-mortem
+
+Cf. CR visio Point 5 :
+- Documentation décisions migration (ADR-015 « Migration Sourcing → monorepo edifio »)
+- Mise à jour `CLAUDE.md` Sourcing → archive read-only
+- Mise à jour `CLAUDE.md` monorepo (module Sourcing intégré)
+- Communication équipe + clients : retour d'expérience
+- Décommissionnement final : archive GitHub `edifio-sourcing` en read-only, suppression projet Vercel `edifio-sourcing`, suppression projet Supabase Sourcing Frankfurt (après 90 jours de rétention backup).
+
+---
+
+## 10. Annexes
+
+### 10.1 Documents référencés (lecture complémentaire)
+
+| Document | Localisation | Description |
+|---|---|---|
+| **Brief migration v2** | `docs/brief_migration_sourcing_to_monorepo.md` | 964 lignes (~32 pages). Inventaire complet repo source + cible, comparatif stacks, 10 lots, 8 risques, plan bascule + rollback. **Lecture obligatoire avant le présent handoff.** |
+| **CR visio cadrage** | `docs/CR_visio_cadrage_migration_2026-06-07.md` | 207 lignes. CR validé Sébastien + Steve. Q1-Q10 confirmées, calendrier consolidé, scénario C hybride superadmin. |
+| **Catalogue Drizzle** | `docs/CATALOG_SCHEMAS_DRIZZLE_TO_MONOREPO.md` | 315 lignes. Lot 0a. Mapping détaillé 25 fichiers schema Drizzle → 31 loaders monorepo + 12 enums + 40 RLS. |
+| **PREP Lot 0b** | `docs/PREP_LOT_0B_chromium_min.md` | 200+ lignes. Plan POC chromium-min Vercel vs Fly.io (Q4). Livrable bench avant 25 juin. |
+| **PREP Lot 1** | `docs/PREP_LOT_1_upgrade_next15.md` | 200+ lignes. Audit grep breaking changes Next 14→15 (params async, cookies async, React 19). **Référence post-mortem si pb Next 15.** |
+| **Brief global** | `docs/brief_global_edifio_sourcing.md` | Brief produit + technique + financier (~18 pages). Contexte stratégique edifio. |
+| **DEPLOY** | `docs/DEPLOY.md` | Procédure de déploiement actuelle Vercel. À adapter post-bascule pour monorepo. |
+| **Variables Mustache CERFA** | `docs/variables_mustache_dc1_dc2.doc` | 33 balises Mustache DC1 + DC2 documentées. À conserver à l'identique post-swap docxtemplater. |
+
+### 10.2 Scripts ops migration (PR #117)
+
+| Script | Localisation | Description |
+|---|---|---|
+| README | `scripts/migration/README.md` | Procédure pas-à-pas backup J-7 + J-1 + rollback. **Référence opérationnelle Steve.** |
+| `backup-sourcing-db.ps1` | `scripts/migration/` | pg_dump Sourcing Frankfurt (Direct connection 5432). Refus pooler. Flag `-UseDocker` fallback. |
+| `backup-suiviact-db.ps1` | `scripts/migration/` | pg_dump Suivi+ACT Paris (idem). |
+| `export-vercel-env.ps1` | `scripts/migration/` | `vercel env pull` preview + production. Bandeau sécurité. Recommandation `age` encryption. |
+| `backup-supabase-storage.ps1` | `scripts/migration/` | Backup 4 buckets via API REST. SERVICE_ROLE_KEY obligatoire. |
+
+### 10.3 Gates / reviews / recettes Lot 1 + 1.5
+
+| Document | Type | Verdict |
+|---|---|---|
+| `gates/RECETTE_PR_115_116_LOT1_LOT15.md` | Recette Camille (QA) | 8 scénarios S1-S6 OK, 0 bloquant, 1 N/A (S7 E2E délégué CI). 1218/1218 vitest verts. |
+| `gates/REVIEW_HUGO_PR117.md` | Review reviewer | APPROUVÉ SOUS RÉSERVE. 0 bloquant sécurité, 2 à corriger avant J-7 (Get-StorageObjects scope + option `-Encrypt age`), 3 suggestions. |
+| `gates/REVIEW_SUIVI_ACT_PR116.md` | Review suivi_act_reviewer | CHANGEMENT REQUIS (mineur, cosmétique) — 1 ligne `UnsafeUnwrappedCookies` inutilisée à supprimer (fait dans PR #118). Match pattern monorepo OK avec 2 écarts notés Lot 2 (rename + COOKIE_DOMAIN). |
+| `gates/AUDIT_ETAT_SALVE_U.md` | Audit (contexte historique) | Pré-Lot 1. État baseline avant upgrade. |
+| `gates/RECETTE_SALVE_U_apprentissage_ecartement.md` | Recette (contexte historique) | Pré-Lot 1. |
+| `gates/REVIEW_GRILLE_SALVE_U.md` | Review (contexte historique) | Pré-Lot 1. |
+
+### 10.4 Variables d'environnement complètes Sourcing
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=         # storage admin + auth admin
+
+# BDD (Drizzle migrate)
+DATABASE_URL=                       # postgres://... avec password URI-encoded
+
+# Auth
+RESET_PASSWORD_REDIRECT_URL=https://sourcing.edifio.fr/reset-password
+COOKIE_DOMAIN=                      # .edifio.fr en prod (SSO multi-modules)
+
+# Site / SEO
+NEXT_PUBLIC_SITE_URL=https://sourcing.edifio.fr
+
+# IA
+ANTHROPIC_API_KEY=
+
+# Brevo (emails utilisateurs : cotraitance, dossier envoyé)
+BREVO_API_KEY=
+BREVO_SENDER_EMAIL=
+BREVO_SENDER_NAME="edifio Sourcing"
+
+# Resend (emails admin : mot de passe provisoire, alertes cron)
+RESEND_API_KEY=
+RESEND_SENDER_EMAIL=
+
+# Sourcing tiers
+BOAMP_API_BASE=https://boamp-datadila.opendatasoft.com
+OPENDATASOFT_API_BASE=
+PAPPERS_API_KEY=                    # enrichissement société (mode dégradé si absent)
+
+# Cron sécurité
+CRON_SECRET=                        # protège /api/cron/* via Bearer
+
+# Fly.io worker (scrap plateformes régionales)
+FLY_PLAYWRIGHT_WORKER_URL=
+FLY_PLAYWRIGHT_WORKER_TOKEN=
+
+# Stripe (minimal MVP Sourcing — à jeter post-migration)
+# (À remplacer par les variables Stripe du module common Suivi+ACT)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# E2E tests
+E2E_TEST_ROUTES_ENABLED=             # =1 active /api/test/seed-session (CI only)
+```
+
+### 10.5 Buckets Supabase Storage (4 buckets, à migrer)
+
+| Bucket | Privé/Public | RLS scope | Contenu |
+|---|---|---|---|
+| `company_library` | Privé | `{orgId}/{kind}/{ts}_{filename}` | Documents bibliothèque entreprise (Kbis, DC1/DC2 templates, fiches métiers, CV, références, tableau Excel, etc.) |
+| `response_files` | Privé | `{orgId}/{tenderId}/...` | CERFA générés (DC1, DC2 multi-archi/BE) + ZIP dossier compilé |
+| `tender_documents` | Privé | `{orgId}/{tenderId}/...` | RC et DCE des AO (uploadés ou téléchargés depuis le source) |
+| `app-assets` | Public read | `{orgId}/...` | Logos organisation custom |
+
+À fusionner ou réutiliser tels quels selon la politique du module `common/storage/` monorepo.
+
+### 10.6 ADR Sourcing référencés
+
+| ADR | Date | Sujet |
+|---|---|---|
+| ADR-011 | 12 mai 2026 | Pivot magic-link → password durable (scanner email entreprise bloquait les links) |
+| ADR-012 | 15 mai 2026 | Alignment visuel edifio.fr (design tokens partagés) |
+| ADR-013 | 18 mai 2026 | ORM Drizzle retenu vs Prisma (score 7,80/10 vs 5,30/10) — **À RECONSIDÉRER post-bascule : Q2 = drop Drizzle pour supabase-js direct** |
+| ADR-014 | 5 juin 2026 | Levée du filtre `@alyosingenierie.fr` du middleware → ouverture multi-tenant (PROTECT) |
+| ADR-015 | À écrire 25 juillet 2026 | Migration Sourcing → monorepo edifio (post-mortem) |
+
+### 10.7 Documentation utilisateur (17 guides intégrés)
+
+17 guides intégrés dans l'app sous `/sourcing/formation/[slug]`, table `formations` :
+
+1. Prendre en main edifio Sourcing en 10 minutes
+2. Traiter sa file « AO du jour »
+3. Répondre en cotraitance avec un architecte
+4. Gérer les contacts et le coffre documentaire BET
+5. Choisir ton mode de réponse à un AO
+6-13. *(autres — liste complète à extraire de `seed-formations.ts`)*
+14. Debug sourcing
+15. Fiches métiers : utiliser le matching auto
+16. Références : matching auto via tableau Excel + fiches A4
+17. CV : sélection auto des intervenants par mots-clés
+
+**Portage** : telles quelles (markdown rendu HTML, pur contenu). Seed à porter Lot 10.
+
+### 10.8 Entité juridique éditrice
+
+**SAS edifio**
+- SIREN 105 534 515
+- RCS Marseille
+- Immatriculation 01/06/2026
+- Siège 5 avenue Verlaque, 13009 Marseille
+
+Stripe Checkout doit facturer au nom de **SAS edifio** (pas AlyoS Ingénierie). Brevo + Resend senders à actualiser post-bascule en « edifio Suite » ou « edifio Sourcing ».
+
+### 10.9 Contacts équipe
+
+| Personne | Rôle | Email |
+|---|---|---|
+| Steve TEISSIER | CEO AlyoS / dirigeant SAS edifio / lead Sourcing | steissier@alyosingenierie.fr |
+| Sébastien TEISSIER | Lead Suivi+ACT / lead migration | sebastien@edifio.fr |
+| Sophie (CTO Cowork) | Pilotage stratégique CTO | (via Cowork) |
+| Marc (CEO Cowork) | Pilotage stratégique CEO | (via Cowork) |
+| Léa (CMO Cowork) | Pilotage marketing | (via Cowork) |
+| Théo (Graphiste Cowork) | Design + tokens | (via Cowork) |
+
+---
+
+*FIN HANDOFF v1 — 10 sections + 9 annexes couvertes. Lecture obligatoire Sébastien avant kickoff 1er juillet 2026.*
