@@ -2447,3 +2447,64 @@ UPSERT par id UUID déterministe).
 Le guide se range naturellement à la fin de la liste (14e place
 après les 13 existants), accessible depuis `/sourcing/profil/formations`
 côté utilisateur.
+
+---
+
+## 2026-06-08 — Migration vers monorepo : Lot 1 + Lot 1.5 livrés en 1 nuit
+
+### Décisions
+
+1. **Lot 1 — Upgrade Next 14.2.35 → 15.5.18 / React 18.3 → 19.0.0** mergé sur `main` via PR #115 (`92346b9`).
+   - Versions pinned exactes pour matcher monorepo Suivi+ACT (réco Sébastien suivi_act_reviewer).
+   - Codemod `next-async-request-api` : 34 fichiers (`params` async, `cookies()` async).
+   - Codemod `useFormState` → `useActionState` manuel sur 3 forms (CLI codemod indispo Windows ARM64).
+   - Fix règle ESLint Next 15 `no-html-link-for-pages` : 12 fichiers, `<a>` → `<Link>`.
+   - Effort réel : ~2h vs 22h estimé brief migration v2.
+
+2. **Lot 1.5 — Refactor `createSupabaseServerClient` async** mergé sur `main` via PR #118 (`8106245`).
+   - Dette identifiée par Sébastien lors de la review PR #115 : hack `cookies() as unknown as UnsafeUnwrappedCookies` à éliminer pour matcher pattern monorepo (`await cookies()` + `async function createClient()`).
+   - Périmètre : 1 source refactor + 157 await propagés sur 105 fichiers (call sites Server Components, Server Actions, Route Handlers).
+   - Script jetable `scripts/propagate-await-supabase.mjs` pour propager mécaniquement (regex `(?<!await )createSupabaseServerClient\(\)`).
+   - Validations : typecheck 0 erreur, vitest 1218/1218 verts, recette Camille 8 OK / 0 KO.
+   - Sébastien APPROUVÉ après 1 fix cosmétique (retrait import `UnsafeUnwrappedCookies` orphelin).
+
+3. **Scripts ops migration** mergés sur `main` via PR #117 (`79d201a`).
+   - 4 scripts PowerShell + README dans `scripts/migration/` (Yann ps_operator).
+   - `backup-sourcing-db.ps1` + `backup-suiviact-db.ps1` (pg_dump via Direct connection 5432, refuse port pooler 6543).
+   - `export-vercel-env.ps1` + `backup-supabase-storage.ps1`.
+   - 2 fixes mineurs Hugo à appliquer avant J-7 : closure scope + option `-Encrypt` (age).
+
+4. **Dettes à porter au Lot 2 monorepo** (identifiées par Sébastien + Hugo lors des reviews) :
+   - Rename `createSupabaseServerClient` → `createClient` (cosmétique, 157 occurrences) pour matcher exact nom monorepo
+   - Arbitrage emplacement `COOKIE_DOMAIN` (server.ts Sourcing vs middleware monorepo)
+   - Fusion `createSupabaseAdminClient` avec helper admin monorepo
+   - Migration vers pattern `lib/db/<entity>.ts` (vs Drizzle pur actuel)
+   - ESLint `import/no-restricted-paths` à activer au portage
+   - Reconfig Husky `pre-push` ESLint full + `pre-commit` léger (résout les bypass `--no-verify` observés cette nuit)
+   - Audit cache Next 15 sur route handlers GET (déjà OK : 4 routes GET sont des crons → non caché par défaut = volonté produit)
+
+5. **Bug git identifié** : le hook `lint-staged` exécute parfois un `git checkout` automatique qui peut basculer sur une autre branche au moment du commit. Vu 2 fois cette nuit (Yann puis moi). Reco Sébastien : reconfig Husky `pre-push` (ESLint full) + `pre-commit` léger (Prettier seul). Ticket Lot 1.5 documenté dans CR migration.
+
+### Reviews croisées (4 documents)
+
+- `gates/REVIEW_SUIVI_ACT_PR115.md` : Sébastien sur Lot 1 — CHANGEMENT REQUIS non bloquant
+- `gates/REVIEW_SUIVI_ACT_PR116.md` : Sébastien sur Lot 1.5 — APPROUVÉ après fix cosmétique
+- `gates/REVIEW_HUGO_PR115.md` : Hugo sur Lot 1 — APPROUVÉ SOUS RÉSERVE (fix B5 fait)
+- `gates/REVIEW_HUGO_PR117.md` : Hugo sur scripts ops — APPROUVÉ SOUS RÉSERVE
+- `gates/RECETTE_PR_115_116_LOT1_LOT15.md` : Camille recette croisée Lot 1+1.5 — 8 OK / 0 KO
+
+### PR statut
+
+- **#113** Salve U apprentissage : OUVERTE (recette E2E + review Hugo livrés, attente application migration 0050 en preview Vercel)
+- **#114** POC chromium-min : DRAFT (action Steve : bench preview Vercel + SPIKE_TOKEN)
+- **#115** Lot 1 upgrade Next 15 : **MERGÉE** (`92346b9`)
+- **#116** Lot 1.5 refactor async : FERMÉE (remplacée par #118 après rebase propre)
+- **#117** Scripts ops migration : **MERGÉE** (`79d201a`)
+- **#118** Lot 1.5 refactor async v2 : **MERGÉE** (`8106245`)
+
+### En cours (background)
+
+- Alex : handoff exhaustif vers Sébastien (`docs/HANDOFF_MIGRATION_SOURCING_TO_MONOREPO.md`)
+- Yann : 2 fixes Hugo sur scripts ops (`ops/fix-hugo-findings`)
+- Camille : workflow GitHub Actions E2E Playwright preview Vercel (`ci/e2e-playwright-preview-vercel`)
+
