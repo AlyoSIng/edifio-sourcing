@@ -94,7 +94,8 @@ function formatDateFr(date: Date | null): string {
   });
 }
 
-export default async function TenderDetailPage({ params }: { params: { id: string } }) {
+export default async function TenderDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Auth check défensif
   const supabase = createSupabaseServerClient();
   const {
@@ -273,7 +274,6 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
         <span aria-hidden>/</span>
         <span className="text-ink">Détail AO</span>
       </nav>
-
       {/* En-tête */}
       <header className="mb-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -304,7 +304,6 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
           )}
         </div>
       </header>
-
       {/* Grille infos + actions DCE */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
         {/* Colonne principale — informations */}

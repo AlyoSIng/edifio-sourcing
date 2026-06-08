@@ -59,14 +59,14 @@ const DOSSIER_ALLOWED_STATUSES = [
 type DossierAllowedStatus = (typeof DOSSIER_ALLOWED_STATUSES)[number];
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   /**
    * Query params :
    *   - `archi` : UUID de l'architecte sélectionné pour préparer son dossier
    *     en mode Tandem multi-archi. Ignoré si Solo / Cotraitance BE ou si
    *     l'UUID ne correspond à aucun architecte accepté pour cet AO.
    */
-  searchParams?: { archi?: string };
+  searchParams?: Promise<{ archi?: string }>;
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -83,7 +83,9 @@ function formatDate(date: Date | null): string {
   });
 }
 
-export default async function DossierPage({ params, searchParams }: PageProps) {
+export default async function DossierPage(props: PageProps) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // Auth check défensif (le middleware a normalement déjà filtré)
   const supabase = createSupabaseServerClient();
   const {

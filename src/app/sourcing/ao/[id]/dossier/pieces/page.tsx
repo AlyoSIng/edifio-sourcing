@@ -47,7 +47,7 @@ export const metadata = {
 };
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   /**
    * Query params :
    *   - `archi` : UUID de l'architecte sélectionné pour préparer son dossier
@@ -58,12 +58,14 @@ interface PageProps {
    *     exclusif avec `archi` — si les deux sont posés, `archi` prime. Sert
    *     uniquement à la compilation du ZIP (DC2 spécifique BE) et au hint UX.
    */
-  searchParams?: { archi?: string; be?: string };
+  searchParams?: Promise<{ archi?: string; be?: string }>;
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-export default async function PiecesPage({ params, searchParams }: PageProps) {
+export default async function PiecesPage(props: PageProps) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // 1. Auth check défensif
   const supabase = createSupabaseServerClient();
   const {

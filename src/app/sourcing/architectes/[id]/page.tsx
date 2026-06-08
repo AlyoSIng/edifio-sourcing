@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { eq, and, desc } from "drizzle-orm";
+import Link from "next/link";
 
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
@@ -32,7 +33,8 @@ export async function generateMetadata() {
   return { title: `Fiche architecte — edifio Sourcing` };
 }
 
-export default async function ArchitectFichePage({ params }: { params: { id: string } }) {
+export default async function ArchitectFichePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Auth check défensif
   const supabase = createSupabaseServerClient();
   const {
@@ -126,9 +128,9 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
     <div className="mx-auto max-w-3xl">
       {/* Fil d'Ariane */}
       <nav aria-label="Fil d'Ariane" className="mb-4 text-xs text-muted">
-        <a href="/sourcing/architectes" className="hover:underline">
+        <Link href="/sourcing/architectes" className="hover:underline">
           Architectes
-        </a>
+        </Link>
         {" / "}
         <span className="text-ink">{architect?.cabinet ?? params.id}</span>
       </nav>

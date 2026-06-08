@@ -74,10 +74,11 @@ function formatMonth(yyyyMm: string): string {
 // ---------------------------------------------------------------------------
 
 interface PageProps {
-  searchParams?: { range?: string; from?: string; to?: string };
+  searchParams?: Promise<{ range?: string; from?: string; to?: string }>;
 }
 
-export default async function IaUsagePage({ searchParams }: PageProps) {
+export default async function IaUsagePage(props: PageProps) {
+  const searchParams = await props.searchParams;
   // 1. Auth + superadmin guard.
   const supabase = createSupabaseServerClient();
   const {

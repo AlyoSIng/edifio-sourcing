@@ -59,7 +59,7 @@ const BODY_SCHEMA = z.object({
 });
 
 interface RouteContext {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }
 
 const STATUS_TO_TENDER_STATUS = {
@@ -68,7 +68,8 @@ const STATUS_TO_TENDER_STATUS = {
   info_requested: "architect_info_requested",
 } as const;
 
-export async function POST(req: Request, { params }: RouteContext): Promise<NextResponse> {
+export async function POST(req: Request, props: RouteContext): Promise<NextResponse> {
+  const params = await props.params;
   const db = defaultDb;
 
   // 1. Verify JWT (signature + audience + exp + révocation BDD)

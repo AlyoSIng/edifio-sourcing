@@ -45,7 +45,7 @@ export const metadata = {
 };
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   /**
    * Query params :
    *   - `archi` : UUID de l'architecte sélectionné comme mandataire du
@@ -62,12 +62,14 @@ interface PageProps {
    * Cotraitance BE). Si les deux sont présents → `archi` prime (Tandem) et
    * `be` est ignoré.
    */
-  searchParams?: { archi?: string; be?: string };
+  searchParams?: Promise<{ archi?: string; be?: string }>;
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-export default async function CerfaPage({ params, searchParams }: PageProps) {
+export default async function CerfaPage(props: PageProps) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // 1. Auth check défensif
   const supabase = createSupabaseServerClient();
   const {

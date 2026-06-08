@@ -53,11 +53,10 @@ const RESEND_KEYS: TemplateKey[] = [
   "user_notification",
 ];
 
-export default async function ModelesEmailPage({
-  searchParams,
-}: {
+export default async function ModelesEmailPage(props: {
   searchParams?: Promise<{ canal?: string; template?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   // 1. Auth check
   const supabase = createSupabaseServerClient();
   const {

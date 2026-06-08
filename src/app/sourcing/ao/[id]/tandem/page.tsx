@@ -44,7 +44,7 @@ export const metadata = {
 };
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -105,7 +105,8 @@ const DEPT_LABELS: Record<string, string> = {
   "2B": "Haute-Corse",
 };
 
-export default async function TandemShortlistPage({ params }: PageProps) {
+export default async function TandemShortlistPage(props: PageProps) {
+  const params = await props.params;
   // Auth check défensif (le middleware a normalement déjà filtré).
   const supabase = createSupabaseServerClient();
   const {

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -38,7 +39,8 @@ interface SearchParams {
   implantation?: string;
 }
 
-export default async function BureauEtudesPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function BureauEtudesPage(props: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   const supabase = createSupabaseServerClient();
   const {
     data: { user },
@@ -106,12 +108,12 @@ export default async function BureauEtudesPage({ searchParams }: { searchParams:
         </div>
         {adminUser ? (
           <div className="flex shrink-0 flex-wrap gap-2">
-            <a
+            <Link
               href="/sourcing/bureaux-etudes/nouveau"
               className="hover:bg-brand-red/90 focus:ring-brand-red/40 inline-flex h-8 items-center rounded-full bg-brand-red px-3 text-xs font-medium text-white focus:outline-none focus:ring-2"
             >
               + Ajouter un BET
-            </a>
+            </Link>
             <CsvImportModal type="be" />
           </div>
         ) : null}
@@ -208,12 +210,12 @@ function FilterBar({
       >
         Filtrer
       </button>
-      <a
+      <Link
         href="/sourcing/bureaux-etudes"
         className="inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-xs text-muted hover:text-ink"
       >
         Réinitialiser
-      </a>
+      </Link>
     </form>
   );
 }

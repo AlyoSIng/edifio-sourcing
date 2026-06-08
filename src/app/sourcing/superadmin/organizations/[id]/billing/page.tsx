@@ -29,7 +29,8 @@ import { BillingControlsClient } from "./BillingControlsClient";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Facturation organisation · edifio Sourcing" };
 
-export default async function BillingPage({ params }: { params: { id: string } }) {
+export default async function BillingPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Auth + rôle
   const supabase = createSupabaseServerClient();
   const {
