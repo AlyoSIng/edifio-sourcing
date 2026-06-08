@@ -1,31 +1,38 @@
 "use client";
 
 /**
- * Modale « Écarter cet AO » — Arbitrage Board C (2026-05-21) : motif
- * optionnel (textarea max 280 chars). Pas dans la maquette officielle Gate 3,
- * design tokens-based aligné sur SoloTandemModal.
+ * Modale « Écarter cet AO » — refonte Salve U (apprentissage par écartement,
+ * Steve 2026-06-08).
  *
- * Wording verbatim (Addendum spec 2026-05-24 §Exigence 1) :
- *  - Titre eyebrow : « Écarter AO »
- *  - Titre h2     : « Pourquoi écarter cet AO ? »
- *  - Bouton CTA   : « Écarter »
- *  - Identifiant technique côté server action `rejectTenderAction` inchangé.
+ * Le motif n'est plus un simple texte libre : l'utilisateur choisit l'un des
+ * 6 MOTIFS STRUCTURÉS (`REJECTION_REASONS`) via des radios, et peut compléter
+ * par un verbatim libre (optionnel, max 280 chars). Les motifs actionnables
+ * (hors zone / budget / hors métier) alimentent les suggestions d'ajustement
+ * du profil de recherche — le motif sert donc concrètement à affiner l'algo
+ * (après validation admin).
+ *
+ * Distinction sémantique : « Écarter » ALIMENTE l'apprentissage. « Exclure »
+ * reste neutre (autre bouton, tooltip dédié).
  *
  * ARIA :
  *  - `role="dialog"` + `aria-modal="true"`
  *  - `aria-labelledby` sur le title
- *  - focus initial sur la textarea (autoFocus)
+ *  - radiogroup avec `aria-label`
+ *  - focus initial sur la première radio
  *  - Escape ferme (onCancel) ; click outside backdrop ferme aussi.
  *
  * UX :
- *  - Compteur live `{n}/280` sous la textarea
- *  - Compteur devient rouge à partir de 250 caractères (alerte visuelle
- *    avant la borne)
- *  - Bouton « Écarter » toujours actif (motif optionnel)
- *  - Le texte saisi est transmis tel quel (chaîne vide → null géré au call-site)
+ *  - 6 radios (un motif obligatoire — le premier est pré-sélectionné)
+ *  - textarea libre en complément + compteur `{n}/280` (rouge dès 250)
+ *  - Bouton « Écarter » toujours actif (un motif est toujours choisi)
  */
 
 import { useCallback, useEffect, useId, useState } from "react";
+
+import {
+  REJECTION_REASONS,
+  type RejectionReasonCode,
+} from "@/lib/sourcing/learning/rejection-reasons";
 
 const MAX_LENGTH = 280;
 const WARN_LENGTH = 250;
@@ -33,16 +40,19 @@ const WARN_LENGTH = 250;
 export interface RejectReasonModalProps {
   tenderTitle: string;
   /**
-   * `reason` : null si textarea vide. Évite de logger `""` côté audit log
-   * pour des raisons de propreté analytics.
+   * Callback de confirmation : motif structuré obligatoire + verbatim optionnel
+   * (null si textarea vide).
    */
-  onConfirm: (reason: string | null) => void;
+  onConfirm: (reasonCode: RejectionReasonCode, verbatim: string | null) => void;
   onCancel: () => void;
 }
 
 export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectReasonModalProps) {
   const titleId = useId();
-  const [reason, setReason] = useState("");
+  const helpId = useId();
+  // Premier motif pré-sélectionné par défaut (un motif est toujours requis).
+  const [reasonCode, setReasonCode] = useState<RejectionReasonCode>(REJECTION_REASONS[0].code);
+  const [verbatim, setVerbatim] = useState("");
 
   // Escape ferme
   useEffect(() => {
@@ -61,17 +71,18 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
   );
 
   function handleConfirm() {
-    const trimmed = reason.trim();
-    onConfirm(trimmed === "" ? null : trimmed);
+    const trimmed = verbatim.trim();
+    onConfirm(reasonCode, trimmed === "" ? null : trimmed);
   }
 
-  const counterColor = reason.length >= WARN_LENGTH ? "text-error" : "text-muted";
+  const counterColor = verbatim.length >= WARN_LENGTH ? "text-error" : "text-muted";
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      aria-describedby={helpId}
       onClick={onBackdropClick}
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F1A2E]/45 p-6"
     >
@@ -88,22 +99,58 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
             Pourquoi écarter cet AO ?
           </h2>
           <p className="mt-1 text-sm text-muted">{tenderTitle}</p>
+          <p id={helpId} className="mt-2 text-[12px] leading-snug text-muted">
+            Le motif aide edifio à te suggérer d&apos;affiner ton profil de recherche (ex. retirer
+            un département, relever le budget minimum).
+          </p>
         </div>
 
-        {/* Textarea */}
+        {/* Radios motifs */}
+        <fieldset className="mb-4">
+          <legend className="sr-only">Motif d&apos;écartement</legend>
+          <div role="radiogroup" aria-label="Motif d'écartement" className="flex flex-col gap-1.5">
+            {REJECTION_REASONS.map((reason) => {
+              const checked = reasonCode === reason.code;
+              return (
+                <label
+                  key={reason.code}
+                  className={`flex cursor-pointer items-center gap-2.5 rounded-sm border px-3 py-2 text-sm transition ${
+                    checked
+                      ? "border-brand-red bg-error-bg text-ink"
+                      : "border-line-2 bg-white text-ink hover:bg-paper-2"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="reject-reason"
+                    value={reason.code}
+                    checked={checked}
+                    onChange={() => setReasonCode(reason.code)}
+                    className="h-4 w-4 accent-brand-red"
+                  />
+                  <span>{reason.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        {/* Verbatim libre (complément) */}
         <div className="mb-4">
+          <label className="mb-1 block font-mono text-[11px] uppercase tracking-wider text-muted">
+            Précision (optionnel)
+          </label>
           <textarea
-            autoFocus
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            value={verbatim}
+            onChange={(e) => setVerbatim(e.target.value)}
             maxLength={MAX_LENGTH}
-            rows={4}
-            placeholder="Optionnel — motif conservé pour votre suivi (max 280 caractères)"
-            aria-label="Motif (optionnel, 280 caractères max)"
+            rows={3}
+            placeholder="Optionnel — détaille en quelques mots (max 280 caractères)"
+            aria-label="Précision (optionnel, 280 caractères max)"
             className="w-full resize-none rounded-sm border border-line-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
           />
           <p className={`mt-1 text-right font-mono text-[11px] ${counterColor}`} aria-live="polite">
-            {reason.length}/{MAX_LENGTH}
+            {verbatim.length}/{MAX_LENGTH}
           </p>
         </div>
 

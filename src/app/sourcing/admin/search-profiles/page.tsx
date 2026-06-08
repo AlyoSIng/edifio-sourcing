@@ -3,11 +3,15 @@ import { redirect } from "next/navigation";
 import { db } from "@/db/client";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
-import { listSearchProfiles } from "@/lib/profile/search-profiles-queries";
+import { getDefaultSearchProfile, listSearchProfiles } from "@/lib/profile/search-profiles-queries";
+import { listLearningEventsForSuggestions } from "@/lib/sourcing/learning/learning-events-queries";
+import { computeSuggestions } from "@/lib/sourcing/learning/suggest-profile-adjustment";
+import type { ProfileSuggestion } from "@/lib/sourcing/learning/suggest-profile-adjustment";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { listSearchProfilesAction } from "../profil/search-profiles-actions";
+import { LearningSuggestions } from "./LearningSuggestions";
 import { SearchProfilesClient } from "./SearchProfilesClient";
 
 export const metadata = {
@@ -83,6 +87,32 @@ export default async function SearchProfilesPage() {
     fetchError = "Erreur base de données — réessayez dans quelques instants.";
   }
 
+  // Suggestions d'ajustement (Salve U — apprentissage par écartement).
+  // Best-effort résilient : un échec ne casse jamais la page (try/catch absorbé).
+  // On ne propose des suggestions que si l'org a un profil par défaut (la cible).
+  let defaultProfileId: string | null = null;
+  let suggestions: ProfileSuggestion[] = [];
+  try {
+    const defaultProfile = await getDefaultSearchProfile(orgId, db);
+    if (defaultProfile) {
+      defaultProfileId = defaultProfile.id;
+      const events = await listLearningEventsForSuggestions(orgId, db);
+      suggestions = computeSuggestions(
+        events,
+        {
+          geoZones: defaultProfile.geoZones,
+          amountMin: defaultProfile.amountMin,
+          keywords: defaultProfile.keywords,
+        },
+        new Date(),
+      );
+    }
+  } catch (err) {
+    console.error("[admin-search-profiles:suggestions:fail]", err);
+    // Suggestions optionnelles : on les masque simplement en cas d'erreur.
+    suggestions = [];
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <header className="mb-6">
@@ -104,7 +134,12 @@ export default async function SearchProfilesPage() {
           {fetchError}
         </div>
       ) : (
-        <SearchProfilesClient profiles={profiles.ok ? profiles.profiles : []} />
+        <div className="space-y-6">
+          {defaultProfileId && suggestions.length > 0 ? (
+            <LearningSuggestions defaultProfileId={defaultProfileId} suggestions={suggestions} />
+          ) : null}
+          <SearchProfilesClient profiles={profiles.ok ? profiles.profiles : []} />
+        </div>
       )}
     </div>
   );

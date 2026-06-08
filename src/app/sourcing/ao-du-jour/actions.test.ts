@@ -65,29 +65,48 @@ const OUT_OF_DOMAIN_EMAIL = "outsider@gmail.com";
 /**
  * Type explicite du snapshot — aligné sur `TenderSnapshot` interne actions.ts.
  * Permet `score: null` dans les fixtures sans inférence string.
+ *
+ * Salve U : enrichi avec buyer / cpv / department / amount pour le payload
+ * `learning_events` (snapshot du tender au moment de l'écartement).
  */
 interface FakeTenderSnapshot {
   status: string;
   score: string | null;
   externalRef: string;
+  buyer: string;
+  cpv: string[];
+  department: string | null;
+  amount: string | null;
 }
 
 const SOURCED_SNAPSHOT: FakeTenderSnapshot = {
   status: "sourced",
   score: "87.00",
   externalRef: "25-AO-00142",
+  buyer: "Ville de Marseille",
+  cpv: ["45000000"],
+  department: "13",
+  amount: "850000.00",
 };
 
 const SELECTED_SNAPSHOT: FakeTenderSnapshot = {
   status: "selected_solo",
   score: "87.00",
   externalRef: "25-AO-00142",
+  buyer: "Ville de Marseille",
+  cpv: ["45000000"],
+  department: "13",
+  amount: "850000.00",
 };
 
 const SOURCED_SNAPSHOT_NO_SCORE: FakeTenderSnapshot = {
   status: "sourced",
   score: null,
   externalRef: "25-AO-00143",
+  buyer: "Ville de Nice",
+  cpv: [],
+  department: "06",
+  amount: null,
 };
 
 // ----------------------------------------------------------------------------
@@ -193,25 +212,31 @@ function buildFakeDb(config: FakeDbConfig): {
     });
   }
 
-  function buildInsertChain() {
+  // Insert chain : on capture les `values`. L'ordre d'insertion est stable et
+  // suffit à distinguer tender_events (intra-TX, 1er) de learning_events
+  // (post-commit, 2e) dans les assertions reject.
+  function buildInsertChain(label: string) {
     return () => ({
       values: async (values: Record<string, unknown>) => {
-        capture.inserts.push({ table: "tender_events", values });
+        capture.inserts.push({ table: label, values });
       },
     });
   }
 
-  // Transaction : on fournit un tx avec select/update/insert
+  // Transaction : on fournit un tx avec select/update/insert (tender_events).
   const fakeTx = {
     select: () => buildSelectChain(),
     update: buildUpdateChain(),
-    insert: buildInsertChain(),
+    insert: buildInsertChain("tender_events"),
   };
 
   const fakeDb = {
     transaction: async <T>(cb: (tx: typeof fakeTx) => Promise<T>): Promise<T> => {
       return cb(fakeTx);
     },
+    // Salve U : rejectTenderAction insère learning_events POST-commit, donc
+    // hors transaction (dbInstance.insert directement). On capture aussi.
+    insert: buildInsertChain("learning_events"),
   };
 
   return { db: fakeDb as unknown as DrizzleClient, capture };
@@ -545,12 +570,12 @@ describe("deferTenderAction", () => {
 // ============================================================================
 
 describe("rejectTenderAction", () => {
-  it("happy path avec motif : status=dropped + event rejected + audit A15", async () => {
+  it("happy path motif actionnable : status=dropped + event rejected + learning_events + audit A15", async () => {
     const { db, capture } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
     const auditFn = makeAuditSpy();
-    const reason = "Hors zone géo";
+    const verbatim = "Trop loin de nos équipes";
 
-    const result = await rejectTenderAction(VALID_TENDER_ID, reason, {
+    const result = await rejectTenderAction(VALID_TENDER_ID, "out_of_area", verbatim, {
       db,
       authClient: fakeAuthClient(alyosUser()),
       auditFn,
@@ -558,31 +583,55 @@ describe("rejectTenderAction", () => {
 
     expect(result).toEqual({ ok: true });
     expect(capture.updates[0]?.set.status).toBe("dropped");
-    expect(capture.inserts[0]?.values.eventType).toBe("rejected");
+
+    // 1er insert (intra-TX) = tender_events
+    const tenderEvent = capture.inserts.find((i) => i.table === "tender_events");
+    expect(tenderEvent?.values.eventType).toBe("rejected");
+    expect(
+      (tenderEvent?.values.data as { extra?: { reason_code?: string } }).extra?.reason_code,
+    ).toBe("out_of_area");
+
+    // 2e insert (post-commit) = learning_events avec reasonCode + payload snapshot
+    const learningEvent = capture.inserts.find((i) => i.table === "learning_events");
+    expect(learningEvent).toBeDefined();
+    expect(learningEvent?.values.eventType).toBe("rejected");
+    expect(learningEvent?.values.reasonCode).toBe("out_of_area");
+    expect(learningEvent?.values.verbatim).toBe(verbatim);
+    expect(learningEvent?.values.payload).toEqual({
+      buyer: SOURCED_SNAPSHOT.buyer,
+      cpv_codes: SOURCED_SNAPSHOT.cpv,
+      geo_zone: SOURCED_SNAPSHOT.department,
+      amount: 850000,
+    });
+
+    // audit A15 : `reason` porte le verbatim libre (schéma inchangé)
     expect(auditFn).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "tender_reject",
         data: expect.objectContaining({
           tender_id: VALID_TENDER_ID,
           tender_ref: SOURCED_SNAPSHOT.externalRef,
-          reason,
+          reason: verbatim,
           score_at_reject: 87,
         }),
       }),
     );
   });
 
-  it("happy path sans motif (reason=null)", async () => {
-    const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
+  it("happy path sans verbatim (verbatim=null) : learning_events verbatim=null", async () => {
+    const { db, capture } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
     const auditFn = makeAuditSpy();
 
-    const result = await rejectTenderAction(VALID_TENDER_ID, null, {
+    const result = await rejectTenderAction(VALID_TENDER_ID, "too_competitive", null, {
       db,
       authClient: fakeAuthClient(alyosUser()),
       auditFn,
     });
 
     expect(result).toEqual({ ok: true });
+    const learningEvent = capture.inserts.find((i) => i.table === "learning_events");
+    expect(learningEvent?.values.reasonCode).toBe("too_competitive");
+    expect(learningEvent?.values.verbatim).toBeNull();
     expect(auditFn).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ reason: null }),
@@ -590,9 +639,26 @@ describe("rejectTenderAction", () => {
     );
   });
 
-  it("retourne invalid_input si reason > 280 caractères", async () => {
+  it("reasonCode invalide → fallback 'other' (rétrocompat, pas d'échec)", async () => {
+    const { db, capture } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
+    const result = await rejectTenderAction(
+      VALID_TENDER_ID,
+      "garbage" as unknown as "other",
+      null,
+      {
+        db,
+        authClient: fakeAuthClient(alyosUser()),
+        auditFn: makeAuditSpy(),
+      },
+    );
+    expect(result).toEqual({ ok: true });
+    const learningEvent = capture.inserts.find((i) => i.table === "learning_events");
+    expect(learningEvent?.values.reasonCode).toBe("other");
+  });
+
+  it("retourne invalid_input si verbatim > 280 caractères", async () => {
     const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
-    const result = await rejectTenderAction(VALID_TENDER_ID, "x".repeat(281), {
+    const result = await rejectTenderAction(VALID_TENDER_ID, "out_of_area", "x".repeat(281), {
       db,
       authClient: fakeAuthClient(alyosUser()),
       auditFn: makeAuditSpy(),
@@ -600,9 +666,9 @@ describe("rejectTenderAction", () => {
     expect(result).toEqual({ ok: false, error: "invalid_input" });
   });
 
-  it("accepte reason exactement 280 caractères (borne incluse)", async () => {
+  it("accepte verbatim exactement 280 caractères (borne incluse)", async () => {
     const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
-    const result = await rejectTenderAction(VALID_TENDER_ID, "x".repeat(280), {
+    const result = await rejectTenderAction(VALID_TENDER_ID, "out_of_scope", "x".repeat(280), {
       db,
       authClient: fakeAuthClient(alyosUser()),
       auditFn: makeAuditSpy(),
@@ -610,10 +676,10 @@ describe("rejectTenderAction", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it("score absent : payload audit score_at_reject=null", async () => {
-    const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT_NO_SCORE });
+  it("score absent : payload audit score_at_reject=null + payload amount=null", async () => {
+    const { db, capture } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT_NO_SCORE });
     const auditFn = makeAuditSpy();
-    const result = await rejectTenderAction(VALID_TENDER_ID, null, {
+    const result = await rejectTenderAction(VALID_TENDER_ID, "budget_too_low", null, {
       db,
       authClient: fakeAuthClient(alyosUser()),
       auditFn,
@@ -624,11 +690,35 @@ describe("rejectTenderAction", () => {
         data: expect.objectContaining({ score_at_reject: null }),
       }),
     );
+    const learningEvent = capture.inserts.find((i) => i.table === "learning_events");
+    expect((learningEvent?.values.payload as { amount: number | null }).amount).toBeNull();
+  });
+
+  it("écriture learning_events best-effort : un échec n'empêche pas le rejet", async () => {
+    const { db, capture } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
+    // On surcharge l'insert top-level (learning_events) pour qu'il throw.
+    (db as unknown as { insert: () => unknown }).insert = () => ({
+      values: async () => {
+        throw new Error("learning insert boom");
+      },
+    });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await rejectTenderAction(VALID_TENDER_ID, "out_of_area", null, {
+      db,
+      authClient: fakeAuthClient(alyosUser()),
+      auditFn: makeAuditSpy(),
+    });
+
+    // Le rejet réussit malgré l'échec de l'insert learning_events.
+    expect(result).toEqual({ ok: true });
+    expect(capture.updates[0]?.set.status).toBe("dropped");
+    spy.mockRestore();
   });
 
   it("retourne invalid_state si tender déjà traité", async () => {
     const { db } = buildFakeDb({ snapshot: SELECTED_SNAPSHOT });
-    const result = await rejectTenderAction(VALID_TENDER_ID, "motif", {
+    const result = await rejectTenderAction(VALID_TENDER_ID, "out_of_area", "motif", {
       db,
       authClient: fakeAuthClient(alyosUser()),
       auditFn: makeAuditSpy(),
@@ -638,7 +728,7 @@ describe("rejectTenderAction", () => {
 
   it("retourne not_authenticated sans session", async () => {
     const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
-    const result = await rejectTenderAction(VALID_TENDER_ID, null, {
+    const result = await rejectTenderAction(VALID_TENDER_ID, "out_of_area", null, {
       db,
       authClient: fakeAuthClient(null),
       auditFn: makeAuditSpy(),

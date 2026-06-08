@@ -40,12 +40,18 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { db as defaultDb } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
+import { learningEvents } from "@/db/schema/audit";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { audit } from "@/lib/audit";
 import { generateBrief } from "@/lib/ai/generate-brief";
 import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import {
+  DEFAULT_REJECTION_REASON_CODE,
+  isRejectionReasonCode,
+  type RejectionReasonCode,
+} from "@/lib/sourcing/learning/rejection-reasons";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ============================================================================
@@ -158,6 +164,15 @@ interface TenderSnapshot {
   status: string;
   score: string | null;
   externalRef: string;
+  /**
+   * Champs snapshot pour le payload `learning_events` (Salve U — apprentissage
+   * par écartement). Capturés au moment du rejet pour agréger les suggestions
+   * d'ajustement de profil sans re-fetch des tenders.
+   */
+  buyer: string;
+  cpv: string[];
+  department: string | null;
+  amount: string | null;
 }
 
 /**
@@ -183,6 +198,10 @@ async function lockAndFetchTender(
       status: tenders.status,
       score: tenders.score,
       externalRef: tenders.externalRef,
+      buyer: tenders.buyer,
+      cpv: tenders.cpv,
+      department: tenders.department,
+      amount: tenders.amount,
     })
     .from(tenders)
     .where(and(eq(tenders.id, tenderId), eq(tenders.organizationId, organizationId)))
@@ -407,17 +426,32 @@ export async function deferTenderAction(
 // ============================================================================
 
 /**
- * Rejette un AO. Le statut passe à `dropped`. Le motif libre (optionnel,
- * max 280 chars) est stocké dans `tender_events.data.reason` ET dans
- * `audit_logs.data.reason`. Le score au moment du rejet est snapshotté
- * pour analyse a posteriori (delta scoring/jugement humain).
+ * Rejette (« Écarter ») un AO. Le statut passe à `dropped`. Le motif est
+ * désormais STRUCTURÉ (Salve U — apprentissage par écartement) :
+ *  - `reasonCode` : l'un des 6 motifs de `REJECTION_REASONS` (radio obligatoire
+ *    côté UI). Les motifs actionnables alimentent les suggestions d'ajustement
+ *    du profil de recherche.
+ *  - `verbatim`   : texte libre optionnel (max 280 chars), en complément.
  *
- * Si `reason === ""`, on l'enregistre tel quel (chaîne vide). Le call-site
- * UI peut choisir de l'envoyer en `null` si rien n'a été saisi.
+ * Effets :
+ *  - `tenders.status = 'dropped'`
+ *  - INSERT `tender_events` (eventType='rejected', data avec reasonCode/verbatim)
+ *  - INSERT `learning_events` (eventType='rejected', reasonCode, verbatim,
+ *    payload = snapshot {buyer, cpvCodes, geoZone, amount}) — BEST-EFFORT :
+ *    une erreur sur cet INSERT ne fait JAMAIS échouer le rejet (try/catch
+ *    absorbé). Le rejet métier prime sur l'apprentissage.
+ *  - audit log A15 `tender_reject` (best-effort, post-commit).
+ *
+ * Distinction sémantique : « Écarter » ALIMENTE l'apprentissage. « Exclure »
+ * (`excludeTenderAction`) reste NEUTRE, zéro effet algo.
+ *
+ * Rétrocompat : si `reasonCode` est absent / invalide (vieux call-sites), on
+ * retombe sur `'other'` (motif non actionnable, simplement tracé).
  */
 export async function rejectTenderAction(
   tenderId: string,
-  reason: string | null,
+  reasonCode: RejectionReasonCode,
+  verbatim: string | null,
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
@@ -431,11 +465,17 @@ export async function rejectTenderAction(
 
   // 2. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
-  if (reason !== null && (typeof reason !== "string" || reason.length > 280)) {
+  // Rétrocompat : un reasonCode absent/invalide → 'other' (jamais d'échec).
+  const normalizedReasonCode: RejectionReasonCode = isRejectionReasonCode(reasonCode)
+    ? reasonCode
+    : DEFAULT_REJECTION_REASON_CODE;
+  if (verbatim !== null && (typeof verbatim !== "string" || verbatim.length > 280)) {
     return { ok: false, error: "invalid_input" };
   }
 
-  // 3. Transaction métier
+  // 3. Transaction métier (statut + tender_events). L'écriture learning_events
+  //    est faite DANS la transaction mais en best-effort (try/catch local) :
+  //    elle ne doit jamais provoquer un rollback du rejet.
   let snapshot: TenderSnapshot | null = null;
   try {
     snapshot = await dbInstance.transaction(async (tx) => {
@@ -459,9 +499,9 @@ export async function rejectTenderAction(
         data: {
           to_status: "dropped",
           external_ref: snap.externalRef,
-          note: reason ?? undefined,
+          note: verbatim ?? undefined,
           score: snapshotScore(snap.score) ?? undefined,
-          extra: { reason },
+          extra: { reason: verbatim, reason_code: normalizedReasonCode },
         },
       });
 
@@ -473,7 +513,32 @@ export async function rejectTenderAction(
     return { ok: false, error: "internal_error" };
   }
 
-  // 4. Audit non-bloquant
+  // 3bis. Apprentissage par écartement (Salve U) — BEST-EFFORT, POST-COMMIT.
+  //       Volontairement HORS de la transaction métier : un échec d'INSERT
+  //       learning_events (ex. colonne manquante si migration 0050 pas encore
+  //       appliquée, ou contrainte) ne doit JAMAIS faire échouer ni rollback
+  //       le rejet déjà commité. Même contrat best-effort que l'audit log.
+  try {
+    await dbInstance.insert(learningEvents).values({
+      tenderId,
+      organizationId: orgId,
+      userId,
+      eventType: "rejected",
+      reasonCode: normalizedReasonCode,
+      verbatim: verbatim ?? null,
+      payload: {
+        buyer: snapshot.buyer,
+        cpv_codes: snapshot.cpv,
+        geo_zone: snapshot.department,
+        amount: snapshot.amount !== null ? Number(snapshot.amount) : null,
+      },
+    });
+  } catch (learningErr) {
+    console.error("[tender-actions:reject:learning:fail]", learningErr);
+  }
+
+  // 4. Audit non-bloquant (A15). `reason` conserve le verbatim libre (schéma
+  //    A15 inchangé) ; le motif structuré vit dans tender_events + learning_events.
   await auditFn({
     action: "tender_reject",
     subjectType: "tender",
@@ -481,7 +546,7 @@ export async function rejectTenderAction(
     data: {
       tender_id: tenderId,
       tender_ref: snapshot.externalRef,
-      reason,
+      reason: verbatim,
       score_at_reject: snapshotScore(snapshot.score),
     },
   });

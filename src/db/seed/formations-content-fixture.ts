@@ -718,6 +718,50 @@ Au MVP, pas d'édition inline des mots-clés (même limitation que pour les fich
 ## 8. Bien penser au cas Tandem multi-archi
 Si tu réponds en Tandem avec un archi externe et que cet archi t'a fourni son CV, ajoute-le en biblio (avec les mots-clés métier qui le caractérisent). Ses mots-clés se cumulent à ceux de tes propres CV — au moment de la compile, l'app inclut TOUS les CV matchants, peu importe leur origine (tes équipes ou ton cotraitant).`;
 
+const GUIDE_18 = `Chaque fois que tu écartes un appel d'offres, tu peux dire **pourquoi**. edifio s'en sert pour t'aider à affiner ton profil de recherche — et donc à recevoir des AO plus pertinents demain. Tu gardes toujours la main : edifio te **propose**, c'est toi qui décides.
+
+## 1. « Écarter » ≠ « Exclure »
+Deux boutons, deux logiques :
+- **Écarter** (avec un motif) : tu sors l'AO de ta file ET tu donnes une raison. Cette raison **alimente l'apprentissage** : elle peut faire émerger une suggestion d'ajustement du profil.
+- **Exclure** : tu sors juste l'AO de la liste, sans donner de raison. C'est **neutre** : aucun effet sur l'algorithme de recherche. Utile pour cacher un AO sans rien changer à ton profil.
+
+Retiens : si tu veux que ton choix « compte » pour affiner la recherche, utilise **Écarter** avec un motif.
+
+## 2. Les 6 motifs d'écartement
+Quand tu cliques sur **Écarter**, une fenêtre te propose 6 motifs (un seul à cocher) + un champ libre optionnel :
+- **Hors zone géographique** — le marché est trop loin de tes équipes.
+- **Budget / CA trop faible** — le montant ne justifie pas une réponse.
+- **Hors métier / compétence** — ce n'est pas ton domaine.
+- **Délai trop court** — pas le temps de monter un dossier sérieux.
+- **Concurrence trop forte** — peu de chances de l'emporter.
+- **Autre** — tout le reste (précise dans le champ libre).
+
+Les 3 premiers sont **actionnables** : ils peuvent générer une suggestion concrète d'ajustement du profil. Les 3 derniers sont simplement **tracés** (ils n'agissent pas sur l'algo).
+
+## 3. Comment naît une suggestion
+edifio observe tes écartements sur les **30 derniers jours**. Dès que **3 AO** ont été écartés pour le **même motif actionnable**, une suggestion apparaît dans **Configuration > Profils de recherche**, en haut de page, dans l'encart « Suggestions d'ajustement ».
+
+Exemples concrets :
+- 3 AO écartés pour « hors zone » sur les départements 13 et 83 → edifio te propose de **retirer 13 et 83** de tes zones de recherche.
+- 3 AO écartés pour « budget trop faible », le plus élevé valait 180 000 € → edifio te propose de **relever ton budget minimum** à ~198 000 €.
+- 3 AO écartés pour « hors métier » avec « informatique » revenant souvent → edifio te propose d'**ajouter « informatique » en mot-clé négatif**.
+
+## 4. Appliquer ou ignorer
+Chaque suggestion a deux boutons :
+- **Appliquer** : edifio modifie ton profil par défaut (retrait de département, nouveau budget minimum, ou ajout de mot-clé négatif). La modification est tracée dans le journal d'audit.
+- **Ignorer** : la suggestion disparaît et ne reviendra pas pour ces écartements-là. Ton profil reste inchangé.
+
+Rien ne se modifie tout seul. Tant que tu n'as pas cliqué **Appliquer**, ton profil ne bouge pas.
+
+## 5. Bonnes pratiques
+- **Sois honnête sur le motif** : si tu coches « hors zone » alors que c'était un problème de délai, tu fausses l'apprentissage.
+- **Le champ libre est ton ami pour « hors métier »** : c'est lui qui permet à edifio de repérer les termes récurrents à proposer en négatif. Écris des mots clairs (« informatique », « nettoyage », « espaces verts »).
+- **Relis avant d'appliquer** : une suggestion « retirer le 13 » est définitive côté profil (réversible manuellement, mais autant vérifier). Si le 13 reste stratégique malgré quelques AO ratés, **Ignore**.
+- **Pas de panique si rien n'apparaît** : tant que tu n'as pas 3 écartements même motif sur 30 jours, c'est normal qu'il n'y ait aucune suggestion.
+
+## 6. Où ça vit
+Tout se passe dans **Configuration > Profils de recherche** (réservé aux administrateurs). L'encart « Suggestions d'ajustement » ne s'affiche que **s'il y a quelque chose à proposer** — sinon, tu ne vois que tes profils, comme d'habitude.`;
+
 export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
   {
     id: "fb000001-0000-0000-0000-000000000001",
@@ -918,5 +962,17 @@ export const FORMATIONS_CONTENT_FIXTURE: FormationSeed[] = [
     contentMd: GUIDE_17,
     isActive: true,
     displayOrder: 17,
+  },
+  {
+    id: "fb000001-0000-0000-0000-000000000012",
+    slug: "apprentissage-ecartement",
+    title: "Affiner ta recherche en écartant des AO",
+    description:
+      "Quand tu écartes un AO avec un motif récurrent, edifio te propose d'ajuster ton profil de recherche. Tu gardes la main : applique ou ignore.",
+    type: "doc",
+    durationMin: 6,
+    contentMd: GUIDE_18,
+    isActive: true,
+    displayOrder: 18,
   },
 ];

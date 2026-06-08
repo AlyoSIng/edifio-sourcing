@@ -2,6 +2,60 @@
 
 ---
 
+## 2026-06-08 — Apprentissage par écartement (Salve U) — [DEV Alex]
+
+**Contexte** : quand l'utilisateur écarte des AO avec un motif structuré
+récurrent, l'app propose d'ajuster le profil de recherche (qui pilote l'algo).
+Human-in-the-loop : suggestion validée par l'admin, jamais d'auto-modification.
+Branche `feat/learning-ecartement`.
+
+**Distinction sémantique cruciale (actée Steve)** :
+- **« Écarter »** (`rejectTenderAction`, avec motif) → ALIMENTE l'apprentissage
+  → peut modifier l'algo après validation humaine.
+- **« Exclure »** (`excludeTenderAction`) → reste NEUTRE, zéro effet algo.
+  Inchangé.
+
+**Décisions actées** :
+
+1. **6 motifs structurés** (`src/lib/sourcing/learning/rejection-reasons.ts`) :
+   `out_of_area` (→ geoZones[], actionnable), `budget_too_low` (→ amountMin,
+   actionnable), `out_of_scope` (→ keywords.negative[], actionnable),
+   `deadline_too_short`, `too_competitive`, `other` (tracés seulement).
+
+2. **Seuil de suggestion** : 3 AO écartés avec le même motif actionnable sur
+   les 30 derniers jours glissants (`SUGGESTION_THRESHOLD=3`,
+   `SUGGESTION_WINDOW_DAYS=30`).
+
+3. **Migration 0050** (`0050_learning_payload.sql`, idempotente, pas de
+   backfill) : ajout sur `learning_events` de `payload jsonb` (snapshot tender :
+   buyer, cpv_codes, geo_zone/department, amount), `reason_code text` (distinct
+   de `motif_category` réservé à la catégorisation IA P9), `applied_at` et
+   `dismissed_at` timestamptz (état de traitement de la suggestion). Index
+   partiel `idx_learning_events_org_reason`. **Validée en dry-run local
+   Postgres 15** (DDL + idempotence). Application manuelle par Steve (Q8).
+
+4. **Nouvelle signature** `rejectTenderAction(tenderId, reasonCode, verbatim,
+   deps)`. Rétrocompat : `reasonCode` absent/invalide → `'other'`. L'écriture
+   `learning_events` est **best-effort POST-COMMIT** (hors transaction métier) :
+   un échec n'empêche JAMAIS le rejet ni ne rollback. Choix d'archi : placer
+   l'INSERT learning hors TX évite d'empoisonner la transaction de rejet
+   (Postgres « current transaction is aborted »).
+
+5. **Suggestions** : calcul pur `computeSuggestions` (hors I/O, testé), affiché
+   dans `/sourcing/admin/search-profiles` (admin-only). Actions
+   `applyProfileSuggestionAction` (revalide le change côté serveur, patch profil
+   par défaut, marque `applied_at`, audit A3) + `dismissSuggestionAction`
+   (marque `dismissed_at`, audit A3). Panneau masqué si aucune suggestion.
+
+6. **Audit** : réutilise A3 `search_profile_change` (operation `update`) — pas
+   de nouvelle valeur d'enum `audit_action` requise.
+
+7. **Guide formation 18** (`apprentissage-ecartement`, displayOrder 18) ajouté
+   à `formations-content-fixture.ts`. Tooltip « Écarter » rétabli en texte vrai
+   (le motif sert maintenant aux suggestions).
+
+---
+
 ## 2026-06-02 — Chantier DC1/DC2/Pouvoir multi-archi / multi-BE
 
 **Contexte** : finaliser le module dossier de candidature pour gérer les

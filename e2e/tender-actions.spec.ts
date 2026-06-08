@@ -148,8 +148,11 @@ test.describe("Actions métier sur TenderCard — PR n°5", () => {
       page.getByRole("heading", { level: 2, name: /Pourquoi écarter cet AO/i }),
     ).toBeVisible();
 
-    // Saisir un motif court
-    await page.getByRole("textbox", { name: /Motif/i }).fill("Hors zone géo");
+    // Sélectionner le motif structuré (Salve U — 6 radios, 1er pré-coché)
+    await page.getByRole("radio", { name: "Hors zone géographique" }).check();
+
+    // Verbatim libre optionnel (Salve U — aria-label « Précision »)
+    await page.getByRole("textbox", { name: /Précision/i }).fill("Hors zone géo");
 
     // Clic sur « Écarter » (footer)
     await page
@@ -198,7 +201,7 @@ test.describe("Actions métier sur TenderCard — PR n°5", () => {
     );
     await expect(ecarterBtn).toHaveAttribute(
       "title",
-      /Écarte l'AO\. Un motif vous sera demandé pour améliorer le scoring\./,
+      /Écarte l'AO\. Le motif aide edifio à vous suggérer d'affiner votre profil de recherche\./,
     );
   });
 });
