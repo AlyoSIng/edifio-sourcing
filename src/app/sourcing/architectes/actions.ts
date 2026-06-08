@@ -262,7 +262,7 @@ export async function upsertArchitect(
   id?: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<UpsertArchitectResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -355,7 +355,7 @@ export interface ImportArchitectsResult {
  * Upsert par `(organizationId, email)` si email présent, sinon INSERT.
  */
 export async function importArchitectsFromCsv(formData: FormData): Promise<ImportArchitectsResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) {
@@ -543,7 +543,7 @@ export async function setRgpdOpposition(
   oppose: boolean,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<SetRgpdOppositionResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -654,7 +654,7 @@ export async function enrichArchitectsFromPappers(params: {
   }
 
   // Auth + domaine
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) {
     return { updated: 0, skipped: 0, notFound: 0, nextOffset: 0, total: 0 };
@@ -820,7 +820,7 @@ export type EnrichSingleResult =
 export async function enrichSingleArchitectFromPappers(
   architectId: string,
 ): Promise<EnrichSingleResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -1000,7 +1000,7 @@ export async function deleteArchitectAction(
   architectId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<DeleteArchitectResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);

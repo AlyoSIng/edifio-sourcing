@@ -71,7 +71,7 @@ export default async function CerfaPage(props: PageProps) {
   const searchParams = await props.searchParams;
   const params = await props.params;
   // 1. Auth check défensif
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

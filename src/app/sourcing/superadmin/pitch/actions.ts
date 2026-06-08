@@ -33,7 +33,7 @@ const PITCH_PDF_KEY = "pitch_pdf_url" as const;
  * Retourne l'ID du superadmin connecté, ou une erreur.
  */
 async function requireSuperadmin(): Promise<{ userId: string } | { error: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

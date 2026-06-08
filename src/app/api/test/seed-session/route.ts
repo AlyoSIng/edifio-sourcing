@@ -142,7 +142,7 @@ async function seedOutOfDomainUser(email: string): Promise<void> {
  * accompagnent la réponse, le browser Playwright les enregistre.
  */
 async function signInAndReturn(email: string, password: string): Promise<NextResponse> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     return jsonError(401, `sign_in_failed:${error.message}`);

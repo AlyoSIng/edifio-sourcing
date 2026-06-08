@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
  * Résilience runtime : try/catch absorbé aligné sur le pattern PR #22.
  */
 export default async function SearchProfilesPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

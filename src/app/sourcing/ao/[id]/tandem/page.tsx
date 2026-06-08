@@ -108,7 +108,7 @@ const DEPT_LABELS: Record<string, string> = {
 export default async function TandemShortlistPage(props: PageProps) {
   const params = await props.params;
   // Auth check défensif (le middleware a normalement déjà filtré).
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

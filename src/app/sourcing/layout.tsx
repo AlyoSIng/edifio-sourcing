@@ -33,7 +33,7 @@ import { computeTrialState } from "@/lib/billing/trial";
 export const dynamic = "force-dynamic";
 
 export default async function SourcingLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

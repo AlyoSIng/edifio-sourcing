@@ -33,7 +33,7 @@ export const metadata = {
 
 export default async function NouvelAOPage() {
   // Auth check
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

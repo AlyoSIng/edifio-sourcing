@@ -30,7 +30,7 @@ export async function generateMetadata() {
 
 export default async function ConceptionRealisationPage() {
   // Auth check défensif — pattern aligné sur `/sourcing/ao-du-jour/page.tsx`
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

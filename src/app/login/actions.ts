@@ -74,7 +74,7 @@ export async function signInWithPasswordAction(
       return { status: "error", message: "Adresse email invalide." };
     }
 
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

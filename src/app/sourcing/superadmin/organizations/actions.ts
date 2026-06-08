@@ -74,7 +74,7 @@ export async function createOrgAction(
   formData: FormData,
 ): Promise<{ ok: boolean; error?: string }> {
   // ── Guard superadmin ─────────────────────────────────────────────────────────
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user: caller },
   } = await supabase.auth.getUser();
@@ -237,7 +237,7 @@ export async function updateOrgAction(
   formData: FormData,
 ): Promise<{ ok: boolean; error?: string }> {
   // ── Guard superadmin ─────────────────────────────────────────────────────────
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user: caller },
   } = await supabase.auth.getUser();

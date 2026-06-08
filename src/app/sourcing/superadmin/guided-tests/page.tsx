@@ -44,7 +44,7 @@ interface GuidedTestRow extends GuidedTest {
 
 export default async function SuperadminGuidedTestsPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

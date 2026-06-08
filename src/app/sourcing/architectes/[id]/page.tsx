@@ -36,7 +36,7 @@ export async function generateMetadata() {
 export default async function ArchitectFichePage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   // Auth check défensif
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

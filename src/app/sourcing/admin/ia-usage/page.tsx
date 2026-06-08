@@ -80,7 +80,7 @@ interface PageProps {
 export default async function IaUsagePage(props: PageProps) {
   const searchParams = await props.searchParams;
   // 1. Auth + superadmin guard.
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

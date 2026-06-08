@@ -49,7 +49,7 @@ const TYPE_COLOR: Record<string, string> = {
 
 export default async function SuperadminFormationsPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

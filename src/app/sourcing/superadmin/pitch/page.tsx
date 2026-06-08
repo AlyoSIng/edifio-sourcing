@@ -39,7 +39,7 @@ const PITCH_PDF_KEY = "pitch_pdf_url";
 
 export default async function SuperadminPitchPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

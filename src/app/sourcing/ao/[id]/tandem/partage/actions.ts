@@ -45,7 +45,7 @@ export async function createShareSession(
   formData: FormData,
 ): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
   // Auth
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -133,7 +133,7 @@ export async function createShareSession(
  * Après révocation, la page /cotraitant/[token] renvoie une erreur.
  */
 export async function revokeShare(shareId: string, tenderId: string): Promise<ActionResult> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -172,7 +172,7 @@ export async function revokeShare(shareId: string, tenderId: string): Promise<Ac
 export async function getDownloadUrl(
   storagePath: string,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
