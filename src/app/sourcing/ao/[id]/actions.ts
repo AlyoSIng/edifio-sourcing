@@ -39,7 +39,7 @@ export async function updateBuyerAddressAction(
 ): Promise<UpdateBuyerAddressResult> {
   try {
     // 1. Auth
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

@@ -209,7 +209,7 @@ export async function listSearchProfilesAction(
   { ok: true; profiles: SearchProfileListItem[] } | Extract<ProfileActionResult, { ok: false }>
 > {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
@@ -256,7 +256,7 @@ export async function createSearchProfileAction(
   deps: ActionDeps = {},
 ): Promise<ProfileActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
@@ -335,7 +335,7 @@ export async function updateSearchProfileAction(
   deps: ActionDeps = {},
 ): Promise<ProfileActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
@@ -417,7 +417,7 @@ export async function deleteSearchProfileAction(
   deps: ActionDeps = {},
 ): Promise<ProfileActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
@@ -470,7 +470,7 @@ export async function setDefaultProfileAction(
   deps: ActionDeps = {},
 ): Promise<ProfileActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
@@ -521,7 +521,7 @@ export async function duplicateSearchProfileAction(
   deps: ActionDeps = {},
 ): Promise<ProfileActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;

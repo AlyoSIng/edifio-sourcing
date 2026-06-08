@@ -16,7 +16,7 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function EntrepriseNouveauPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

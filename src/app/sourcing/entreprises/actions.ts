@@ -171,7 +171,7 @@ export async function upsertCompany(
   id?: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<UpsertCompanyResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
@@ -230,7 +230,7 @@ export async function upsertCompany(
  * sinon INSERT.
  */
 export async function importCompanyFromCsv(formData: FormData): Promise<ImportCompanyResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) {

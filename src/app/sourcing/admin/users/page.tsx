@@ -49,7 +49,7 @@ export const metadata = {
  */
 export default async function AdminUsersPage() {
   // Vérif admin défensive (le middleware aurait déjà redirigé sinon).
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

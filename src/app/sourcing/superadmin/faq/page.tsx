@@ -48,7 +48,7 @@ function categoryLabel(cat: string): string {
 
 export default async function SuperadminFaqPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

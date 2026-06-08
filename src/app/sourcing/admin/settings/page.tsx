@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function SettingsPage() {
   // 1. Auth check
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

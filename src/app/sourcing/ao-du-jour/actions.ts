@@ -15,7 +15,7 @@
  *  - `rejectTenderAction`  : `sourced` → `dropped` + reason optionnel (A15)
  *
  * Contrat commun :
- *  1. Auth check via `createSupabaseServerClient().auth.getUser()`
+ *  1. Auth check via `await createSupabaseServerClient().auth.getUser()`
  *  2. Validation domaine `@alyosingenierie.fr` (defense in depth — le
  *     middleware filtre déjà, mais on re-vérifie côté server action)
  *  3. Validation input (UUID, mode enum, hours_offset positif, reason ≤ 280)
@@ -220,7 +220,7 @@ export async function selectTenderAction(
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine
@@ -317,7 +317,7 @@ export async function deferTenderAction(
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine
@@ -421,7 +421,7 @@ export async function rejectTenderAction(
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine
@@ -517,7 +517,7 @@ export async function excludeTenderAction(
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   // 1. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
@@ -575,7 +575,7 @@ export async function trackDceDownload(
   dceUrl: string,
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine
@@ -645,7 +645,7 @@ export async function generateTenderBriefAction(
   deps: ActionDeps = {},
 ): Promise<{ ok: boolean; briefText?: string; error?: string }> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);

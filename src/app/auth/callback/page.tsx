@@ -43,7 +43,7 @@ export default async function AuthCallback({
 
   // PKCE résiduel — échange code → session, redirect destination.
   if (code) {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       redirect("/auth/error?code=otp_expired");

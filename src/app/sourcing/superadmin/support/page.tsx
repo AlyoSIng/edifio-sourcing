@@ -49,7 +49,7 @@ export default async function SuperadminSupportPage(props: {
 }) {
   const searchParams = await props.searchParams;
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

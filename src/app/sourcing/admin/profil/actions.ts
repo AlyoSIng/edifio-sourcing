@@ -9,7 +9,7 @@
  *  - 5 recos Q1-Q5 Board 22/05 (cf. `DECISIONS.md`)
  *
  * Pattern aligné sur `src/app/sourcing/ao-du-jour/actions.ts` (PR n°5) :
- *  1. Auth check `createSupabaseServerClient().auth.getUser()`
+ *  1. Auth check `await createSupabaseServerClient().auth.getUser()`
  *  2. Defense-in-depth : domain `@alyosingenierie.fr` + role `admin`
  *  3. Parse Zod du payload côté serveur (jamais trust client)
  *  4. Lookup profil actif AlyoS via `getActiveSearchProfile(ALYOS_ORG_ID)`
@@ -218,7 +218,7 @@ export async function updateProfileAction(
   deps: ActionDeps = {},
 ): Promise<UpdateProfileResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine + admin

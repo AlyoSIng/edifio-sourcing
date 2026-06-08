@@ -202,7 +202,7 @@ async function readSessionContext(): Promise<{
   actorRole: "admin" | "user" | "viewer" | null;
 }> {
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -224,7 +224,7 @@ async function readSessionContext(): Promise<{
       actorRole: meta.role ?? null,
     };
   } catch (err) {
-    // Tolérant : si createSupabaseServerClient() throw (hors contexte Next.js
+    // Tolérant : si await createSupabaseServerClient() throw (hors contexte Next.js
     // request, ex. tests), on garde des null. L'erreur originelle est tracée.
     console.error("[audit] readSessionContext a échoué :", err);
     return {

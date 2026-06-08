@@ -29,9 +29,8 @@ export async function generateMetadata() {
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-export default async function EntrepriseFichePage(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
-  const supabase = createSupabaseServerClient();
+export default async function EntrepriseFichePage({ params }: { params: { id: string } }) {
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

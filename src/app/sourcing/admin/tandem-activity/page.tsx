@@ -57,7 +57,7 @@ function formatDateForInput(d: Date): string {
 export default async function TandemActivityPage(props: PageProps) {
   const searchParams = await props.searchParams;
   // 1. Auth + admin.
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

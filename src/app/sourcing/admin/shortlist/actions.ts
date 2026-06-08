@@ -98,7 +98,7 @@ type AdminAuthError = {
 async function requireAlyosAdmin(): Promise<
   { ok: true; userId: string; orgId: string } | AdminAuthError
 > {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

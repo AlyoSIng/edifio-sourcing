@@ -97,7 +97,7 @@ function formatDateFr(date: Date | null): string {
 export default async function TenderDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   // Auth check défensif
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -38,7 +38,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * Retourne l'ID du superadmin connecté, ou une erreur.
  */
 async function requireSuperadmin(): Promise<{ userId: string } | { error: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

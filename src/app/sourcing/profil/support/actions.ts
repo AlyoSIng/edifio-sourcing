@@ -22,7 +22,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 // ─── Guard interne ────────────────────────────────────────────────────────────
 
 async function requireAlyosUser(): Promise<{ userId: string; orgId: string } | { error: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

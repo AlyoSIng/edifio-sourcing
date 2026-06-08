@@ -122,7 +122,7 @@ export async function deleteBEDuplicateAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   // Guard 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

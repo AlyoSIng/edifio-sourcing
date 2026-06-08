@@ -34,7 +34,7 @@ export const runtime = "nodejs";
  */
 export default async function BibliothequeAdminPage() {
   // 1. Auth check — admin uniquement
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

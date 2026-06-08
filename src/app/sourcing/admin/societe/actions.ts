@@ -101,7 +101,7 @@ export type SaveOrgProfileResult =
 
 export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgProfileResult> {
   // 1. Auth check
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -249,7 +249,7 @@ export type SaveOrgSiretResult =
  */
 export async function saveOrgSiretAction(formData: FormData): Promise<SaveOrgSiretResult> {
   // Auth check
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -31,7 +31,7 @@ export const runtime = "nodejs";
 const HISTORY_LIMIT = 200;
 
 export default async function EnvoisPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

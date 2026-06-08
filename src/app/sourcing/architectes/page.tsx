@@ -55,7 +55,7 @@ interface SearchParams {
 export default async function ArchitectesPage(props: { searchParams: Promise<SearchParams> }) {
   const searchParams = await props.searchParams;
   // Auth check défensif (le middleware a normalement déjà filtré).
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

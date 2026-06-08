@@ -30,7 +30,7 @@ export default async function ResetPasswordPage() {
   let hasSession = false;
 
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
