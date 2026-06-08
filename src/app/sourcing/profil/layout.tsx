@@ -1,9 +1,11 @@
 /**
  * Layout Profil utilisateur — edifio Sourcing (Server Component)
  *
- * Garde d'authentification : session valide + domaine autorisé.
+ * Garde d'authentification : session valide uniquement.
  * (Le middleware `/sourcing/*` gère déjà l'auth — re-check défensif ici
  * pour la profondeur de sécurité.)
+ * ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+ * ouverture multi-tenant (PROTECT + orgs futures).
  *
  * Structure : en-tête + navigation latérale (`ProfilNav`, client) + contenu.
  * Sections disponibles :
@@ -19,7 +21,6 @@
 
 import { redirect } from "next/navigation";
 
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -36,11 +37,6 @@ export default async function ProfilLayout({ children }: { children: React.React
 
   if (!user) {
     redirect("/login?next=/sourcing/profil");
-  }
-
-  // Garde domaine (défense en profondeur)
-  if (!isAuthorizedEmail(user.email)) {
-    redirect("/forbidden");
   }
 
   const profile = toUserProfile(user);

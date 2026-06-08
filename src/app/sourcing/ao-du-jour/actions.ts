@@ -43,8 +43,6 @@ import { tenderBriefs } from "@/db/schema/ai";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { audit } from "@/lib/audit";
 import { generateBrief } from "@/lib/ai/generate-brief";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -138,9 +136,9 @@ async function requireAlyosUser(
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
 
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
-
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Le tenant est strictement
+  // scopé par `getRequiredOrgId` + RLS BDD ci-dessous.
   const orgId = await getRequiredOrgId(user.id);
   return { ok: true, userId: user.id, orgId };
 }

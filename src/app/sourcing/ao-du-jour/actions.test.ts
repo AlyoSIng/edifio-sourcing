@@ -60,7 +60,8 @@ vi.mock("@/lib/supabase/server", () => ({
 
 const VALID_TENDER_ID = "11111111-1111-1111-1111-111111111111";
 const ALYOS_EMAIL = "alex@alyosingenierie.fr";
-const OUT_OF_DOMAIN_EMAIL = "outsider@gmail.com";
+// ADR-014 (2026-06-05) — OUT_OF_DOMAIN_EMAIL et outOfDomainUser() supprimés :
+// la garde `isAuthorizedEmail` est levée (ouverture multi-tenant).
 
 /**
  * Type explicite du snapshot — aligné sur `TenderSnapshot` interne actions.ts.
@@ -110,17 +111,6 @@ function alyosUser(): User {
     email: ALYOS_EMAIL,
     user_metadata: { role: "user" },
     app_metadata: { organization_id: "org-1", role: "user" },
-    aud: "authenticated",
-    created_at: "2026-05-21T00:00:00Z",
-  } as unknown as User;
-}
-
-function outOfDomainUser(): User {
-  return {
-    id: "user-2",
-    email: OUT_OF_DOMAIN_EMAIL,
-    user_metadata: {},
-    app_metadata: {},
     aud: "authenticated",
     created_at: "2026-05-21T00:00:00Z",
   } as unknown as User;
@@ -305,15 +295,10 @@ describe("selectTenderAction", () => {
     expect(result).toEqual({ ok: false, error: "not_authenticated" });
   });
 
-  it("retourne forbidden_domain si email hors @alyosingenierie.fr", async () => {
-    const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });
-    const result = await selectTenderAction(VALID_TENDER_ID, "solo", {
-      db,
-      authClient: fakeAuthClient(outOfDomainUser()),
-      auditFn: makeAuditSpy(),
-    });
-    expect(result).toEqual({ ok: false, error: "forbidden_domain" });
-  });
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Le test
+  // `forbidden_domain` est supprimé. La garde tenant reste assurée par
+  // `getRequiredOrgId` + RLS BDD (testée séparément côté pgTAP).
 
   it("retourne invalid_input si tenderId pas UUID", async () => {
     const { db } = buildFakeDb({ snapshot: SOURCED_SNAPSHOT });

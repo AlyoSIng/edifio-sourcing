@@ -6,16 +6,14 @@
  * Actions disponibles :
  *   - `createTicketAction` : crée un ticket d'aide dans `support_tickets`
  *
- * Double garde d'authentification sur chaque action :
+ * Garde d'authentification sur chaque action (ADR-014 retire la garde domaine) :
  *   1. Session Supabase valide
- *   2. Domaine autorisé (`isAuthorizedEmail`)
  *
  * Décision Board 2026-05-27 — module profil utilisateur edifio Sourcing.
  */
 
 import { db } from "@/db/client";
 import { supportTickets } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -28,7 +26,8 @@ async function requireAlyosUser(): Promise<{ userId: string; orgId: string } | {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Non authentifié." };
-  if (!isAuthorizedEmail(user.email)) return { error: "Domaine non autorisé." };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
+  // Le tenant est strictement scopé par `getRequiredOrgId` + RLS BDD ci-dessous.
 
   const orgId = await getRequiredOrgId(user.id);
   return { userId: user.id, orgId };

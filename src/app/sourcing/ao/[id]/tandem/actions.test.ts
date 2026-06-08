@@ -89,17 +89,9 @@ describe("matchArchitectsForTender — invariants pré-BDD", () => {
     if (!result.ok) expect(result.error).toBe("not_authenticated");
   });
 
-  it("forbidden_domain si email hors alyosingenierie.fr", async () => {
-    const result = await matchArchitectsForTender(
-      VALID_TENDER_ID,
-      { topN: 3 },
-      {
-        authClient: authClientWith({ id: "u1", email: "user@external.fr" }),
-      },
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("forbidden_domain");
-  });
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant. Le test `forbidden_domain` est supprimé.
+  // Garde tenant assurée par `getRequiredOrgId` + RLS BDD (testée séparément).
 
   it("invalid_input si tenderId mal formé", async () => {
     const result = await matchArchitectsForTender(
@@ -153,13 +145,8 @@ describe("sendArchitectSolicitation — invariants pré-BDD", () => {
     if (!result.ok) expect(result.error).toBe("not_authenticated");
   });
 
-  it("forbidden_domain si email hors alyosingenierie.fr", async () => {
-    const result = await sendArchitectSolicitation(VALID_TENDER_ID, VALID_ARCHI_ID, validOptions, {
-      authClient: authClientWith({ id: "u", email: "x@gmail.com" }),
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toBe("forbidden_domain");
-  });
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant. Le test `forbidden_domain` est supprimé.
 
   it("invalid_input si tenderId mal formé", async () => {
     const result = await sendArchitectSolicitation("not-a-uuid", VALID_ARCHI_ID, validOptions, {

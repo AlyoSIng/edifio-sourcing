@@ -36,7 +36,6 @@ import {
   type CotraitantDocumentKind,
 } from "@/db/schema/cotraitants";
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
@@ -105,8 +104,8 @@ async function requireAlyosUser(
     data: { user },
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
   const orgId = await getRequiredOrgId(user.id);
   return { ok: true, userId: user.id, orgId, profile };
 }

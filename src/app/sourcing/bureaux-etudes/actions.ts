@@ -21,7 +21,6 @@ import { db as defaultDb } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { beDocuments, type BeDocument, type BeDocumentKind } from "@/db/schema/be-documents";
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
@@ -108,8 +107,8 @@ async function requireAlyosUser(
     data: { user },
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
   const orgId = await getRequiredOrgId(user.id);
   return { ok: true, userId: user.id, orgId, profile };
 }

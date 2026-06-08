@@ -1,21 +1,23 @@
 /**
  * Layout du module Superadmin — edifio Sourcing
  *
- * Triple garde d'authentification :
+ * Double garde d'authentification :
  *   1. Session Supabase valide
- *   2. Email sur domaine autorisé (via `isAuthorizedEmail`)
- *   3. Rôle `superadmin` (via `isSuperAdmin`)
+ *   2. Rôle `superadmin` (via `isSuperAdmin`)
  *
  * Si l'une des conditions n'est pas remplie → redirect `/sourcing/ao-du-jour?error=forbidden`.
  * Le middleware assure déjà ces vérifications, mais la défense en profondeur
  * est maintenue ici au niveau layout.
+ *
+ * ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+ * ouverture multi-tenant (PROTECT + orgs futures). Le rôle superadmin reste
+ * la seule garde non triviale et n'est attribué qu'à `contact@edifio.fr`.
  *
  * Décision Board 2026-05-27 — rôle superadmin éditeur edifio.
  */
 
 import { redirect } from "next/navigation";
 
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -32,12 +34,7 @@ export default async function SuperadminLayout({ children }: { children: React.R
     redirect("/login?next=/sourcing/superadmin");
   }
 
-  // Garde 2 — domaine autorisé
-  if (!isAuthorizedEmail(user.email)) {
-    redirect("/forbidden");
-  }
-
-  // Garde 3 — rôle superadmin
+  // Garde 2 — rôle superadmin (ADR-014 : garde domaine retirée)
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) {
     redirect("/sourcing/ao-du-jour?error=forbidden");

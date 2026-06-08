@@ -1,7 +1,7 @@
 /**
  * Page Superadmin — Détail d'une organisation — edifio Sourcing
  *
- * Server Component — triple garde (session + domaine + superadmin).
+ * Server Component — double garde (session + superadmin) — ADR-014 retire la garde domaine.
  *
  * Sections :
  *   - En-tête : nom org + tier badge + lien retour
@@ -14,7 +14,6 @@ import { notFound, redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import {
   getOrganizationById,
@@ -69,10 +68,7 @@ export default async function SuperadminOrgDetailPage(props: { params: Promise<{
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/superadmin/organizations/${id}`);
 
-  // Garde 2 — domaine
-  if (!isAuthorizedEmail(user.email)) redirect("/forbidden");
-
-  // Garde 3 — superadmin
+  // Garde 2 — superadmin (ADR-014 : garde domaine retirée)
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 

@@ -30,7 +30,6 @@ import { aiPrompts, aiRuns } from "@/db/schema/ai";
 import { libraryItemIndex } from "@/db/schema/library-index";
 import { presentationLibrary } from "@/db/schema/library";
 import { toUserProfile, isAdmin } from "@/lib/auth/types";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import { indexLibraryItem } from "@/lib/library/index-item";
@@ -114,17 +113,9 @@ export async function indexLibraryBatchAction(): Promise<IndexLibraryResult> {
         remaining: 0,
       };
     }
+    // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
+    // Les gardes auth + rôle admin + tenant via `getRequiredOrgId` + RLS restent.
     const profile = toUserProfile(user);
-    if (!isAuthorizedEmail(profile.email)) {
-      return {
-        ok: false,
-        error: "forbidden_domain",
-        indexed: 0,
-        failed: 0,
-        skipped: 0,
-        remaining: 0,
-      };
-    }
     if (!isAdmin(profile)) {
       return {
         ok: false,
@@ -354,8 +345,8 @@ export async function reindexLibraryItemAction(itemId: string): Promise<ReindexL
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: "not_authenticated" };
+    // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
     const profile = toUserProfile(user);
-    if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
     if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
     const orgId = await getRequiredOrgId(profile.id);
 

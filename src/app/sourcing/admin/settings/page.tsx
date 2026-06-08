@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { getOrgBranding } from "@/lib/admin/branding-queries";
@@ -36,8 +35,8 @@ export default async function SettingsPage() {
 
   if (!user) redirect("/login?next=/sourcing/admin/settings");
 
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
   if (!isAdmin(profile)) redirect("/sourcing");
 
   // 2. Résolution org
