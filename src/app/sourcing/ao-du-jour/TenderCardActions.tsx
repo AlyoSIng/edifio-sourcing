@@ -311,7 +311,7 @@ export function TenderCardActions({
           type="button"
           onClick={() => setShowRejectModal(true)}
           disabled={isPending}
-          title="Écarte l'AO. Un motif vous sera demandé pour améliorer le scoring."
+          title="Écarte l'AO de votre file. Un motif peut être noté à titre de traçabilité (sans effet sur l'algorithme de recherche)."
           className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-error transition hover:bg-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x2715;</span>

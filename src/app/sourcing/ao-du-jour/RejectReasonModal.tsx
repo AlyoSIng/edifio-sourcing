@@ -98,7 +98,7 @@ export function RejectReasonModal({ tenderTitle, onConfirm, onCancel }: RejectRe
             onChange={(e) => setReason(e.target.value)}
             maxLength={MAX_LENGTH}
             rows={4}
-            placeholder="Optionnel — quelques mots aident l'IA à affiner le scoring (max 280 caractères)"
+            placeholder="Optionnel — motif conservé pour votre suivi (max 280 caractères)"
             aria-label="Motif (optionnel, 280 caractères max)"
             className="w-full resize-none rounded-sm border border-line-2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand-red focus:outline-none focus:ring-1 focus:ring-brand-red"
           />
