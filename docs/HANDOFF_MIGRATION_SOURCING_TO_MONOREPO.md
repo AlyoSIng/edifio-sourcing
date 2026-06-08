@@ -10,16 +10,18 @@
 
 ## Sommaire
 
-1. [État actuel post-Lot 1 / 1.5](#1-état-actuel-post-lot-1--15)
-2. [Catalogue exhaustif des modules à porter](#2-catalogue-exhaustif-des-modules-à-porter)
-3. [Dettes connues à porter](#3-dettes-connues-à-porter)
-4. [Décisions Q1-Q10 visio cadrage 2026-06-07](#4-décisions-q1-q10-visio-cadrage-2026-06-07)
-5. [Tests et qualité](#5-tests-et-qualité)
-6. [Sub-agents équipe Sourcing](#6-sub-agents-équipe-sourcing) *(à venir commit 2)*
-7. [Comptes externes / providers tiers](#7-comptes-externes--providers-tiers) *(à venir commit 2)*
-8. [Risques migration](#8-risques-migration) *(à venir commit 2)*
-9. [Procédure de bascule J0](#9-procédure-de-bascule-j0) *(à venir commit 2)*
-10. [Annexes](#10-annexes) *(à venir commit 2)*
+1. [État actuel post-Lot 1 / 1.5](#1-état-actuel-post-lot-1--15) — versions stack, refactor async, scripts ops, périmètre non migré
+2. [Catalogue exhaustif des modules à porter](#2-catalogue-exhaustif-des-modules-à-porter) — 8 modules, 41 tables, ~25 j focus, ordre suggéré
+3. [Dettes connues à porter](#3-dettes-connues-à-porter) — 10 arbitrages techniques (rename, COOKIE_DOMAIN, Drizzle drop, ESLint, etc.)
+4. [Décisions Q1-Q10 visio cadrage 2026-06-07](#4-décisions-q1-q10-visio-cadrage-2026-06-07) — récap + Q6 B-en-2-temps + calendrier Lots 1-12
+5. [Tests et qualité](#5-tests-et-qualité) — 1218 vitest verts, 13 pgTAP RLS, 8 specs E2E, 50 migrations Drizzle
+6. [Sub-agents équipe Sourcing](#6-sub-agents-équipe-sourcing) — Alex, Yann, Hugo, Camille, dev_tandem, suivi_act_reviewer
+7. [Comptes externes / providers tiers](#7-comptes-externes--providers-tiers) — Supabase, Vercel, Anthropic, Brevo, Resend, Fly.io, Pappers, Stripe, Upstash, OVH, 1Password
+8. [Risques migration](#8-risques-migration) — 5 résolus + 10 actifs Lot 2-10 + 4 BDD inter-région + 4 sécurité + 3 DNS
+9. [Procédure de bascule J0](#9-procédure-de-bascule-j0) — J-7 (11/7) → J-1 (17/7) → J0 (18/7 8-11h) → J+7 (25/7) post-mortem
+10. [Annexes](#10-annexes) — docs référencés, scripts ops, gates, ENV, buckets, ADR, formations, entité juridique, contacts
+
+> **⚠️ Point d'attention Sébastien** : la décision Q1 (BDD partagée d'emblée) + Q2 (adopter Paris monorepo) implique une **migration inter-région Frankfurt → Paris** non triviale. Le risque le plus subtil — facilement raté en lecture rapide — est la **réécriture des FK `auth.users.id`** (§8.3) : les UUIDs Frankfurt ≠ UUIDs Paris si l'export Supabase Auth ne préserve pas les IDs. À traiter en priorité Lot 2 sinon tout casse à la bascule.
 
 ---
 
