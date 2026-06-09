@@ -126,7 +126,9 @@ function isAllowedHoursOffset(value: unknown): value is AllowedHoursOffset {
  * `ActionResult` d'échec à propager tel quel.
  *
  * Résout également l'orgId via `getRequiredOrgId` (lookup memberships —
- * Phase A multi-tenant, fallback ALYOS_ORG_ID pour retro-compat).
+ * Phase A multi-tenant). Depuis le Lot 1.6-bis (Hugo 2026-06-09),
+ * `getRequiredOrgId` lève `NoOrganizationMembershipError` si aucune
+ * membership — l'erreur remonte au caller qui retourne `internal_error`.
  */
 async function requireAlyosUser(
   authClient: AuthClientLike,
@@ -150,7 +152,8 @@ async function requireAlyosUser(
  * Le SELECT FOR UPDATE garantit qu'un double-clic optimiste UI ne génère
  * pas deux mutations concurrentes. RLS n'est PAS notre ligne de défense
  * ici (cf. JSDoc `src/lib/constants/organization.ts`) — c'est le filtre
- * `organization_id = ALYOS_ORG_ID` qui assure le multi-tenant côté app.
+ * `organization_id = orgId` (résolu via `getRequiredOrgId`) qui assure
+ * le multi-tenant côté app.
  */
 interface TenderSnapshot {
   status: string;
@@ -218,7 +221,7 @@ export async function selectTenderAction(
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? await createSupabaseServerClient();
+  const authClient = deps.authClient ?? (await createSupabaseServerClient());
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine
@@ -315,7 +318,7 @@ export async function deferTenderAction(
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? await createSupabaseServerClient();
+  const authClient = deps.authClient ?? (await createSupabaseServerClient());
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine
@@ -419,7 +422,7 @@ export async function rejectTenderAction(
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? await createSupabaseServerClient();
+  const authClient = deps.authClient ?? (await createSupabaseServerClient());
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine
@@ -515,7 +518,7 @@ export async function excludeTenderAction(
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? await createSupabaseServerClient();
+  const authClient = deps.authClient ?? (await createSupabaseServerClient());
 
   // 1. Validation input
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
@@ -573,7 +576,7 @@ export async function trackDceDownload(
   dceUrl: string,
   deps: ActionDeps = {},
 ): Promise<ActionResult> {
-  const authClient = deps.authClient ?? await createSupabaseServerClient();
+  const authClient = deps.authClient ?? (await createSupabaseServerClient());
   const auditFn = deps.auditFn ?? audit;
 
   // 1. Auth + domaine
@@ -643,7 +646,7 @@ export async function generateTenderBriefAction(
   deps: ActionDeps = {},
 ): Promise<{ ok: boolean; briefText?: string; error?: string }> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? await createSupabaseServerClient();
+  const authClient = deps.authClient ?? (await createSupabaseServerClient());
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);

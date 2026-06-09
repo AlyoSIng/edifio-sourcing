@@ -27,7 +27,6 @@ import { architects } from "@/db/schema/architects";
 import { architectResponses, matchProposals } from "@/db/schema/selections";
 import { audit } from "@/lib/audit";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { withTenantContext } from "@/lib/db/with-tenant-context";
 import {
@@ -59,8 +58,14 @@ export interface FetchArchitectsPageParams {
   solicitable?: boolean;
   /** Filtre booléen `rgpd_opposition`. */
   rgpdOpposition?: boolean;
-  /** UUID de l'organisation courante (résolu par la page appelante). */
-  orgId?: string;
+  /**
+   * UUID de l'organisation courante (résolu par la page appelante via
+   * `getRequiredOrgId`). **Requis** depuis le Lot 1.6-bis (Hugo 2026-06-09) —
+   * plus de fallback `ALYOS_ORG_ID` silencieux qui fuyait cross-tenant
+   * (vuln CC-2). Le caller doit gérer le `NoOrganizationMembershipError`
+   * et rediriger vers `/no-org` avant d'appeler.
+   */
+  orgId: string;
 }
 
 export interface FetchArchitectsPageResult {
@@ -159,7 +164,7 @@ async function requireAlyosUser(
  * @param dbClient — injectable pour les tests (défaut : `db` global)
  */
 export async function fetchArchitectsPage(
-  params: FetchArchitectsPageParams = {},
+  params: FetchArchitectsPageParams,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<FetchArchitectsPageResult> {
   const {
@@ -170,9 +175,8 @@ export async function fetchArchitectsPage(
     tutoiement,
     solicitable,
     rgpdOpposition,
-    orgId: paramOrgId,
+    orgId: resolvedOrgId,
   } = params;
-  const resolvedOrgId = paramOrgId ?? ALYOS_ORG_ID;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
   // Construction dynamique des conditions WHERE

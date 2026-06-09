@@ -2,12 +2,10 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { getActiveSearchProfile } from "@/lib/profile/queries";
 import { MARKET_TYPES, type MarketType } from "@/lib/profile/schema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { ProfileForm, type ProfileFormInitialValues } from "./ProfileForm";
 
@@ -50,14 +48,16 @@ export default async function AdminProfilPage() {
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[admin-profil:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // 2. Fetch profil actif — try/catch résilience (defense applicative)

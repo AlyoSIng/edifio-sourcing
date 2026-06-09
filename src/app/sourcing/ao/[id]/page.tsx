@@ -31,14 +31,13 @@ import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { findBuyerByName } from "@/lib/buyers/upsert-buyer";
 
 import { BuyerAddressEditor } from "./BuyerAddressEditor";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
 import { platforms } from "@/db/schema/config";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { RcAnalysisCard } from "./RcAnalysisCard";
 import { RcSidebarWidget } from "./RcSidebarWidget";
@@ -107,14 +106,16 @@ export default async function TenderDetailPage(props: { params: Promise<{ id: st
   // rôle admin pour l'édition buyer plus bas).
   const profile = toUserProfile(user);
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[ao-detail:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // Validation UUID

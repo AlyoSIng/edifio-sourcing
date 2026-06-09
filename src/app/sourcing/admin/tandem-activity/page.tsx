@@ -19,10 +19,9 @@ import { architects } from "@/db/schema/architects";
 import { architectResponses, architectTokens } from "@/db/schema/selections";
 import { tenders } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { markArchitectNotificationsSeen } from "@/lib/notifications/architect-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import {
   RangeFilter,
@@ -65,12 +64,16 @@ export default async function TandemActivityPage(props: PageProps) {
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[admin-tandem-activity:org:fail]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // H7 — marque les notifications comme vues à l'ouverture de la page.

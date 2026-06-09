@@ -13,9 +13,8 @@
 import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { CrKanbanBoard } from "./CrKanbanBoard";
 import { loadCrPipelineData } from "./page-data";
@@ -37,14 +36,16 @@ export default async function ConceptionRealisationPage() {
   // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
   // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous).
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[conception-realisation:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // Chargement pipeline C/R — résilience runtime (memory `feedback_nextjs_runtime_page_resilience`)

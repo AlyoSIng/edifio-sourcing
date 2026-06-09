@@ -2,7 +2,7 @@
  * Data loader — page short-list Tandem `/sourcing/ao/[id]/tandem`.
  *
  * Server-side helper consommé par `page.tsx` (Server Component). Charge :
- *   - le tender cible (filtre tenant explicite via `ALYOS_ORG_ID`)
+ *   - le tender cible (filtre tenant explicite via l'`organizationId` du caller)
  *   - le statut tender (utilisé pour bloquer l'accès si statut invalide :
  *     un tender `rejected` ou en pipeline `won` ne doit pas être re-Tandem)
  *   - les `match_proposals` déjà persistés (s'ils existent — l'utilisateur
@@ -22,7 +22,7 @@
  *     `DATABASE_URL` ou si Supabase blip, on rend `<ErrorBanner>`.
  *
  * RLS / tenant : la query `db` consomme la session Drizzle directe (postgres
- * rôle, bypass RLS). On porte le filtre `organizationId = ALYOS_ORG_ID`
+ * rôle, bypass RLS). On porte le filtre `organizationId = <orgId du caller>`
  * explicitement (defense in depth applicative).
  */
 
@@ -105,7 +105,8 @@ export type LoadTandemShortlistResult =
  * Charge la donnée nécessaire à la page short-list Tandem.
  *
  * @param tenderId — UUID du tender (depuis le param de route)
- * @param organizationId — UUID de l'org courante (ALYOS_ORG_ID en MVP)
+ * @param organizationId — UUID de l'org courante (résolu par le caller via
+ *                        `getRequiredOrgId(user.id)`)
  * @param deps — injection pour tests
  */
 export async function loadTandemShortlistData(

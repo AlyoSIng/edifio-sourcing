@@ -20,9 +20,8 @@ import { db } from "@/db/client";
 import { tenders } from "@/db/schema/tenders";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import {
   getTenderCotraitant,
@@ -57,14 +56,16 @@ export default async function TandemCotraitantPage(props: PageProps) {
   // rôle admin pour les actions sensibles plus bas).
   const profile = toUserProfile(user);
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[ao-tandem-cotraitant:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   if (!UUID_SHAPE.test(params.id)) {

@@ -32,6 +32,11 @@ export const PUBLIC_ROUTES = [
   // Public car l'utilisateur peut y être redirigé en session active depuis
   // n'importe quelle route protégée. Pas de données sensibles.
   "/trial-expired",
+  // /no-org : page affichée quand un utilisateur authentifié n'a aucune
+  // ligne `memberships` (sortie propre de `NoOrganizationMembershipError`).
+  // Public car ne dépend pas du tenant — pas de données sensibles, juste
+  // un message + bouton logout + lien mailto support. Lot 1.6-bis Hugo.
+  "/no-org",
 ] as const;
 
 /** Préfixe des routes UI protégées (sourcing app authentifiée). */
