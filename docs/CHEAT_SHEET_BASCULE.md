@@ -100,6 +100,25 @@ curl -H "Authorization: Bearer $env:CRON_SECRET" `
 
 ## Phase 7 — Communication (~10 min)
 
+```powershell
+# Post-deploy SQL assertions (AVANT communication)
+# ENV vars PROD doivent encore être posées dans la session
+.\scripts\migration\run-post-deploy-verify.ps1 -Environment prod
+# Doit afficher : "Toutes les assertions post-deploy OK"
+# Si KO : NE PAS communiquer la bascule, revenir Phase 4 / rollback
+```
+
+Vérifications couvertes (6 catégories, ~15 assertions) :
+
+- **A** — 4 hashes 0050-0053 présents dans `drizzle.__drizzle_migrations`
+- **B** — Colonnes `learning_events.payload/reason_code/applied_at/dismissed_at`
+- **C** — `FORCE RLS` actif sur `companies`, `bureaux_etudes`, `cotraitant_shares`, `cotraitant_share_items`
+- **D** — 5 helpers `SECURITY DEFINER` présents et bien `prosecdef=true`
+- **E** — ≥ 16 policies + aucune `select_public` / `public_token_*` résiduelle (drop 0053)
+- **F** — Helpers exécutables sans exception (smoke logique)
+
+Une fois OK :
+
 - Mail équipe AlyoS (template dans PLAN_BASCULE §9.1)
 - Slack/Discord interne (template §9.2)
 
