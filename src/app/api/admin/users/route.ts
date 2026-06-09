@@ -114,10 +114,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return jsonError(500, "Impossible de créer le compte (Supabase).");
     }
 
-    // ---------- 3b. Création public.users + membership ----------
+    // ---------- 3b. Création public.users + membership (HARDFAIL) ----------
     // Indispensable pour que la FK audit_logs.actor_id → public.users.id
     // ne rejette pas les futures insertions d'audit. Idempotent (onConflictDoNothing).
     // L'organisation du nouveau membre = celle de l'admin appelant (résolution dynamique).
+    //
+    // Lot 1.6-bis (Hugo, 2026-06-09) — HARDFAIL : l'ancienne version laissait
+    // passer un user créé côté Supabase Auth mais sans `memberships` côté BDD.
+    // Combiné au fallback `ALYOS_ORG_ID` (désormais supprimé), ce user voyait
+    // l'org AlyoS au login — fuite cross-tenant CC-2. Désormais, si l'insert
+    // memberships échoue, on **rollback** la création Supabase Auth pour ne
+    // pas laisser de fantôme exploitable.
     try {
       const callerOrgId = await getRequiredOrgId(caller.id);
 
@@ -140,13 +147,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         })
         .onConflictDoNothing();
     } catch (dbErr) {
-      // Non-bloquant : le compte auth est créé, l'email partira quand même.
-      // L'admin peut corriger via un backfill si besoin. Log structuré.
-      console.error("[admin/users:db:fail]", {
+      // HARDFAIL : on rollback la création auth pour éviter un user fantôme
+      // (auth.users sans memberships → après suppression du fallback
+      // ALYOS_ORG_ID, ce user atterrirait sur /no-org au login mais
+      // resterait actif côté Supabase Auth — orphelin gênant et exploitable
+      // si un admin re-active le fallback par erreur).
+      console.error("[admin/users:db:fail-hardfail]", {
         user_id: created.user.id,
         email,
         message: dbErr instanceof Error ? dbErr.message : String(dbErr),
       });
+
+      // Best-effort rollback — si le deleteUser rate, on log mais on renvoie
+      // tout de même 500 (l'admin doit voir l'erreur, pas un 201 trompeur).
+      try {
+        await admin.auth.admin.deleteUser(created.user.id);
+      } catch (rollbackErr) {
+        console.error("[admin/users:db:fail-hardfail:rollback-failed]", {
+          user_id: created.user.id,
+          email,
+          message: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
+        });
+      }
+
+      return jsonError(
+        500,
+        "Création BDD impossible (memberships). Le compte a été annulé — réessayez.",
+      );
     }
 
     // ---------- 4. Email Resend ----------
