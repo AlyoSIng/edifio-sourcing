@@ -24,7 +24,7 @@ $env:PGPASSWORD = "<PROD-PASSWORD>"
 # Backup
 .\scripts\migration\backup-sourcing-db.ps1
 
-# Confirmer : ls backups/sourcing-prod-*.sql.gz | sort -Descending | select -First 1
+# Confirmer : ls backups/sourcing-prod-*.dump | sort -Descending | select -First 1
 ```
 
 ## Phase 2 — Dry-run + apply PREVIEW (~15 min)
@@ -76,7 +76,7 @@ $env:PGPASSWORD = "<PROD-PASSWORD>"
 
 ## Phase 5 — Smoke PROD (~15 min)
 
-URL : `https://sourcing.edifio.fr`
+URL : `https://sourcing.alyosingenierie.fr`
 
 | Test | OK ? |
 |---|---|
@@ -94,7 +94,7 @@ schedule `0 5 * * 1-5`.
 Test manuel :
 ```powershell
 curl -H "Authorization: Bearer $env:CRON_SECRET" `
-  https://sourcing.edifio.fr/api/cron/sourcing-monitoring
+  https://sourcing.alyosingenierie.fr/api/cron/sourcing-monitoring
 # Attendu : { ok: true, alertSent: false }
 ```
 
@@ -127,7 +127,7 @@ SELECT count(*) FROM drizzle.__drizzle_migrations;
 |---|---|
 | Supabase Studio prod | `https://supabase.com/dashboard/project/<prod-ref>` |
 | Vercel prod | `https://vercel.com/teissiers-projects/edifio-sourcing` |
-| Status check | `https://sourcing.edifio.fr/api/admin/crons` |
+| Status check | `https://sourcing.alyosingenierie.fr/api/admin/crons` |
 
 ### Contacts
 - **CTO edifio** : `sebastien@edifio.fr`

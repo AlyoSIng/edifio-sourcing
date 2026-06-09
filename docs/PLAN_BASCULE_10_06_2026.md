@@ -103,14 +103,14 @@ $env:PGPASSWORD = "<password prod depuis 1Password>"
 .\scripts\migration\backup-sourcing-db.ps1
 ```
 
-Sortie attendue : `backups/sourcing-prod-2026-06-10-08h30.sql.gz`
+Sortie attendue : `backups/sourcing-prod-2026-06-10-08h30.dump`
 
 ⚠️ **NE JAMAIS** continuer si le backup échoue. Sans backup, pas de rollback.
 
 ### Vérifier le backup
 
 ```powershell
-ls backups/sourcing-prod-*.sql.gz | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+ls backups/sourcing-prod-*.dump | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 # Doit afficher un fichier > 5 MB (BDD non vide)
 ```
 
@@ -274,7 +274,7 @@ Identique au 4.1 mais sur la BDD prod via Supabase Studio.
 
 ### 7.2. Smoke applicatif prod (10 min)
 
-Va sur `https://sourcing.edifio.fr` (prod) avec un user AlyoS admin :
+Va sur `https://sourcing.alyosingenierie.fr` (prod) avec un user AlyoS admin :
 
 - [ ] Login OK
 - [ ] `/sourcing/ao-du-jour` s'affiche
@@ -300,7 +300,7 @@ Le cron de monitoring `/api/cron/sourcing-monitoring` est défini dans
 ```powershell
 # Trigger manuel (avec secret CRON_SECRET)
 curl -H "Authorization: Bearer $env:CRON_SECRET" `
-  https://sourcing.edifio.fr/api/cron/sourcing-monitoring
+  https://sourcing.alyosingenierie.fr/api/cron/sourcing-monitoring
 # Réponse attendue : { ok: true, alertSent: false } (car le cron sourcing-run est OK)
 ```
 
@@ -332,7 +332,7 @@ Steve
 
 ```
 ✅ Migrations 0050-0053 appliquées en prod le 10 juin 2026 à <heure>.
-Backup pre-deploy : backups/sourcing-prod-2026-06-10-<heure>.sql.gz
+Backup pre-deploy : backups/sourcing-prod-2026-06-10-<heure>.dump
 Sub-agent invocations préparatrices : 38
 PR mergées dans la session : 20
 
