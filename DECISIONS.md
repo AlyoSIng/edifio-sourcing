@@ -2,6 +2,45 @@
 
 ---
 
+## 2026-06-09 — Migration 0052 RLS Lot 1.7-bis (FORCE + helper monorepo + naming + restriction anon)
+
+**Agent** : Alex (`dev`)
+**Contexte** : alignement pattern monorepo `alyos-suivi-chantier` (bascule prévue 18 juillet 2026) sur les 3 tables fixées par 0051 (Lot 1.7). Demande Sébastien (`suivi_act_reviewer`) + flag Camille (`qa`) CC-1 sur FORCE RLS.
+
+**4 ajustements appliqués** :
+
+1. **Helper `public.current_user_org_id()`** SECURITY DEFINER + `SET search_path = public, pg_temp`, lookup `memberships` (au lieu du JWT claim `current_organization_id()`). GRANT EXECUTE TO authenticated, anon. Pattern aligné `C:\Dev\alyos-suivi-chantier\app\db\migrations\0001_init.sql:321-330`. **Créé mais PAS encore utilisé dans les policies** : la bascule de la valeur lue par les policies sera faite par Sébastien lors du Lot 2 monorepo, après audit + wrap des call sites manquants. Cette fonction est posée ici pour qu'elle soit déjà disponible côté BDD prod le 18/07.
+
+2. **Naming `<table>_<action>`** : remplacement de `tenant_isolation` / `admin_write` / `admin_update` / `public_token_read` / `public_token_update_signed` par :
+   - `companies_select`, `companies_insert`, `companies_update`, `companies_delete`
+   - `bureaux_etudes_select`, `bureaux_etudes_insert`, `bureaux_etudes_update`, `bureaux_etudes_delete`
+   - `cotraitant_shares_select`, `cotraitant_shares_select_public`, `cotraitant_shares_insert`, `cotraitant_shares_update`, `cotraitant_shares_delete`
+   - `cotraitant_share_items_select`, `cotraitant_share_items_select_public`, `cotraitant_share_items_update_signed`
+   Choix PERMISSIVE 1 policy par action (vs RESTRICTIVE + tenant_isolation Lot 1.7) — aligne sémantique monorepo Suivi+ACT (Q2 supabase-js direct).
+
+3. **FORCE ROW LEVEL SECURITY** sur `companies`, `bureaux_etudes`, `cotraitant_shares`, `cotraitant_share_items` (CC-1 Camille). Analyse risque :
+   - Rôle prod `postgres` (DATABASE_URL) reste `rolbypassrls=true` côté Supabase → FORCE ne s'applique pas. Pages Next.js Server fonctionnent identiquement.
+   - Rôle `service_role` (Edge Functions cron) sans BYPASSRLS → FORCE s'applique. C'est le comportement voulu par CC-1 (sinon cron sourcing voit tout cross-tenant).
+   - Patterns 0009, 0018, 0022, 0027, 0038, 0041, 0046, 0048 prouvent que FORCE n'a jamais cassé la prod.
+   - Fallback en cas de régression : migration 0053 `NO FORCE` en attendant Lot 2 monorepo Sébastien.
+
+4. **Restriction anon `cotraitant_shares` / `cotraitant_share_items`** : remplacement de `USING (TRUE)` par contraint `revoked_at IS NULL AND expires_at > now()` (défense en profondeur). Dual-policy SELECT sur `cotraitant_shares` :
+   - `cotraitant_shares_select` (auth, org-scoped, voit tout y compris expirés — préserve audit `/sourcing/ao/[id]/tandem/partage`)
+   - `cotraitant_shares_select_public` (anon, contraint share actif)
+   Le UPDATE signed du flow public `/api/cotraitant/[token]/upload` est désormais contraint sur parent share actif.
+
+**Tests pgTAP adaptés** :
+- `tests/rls/13_companies_isolation.sql` : 7 → 12 assertions (+ FORCE + 4 naming policies)
+- `tests/rls/14_cotraitant_shares_isolation.sql` : 7 → 13 assertions (+ FORCE + 5 naming + helper `current_user_org_id` + test anon expires_at bloqué)
+- `tests/rls/15_bureaux_etudes_isolation.sql` : 7 → 12 assertions (+ FORCE + 4 naming policies)
+- Total : 21 → 37 assertions sur les 3 tests.
+
+**Action Steve (ops)** : appliquer migration 0052 en preview puis prod via SQL Editor Supabase après merge PR. Aucune régression attendue runtime page (rôle `postgres` BYPASSRLS).
+
+**Migration** : `src/db/migrations/0052_rls_lot17_bis_force_helper_naming.sql` + entrée `idx 52` dans `meta/_journal.json` (timestamp 1779731009000).
+
+---
+
 ## 2026-06-08 — Migration 0051 RLS fix companies + cotraitant_shares + bureaux_etudes (Lot 1.7)
 
 **Agent** : Alex (`dev`)
