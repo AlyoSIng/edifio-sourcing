@@ -2,6 +2,80 @@
 
 ---
 
+## 2026-06-08 — Migration 0051 RLS fix companies + cotraitant_shares + bureaux_etudes (Lot 1.7)
+
+**Agent** : Alex (`dev`)
+**Contexte** : audit sécurité Hugo (`gates/REVIEW_HUGO_PR121_RISQUES_SECU.md`) +
+audit final main (`gates/AUDIT_SECU_FINAL_MAIN_260608.md`) ont flag VETO conditionnel :
+**3 tables sans RLS en prod actuelle**, dette pré-existante amplifiée par la bascule
+multi-tenant prévue le 18 juillet 2026 (migration vers monorepo `alyos-suivi-chantier`).
+
+**Tables fixées** :
+- `companies` (migration 0011, annuaire entreprises BTP/majors)
+- `bureaux_etudes` (migration 0011, annuaire BE partenaires)
+- `cotraitant_shares` (migration 0014, tokens partage cotraitant)
+- `cotraitant_share_items` (migration 0014, items rattachés au share)
+
+**Stratégie retenue — ENABLE seul, PAS de FORCE** (zone orange) :
+
+Le pattern Sourcing utilise `current_organization_id()` qui lit le JWT Supabase
+OU `app.current_organization_id` posé par `withTenantContext()` (cf. 0028). Or les
+actions sur ces 3 tables (`entreprises/actions.ts`, `bureaux-etudes/*`,
+`cotraitant/[token]/page.tsx`) utilisent `db` Drizzle direct **SANS**
+`withTenantContext`. Si on pose FORCE RLS :
+- rôle postgres (DATABASE_URL prod) cesse de bypass FORCE RLS
+- `current_organization_id()` renvoie NULL → policy `tenant_isolation` rejette tout
+- pages annuaires + flow public cotraitant cassent en prod
+
+C'est exactement le bug fixé en PR #86 (28 mai 2026 — `fetchArchitectsPage` qui ne
+wrappait pas dans `withTenantContext`). FORCE RLS sans wrap préalable = régression.
+
+**Décision** :
+1. **Lot 1.7 (ce commit)** : ENABLE RLS + policies `tenant_isolation` (PERMISSIVE)
+   + `admin_write`/`admin_update` (RESTRICTIVE) sur `companies` + `bureaux_etudes`.
+   ENABLE + `public_token_read` + `public_token_update_signed` sur `cotraitant_shares`
+   et `cotraitant_share_items` pour préserver le flow public `/cotraitant/[token]`.
+2. **Lot 1.7-bis (futur PR)** : audit exhaustif des call sites, wrap systématique
+   dans `withTenantContext`, puis FORCE RLS. Conditionne à passer en revue les
+   ~5 modules concernés (entreprises, bureaux-etudes, cotraitant, dossier ZIP).
+
+**Effet net** :
+- **CI** (pg_prove, rôle `test_authenticated` NOINHERIT) : RLS appliquée,
+  tests 13-14-15 (21 assertions) vérifient l'isolation cross-tenant + flux public.
+- **Runtime prod actuel** (rôle postgres BYPASSRLS sur ENABLE) : zéro régression
+  page. Comportement utilisateur préservé.
+- **Future migration** vers rôle Supabase `authenticated` (SDK client) : la RLS
+  s'active automatiquement, multi-tenant garanti.
+
+**Choix `cotraitant_shares` flow public** :
+- Policy `public_token_read FOR SELECT USING (TRUE)` — la sécurité repose sur
+  l'entropie du token (UUID v4 = 122 bits non devinable + `expires_at` + `revoked_at`
+  vérifiés côté code).
+- TODO Lot 1.7-bis : remplacer `USING (TRUE)` par un check sur paramètre
+  `app.cotraitant_token` posé par middleware, pour scoper l'accès au seul token
+  présenté dans l'URL.
+
+**Tests pgTAP créés** :
+- `tests/rls/13_companies_isolation.sql` (7 assertions)
+- `tests/rls/14_cotraitant_shares_isolation.sql` (7 assertions)
+- `tests/rls/15_bureaux_etudes_isolation.sql` (7 assertions)
+Pattern aligné sur `02_tenant_isolation.sql` + `09_tandem_tables.sql`.
+
+**Validation locale** (Docker postgres:15 sur port 5435) :
+- Migrations 0000-0032 + 0051 appliquées sans erreur via `tsx src/db/migrate.ts`
+- 21/21 assertions pgTAP pass sur les nouveaux tests
+- Tests existants (00, 01, 02, 09) restent verts
+- Vitest : 79 files, 1215 tests pass
+- ESLint + TypeScript : 0 erreur
+
+**Action Steve (ops)** : appliquer migration 0051 en preview puis prod via SQL Editor
+Supabase après merge PR.
+
+**Migration** : `src/db/migrations/0051_rls_fix_companies_cotraitant_shares_be.sql`
++ ajout entrée `idx 51` dans `meta/_journal.json` (timestamp 1779731008000).
+
+---
+
 ## 2026-06-02 — Chantier DC1/DC2/Pouvoir multi-archi / multi-BE
 
 **Contexte** : finaliser le module dossier de candidature pour gérer les
