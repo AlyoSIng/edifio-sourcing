@@ -1,0 +1,29 @@
+#!/bin/sh
+# Pre-push : validations strictes ESLint full + typecheck.
+# Déplacé du pre-commit (bug switch de branche observé 3 fois nuit 8-9 juin 2026).
+#
+# Skip ponctuel : `HUSKY=0 git push ...` (rare — préférer fixer les erreurs).
+# Push de docs uniquement : continue de tourner mais rapide (~10s).
+
+set -e
+
+echo "==> ESLint full sur src/"
+NODE_OPTIONS="--max-old-space-size=8192" node ./node_modules/eslint/bin/eslint.js src/ --max-warnings 0
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "[ERREUR] ESLint a trouvé des erreurs — push refusé."
+  echo "Fix les erreurs puis re-push, ou utilise 'HUSKY=0 git push' pour skipper (déconseillé)."
+  exit 1
+fi
+
+echo "==> Typecheck"
+NODE_OPTIONS="--max-old-space-size=8192" node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.json
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "[ERREUR] typecheck KO — push refusé."
+  echo "Fix les erreurs puis re-push."
+  exit 1
+fi
+
+echo ""
+echo "[OK] Validations pre-push passées."

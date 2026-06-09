@@ -85,8 +85,7 @@
     "zod": "4.1.13"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,css,md,html,yml,yaml}": "prettier --check",
-    "*.{ts,tsx,js,jsx}": "eslint --max-warnings 0"
+    "*.{ts,tsx,js,jsx,json,css,md,html,yml,yaml}": "prettier --check"
   },
   "pnpm": {
     "supportedArchitectures": {
