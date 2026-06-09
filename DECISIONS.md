@@ -2,6 +2,62 @@
 
 ---
 
+## 2026-06-09 — Migration 0053 éradication bombe à retardement `cotraitant_shares_select_public`
+
+**Contexte** — Audit Hugo MEGA-FINAL + recommandation Sébastien (suivi_act_reviewer) :
+la policy `cotraitant_shares_select_public` PERMISSIVE (et son équivalent sur
+`cotraitant_share_items`) introduite en 0051 puis durcie en 0052 reste une bombe
+à retardement cross-tenant. Neutre tant que le rôle postgres prod bypass RLS,
+mais à éradiquer impérativement avant la bascule monorepo 18 juillet (où le
+pattern devient supabase-js direct + service_role/anon, donc RLS effective).
+
+**Décision** — Migration 0053 (branche `feat/eradicate-cotraitant-public-policy`) :
+
+1. **DROP** des 3 policies anon : `cotraitant_shares_select_public`,
+   `cotraitant_share_items_select_public`, `cotraitant_share_items_update_signed`.
+2. **CREATE 4 functions SECURITY DEFINER** (search_path = public, pg_temp ;
+   anti shadowing CVE-pattern PG) qui remplacent l'accès public anon :
+   - `get_cotraitant_share_by_token(uuid)` — share core (id, contact_name,
+     contact_email, expires_at, revoked_at) **sans organization_id ni tender_id**
+     (anti-leak). Retourne la ligne même si revoke/expire pour que le code
+     Next.js affiche un message distinct (introuvable vs révoqué vs expiré).
+   - `get_cotraitant_share_items_by_token(uuid)` — items du share, **uniquement
+     si actif** (revoked_at IS NULL AND expires_at > now()). Défense en profondeur.
+   - `get_cotraitant_item_original_path(uuid, uuid)` — path Storage pour générer
+     une URL signée, avec anti-IDOR : jointure share + item, NULL si l'item
+     n'appartient pas au token fourni.
+   - `mark_cotraitant_share_item_signed(uuid, uuid, text, text, text)` — UPDATE
+     atomique post-upload signé. Refuse si share inactif OU item déjà signé
+     (anti re-signature). Retourne boolean (true = 1 row affectée).
+3. **GRANT EXECUTE TO anon, authenticated** avec DO/EXCEPTION guard pour compat
+   CI Postgres vanilla (pattern déjà éprouvé en 0052).
+
+**Code applicatif adapté** :
+- `src/app/cotraitant/[token]/page.tsx` : remplace `db.select(...).from(cotraitantShares)`
+  par `db.execute(sql\`SELECT ... FROM get_cotraitant_share_by_token(${token})\`)`.
+- `src/app/cotraitant/[token]/actions.ts` : `getCotraitantDownloadUrl` utilise
+  `get_cotraitant_item_original_path` (pré-check + anti-IDOR en un roundtrip) ;
+  `uploadSignedDocument` utilise `mark_cotraitant_share_item_signed` (UPDATE
+  atomique). Ajout d'un cleanup best-effort si le mark échoue après upload
+  (suppression Storage pour éviter les orphelins).
+
+**Tests** : `tests/rls/14_cotraitant_shares_isolation.sql` étendu à 19 assertions :
+DROP des policies anon vérifié, 4 functions présentes avec bonne signature,
+anti-leak (`organization_id` absent du record type retourné), défense en profondeur
+(items / mark refusés sur share expiré/révoqué), anti-IDOR cross-item.
+Préservation FORCE RLS (0052) + policies tenant auth + isolation cross-tenant UPDATE.
+
+**Pourquoi** — Aligne edifio Sourcing sur le pattern Suivi+ACT (position Q2 monorepo :
+supabase-js direct, aucune policy `TO anon` sur les tables sensibles, accès via
+SECURITY DEFINER functions). Élimine le risque cross-tenant pré-bascule 18/07.
+
+**Risque rollback** — Si régression `/cotraitant/[token]`, rollback = recréer les
+policies 0052 + revert le code applicatif. Le pattern function est plus robuste
+car indépendant du rôle qui appelle (postgres BYPASSRLS aujourd'hui, service_role
+ou anon en monorepo demain).
+
+---
+
 ## 2026-06-09 — Migration 0052 RLS Lot 1.7-bis (FORCE + helper monorepo + naming + restriction anon)
 
 **Agent** : Alex (`dev`)

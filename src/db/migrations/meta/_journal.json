@@ -246,6 +246,13 @@
       "when": 1779731009000,
       "tag": "0052_rls_lot17_bis_force_helper_naming",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1779731010000,
+      "tag": "0053_eradicate_cotraitant_public_policy",
+      "breakpoints": true
     }
   ]
 }

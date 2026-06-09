@@ -5,20 +5,30 @@
  * Auth  : AUCUNE — sécurité par token UUID + vérification expiration/révocation.
  *
  * Cette page est INTENTIONNELLEMENT en dehors de /sourcing/ pour ne pas
- * être interceptée par le middleware @alyosingenierie.fr.
- * Cf. src/middleware.ts : le matcher couvre uniquement /sourcing/* et
- * les routes app internes.
+ * être interceptée par le middleware AlyoS interne.
  *
  * Comportement :
- *  1. Valide le token (format UUID, existence, non-révoqué, non-expiré)
- *  2. Charge les items du partage
- *  3. Rendu : CotraitantPageClient (téléchargement + upload)
+ *  1. Valide le token (format UUID)
+ *  2. Appelle la function SECURITY DEFINER `get_cotraitant_share_by_token`
+ *     qui retourne le share core (PAS d'organization_id, anti-leak)
+ *  3. Distingue les états : introuvable / révoqué / expiré
+ *  4. Charge les items via `get_cotraitant_share_items_by_token`
+ *     (la function ne retourne rien si le share est inactif → défense en profondeur)
+ *  5. Rendu : CotraitantPageClient (téléchargement + upload)
+ *
+ * Sécurité (migration 0053 — éradication policies anon publiques) :
+ *  - AUCUNE policy `FOR SELECT TO anon` sur cotraitant_shares / cotraitant_share_items
+ *  - Le pattern utilise des SECURITY DEFINER functions qui s'exécutent avec
+ *    les droits du propriétaire (postgres BYPASSRLS) et ne retournent JAMAIS
+ *    organization_id ni tender_id (anti-leak cross-tenant).
+ *  - La validité du share (revoked_at IS NULL AND expires_at > now()) est
+ *    vérifiée DANS le SQL des functions (items / path / sign), pas seulement
+ *    côté code applicatif.
  */
 
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 import { db } from "@/db/client";
-import { cotraitantShareItems, cotraitantShares } from "@/db/schema/sharing";
 
 import { CotraitantPageClient } from "./CotraitantPageClient";
 
@@ -39,6 +49,32 @@ export interface CotraitantItemData {
   signedAt: Date | null;
   signerName: string | null;
   signedFilename: string | null;
+}
+
+/**
+ * Forme brute retournée par `get_cotraitant_share_by_token` (snake_case SQL).
+ * `extends Record<string, unknown>` requis par la contrainte de `db.execute<T>`.
+ */
+interface ShareRow extends Record<string, unknown> {
+  id: string;
+  contact_name: string;
+  contact_email: string;
+  expires_at: string | Date;
+  revoked_at: string | Date | null;
+}
+
+/**
+ * Forme brute retournée par `get_cotraitant_share_items_by_token` (snake_case SQL).
+ * `extends Record<string, unknown>` requis par la contrainte de `db.execute<T>`.
+ */
+interface ItemRow extends Record<string, unknown> {
+  id: string;
+  name: string;
+  kind: string;
+  original_storage_path: string;
+  signed_at: string | Date | null;
+  signer_name: string | null;
+  signed_filename: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,43 +103,53 @@ export default async function CotraitantPage(props: PageProps) {
   } | null = null;
 
   try {
-    const shareRows = await db
-      .select({
-        id: cotraitantShares.id,
-        contactName: cotraitantShares.contactName,
-        expiresAt: cotraitantShares.expiresAt,
-        revokedAt: cotraitantShares.revokedAt,
-      })
-      .from(cotraitantShares)
-      .where(eq(cotraitantShares.token, token))
-      .limit(1);
-
-    const share = shareRows[0];
+    // 1. Récupération du share core via SECURITY DEFINER function.
+    //    La function bypass la RLS (post-0053) et NE retourne PAS
+    //    organization_id/tender_id (anti-leak).
+    //    Si le share n'existe pas : 0 row → introuvable.
+    //    Si revoké/expiré : la function retourne quand même la ligne pour
+    //    permettre un message d'erreur distinct (révoqué vs expiré).
+    const shareResult = await db.execute<ShareRow>(
+      sql`SELECT id, contact_name, contact_email, expires_at, revoked_at
+            FROM public.get_cotraitant_share_by_token(${token}::uuid)`,
+    );
+    const share = shareResult[0];
 
     if (!share) {
       return <ErrorPage message="Ce lien est introuvable ou a expiré." />;
     }
-    if (share.revokedAt) {
+    if (share.revoked_at) {
       return <ErrorPage message="Ce lien de partage a été révoqué." />;
     }
-    if (new Date(share.expiresAt) < new Date()) {
+    if (new Date(share.expires_at) < new Date()) {
       return <ErrorPage message="Ce lien de partage a expiré (validité 30 jours)." />;
     }
 
-    const itemRows = await db
-      .select({
-        id: cotraitantShareItems.id,
-        name: cotraitantShareItems.name,
-        kind: cotraitantShareItems.kind,
-        originalStoragePath: cotraitantShareItems.originalStoragePath,
-        signedAt: cotraitantShareItems.signedAt,
-        signerName: cotraitantShareItems.signerName,
-        signedFilename: cotraitantShareItems.signedFilename,
-      })
-      .from(cotraitantShareItems)
-      .where(eq(cotraitantShareItems.shareId, share.id));
+    // 2. Récupération des items via SECURITY DEFINER function.
+    //    Si share inactif côté SQL → la function retourne 0 row (défense en
+    //    profondeur, double-check du share status).
+    const itemsResult = await db.execute<ItemRow>(
+      sql`SELECT id, name, kind, original_storage_path, signed_at, signer_name, signed_filename
+            FROM public.get_cotraitant_share_items_by_token(${token}::uuid)`,
+    );
 
-    shareData = { ...share, items: itemRows };
+    const items: CotraitantItemData[] = itemsResult.map((row) => ({
+      id: row.id,
+      name: row.name,
+      kind: row.kind,
+      originalStoragePath: row.original_storage_path,
+      signedAt: row.signed_at ? new Date(row.signed_at) : null,
+      signerName: row.signer_name,
+      signedFilename: row.signed_filename,
+    }));
+
+    shareData = {
+      id: share.id,
+      contactName: share.contact_name,
+      expiresAt: new Date(share.expires_at),
+      revokedAt: share.revoked_at ? new Date(share.revoked_at) : null,
+      items,
+    };
   } catch (err) {
     console.error("[cotraitant-page:load:fail]", err);
     return <ErrorPage message="Erreur de chargement. Veuillez réessayer." />;
