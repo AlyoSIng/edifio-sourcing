@@ -213,7 +213,34 @@ export interface NotificationPayload {
 }
 
 // ============================================================================
-// 8. audit_logs.data — payload détaillé par action (13 schémas)
+// 9. learning_events.payload — snapshot tender au moment du rejet (Salve U)
+// ============================================================================
+/**
+ * Snapshot du tender capturé au moment où l'utilisateur écarte un AO avec un
+ * motif structuré (migration 0050, branche feat/learning-ecartement).
+ *
+ * Sert à agréger les suggestions d'ajustement du profil de recherche sans
+ * re-fetch des tenders (les tenders peuvent évoluer ou être purgés). Tous les
+ * champs sont optionnels : le snapshot est best-effort à partir de
+ * `lockAndFetchTender` côté `rejectTenderAction`.
+ *
+ * Distinction sémantique : alimenté UNIQUEMENT par « Écarter »
+ * (`rejectTenderAction`), jamais par « Exclure » (`excludeTenderAction` reste
+ * neutre, zéro effet algo).
+ */
+export interface LearningEventPayload {
+  /** Acheteur (snapshot `tenders.buyer`) */
+  buyer?: string;
+  /** Codes CPV principaux + secondaires (snapshot `tenders.cpv`) */
+  cpv_codes?: string[];
+  /** Département du lieu d'exécution (snapshot `tenders.department`, ex. "13") */
+  geo_zone?: string | null;
+  /** Montant estimé (snapshot `tenders.amount`, numeric → number) */
+  amount?: number | null;
+}
+
+// ============================================================================
+// 10. audit_logs.data — payload détaillé par action (13 schémas)
 // ============================================================================
 /**
  * Cf. `audit_log_v1.md` — 13 actions × payload spécifique. On type une union

@@ -41,6 +41,8 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import type { RejectionReasonCode } from "@/lib/sourcing/learning/rejection-reasons";
+
 import {
   deferTenderAction,
   excludeTenderAction,
@@ -221,10 +223,10 @@ export function TenderCardActions({
     [tenderId, router],
   );
 
-  function handleReject(reason: string | null): void {
+  function handleReject(reasonCode: RejectionReasonCode, verbatim: string | null): void {
     setShowRejectModal(false);
     startTransition(async () => {
-      const result = await rejectTenderAction(tenderId, reason);
+      const result = await rejectTenderAction(tenderId, reasonCode, verbatim);
       if (!result.ok) {
         emitError(result.error);
         return;
@@ -311,7 +313,7 @@ export function TenderCardActions({
           type="button"
           onClick={() => setShowRejectModal(true)}
           disabled={isPending}
-          title="Écarte l'AO de votre file. Un motif peut être noté à titre de traçabilité (sans effet sur l'algorithme de recherche)."
+          title="Écarte l'AO. Le motif aide edifio à vous suggérer d'affiner votre profil de recherche."
           className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-2 bg-white px-3 py-1 text-[11px] font-medium text-error transition hover:bg-error-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1 disabled:opacity-50"
         >
           <span aria-hidden>&#x2715;</span>
