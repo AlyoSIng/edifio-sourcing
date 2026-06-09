@@ -18,7 +18,6 @@ import { and, count, eq, ilike, or, sql } from "drizzle-orm";
 import { db as defaultDb } from "@/db/client";
 import { companies } from "@/db/schema/companies";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Company, NewCompany } from "@/db/schema/companies";
@@ -34,8 +33,14 @@ export interface FetchCompaniesPageParams {
   search?: string;
   specialty?: string;
   implantation?: string;
-  /** UUID organisation courante. Fallback ALYOS_ORG_ID pour retro-compat. */
-  orgId?: string;
+  /**
+   * UUID de l'organisation courante (résolu par la page appelante via
+   * `getRequiredOrgId`). **Requis** depuis le Lot 1.6-bis (Hugo 2026-06-09) —
+   * plus de fallback `ALYOS_ORG_ID` silencieux qui fuyait cross-tenant
+   * (vuln CC-2). Le caller doit gérer le `NoOrganizationMembershipError`
+   * et rediriger vers `/no-org` avant d'appeler.
+   */
+  orgId: string;
 }
 
 export interface FetchCompaniesPageResult {
@@ -108,11 +113,10 @@ async function requireAlyosUser(
 // ============================================================================
 
 export async function fetchCompaniesPage(
-  params: FetchCompaniesPageParams = {},
+  params: FetchCompaniesPageParams,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<FetchCompaniesPageResult> {
-  const { page = 1, search, specialty, implantation, orgId: paramOrgId } = params;
-  const resolvedOrgId = paramOrgId ?? ALYOS_ORG_ID;
+  const { page = 1, search, specialty, implantation, orgId: resolvedOrgId } = params;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
   const conditions = [eq(companies.organizationId, resolvedOrgId)];

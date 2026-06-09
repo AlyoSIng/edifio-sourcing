@@ -7,9 +7,8 @@ import { architects } from "@/db/schema/architects";
 import { architectResponses } from "@/db/schema/selections";
 import { tenders } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { ArchitectEditForm } from "./ArchitectEditForm";
 import { PappersEnrichSingleButton } from "./PappersEnrichSingleButton";
@@ -23,7 +22,8 @@ import { PappersEnrichSingleButton } from "./PappersEnrichSingleButton";
  * Périmètre :
  *  - Lecture : tous rôles authentifiés AlyoS.
  *  - Édition : admin uniquement (formulaire `ArchitectEditForm` inclus si admin).
- *  - Données : lecture directe BDD avec filtre tenant explicite `ALYOS_ORG_ID`.
+ *  - Données : lecture directe BDD avec filtre tenant explicite via `orgId`
+ *    résolu par `getRequiredOrgId(user.id)`.
  *
  * Pattern résilience (MEMORY) : try/catch absorbé avec ErrorBanner.
  */
@@ -44,15 +44,16 @@ export default async function ArchitectFichePage(props: { params: Promise<{ id: 
   const profile = toUserProfile(user);
   const adminUser = isAdmin(profile);
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
-  // NB : ALYOS_ORG_ID déjà importé plus haut dans ce fichier.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[architecte-detail:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // Résilience runtime

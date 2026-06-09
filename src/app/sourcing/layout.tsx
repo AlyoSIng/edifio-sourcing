@@ -5,8 +5,7 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { TrialBanner } from "@/components/app-shell/TrialBanner";
 import { db } from "@/db/client";
 import { organizations } from "@/db/schema/organizations";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { computeBrandingCss } from "@/lib/admin/branding";
 import { getOrgBranding } from "@/lib/admin/branding-queries";
@@ -47,13 +46,16 @@ export default async function SourcingLayout({ children }: { children: React.Rea
   const profile = toUserProfile(user);
 
   // Résolution org (utilisée pour branding + billing).
-  // Typage explicite `string` pour pouvoir réassigner (ALYOS_ORG_ID est une
-  // const literal UUID — le TS strict refuserait l'union sinon).
-  let orgId: string = ALYOS_ORG_ID;
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
+  let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
-  } catch {
-    // Fallback silencieux
+  } catch (err) {
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // Chargement état billing (Steve 2026-06-05 — Stripe minimal MVP).

@@ -27,9 +27,8 @@ import { dossierDispatches } from "@/db/schema/dossier-dispatches";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { presentationLibrary } from "@/db/schema/library";
 import { libraryItemIndex } from "@/db/schema/library-index";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
 import { classifyLibraryExpiry } from "@/lib/library/expiry";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
@@ -74,14 +73,16 @@ export default async function PiecesPage(props: PageProps) {
   // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
   // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous).
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[dossier-pieces:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // 2. Validation UUID
