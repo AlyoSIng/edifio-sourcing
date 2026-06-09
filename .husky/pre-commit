@@ -1,2 +1,6 @@
 #!/bin/sh
-pnpm exec lint-staged
+# Pre-commit léger : Prettier seul (rapide, pas de switch de branche bug).
+# ESLint + typecheck tournent en pre-push (cf. .husky/pre-push).
+# Bug 3 occurrences nuit 8-9 juin 2026 (Yann ops, Alex Lot 1.7-bis, Sébastien quick start).
+# Binaire local pour contourner MEMORY env_pnpm_corepack.md.
+node ./node_modules/lint-staged/bin/lint-staged.js --config .lintstagedrc.pre-commit.json
