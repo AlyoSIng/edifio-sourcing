@@ -23,7 +23,7 @@ import {
  * publiques + nouveau préfixe admin).
  */
 describe("constantes", () => {
-  it("PUBLIC_ROUTES contient les routes publiques (étendu /pricing + /trial-expired ADR-014/T-billing)", () => {
+  it("PUBLIC_ROUTES contient les routes publiques (étendu /pricing + /trial-expired ADR-014/T-billing + /no-org Lot 1.6-bis)", () => {
     expect(PUBLIC_ROUTES).toEqual([
       "/",
       "/about",
@@ -34,6 +34,7 @@ describe("constantes", () => {
       "/forgot-password",
       "/reset-password",
       "/trial-expired",
+      "/no-org",
     ]);
   });
 
