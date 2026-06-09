@@ -19,11 +19,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { tenders } from "@/db/schema/tenders";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import {
   getTenderCotraitant,
@@ -41,27 +39,33 @@ export const metadata = {
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default async function TandemCotraitantPage({ params }: PageProps) {
+export default async function TandemCotraitantPage(props: PageProps) {
+  const params = await props.params;
   // Auth check défensif
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/tandem/cotraitant`);
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous,
+  // rôle admin pour les actions sensibles plus bas).
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[ao-tandem-cotraitant:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   if (!UUID_SHAPE.test(params.id)) {

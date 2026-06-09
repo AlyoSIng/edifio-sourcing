@@ -19,9 +19,8 @@ import { sql, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db/client";
 import { aiPrompts, aiRuns } from "@/db/schema/ai";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import {
   RangeFilter,
@@ -74,12 +73,13 @@ function formatMonth(yyyyMm: string): string {
 // ---------------------------------------------------------------------------
 
 interface PageProps {
-  searchParams?: { range?: string; from?: string; to?: string };
+  searchParams?: Promise<{ range?: string; from?: string; to?: string }>;
 }
 
-export default async function IaUsagePage({ searchParams }: PageProps) {
+export default async function IaUsagePage(props: PageProps) {
+  const searchParams = await props.searchParams;
   // 1. Auth + superadmin guard.
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -98,13 +98,17 @@ export default async function IaUsagePage({ searchParams }: PageProps) {
     ? `${custom.from.toLocaleDateString("fr-FR")} → ${custom.to.toLocaleDateString("fr-FR")}`
     : `${range} j`;
 
-  // 2. Résolution dynamique de l'org (fallback ALYOS_ORG_ID).
+  // 2. Résolution dynamique de l'org.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[admin-ia-usage:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // 3. Chargement des agrégats.

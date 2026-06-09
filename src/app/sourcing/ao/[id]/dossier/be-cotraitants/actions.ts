@@ -32,9 +32,7 @@ import { db } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { tenderBeCotraitants } from "@/db/schema/tender-cotraitants";
 import { tenders } from "@/db/schema/tenders";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
-import { toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // ---------------------------------------------------------------------------
@@ -73,13 +71,12 @@ async function getAuthenticatedContext(): Promise<
   | { ok: true; userId: string; orgId: string }
   | { ok: false; error: "not_authenticated" | "forbidden_domain" }
 > {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const orgId = await getRequiredOrgId(user.id);
   return { ok: true, userId: user.id, orgId };
 }

@@ -1,12 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
+import Link from "next/link";
 
 import { db } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { BE_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
 
 import { listBeDocuments } from "../actions";
@@ -37,7 +37,7 @@ export async function generateMetadata() {
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 export default async function BEFichePage({ params }: { params: { id: string } }) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -45,14 +45,16 @@ export default async function BEFichePage({ params }: { params: { id: string } }
   const profile = toUserProfile(user);
   const adminUser = isAdmin(profile);
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[be-detail:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   let be: Awaited<ReturnType<typeof fetchBE>> | null = null;
@@ -72,9 +74,9 @@ export default async function BEFichePage({ params }: { params: { id: string } }
   return (
     <div className="mx-auto max-w-3xl">
       <nav aria-label="Fil d'Ariane" className="mb-4 text-xs text-muted">
-        <a href="/sourcing/bureaux-etudes" className="hover:underline">
+        <Link href="/sourcing/bureaux-etudes" className="hover:underline">
           Bureaux d&rsquo;Études
-        </a>
+        </Link>
         {" / "}
         <span className="text-ink">{be?.cabinet ?? params.id}</span>
       </nav>

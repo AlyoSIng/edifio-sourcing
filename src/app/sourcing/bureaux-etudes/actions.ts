@@ -21,9 +21,7 @@ import { db as defaultDb } from "@/db/client";
 import { bureauEtudes } from "@/db/schema/bureaux-etudes";
 import { beDocuments, type BeDocument, type BeDocumentKind } from "@/db/schema/be-documents";
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import {
   getPappersBySiren,
@@ -44,8 +42,14 @@ export interface FetchBEPageParams {
   search?: string;
   specialty?: string;
   implantation?: string;
-  /** UUID de l'organisation courante (résolu par la page appelante). */
-  orgId?: string;
+  /**
+   * UUID de l'organisation courante (résolu par la page appelante via
+   * `getRequiredOrgId`). **Requis** depuis le Lot 1.6-bis (Hugo 2026-06-09) —
+   * plus de fallback `ALYOS_ORG_ID` silencieux qui fuyait cross-tenant
+   * (vuln CC-2). Le caller doit gérer le `NoOrganizationMembershipError`
+   * et rediriger vers `/no-org` avant d'appeler.
+   */
+  orgId: string;
 }
 
 export interface FetchBEPageResult {
@@ -108,8 +112,8 @@ async function requireAlyosUser(
     data: { user },
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
   const orgId = await getRequiredOrgId(user.id);
   return { ok: true, userId: user.id, orgId, profile };
 }
@@ -119,11 +123,10 @@ async function requireAlyosUser(
 // ============================================================================
 
 export async function fetchBEPage(
-  params: FetchBEPageParams = {},
+  params: FetchBEPageParams,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<FetchBEPageResult> {
-  const { page = 1, search, specialty, implantation, orgId: paramOrgId } = params;
-  const resolvedOrgId = paramOrgId ?? ALYOS_ORG_ID;
+  const { page = 1, search, specialty, implantation, orgId: resolvedOrgId } = params;
   const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
   const conditions = [eq(bureauEtudes.organizationId, resolvedOrgId)];
@@ -181,7 +184,7 @@ export async function upsertBE(
   id?: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<UpsertBEResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
@@ -239,7 +242,7 @@ export async function upsertBE(
  * Upsert par `(organizationId, email)` si email présent, sinon INSERT.
  */
 export async function importBEFromCsv(formData: FormData): Promise<ImportBEResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) {
@@ -434,7 +437,7 @@ export async function uploadBeDocument(
   expiresAt?: Date | null,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<BeDocumentActionResult<{ id: string }>> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -520,7 +523,7 @@ export async function deleteBeDocument(
   documentId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<BeDocumentActionResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -597,7 +600,7 @@ export async function getBeDocumentUrl(
   documentId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<BeDocumentActionResult<{ url: string }>> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   const { orgId: urlOrgId } = authResult;
@@ -645,7 +648,7 @@ export async function listBeDocuments(
   beId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<BeDocumentRow[]> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return [];
   const { orgId: listOrgId } = authResult;
@@ -714,7 +717,7 @@ export type EnrichSingleResult =
  * @param beId UUID du bureau d'études à enrichir
  */
 export async function enrichSingleBEFromPappers(beId: string): Promise<EnrichSingleResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -886,7 +889,7 @@ export async function deleteBEAction(
   beId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<DeleteBEResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);

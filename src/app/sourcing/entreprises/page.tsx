@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { COMPANY_SPECIALTY_CODES } from "@/lib/architects/specialty-codes";
 import type { Company } from "@/db/schema/companies";
 
@@ -35,21 +35,23 @@ interface SearchParams {
 }
 
 export default async function EntreprisesPage({ searchParams }: { searchParams: SearchParams }) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/entreprises");
   const profile = toUserProfile(user);
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[entreprises:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
@@ -91,12 +93,12 @@ export default async function EntreprisesPage({ searchParams }: { searchParams: 
         </div>
         {adminUser ? (
           <div className="flex shrink-0 flex-wrap gap-2">
-            <a
+            <Link
               href="/sourcing/entreprises/nouveau"
               className="hover:bg-brand-red/90 focus:ring-brand-red/40 inline-flex h-8 items-center rounded-full bg-brand-red px-3 text-xs font-medium text-white focus:outline-none focus:ring-2"
             >
               + Ajouter une entreprise
-            </a>
+            </Link>
             <CsvImportModal type="company" />
           </div>
         ) : null}
@@ -190,12 +192,12 @@ function FilterBar({
       >
         Filtrer
       </button>
-      <a
+      <Link
         href="/sourcing/entreprises"
         className="inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-xs text-muted hover:text-ink"
       >
         Réinitialiser
-      </a>
+      </Link>
     </form>
   );
 }

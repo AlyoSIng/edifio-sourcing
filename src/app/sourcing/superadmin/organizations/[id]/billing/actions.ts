@@ -28,7 +28,7 @@ export interface BillingActionResult {
 }
 
 async function assertSuperadmin(): Promise<BillingActionResult | null> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

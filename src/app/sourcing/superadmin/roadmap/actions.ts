@@ -7,10 +7,9 @@
  *   - `saveRoadmapUrlAction` : UPSERT de l'URL dans `app_content`
  *     avec la clé 'roadmap_pdf_url'.
  *
- * Triple garde d'authentification :
+ * Double garde d'authentification (ADR-014 retire la garde domaine) :
  *   1. Session Supabase valide
- *   2. Domaine autorisé (`isAuthorizedEmail`)
- *   3. Rôle superadmin (`isSuperAdmin`)
+ *   2. Rôle superadmin (`isSuperAdmin`)
  *
  * Décision Board 2026-05-27 — module superadmin éditeur edifio.
  */
@@ -19,7 +18,6 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
 import { appContent } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -29,17 +27,17 @@ const ROADMAP_PDF_KEY = "roadmap_pdf_url" as const;
 // ─── Guard interne ────────────────────────────────────────────────────────────
 
 /**
- * Vérifie la triple garde (session + domaine + superadmin).
+ * Vérifie la double garde (session + superadmin).
+ * ADR-014 (2026-06-05) : garde domaine retirée — ouverture multi-tenant.
  * Retourne l'ID du superadmin connecté, ou une erreur.
  */
 async function requireSuperadmin(): Promise<{ userId: string } | { error: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Non authentifié." };
-  if (!isAuthorizedEmail(user.email)) return { error: "Domaine non autorisé." };
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) return { error: "Accès réservé au superadmin." };
 

@@ -18,8 +18,8 @@ import { cookies } from "next/headers";
  * les cookies de `NextRequest` / `NextResponse` (cf. spec §3.1) — on ne
  * réutilise pas ce helper dans le middleware.
  */
-export function createSupabaseServerClient() {
-  const cookieStore = cookies();
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     requireEnv("NEXT_PUBLIC_SUPABASE_URL"),

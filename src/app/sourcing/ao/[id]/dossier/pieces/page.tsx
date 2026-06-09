@@ -27,11 +27,8 @@ import { dossierDispatches } from "@/db/schema/dossier-dispatches";
 import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { presentationLibrary } from "@/db/schema/library";
 import { libraryItemIndex } from "@/db/schema/library-index";
-import { toUserProfile } from "@/lib/auth/types";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { matchPiecesWithLibrary } from "@/lib/dossier/pieces-match";
 import { classifyLibraryExpiry } from "@/lib/library/expiry";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
@@ -47,7 +44,7 @@ export const metadata = {
 };
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   /**
    * Query params :
    *   - `archi` : UUID de l'architecte sélectionné pour préparer son dossier
@@ -58,29 +55,34 @@ interface PageProps {
    *     exclusif avec `archi` — si les deux sont posés, `archi` prime. Sert
    *     uniquement à la compilation du ZIP (DC2 spécifique BE) et au hint UX.
    */
-  searchParams?: { archi?: string; be?: string };
+  searchParams?: Promise<{ archi?: string; be?: string }>;
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-export default async function PiecesPage({ params, searchParams }: PageProps) {
+export default async function PiecesPage(props: PageProps) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // 1. Auth check défensif
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/dossier/pieces`);
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous).
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[dossier-pieces:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // 2. Validation UUID

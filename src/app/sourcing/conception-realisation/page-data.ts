@@ -61,7 +61,8 @@ export type LoadCrResult =
 /**
  * Charge les données du pipeline Conception/Réalisation.
  *
- * @param organizationId - UUID du tenant courant (ALYOS_ORG_ID en MVP)
+ * @param organizationId - UUID du tenant courant (résolu par le caller via
+ *                         `getRequiredOrgId(user.id)`)
  * @param deps           - injection pour tests (db mockable)
  */
 export async function loadCrPipelineData(

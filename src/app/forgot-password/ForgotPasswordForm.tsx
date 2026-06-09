@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 
 import { requestPasswordResetAction } from "./actions";
 import { initialForgotPasswordState, type ForgotPasswordState } from "./types";
@@ -13,7 +14,7 @@ import { initialForgotPasswordState, type ForgotPasswordState } from "./types";
  * distingue jamais « email inconnu » de « email envoyé ».
  */
 export function ForgotPasswordForm() {
-  const [state, formAction] = useFormState<ForgotPasswordState, FormData>(
+  const [state, formAction] = useActionState<ForgotPasswordState, FormData>(
     requestPasswordResetAction,
     initialForgotPasswordState,
   );

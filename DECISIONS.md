@@ -2,57 +2,116 @@
 
 ---
 
-## 2026-06-08 — Apprentissage par écartement (Salve U) — [DEV Alex]
+## 2026-06-09 — Migration 0052 RLS Lot 1.7-bis (FORCE + helper monorepo + naming + restriction anon)
 
-**Contexte** : quand l'utilisateur écarte des AO avec un motif structuré
-récurrent, l'app propose d'ajuster le profil de recherche (qui pilote l'algo).
-Human-in-the-loop : suggestion validée par l'admin, jamais d'auto-modification.
-Branche `feat/learning-ecartement`.
+**Agent** : Alex (`dev`)
+**Contexte** : alignement pattern monorepo `alyos-suivi-chantier` (bascule prévue 18 juillet 2026) sur les 3 tables fixées par 0051 (Lot 1.7). Demande Sébastien (`suivi_act_reviewer`) + flag Camille (`qa`) CC-1 sur FORCE RLS.
 
-**Distinction sémantique cruciale (actée Steve)** :
-- **« Écarter »** (`rejectTenderAction`, avec motif) → ALIMENTE l'apprentissage
-  → peut modifier l'algo après validation humaine.
-- **« Exclure »** (`excludeTenderAction`) → reste NEUTRE, zéro effet algo.
-  Inchangé.
+**4 ajustements appliqués** :
 
-**Décisions actées** :
+1. **Helper `public.current_user_org_id()`** SECURITY DEFINER + `SET search_path = public, pg_temp`, lookup `memberships` (au lieu du JWT claim `current_organization_id()`). GRANT EXECUTE TO authenticated, anon. Pattern aligné `C:\Dev\alyos-suivi-chantier\app\db\migrations\0001_init.sql:321-330`. **Créé mais PAS encore utilisé dans les policies** : la bascule de la valeur lue par les policies sera faite par Sébastien lors du Lot 2 monorepo, après audit + wrap des call sites manquants. Cette fonction est posée ici pour qu'elle soit déjà disponible côté BDD prod le 18/07.
 
-1. **6 motifs structurés** (`src/lib/sourcing/learning/rejection-reasons.ts`) :
-   `out_of_area` (→ geoZones[], actionnable), `budget_too_low` (→ amountMin,
-   actionnable), `out_of_scope` (→ keywords.negative[], actionnable),
-   `deadline_too_short`, `too_competitive`, `other` (tracés seulement).
+2. **Naming `<table>_<action>`** : remplacement de `tenant_isolation` / `admin_write` / `admin_update` / `public_token_read` / `public_token_update_signed` par :
+   - `companies_select`, `companies_insert`, `companies_update`, `companies_delete`
+   - `bureaux_etudes_select`, `bureaux_etudes_insert`, `bureaux_etudes_update`, `bureaux_etudes_delete`
+   - `cotraitant_shares_select`, `cotraitant_shares_select_public`, `cotraitant_shares_insert`, `cotraitant_shares_update`, `cotraitant_shares_delete`
+   - `cotraitant_share_items_select`, `cotraitant_share_items_select_public`, `cotraitant_share_items_update_signed`
+   Choix PERMISSIVE 1 policy par action (vs RESTRICTIVE + tenant_isolation Lot 1.7) — aligne sémantique monorepo Suivi+ACT (Q2 supabase-js direct).
 
-2. **Seuil de suggestion** : 3 AO écartés avec le même motif actionnable sur
-   les 30 derniers jours glissants (`SUGGESTION_THRESHOLD=3`,
-   `SUGGESTION_WINDOW_DAYS=30`).
+3. **FORCE ROW LEVEL SECURITY** sur `companies`, `bureaux_etudes`, `cotraitant_shares`, `cotraitant_share_items` (CC-1 Camille). Analyse risque :
+   - Rôle prod `postgres` (DATABASE_URL) reste `rolbypassrls=true` côté Supabase → FORCE ne s'applique pas. Pages Next.js Server fonctionnent identiquement.
+   - Rôle `service_role` (Edge Functions cron) sans BYPASSRLS → FORCE s'applique. C'est le comportement voulu par CC-1 (sinon cron sourcing voit tout cross-tenant).
+   - Patterns 0009, 0018, 0022, 0027, 0038, 0041, 0046, 0048 prouvent que FORCE n'a jamais cassé la prod.
+   - Fallback en cas de régression : migration 0053 `NO FORCE` en attendant Lot 2 monorepo Sébastien.
 
-3. **Migration 0050** (`0050_learning_payload.sql`, idempotente, pas de
-   backfill) : ajout sur `learning_events` de `payload jsonb` (snapshot tender :
-   buyer, cpv_codes, geo_zone/department, amount), `reason_code text` (distinct
-   de `motif_category` réservé à la catégorisation IA P9), `applied_at` et
-   `dismissed_at` timestamptz (état de traitement de la suggestion). Index
-   partiel `idx_learning_events_org_reason`. **Validée en dry-run local
-   Postgres 15** (DDL + idempotence). Application manuelle par Steve (Q8).
+4. **Restriction anon `cotraitant_shares` / `cotraitant_share_items`** : remplacement de `USING (TRUE)` par contraint `revoked_at IS NULL AND expires_at > now()` (défense en profondeur). Dual-policy SELECT sur `cotraitant_shares` :
+   - `cotraitant_shares_select` (auth, org-scoped, voit tout y compris expirés — préserve audit `/sourcing/ao/[id]/tandem/partage`)
+   - `cotraitant_shares_select_public` (anon, contraint share actif)
+   Le UPDATE signed du flow public `/api/cotraitant/[token]/upload` est désormais contraint sur parent share actif.
 
-4. **Nouvelle signature** `rejectTenderAction(tenderId, reasonCode, verbatim,
-   deps)`. Rétrocompat : `reasonCode` absent/invalide → `'other'`. L'écriture
-   `learning_events` est **best-effort POST-COMMIT** (hors transaction métier) :
-   un échec n'empêche JAMAIS le rejet ni ne rollback. Choix d'archi : placer
-   l'INSERT learning hors TX évite d'empoisonner la transaction de rejet
-   (Postgres « current transaction is aborted »).
+**Tests pgTAP adaptés** :
+- `tests/rls/13_companies_isolation.sql` : 7 → 12 assertions (+ FORCE + 4 naming policies)
+- `tests/rls/14_cotraitant_shares_isolation.sql` : 7 → 13 assertions (+ FORCE + 5 naming + helper `current_user_org_id` + test anon expires_at bloqué)
+- `tests/rls/15_bureaux_etudes_isolation.sql` : 7 → 12 assertions (+ FORCE + 4 naming policies)
+- Total : 21 → 37 assertions sur les 3 tests.
 
-5. **Suggestions** : calcul pur `computeSuggestions` (hors I/O, testé), affiché
-   dans `/sourcing/admin/search-profiles` (admin-only). Actions
-   `applyProfileSuggestionAction` (revalide le change côté serveur, patch profil
-   par défaut, marque `applied_at`, audit A3) + `dismissSuggestionAction`
-   (marque `dismissed_at`, audit A3). Panneau masqué si aucune suggestion.
+**Action Steve (ops)** : appliquer migration 0052 en preview puis prod via SQL Editor Supabase après merge PR. Aucune régression attendue runtime page (rôle `postgres` BYPASSRLS).
 
-6. **Audit** : réutilise A3 `search_profile_change` (operation `update`) — pas
-   de nouvelle valeur d'enum `audit_action` requise.
+**Migration** : `src/db/migrations/0052_rls_lot17_bis_force_helper_naming.sql` + entrée `idx 52` dans `meta/_journal.json` (timestamp 1779731009000).
 
-7. **Guide formation 18** (`apprentissage-ecartement`, displayOrder 18) ajouté
-   à `formations-content-fixture.ts`. Tooltip « Écarter » rétabli en texte vrai
-   (le motif sert maintenant aux suggestions).
+---
+
+## 2026-06-08 — Migration 0051 RLS fix companies + cotraitant_shares + bureaux_etudes (Lot 1.7)
+
+**Agent** : Alex (`dev`)
+**Contexte** : audit sécurité Hugo (`gates/REVIEW_HUGO_PR121_RISQUES_SECU.md`) +
+audit final main (`gates/AUDIT_SECU_FINAL_MAIN_260608.md`) ont flag VETO conditionnel :
+**3 tables sans RLS en prod actuelle**, dette pré-existante amplifiée par la bascule
+multi-tenant prévue le 18 juillet 2026 (migration vers monorepo `alyos-suivi-chantier`).
+
+**Tables fixées** :
+- `companies` (migration 0011, annuaire entreprises BTP/majors)
+- `bureaux_etudes` (migration 0011, annuaire BE partenaires)
+- `cotraitant_shares` (migration 0014, tokens partage cotraitant)
+- `cotraitant_share_items` (migration 0014, items rattachés au share)
+
+**Stratégie retenue — ENABLE seul, PAS de FORCE** (zone orange) :
+
+Le pattern Sourcing utilise `current_organization_id()` qui lit le JWT Supabase
+OU `app.current_organization_id` posé par `withTenantContext()` (cf. 0028). Or les
+actions sur ces 3 tables (`entreprises/actions.ts`, `bureaux-etudes/*`,
+`cotraitant/[token]/page.tsx`) utilisent `db` Drizzle direct **SANS**
+`withTenantContext`. Si on pose FORCE RLS :
+- rôle postgres (DATABASE_URL prod) cesse de bypass FORCE RLS
+- `current_organization_id()` renvoie NULL → policy `tenant_isolation` rejette tout
+- pages annuaires + flow public cotraitant cassent en prod
+
+C'est exactement le bug fixé en PR #86 (28 mai 2026 — `fetchArchitectsPage` qui ne
+wrappait pas dans `withTenantContext`). FORCE RLS sans wrap préalable = régression.
+
+**Décision** :
+1. **Lot 1.7 (ce commit)** : ENABLE RLS + policies `tenant_isolation` (PERMISSIVE)
+   + `admin_write`/`admin_update` (RESTRICTIVE) sur `companies` + `bureaux_etudes`.
+   ENABLE + `public_token_read` + `public_token_update_signed` sur `cotraitant_shares`
+   et `cotraitant_share_items` pour préserver le flow public `/cotraitant/[token]`.
+2. **Lot 1.7-bis (futur PR)** : audit exhaustif des call sites, wrap systématique
+   dans `withTenantContext`, puis FORCE RLS. Conditionne à passer en revue les
+   ~5 modules concernés (entreprises, bureaux-etudes, cotraitant, dossier ZIP).
+
+**Effet net** :
+- **CI** (pg_prove, rôle `test_authenticated` NOINHERIT) : RLS appliquée,
+  tests 13-14-15 (21 assertions) vérifient l'isolation cross-tenant + flux public.
+- **Runtime prod actuel** (rôle postgres BYPASSRLS sur ENABLE) : zéro régression
+  page. Comportement utilisateur préservé.
+- **Future migration** vers rôle Supabase `authenticated` (SDK client) : la RLS
+  s'active automatiquement, multi-tenant garanti.
+
+**Choix `cotraitant_shares` flow public** :
+- Policy `public_token_read FOR SELECT USING (TRUE)` — la sécurité repose sur
+  l'entropie du token (UUID v4 = 122 bits non devinable + `expires_at` + `revoked_at`
+  vérifiés côté code).
+- TODO Lot 1.7-bis : remplacer `USING (TRUE)` par un check sur paramètre
+  `app.cotraitant_token` posé par middleware, pour scoper l'accès au seul token
+  présenté dans l'URL.
+
+**Tests pgTAP créés** :
+- `tests/rls/13_companies_isolation.sql` (7 assertions)
+- `tests/rls/14_cotraitant_shares_isolation.sql` (7 assertions)
+- `tests/rls/15_bureaux_etudes_isolation.sql` (7 assertions)
+Pattern aligné sur `02_tenant_isolation.sql` + `09_tandem_tables.sql`.
+
+**Validation locale** (Docker postgres:15 sur port 5435) :
+- Migrations 0000-0032 + 0051 appliquées sans erreur via `tsx src/db/migrate.ts`
+- 21/21 assertions pgTAP pass sur les nouveaux tests
+- Tests existants (00, 01, 02, 09) restent verts
+- Vitest : 79 files, 1215 tests pass
+- ESLint + TypeScript : 0 erreur
+
+**Action Steve (ops)** : appliquer migration 0051 en preview puis prod via SQL Editor
+Supabase après merge PR.
+
+**Migration** : `src/db/migrations/0051_rls_fix_companies_cotraitant_shares_be.sql`
++ ajout entrée `idx 51` dans `meta/_journal.json` (timestamp 1779731008000).
 
 ---
 
@@ -2501,3 +2560,64 @@ UPSERT par id UUID déterministe).
 Le guide se range naturellement à la fin de la liste (14e place
 après les 13 existants), accessible depuis `/sourcing/profil/formations`
 côté utilisateur.
+
+---
+
+## 2026-06-08 — Migration vers monorepo : Lot 1 + Lot 1.5 livrés en 1 nuit
+
+### Décisions
+
+1. **Lot 1 — Upgrade Next 14.2.35 → 15.5.18 / React 18.3 → 19.0.0** mergé sur `main` via PR #115 (`92346b9`).
+   - Versions pinned exactes pour matcher monorepo Suivi+ACT (réco Sébastien suivi_act_reviewer).
+   - Codemod `next-async-request-api` : 34 fichiers (`params` async, `cookies()` async).
+   - Codemod `useFormState` → `useActionState` manuel sur 3 forms (CLI codemod indispo Windows ARM64).
+   - Fix règle ESLint Next 15 `no-html-link-for-pages` : 12 fichiers, `<a>` → `<Link>`.
+   - Effort réel : ~2h vs 22h estimé brief migration v2.
+
+2. **Lot 1.5 — Refactor `createSupabaseServerClient` async** mergé sur `main` via PR #118 (`8106245`).
+   - Dette identifiée par Sébastien lors de la review PR #115 : hack `cookies() as unknown as UnsafeUnwrappedCookies` à éliminer pour matcher pattern monorepo (`await cookies()` + `async function createClient()`).
+   - Périmètre : 1 source refactor + 157 await propagés sur 105 fichiers (call sites Server Components, Server Actions, Route Handlers).
+   - Script jetable `scripts/propagate-await-supabase.mjs` pour propager mécaniquement (regex `(?<!await )createSupabaseServerClient\(\)`).
+   - Validations : typecheck 0 erreur, vitest 1218/1218 verts, recette Camille 8 OK / 0 KO.
+   - Sébastien APPROUVÉ après 1 fix cosmétique (retrait import `UnsafeUnwrappedCookies` orphelin).
+
+3. **Scripts ops migration** mergés sur `main` via PR #117 (`79d201a`).
+   - 4 scripts PowerShell + README dans `scripts/migration/` (Yann ps_operator).
+   - `backup-sourcing-db.ps1` + `backup-suiviact-db.ps1` (pg_dump via Direct connection 5432, refuse port pooler 6543).
+   - `export-vercel-env.ps1` + `backup-supabase-storage.ps1`.
+   - 2 fixes mineurs Hugo à appliquer avant J-7 : closure scope + option `-Encrypt` (age).
+
+4. **Dettes à porter au Lot 2 monorepo** (identifiées par Sébastien + Hugo lors des reviews) :
+   - Rename `createSupabaseServerClient` → `createClient` (cosmétique, 157 occurrences) pour matcher exact nom monorepo
+   - Arbitrage emplacement `COOKIE_DOMAIN` (server.ts Sourcing vs middleware monorepo)
+   - Fusion `createSupabaseAdminClient` avec helper admin monorepo
+   - Migration vers pattern `lib/db/<entity>.ts` (vs Drizzle pur actuel)
+   - ESLint `import/no-restricted-paths` à activer au portage
+   - Reconfig Husky `pre-push` ESLint full + `pre-commit` léger (résout les bypass `--no-verify` observés cette nuit)
+   - Audit cache Next 15 sur route handlers GET (déjà OK : 4 routes GET sont des crons → non caché par défaut = volonté produit)
+
+5. **Bug git identifié** : le hook `lint-staged` exécute parfois un `git checkout` automatique qui peut basculer sur une autre branche au moment du commit. Vu 2 fois cette nuit (Yann puis moi). Reco Sébastien : reconfig Husky `pre-push` (ESLint full) + `pre-commit` léger (Prettier seul). Ticket Lot 1.5 documenté dans CR migration.
+
+### Reviews croisées (4 documents)
+
+- `gates/REVIEW_SUIVI_ACT_PR115.md` : Sébastien sur Lot 1 — CHANGEMENT REQUIS non bloquant
+- `gates/REVIEW_SUIVI_ACT_PR116.md` : Sébastien sur Lot 1.5 — APPROUVÉ après fix cosmétique
+- `gates/REVIEW_HUGO_PR115.md` : Hugo sur Lot 1 — APPROUVÉ SOUS RÉSERVE (fix B5 fait)
+- `gates/REVIEW_HUGO_PR117.md` : Hugo sur scripts ops — APPROUVÉ SOUS RÉSERVE
+- `gates/RECETTE_PR_115_116_LOT1_LOT15.md` : Camille recette croisée Lot 1+1.5 — 8 OK / 0 KO
+
+### PR statut
+
+- **#113** Salve U apprentissage : OUVERTE (recette E2E + review Hugo livrés, attente application migration 0050 en preview Vercel)
+- **#114** POC chromium-min : DRAFT (action Steve : bench preview Vercel + SPIKE_TOKEN)
+- **#115** Lot 1 upgrade Next 15 : **MERGÉE** (`92346b9`)
+- **#116** Lot 1.5 refactor async : FERMÉE (remplacée par #118 après rebase propre)
+- **#117** Scripts ops migration : **MERGÉE** (`79d201a`)
+- **#118** Lot 1.5 refactor async v2 : **MERGÉE** (`8106245`)
+
+### En cours (background)
+
+- Alex : handoff exhaustif vers Sébastien (`docs/HANDOFF_MIGRATION_SOURCING_TO_MONOREPO.md`)
+- Yann : 2 fixes Hugo sur scripts ops (`ops/fix-hugo-findings`)
+- Camille : workflow GitHub Actions E2E Playwright preview Vercel (`ci/e2e-playwright-preview-vercel`)
+

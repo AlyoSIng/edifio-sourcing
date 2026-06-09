@@ -4,7 +4,7 @@
  * Server Component — Phase 2 (implémentation complète).
  *
  * Fonctionnalités :
- *   - Triple garde (session + domaine + superadmin)
+ *   - Double garde (session + superadmin) — ADR-014 retire la garde domaine
  *   - Lecture de `app_content` WHERE key = 'market_study_url' (Drizzle)
  *   - Si URL configurée : `MarketStudyViewer` (iframe + bouton "Modifier l'URL")
  *   - Si pas d'URL : `MarketStudyForm` (formulaire de configuration initiale)
@@ -19,7 +19,6 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { appContent } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -39,16 +38,13 @@ const MARKET_STUDY_KEY = "market_study_url";
 
 export default async function SuperadminMarketStudyPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/superadmin/market-study");
 
-  // Garde 2 — domaine
-  if (!isAuthorizedEmail(user.email)) redirect("/forbidden");
-
-  // Garde 3 — superadmin
+  // Garde 2 — superadmin (ADR-014 : garde domaine retirée)
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 

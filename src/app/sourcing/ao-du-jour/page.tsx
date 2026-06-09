@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { isAdmin, isSuperAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import {
   getActiveSearchProfileKeywords,
@@ -12,8 +12,6 @@ import {
 } from "@/lib/sourcing/queries";
 import { listSearchProfiles } from "@/lib/profile/search-profiles-queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { EmptyState } from "./EmptyState";
 import { ErrorBanner } from "./ErrorBanner";
@@ -63,27 +61,28 @@ export const dynamic = "force-dynamic";
  *    la largeur, conforme M-A (la grille 3 colonnes de la PR n°4 n'est pas
  *    dans la maquette définitive).
  */
-export default async function AoDuJourPage({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>;
+export default async function AoDuJourPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const searchParams = await props.searchParams;
   // Auth check défensif (le middleware a normalement déjà filtré).
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/ao-du-jour");
   const profile = toUserProfile(user);
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[ao-du-jour:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // -------------------------------------------------------------------------

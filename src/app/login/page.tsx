@@ -21,11 +21,10 @@ export const metadata = {
  *
  * Pivot Board 2026-05-11 : email + password (cf. `signInWithPasswordAction`).
  */
-export default function Login({
-  searchParams,
-}: {
-  searchParams?: { error?: string; notice?: string; next?: string };
+export default async function Login(props: {
+  searchParams?: Promise<{ error?: string; notice?: string; next?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const errorParam = searchParams?.error;
   const noticeParam = searchParams?.notice;
   const next = searchParams?.next;

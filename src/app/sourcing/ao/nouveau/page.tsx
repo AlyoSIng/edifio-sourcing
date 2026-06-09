@@ -19,7 +19,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { PrivateTenderForm } from "./PrivateTenderForm";
@@ -33,13 +32,15 @@ export const metadata = {
 
 export default async function NouvelAOPage() {
   // Auth check
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/ao/nouveau");
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). La garde de rôle
+  // admin reste appliquée juste après.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
 
   // Réservé aux admins
   if (!isAdmin(profile)) {

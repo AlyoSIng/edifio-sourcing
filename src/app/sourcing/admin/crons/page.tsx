@@ -50,7 +50,7 @@ function formatDateTime(iso: string | null): string {
 }
 
 export default async function CronsPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

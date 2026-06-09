@@ -27,11 +27,8 @@
 import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { TandemShortlistClient } from "./TandemShortlistClient";
 import { loadTandemShortlistData } from "./page-data";
@@ -44,7 +41,7 @@ export const metadata = {
 };
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -105,24 +102,28 @@ const DEPT_LABELS: Record<string, string> = {
   "2B": "Haute-Corse",
 };
 
-export default async function TandemShortlistPage({ params }: PageProps) {
+export default async function TandemShortlistPage(props: PageProps) {
+  const params = await props.params;
   // Auth check défensif (le middleware a normalement déjà filtré).
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/tandem`);
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous).
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[ao-tandem:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   if (!UUID_SHAPE.test(params.id)) {

@@ -10,6 +10,7 @@
  */
 
 import { useTransition, useState } from "react";
+import Link from "next/link";
 
 import { useRouter } from "next/navigation";
 
@@ -471,9 +472,9 @@ export function BECreateForm() {
           >
             {pending ? "Création en cours…" : "Créer le bureau d'études"}
           </button>
-          <a href="/sourcing/bureaux-etudes" className="text-sm text-muted hover:text-ink">
+          <Link href="/sourcing/bureaux-etudes" className="text-sm text-muted hover:text-ink">
             Annuler
-          </a>
+          </Link>
         </div>
       </fieldset>
     </form>

@@ -28,11 +28,10 @@ export const metadata = {
  *
  * Habillage DS edifio aligné `/login` et `/forbidden`.
  */
-export default function AuthErrorPage({
-  searchParams,
-}: {
-  searchParams?: { code?: string; description?: string };
+export default async function AuthErrorPage(props: {
+  searchParams?: Promise<{ code?: string; description?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   const year = new Date().getFullYear();
   const code = searchParams?.code ?? "unknown";
   const { title, message, actionLabel, actionHref } = describeError(code);

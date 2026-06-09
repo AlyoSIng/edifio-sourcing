@@ -19,10 +19,9 @@ import { architects } from "@/db/schema/architects";
 import { architectResponses, architectTokens } from "@/db/schema/selections";
 import { tenders } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { markArchitectNotificationsSeen } from "@/lib/notifications/architect-responses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import {
   RangeFilter,
@@ -44,7 +43,7 @@ export const runtime = "nodejs";
 // ---------------------------------------------------------------------------
 
 interface PageProps {
-  searchParams?: { range?: string; from?: string; to?: string };
+  searchParams?: Promise<{ range?: string; from?: string; to?: string }>;
 }
 
 function formatDateForInput(d: Date): string {
@@ -54,9 +53,10 @@ function formatDateForInput(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export default async function TandemActivityPage({ searchParams }: PageProps) {
+export default async function TandemActivityPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   // 1. Auth + admin.
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -64,12 +64,16 @@ export default async function TandemActivityPage({ searchParams }: PageProps) {
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[admin-tandem-activity:org:fail]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // H7 — marque les notifications comme vues à l'ouverture de la page.

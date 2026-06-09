@@ -4,7 +4,7 @@
  * Server Component — Phase 2 (implémentation complète).
  *
  * Fonctionnalités :
- *   - Triple garde (session + domaine + superadmin)
+ *   - Double garde (session + superadmin) — ADR-014 retire la garde domaine
  *   - Récupération de tous les tickets depuis `support_tickets` (Drizzle)
  *   - Résolution email → userId via `auth.admin.listUsers`
  *   - Filtre par statut via URL searchParam `?status=open|in_progress|closed|all`
@@ -25,7 +25,6 @@ import { desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { supportTickets } from "@/db/schema/superadmin";
 import type { SupportTicket } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -44,22 +43,18 @@ type StatusFilter = "all" | "open" | "in_progress" | "closed";
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
-export default async function SuperadminSupportPage({
-  searchParams,
-}: {
-  searchParams: { status?: string };
+export default async function SuperadminSupportPage(props: {
+  searchParams: Promise<{ status?: string }>;
 }) {
+  const searchParams = await props.searchParams;
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/superadmin/support");
 
-  // Garde 2 — domaine
-  if (!isAuthorizedEmail(user.email)) redirect("/forbidden");
-
-  // Garde 3 — superadmin
+  // Garde 2 — superadmin (ADR-014 : garde domaine retirée)
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 
@@ -226,7 +221,6 @@ function TicketCard({ ticket, authorEmail }: { ticket: SupportTicket; authorEmai
           {badgeLabel}
         </span>
       </div>
-
       {/* Corps */}
       <div className="px-4 py-4">
         <h3 className="mb-2 text-sm font-semibold text-ink">{ticket.subject}</h3>

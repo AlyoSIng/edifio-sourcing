@@ -17,8 +17,6 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
 import { cotraitantShareItems, cotraitantShares } from "@/db/schema/sharing";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -45,14 +43,13 @@ export async function createShareSession(
   formData: FormData,
 ): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
   // Auth
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
 
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const orgId = await getRequiredOrgId(user.id);
 
   // Validation des champs
@@ -133,14 +130,13 @@ export async function createShareSession(
  * Après révocation, la page /cotraitant/[token] renvoie une erreur.
  */
 export async function revokeShare(shareId: string, tenderId: string): Promise<ActionResult> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
 
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const revokeOrgId = await getRequiredOrgId(user.id);
 
   if (!UUID_SHAPE.test(shareId)) return { ok: false, error: "invalid_input" };
@@ -172,14 +168,13 @@ export async function revokeShare(shareId: string, tenderId: string): Promise<Ac
 export async function getDownloadUrl(
   storagePath: string,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
 
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
 
   if (!storagePath || storagePath.includes("..")) {
     return { ok: false, error: "invalid_path" };

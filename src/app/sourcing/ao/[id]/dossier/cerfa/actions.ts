@@ -115,7 +115,7 @@ export interface ValidateCerfaResult {
 // ---------------------------------------------------------------------------
 
 async function getAuthenticatedUser() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -1,7 +1,7 @@
 /**
  * Page Superadmin — Détail d'une organisation — edifio Sourcing
  *
- * Server Component — triple garde (session + domaine + superadmin).
+ * Server Component — double garde (session + superadmin) — ADR-014 retire la garde domaine.
  *
  * Sections :
  *   - En-tête : nom org + tier badge + lien retour
@@ -14,7 +14,6 @@ import { notFound, redirect } from "next/navigation";
 
 import { db } from "@/db/client";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import {
   getOrganizationById,
@@ -49,7 +48,8 @@ const ROLE_LABEL: Record<string, string> = {
 
 // ─── Métadonnées dynamiques ───────────────────────────────────────────────────
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return {
     title: `Organisation ${params.id.slice(0, 8)}… — Superadmin — edifio Sourcing`,
   };
@@ -57,20 +57,18 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
-export default async function SuperadminOrgDetailPage({ params }: { params: { id: string } }) {
+export default async function SuperadminOrgDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { id } = params;
 
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/superadmin/organizations/${id}`);
 
-  // Garde 2 — domaine
-  if (!isAuthorizedEmail(user.email)) redirect("/forbidden");
-
-  // Garde 3 — superadmin
+  // Garde 2 — superadmin (ADR-014 : garde domaine retirée)
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 

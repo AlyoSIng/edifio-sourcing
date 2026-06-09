@@ -22,7 +22,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * un détail d'implémentation de `SignOutButton` (couplage attendu).
  */
 export async function signOutAction(): Promise<void> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   redirect("/login");
 }

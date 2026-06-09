@@ -6,10 +6,9 @@
  *     + met le statut à 'in_progress' + crée une notification in-app pour l'auteur.
  *   - `closeTicketAction`    : passe le statut d'un ticket à 'closed'.
  *
- * Triple garde d'authentification sur chaque action :
+ * Double garde d'authentification sur chaque action (ADR-014 retire la garde domaine) :
  *   1. Session Supabase valide
- *   2. Domaine autorisé (`isAuthorizedEmail`)
- *   3. Rôle superadmin (`isSuperAdmin`)
+ *   2. Rôle superadmin (`isSuperAdmin`)
  *
  * Décision Board 2026-05-27 — module superadmin éditeur edifio.
  */
@@ -22,7 +21,6 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { supportTickets, userNotifications } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -38,17 +36,17 @@ const ReplySchema = z.object({
 // ─── Guard interne ────────────────────────────────────────────────────────────
 
 /**
- * Vérifie la triple garde (session + domaine + superadmin).
+ * Vérifie la double garde (session + superadmin).
+ * ADR-014 (2026-06-05) : garde domaine retirée — ouverture multi-tenant.
  * Retourne l'ID du superadmin connecté, ou une erreur.
  */
 async function requireSuperadmin(): Promise<{ userId: string } | { error: string }> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Non authentifié." };
-  if (!isAuthorizedEmail(user.email)) return { error: "Domaine non autorisé." };
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) return { error: "Accès réservé au superadmin." };
 

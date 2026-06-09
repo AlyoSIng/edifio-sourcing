@@ -57,8 +57,6 @@ import { organizationProfiles } from "@/db/schema/messaging";
 import { withTenantContext } from "@/lib/db/with-tenant-context";
 import { tenders } from "@/db/schema/tenders";
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { toUserProfile } from "@/lib/auth/types";
 import { getBrevoClient, type BrevoClient } from "@/lib/brevo/client";
 import {
   defaultRegisterFromTutoiement,
@@ -180,8 +178,7 @@ async function requireAlyosUser(
     data: { user },
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const orgId = await getRequiredOrgId(user.id);
   return { ok: true, userId: user.id, orgId };
 }
@@ -205,7 +202,7 @@ export async function matchArchitectsForTender(
   deps: ActionDeps = {},
 ): Promise<MatchActionResult> {
   const db = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   // 1. Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -370,7 +367,7 @@ export async function persistMatchProposals(
   if (!UUID_SHAPE.test(tenderId)) return { ok: false, error: "invalid_input" };
   if (!Array.isArray(matches) || matches.length === 0) return { ok: true };
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return { ok: false, error: authResult.error };
   const { orgId } = authResult;
@@ -451,7 +448,7 @@ export async function sendArchitectSolicitation(
   deps: ActionDeps = {},
 ): Promise<SolicitActionResult> {
   const db = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
   const brevoClient = deps.brevoClient ?? getBrevoClient();
 
@@ -870,7 +867,7 @@ export async function searchArchitectsForShortlist(
   deps: ActionDeps = {},
 ): Promise<SearchArchitectsResult> {
   const db = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   // Auth + domaine
   const authResult = await requireAlyosUser(authClient);
@@ -973,7 +970,7 @@ export async function sendDossierToArchitectAction(
   deps: ActionDeps = {},
 ): Promise<SendDossierResult> {
   const db = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
   const auditFn = deps.auditFn ?? audit;
   const brevoClient = deps.brevoClient ?? getBrevoClient();
 
@@ -1215,7 +1212,7 @@ export async function sendBulkArchitectSolicitation(
   items: BulkSolicitInput[],
   deps: ActionDeps = {},
 ): Promise<BulkSolicitResult> {
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? await createSupabaseServerClient();
 
   // Auth + domaine
   const authResult = await requireAlyosUser(authClient);

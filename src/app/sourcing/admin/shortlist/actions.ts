@@ -10,17 +10,18 @@
  *
  * Pattern de sécurité (identique aux autres actions admin) :
  *  1. Auth check Supabase (`getUser()`)
- *  2. Defense-in-depth : domaine `@alyosingenierie.fr` + rôle `admin`
+ *  2. Defense-in-depth : rôle `admin` (ADR-014 retire la garde domaine)
  *  3. Validation Zod côté serveur (jamais trust client)
  *  4. Opération Drizzle (get / upsert)
  *  5. `revalidatePath` sur les routes impactées
  *
  * Codes erreur retournés (mappés UI) :
  *  - `not_authenticated`  : pas de session Supabase
- *  - `forbidden_domain`   : email hors `@alyosingenierie.fr`
  *  - `forbidden_role`     : user authentifié mais non-admin
  *  - `invalid_input`      : payload Zod invalide
  *  - `internal_error`     : erreur inattendue
+ *
+ * `forbidden_domain` est conservé dans les types unions par compat type (jamais émis).
  */
 
 import { revalidatePath } from "next/cache";
@@ -29,7 +30,6 @@ import { z } from "zod";
 
 import { db as defaultDb } from "@/db/client";
 import { shortlistCriteria, type ShortlistCriteria } from "@/db/schema/shortlist";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -98,7 +98,7 @@ type AdminAuthError = {
 async function requireAlyosAdmin(): Promise<
   { ok: true; userId: string; orgId: string } | AdminAuthError
 > {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -107,11 +107,8 @@ async function requireAlyosAdmin(): Promise<
     return err;
   }
 
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) {
-    const err: AdminAuthError = { ok: false, error: "forbidden_domain" };
-    return err;
-  }
   if (!isAdmin(profile)) {
     const err: AdminAuthError = { ok: false, error: "forbidden_role" };
     return err;

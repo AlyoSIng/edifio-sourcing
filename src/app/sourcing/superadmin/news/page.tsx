@@ -4,7 +4,7 @@
  * Server Component — Phase 2 (implémentation complète).
  *
  * Fonctionnalités :
- *   - Triple garde (session + domaine + superadmin)
+ *   - Double garde (session + superadmin) — ADR-014 : garde domaine retirée
  *   - Récupération de tous les `newsItems` triés par createdAt desc (Drizzle)
  *   - Affichage du statut publié / brouillon via badge font-mono
  *   - Bouton "Publier" (brouillon) ou "Dépublier" (publié) via Server Action inline
@@ -22,7 +22,6 @@ import { desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { newsItems } from "@/db/schema/superadmin";
 import type { NewsItem } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -39,16 +38,13 @@ export const metadata = {
 
 export default async function SuperadminNewsPage() {
   // Garde 1 — session
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/superadmin/news");
 
-  // Garde 2 — domaine
-  if (!isAuthorizedEmail(user.email)) redirect("/forbidden");
-
-  // Garde 3 — superadmin
+  // Garde 2 — superadmin (ADR-014 : garde domaine retirée)
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 

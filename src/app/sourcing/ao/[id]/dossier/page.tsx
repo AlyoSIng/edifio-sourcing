@@ -24,11 +24,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 
 import { AcceptedArchitectsSelector } from "./AcceptedArchitectsSelector";
 import { DossierClient } from "./DossierClient";
@@ -59,14 +56,14 @@ const DOSSIER_ALLOWED_STATUSES = [
 type DossierAllowedStatus = (typeof DOSSIER_ALLOWED_STATUSES)[number];
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   /**
    * Query params :
    *   - `archi` : UUID de l'architecte sélectionné pour préparer son dossier
    *     en mode Tandem multi-archi. Ignoré si Solo / Cotraitance BE ou si
    *     l'UUID ne correspond à aucun architecte accepté pour cet AO.
    */
-  searchParams?: { archi?: string };
+  searchParams?: Promise<{ archi?: string }>;
 }
 
 const UUID_SHAPE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -83,24 +80,29 @@ function formatDate(date: Date | null): string {
   });
 }
 
-export default async function DossierPage({ params, searchParams }: PageProps) {
+export default async function DossierPage(props: PageProps) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // Auth check défensif (le middleware a normalement déjà filtré)
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/dossier`);
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous).
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[ao-dossier:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // Validation UUID

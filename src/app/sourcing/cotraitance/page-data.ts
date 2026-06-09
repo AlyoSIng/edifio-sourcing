@@ -92,7 +92,8 @@ type TandemPipelineStatus = (typeof TANDEM_PIPELINE_STATUSES)[number];
 /**
  * Charge les données de la page pipeline cotraitance.
  *
- * @param organizationId - UUID du tenant courant (ALYOS_ORG_ID en MVP)
+ * @param organizationId - UUID du tenant courant (résolu par le caller via
+ *                         `getRequiredOrgId(user.id)`)
  * @param deps           - injection pour tests (db mockable)
  */
 export async function loadCotraitancePipelineData(

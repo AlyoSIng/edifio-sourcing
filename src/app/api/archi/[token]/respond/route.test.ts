@@ -50,7 +50,7 @@ function makeRequest(body: unknown): Request {
 describe("POST /api/archi/[token]/respond — sécurité token", () => {
   it("401 si token malformé", async () => {
     const req = makeRequest({ status: "accepted" });
-    const resp = await POST(req, { params: { token: "not-a-jwt" } });
+    const resp = await POST(req, { params: Promise.resolve({ token: "not-a-jwt" }) });
     expect(resp.status).toBe(401);
     const data = await resp.json();
     expect(data.error).toBe("invalid_token");
@@ -66,7 +66,7 @@ describe("POST /api/archi/[token]/respond — sécurité token", () => {
       -10, // expiré
     );
     const req = makeRequest({ status: "accepted" });
-    const resp = await POST(req, { params: { token } });
+    const resp = await POST(req, { params: Promise.resolve({ token }) });
     expect(resp.status).toBe(401);
     const data = await resp.json();
     expect(data.error).toBe("invalid_token");
@@ -80,7 +80,7 @@ describe("POST /api/archi/[token]/respond — sécurité token", () => {
       organizationId: "33333333-3333-3333-3333-333333333333",
     });
     const req = makeRequest({ status: "accepted" });
-    const resp = await POST(req, { params: { token } });
+    const resp = await POST(req, { params: Promise.resolve({ token }) });
     expect(resp.status).toBe(401);
     const data = await resp.json();
     expect(data.error).toBe("invalid_token");

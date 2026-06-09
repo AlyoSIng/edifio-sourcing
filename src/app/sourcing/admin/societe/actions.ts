@@ -17,7 +17,6 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 
 import { db as defaultDb } from "@/db/client";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -101,17 +100,15 @@ export type SaveOrgProfileResult =
 
 export async function saveOrgProfileAction(formData: FormData): Promise<SaveOrgProfileResult> {
   // 1. Auth check
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return { ok: false, error: "not_authenticated" };
 
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(user.email ?? "")) {
-    return { ok: false, error: "forbidden_domain" };
-  }
   if (!isAdmin(profile)) {
     return { ok: false, error: "forbidden_role" };
   }
@@ -249,13 +246,13 @@ export type SaveOrgSiretResult =
  */
 export async function saveOrgSiretAction(formData: FormData): Promise<SaveOrgSiretResult> {
   // Auth check
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) return { ok: false, error: "not_authenticated" };
-  if (!isAuthorizedEmail(user.email ?? "")) return { ok: false, error: "forbidden_domain" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };
 

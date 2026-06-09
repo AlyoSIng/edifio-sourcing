@@ -27,19 +27,17 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { BriefGenerator } from "@/app/sourcing/ao-du-jour/BriefGenerator";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { findBuyerByName } from "@/lib/buyers/upsert-buyer";
 
 import { BuyerAddressEditor } from "./BuyerAddressEditor";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { db } from "@/db/client";
 import { tenderBriefs } from "@/db/schema/ai";
 import { platforms } from "@/db/schema/config";
 import { tenderDocuments, tenderEvents, tenders } from "@/db/schema/tenders";
 import { rcAnalysisSchema } from "@/lib/ai/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { RcAnalysisCard } from "./RcAnalysisCard";
 import { RcSidebarWidget } from "./RcSidebarWidget";
@@ -94,24 +92,30 @@ function formatDateFr(date: Date | null): string {
   });
 }
 
-export default async function TenderDetailPage({ params }: { params: { id: string } }) {
+export default async function TenderDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Auth check défensif
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}`);
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous,
+  // rôle admin pour l'édition buyer plus bas).
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[ao-detail:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // Validation UUID
@@ -273,7 +277,6 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
         <span aria-hidden>/</span>
         <span className="text-ink">Détail AO</span>
       </nav>
-
       {/* En-tête */}
       <header className="mb-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -304,7 +307,6 @@ export default async function TenderDetailPage({ params }: { params: { id: strin
           )}
         </div>
       </header>
-
       {/* Grille infos + actions DCE */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
         {/* Colonne principale — informations */}

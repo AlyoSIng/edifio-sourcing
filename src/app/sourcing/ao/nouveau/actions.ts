@@ -94,7 +94,7 @@ function newUuid(): string {
  */
 export async function createPrivateTender(formData: FormData): Promise<CreatePrivateTenderResult> {
   // 1. Auth check + isAdmin
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -660,7 +660,7 @@ function _extractJson(text: string): string {
 export async function enrichTenderFromUrlAction(url: string): Promise<EnrichTenderResult> {
   try {
     // 1. Auth check
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

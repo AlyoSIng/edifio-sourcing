@@ -5,7 +5,9 @@
  * Le `.limit()` est le point de résolution (awaité) — il retourne `mockSelectResult`.
  * On vérifie les deux branches :
  *   1. membership trouvée → retourne l'orgId de la ligne
- *   2. aucune membership → fallback ALYOS_ORG_ID + warn console
+ *   2. aucune membership → throw `NoOrganizationMembershipError`
+ *      (ADR-014 hardening : fallback ALYOS_ORG_ID supprimé pour éviter
+ *      la fuite cross-tenant silencieuse d'un user externe non rattaché).
  */
 
 import { vi, describe, it, expect, beforeEach } from "vitest";
@@ -33,8 +35,7 @@ vi.mock("@/db/client", () => {
 });
 
 // Imports après le mock (hoisting Vitest garantit l'ordre correct)
-import { getRequiredOrgId } from "./get-required-org-id";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "./get-required-org-id";
 
 // ============================================================================
 // Constante de test
@@ -60,16 +61,16 @@ describe("getRequiredOrgId()", () => {
     expect(result).toBe(MOCK_ORG_ID);
   });
 
-  it("retourne ALYOS_ORG_ID en fallback si aucune membership", async () => {
+  it("throw NoOrganizationMembershipError si aucune membership (ADR-014 hardening)", async () => {
     mockSelectResult = [];
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const result = await getRequiredOrgId("user-sans-membership");
-
-    expect(result).toBe(ALYOS_ORG_ID);
-    // Vérifie que le fallback est bien signalé (traçabilité Phase A)
-    expect(warnSpy).toHaveBeenCalledOnce();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("user-sans-membership"));
-    warnSpy.mockRestore();
+    await expect(getRequiredOrgId("user-sans-membership")).rejects.toBeInstanceOf(
+      NoOrganizationMembershipError,
+    );
+    // Vérifie que l'incident sécurité est bien tracé (alertable en prod)
+    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("user-sans-membership"));
+    errorSpy.mockRestore();
   });
 });

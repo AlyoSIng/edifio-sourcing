@@ -36,7 +36,6 @@ import {
   type CotraitantDocumentKind,
 } from "@/db/schema/cotraitants";
 import { audit } from "@/lib/audit";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
@@ -105,8 +104,8 @@ async function requireAlyosUser(
     data: { user },
   } = await authClient.auth.getUser();
   if (!user) return { ok: false, error: "not_authenticated" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) return { ok: false, error: "forbidden_domain" };
   const orgId = await getRequiredOrgId(user.id);
   return { ok: true, userId: user.id, orgId, profile };
 }
@@ -122,7 +121,7 @@ async function requireAlyosUser(
 export async function listCotraitants(
   dbClient: DrizzleClient = defaultDb,
 ): Promise<CotraitantRow[]> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return [];
   const { orgId: listOrgId } = authResult;
@@ -152,7 +151,7 @@ export async function createCotraitant(
   data: CreateCotraitantInput,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<ActionResult<{ id: string }>> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -202,7 +201,7 @@ export async function updateCotraitant(
   data: UpdateCotraitantInput,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<ActionResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -257,7 +256,7 @@ export async function deleteCotraitant(
   id: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<ActionResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -296,7 +295,7 @@ export async function associateToTender(
   cotraitantId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<ActionResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -336,7 +335,7 @@ export async function dissociateFromTender(
   tenderId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<ActionResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -384,7 +383,7 @@ export async function uploadCotraitantDocument(
   label: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<ActionResult<{ id: string }>> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -470,7 +469,7 @@ export async function deleteCotraitantDocument(
   documentId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<ActionResult> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   if (!isAdmin(authResult.profile)) return { ok: false, error: "forbidden_role" };
@@ -557,7 +556,7 @@ export async function getDownloadUrl(
   documentId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<ActionResult<{ url: string }>> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return authResult;
   const { orgId: urlDocOrgId } = authResult;
@@ -609,7 +608,7 @@ export async function listDocumentsForCotraitant(
   tenderId?: string | null,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<CotraitantDocumentRow[]> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return [];
   const { orgId: listDocOrgId } = authResult;
@@ -651,7 +650,7 @@ export async function getTenderCotraitant(
   tenderId: string,
   dbClient: DrizzleClient = defaultDb,
 ): Promise<{ association: typeof tenderCotraitants.$inferSelect; cotraitant: Cotraitant } | null> {
-  const authClient = createSupabaseServerClient();
+  const authClient = await createSupabaseServerClient();
   const authResult = await requireAlyosUser(authClient);
   if (!authResult.ok) return null;
   const { orgId: getTenderOrgId } = authResult;

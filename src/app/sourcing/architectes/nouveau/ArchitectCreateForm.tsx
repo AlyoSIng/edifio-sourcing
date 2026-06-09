@@ -10,6 +10,7 @@
  */
 
 import { useTransition, useState } from "react";
+import Link from "next/link";
 
 import { useRouter } from "next/navigation";
 
@@ -421,9 +422,9 @@ export function ArchitectCreateForm() {
           >
             {pending ? "Création en cours…" : "Créer l'architecte"}
           </button>
-          <a href="/sourcing/architectes" className="text-sm text-muted hover:text-ink">
+          <Link href="/sourcing/architectes" className="text-sm text-muted hover:text-ink">
             Annuler
-          </a>
+          </Link>
         </div>
       </fieldset>
     </form>

@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
+import Link from "next/link";
 
 import { db } from "@/db/client";
 import { shortlistCriteria } from "@/db/schema/shortlist";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import type { Architect } from "@/db/schema/architects";
 
 import { fetchArchitectsPage } from "./actions";
@@ -51,23 +51,26 @@ interface SearchParams {
   rgpdOpposition?: string;
 }
 
-export default async function ArchitectesPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ArchitectesPage(props: { searchParams: Promise<SearchParams> }) {
+  const searchParams = await props.searchParams;
   // Auth check défensif (le middleware a normalement déjà filtré).
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/architectes");
   const profile = toUserProfile(user);
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[architectes:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // Parsing des searchParams URL
@@ -172,22 +175,22 @@ export default async function ArchitectesPage({ searchParams }: { searchParams: 
         {adminUser ? (
           <div className="flex shrink-0 flex-wrap items-start gap-2">
             {/* Bouton création manuelle d'un architecte */}
-            <a
+            <Link
               href="/sourcing/architectes/nouveau"
               className="hover:bg-brand-red/90 focus:ring-brand-red/40 inline-flex h-8 items-center rounded-full bg-brand-red px-3 text-xs font-medium text-white focus:outline-none focus:ring-2"
             >
               + Ajouter un architecte
-            </a>
+            </Link>
             {/* Badge critères short-list actifs — Tandem Phase 1 */}
             {hasShortlistCriteria ? (
-              <a
+              <Link
                 href="/sourcing/admin/shortlist"
                 title="Critères de short-list configurés — cliquer pour modifier"
                 className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
               >
                 <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                 Short-list active
-              </a>
+              </Link>
             ) : null}
             <PappersEnrichButton />
             <CsvImportButton />
@@ -353,12 +356,12 @@ function FilterBar({
         Filtrer
       </button>
       {/* Lien reset — efface tous les filtres */}
-      <a
+      <Link
         href="/sourcing/architectes"
         className="inline-flex h-8 items-center rounded-full border border-line bg-white px-3 text-xs text-muted hover:text-ink"
       >
         Réinitialiser
-      </a>
+      </Link>
     </form>
   );
 }

@@ -1,14 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import { eq, and, desc } from "drizzle-orm";
+import Link from "next/link";
 
 import { db } from "@/db/client";
 import { architects } from "@/db/schema/architects";
 import { architectResponses } from "@/db/schema/selections";
 import { tenders } from "@/db/schema/tenders";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
-import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
+import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 
 import { ArchitectEditForm } from "./ArchitectEditForm";
 import { PappersEnrichSingleButton } from "./PappersEnrichSingleButton";
@@ -22,7 +22,8 @@ import { PappersEnrichSingleButton } from "./PappersEnrichSingleButton";
  * Périmètre :
  *  - Lecture : tous rôles authentifiés AlyoS.
  *  - Édition : admin uniquement (formulaire `ArchitectEditForm` inclus si admin).
- *  - Données : lecture directe BDD avec filtre tenant explicite `ALYOS_ORG_ID`.
+ *  - Données : lecture directe BDD avec filtre tenant explicite via `orgId`
+ *    résolu par `getRequiredOrgId(user.id)`.
  *
  * Pattern résilience (MEMORY) : try/catch absorbé avec ErrorBanner.
  */
@@ -32,9 +33,10 @@ export async function generateMetadata() {
   return { title: `Fiche architecte — edifio Sourcing` };
 }
 
-export default async function ArchitectFichePage({ params }: { params: { id: string } }) {
+export default async function ArchitectFichePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Auth check défensif
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -42,15 +44,16 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
   const profile = toUserProfile(user);
   const adminUser = isAdmin(profile);
   // Résolution dynamique de l'org (Phase A multi-tenant).
-  // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
-  // plutôt que crash 500 de la page entière.
-  // NB : ALYOS_ORG_ID déjà importé plus haut dans ce fichier.
+  // Lot 1.6-bis (Hugo, 2026-06-09) — suppression du fallback ALYOS_ORG_ID.
+  // Si pas de membership : redirect /no-org (ne JAMAIS fallback — fuite CC-2).
   let orgId: string;
   try {
     orgId = await getRequiredOrgId(user.id);
   } catch (err) {
-    console.error("[architecte-detail:org-resolution-failed]", err);
-    orgId = ALYOS_ORG_ID;
+    if (err instanceof NoOrganizationMembershipError) {
+      redirect("/no-org");
+    }
+    throw err;
   }
 
   // Résilience runtime
@@ -126,9 +129,9 @@ export default async function ArchitectFichePage({ params }: { params: { id: str
     <div className="mx-auto max-w-3xl">
       {/* Fil d'Ariane */}
       <nav aria-label="Fil d'Ariane" className="mb-4 text-xs text-muted">
-        <a href="/sourcing/architectes" className="hover:underline">
+        <Link href="/sourcing/architectes" className="hover:underline">
           Architectes
-        </a>
+        </Link>
         {" / "}
         <span className="text-ink">{architect?.cabinet ?? params.id}</span>
       </nav>

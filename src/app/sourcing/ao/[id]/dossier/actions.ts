@@ -187,7 +187,7 @@ function validateExternalUrl(rawUrl: string): "invalid_dce_url" | null {
  * Un `user` ET `admin` peuvent préparer un dossier (arbitrage Board G2 §3/A).
  */
 async function getAuthenticatedProfile() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

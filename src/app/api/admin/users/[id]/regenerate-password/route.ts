@@ -41,11 +41,12 @@ import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/sup
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const params = await props.params;
   try {
     // ---------- 1. Vérification admin ----------
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const {
       data: { user: caller },
     } = await supabase.auth.getUser();
