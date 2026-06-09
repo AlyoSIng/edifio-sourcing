@@ -3,7 +3,12 @@ import { redirect } from "next/navigation";
 import { db } from "@/db/client";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId, NoOrganizationMembershipError } from "@/lib/auth/get-required-org-id";
-import { listSearchProfiles } from "@/lib/profile/search-profiles-queries";
+import { getDefaultSearchProfile, listSearchProfiles } from "@/lib/profile/search-profiles-queries";
+import { listLearningEventsForSuggestions } from "@/lib/sourcing/learning/learning-events-queries";
+import {
+  computeSuggestions,
+  type ProfileSuggestion,
+} from "@/lib/sourcing/learning/suggest-profile-adjustment";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { listSearchProfilesAction } from "../profil/search-profiles-actions";

@@ -174,7 +174,7 @@ export async function applyProfileSuggestionAction(
   deps: ActionDeps = {},
 ): Promise<LearningActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? (await createSupabaseServerClient());
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
@@ -279,7 +279,7 @@ export async function dismissSuggestionAction(
   deps: ActionDeps = {},
 ): Promise<LearningActionResult> {
   const dbInstance = deps.db ?? defaultDb;
-  const authClient = deps.authClient ?? createSupabaseServerClient();
+  const authClient = deps.authClient ?? (await createSupabaseServerClient());
 
   const authResult = await requireAlyosAdmin(authClient);
   if (!authResult.ok) return authResult;
