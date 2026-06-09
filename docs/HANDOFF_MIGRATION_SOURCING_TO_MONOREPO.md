@@ -2,8 +2,8 @@
 
 > **Dossier de référence unique** pour le kickoff Sébastien (lead Suivi+ACT) — 1er juillet 2026.
 > **Auteurs** : équipe Sourcing (Steve TEISSIER + sub-agents Claude Code).
-> **Date** : 2026-06-08.
-> **Statut** : v1 — exhaustif. Lecture obligatoire avant kickoff.
+> **Date** : 2026-06-09 (v2 — rework post-review Sébastien `gates/REVIEW_SUIVI_ACT_PR121.md`).
+> **Statut** : v2 — densité technique. Lecture obligatoire avant kickoff.
 > **Cible bascule DNS** : samedi 18 juillet 2026 8h-11h.
 
 ---
@@ -14,14 +14,13 @@
 2. [Catalogue exhaustif des modules à porter](#2-catalogue-exhaustif-des-modules-à-porter) — 8 modules, 41 tables, ~25 j focus, ordre suggéré
 3. [Dettes connues à porter](#3-dettes-connues-à-porter) — 10 arbitrages techniques (rename, COOKIE_DOMAIN, Drizzle drop, ESLint, etc.)
 4. [Décisions Q1-Q10 visio cadrage 2026-06-07](#4-décisions-q1-q10-visio-cadrage-2026-06-07) — récap + Q6 B-en-2-temps + calendrier Lots 1-12
-5. [Tests et qualité](#5-tests-et-qualité) — 1218 vitest verts, 13 pgTAP RLS, 8 specs E2E, 50 migrations Drizzle
-6. [Sub-agents équipe Sourcing](#6-sub-agents-équipe-sourcing) — Alex, Yann, Hugo, Camille, dev_tandem, suivi_act_reviewer
-7. [Comptes externes / providers tiers](#7-comptes-externes--providers-tiers) — Supabase, Vercel, Anthropic, Brevo, Resend, Fly.io, Pappers, Stripe, Upstash, OVH, 1Password
-8. [Risques migration](#8-risques-migration) — 5 résolus + 10 actifs Lot 2-10 + 4 BDD inter-région + 4 sécurité + 3 DNS
-9. [Procédure de bascule J0](#9-procédure-de-bascule-j0) — J-7 (11/7) → J-1 (17/7) → J0 (18/7 8-11h) → J+7 (25/7) post-mortem
-10. [Annexes](#10-annexes) — docs référencés, scripts ops, gates, ENV, buckets, ADR, formations, entité juridique, contacts
+5. [Tests et qualité](#5-tests-et-qualité) — 1218 vitest verts, 15 pgTAP RLS, 8 specs E2E, 51 migrations Drizzle (récap)
+6. [Comptes externes / providers tiers](#6-comptes-externes--providers-tiers) — Supabase, Vercel, Anthropic, Brevo, Resend, Fly.io, Pappers, Stripe, Upstash, OVH, 1Password
+7. [Risques migration](#7-risques-migration) — 5 résolus + 10 actifs Lot 2-10 + 4 BDD inter-région (R-FK détaillé) + 4 sécurité + 3 DNS + 5 nouveaux R11-R15 Sébastien
+8. [Procédure de bascule J0](#8-procédure-de-bascule-j0) — J-7 (11/7) → J-1 (17/7) → J0 (18/7 8-11h, storage 4 buckets détaillé) → J+7 (25/7) post-mortem
+9. [Annexes](#9-annexes) — docs référencés, scripts ops, gates, ENV, buckets, ADR, **17 guides formation listés**, entité juridique, contacts
 
-> **⚠️ Point d'attention Sébastien** : la décision Q1 (BDD partagée d'emblée) + Q2 (adopter Paris monorepo) implique une **migration inter-région Frankfurt → Paris** non triviale. Le risque le plus subtil — facilement raté en lecture rapide — est la **réécriture des FK `auth.users.id`** (§8.3) : les UUIDs Frankfurt ≠ UUIDs Paris si l'export Supabase Auth ne préserve pas les IDs. À traiter en priorité Lot 2 sinon tout casse à la bascule.
+> **⚠️ Point d'attention Sébastien** : la décision Q1 (BDD partagée d'emblée) + Q2 (adopter Paris monorepo) implique une **migration inter-région Frankfurt → Paris** non triviale. Le risque le plus subtil — facilement raté en lecture rapide — est la **réécriture des FK `auth.users.id`** (§7.3) : les UUIDs Frankfurt ≠ UUIDs Paris si l'export Supabase Auth ne préserve pas les IDs. **Test J-14 obligatoire** : créer 1 user via Auth API `auth.admin.createUser({ id: <uuid> })` et vérifier la préservation. Plan B si KO = mapping ancien→nouveau + UPDATE bulk sur toutes les FK AVANT `pg_restore`. À traiter en priorité Lot 2 sinon tout casse à la bascule.
 
 ---
 
@@ -90,7 +89,7 @@ Posture : safe-by-default, refus si ENV manquantes, `backups/` dans `.gitignore`
 
 ### 1.5 Ce qui n'a PAS encore été migré
 
-- **Drizzle reste en place** côté Sourcing — `drizzle-orm@0.39.3` + `drizzle-kit@0.30.6` + `postgres@3.4.9`. 25 fichiers schema TS dans `src/db/schema/`, 50 migrations SQL dans `src/db/migrations/` (`0000_init.sql` à `0049_trial_billing.sql`).
+- **Drizzle reste en place** côté Sourcing — `drizzle-orm@0.39.3` + `drizzle-kit@0.30.6` + `postgres@3.4.9`. 25 fichiers schema TS dans `src/db/schema/`, 51 migrations SQL dans `src/db/migrations/` (`0000_init.sql` à `0051_rls_fix_companies_cotraitant_shares_be.sql` post-Lot 1.7).
 - **`lib/db/<entity>.ts` pattern** monorepo non adopté — c'est précisément le périmètre du **Lot 2 monorepo** (réécriture des 25 schemas Drizzle en 25 loaders supabase-js).
 - **`useFormState` → `useActionState`** : ProfileForm.tsx contient encore un commentaire JSDoc résiduel mentionnant le hook, mais 0 import / 0 call (cf. recette QA S4 OK).
 - **Stripe full ecosystem** — Sourcing tourne sur le MVP minimal Option C (migration 0049). À jeter au profit du modèle 0115 monorepo (cf. §4 Q6 B-en-2-temps).
@@ -133,6 +132,63 @@ Posture : safe-by-default, refus si ENV manquantes, `backups/` dans `.gitignore`
 
 **Effort sous-total Module A** : ~13 h (1.5 j focus).
 **Risques globaux** : (1) idempotence cron BOAMP via UNIQUE 3-tuple — ne pas casser. (2) Partial index `idx_tenders_deferred_until` à reposer mais prédicat IMMUTABLE (cf. JSDoc enums.ts — `now()` STABLE casse partiel).
+
+##### Sourcing engine — détail technique (lecture obligatoire Sébastien)
+
+Le « Sourcing engine » désigne la chaîne de production du flux AO du jour : 6 fetchers → normalize → dedup → filter → score → insert. Source : `src/lib/sourcing/` + `specs/module_sourcing_engine_v1.md`.
+
+**(1) Les 6 fetchers (1 ouvert + 5 scrapés)**
+
+| Code plateforme | Endpoint / source | Auth | Rate-limit | Module |
+|---|---|---|---|---|
+| `boamp` | `https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records` (portail Opendatasoft DILA officiel) | Aucune (API ouverte) | ~500 req/min sans clé, pagination `limit=100` + `offset` max 100 v2.1, retry exponentiel 1/2/4s sur 429+5xx, garde-fou `MAX_PAGINATION_ITERATIONS=200` (~20K records) | `connectors/boamp.ts` (testé vitest) |
+| `place` | `https://www.marches-publics.gouv.fr/` (PLACE État) | Aucune (scrape Playwright) | Worker Fly.io, throttle 1 req/3s | `connectors/scraping-client.ts` (HTTP POST vers worker Fly) |
+| `francmarches` | `https://francemarches.com/` | Aucune (scrape) | idem | `connectors/scraping-client.ts` |
+| `mp_info` | `https://www.marches-publics.info/` | Aucune (scrape) | idem | `connectors/scraping-client.ts` |
+| `e_marchespublics` | `https://www.e-marchespublics.com/` | Aucune (scrape) | idem | `connectors/scraping-client.ts` |
+| `prive` | Plateforme privée AlyoS (saisie manuelle / future intégration) | N/A | N/A (insertion humaine) | Pas de fetcher — INSERT direct via admin UI |
+
+Tous les fetchers retournent un `RawTender` au format unifié (cf. `types.ts`). Le scrape worker tourne sur container Docker Fly.io EU dédié (`FLY_PLAYWRIGHT_WORKER_URL`), déclenché par message Supabase Realtime ou requête HTTP synchrone selon implémentation. **PR #3 BOAMP only mergée ; PLACE + 4 régionaux scrapés à intégrer post-bascule (cf. Q4 visio).**
+
+**Fenêtre temporelle** : `FETCH_WINDOW_MS = 72h` glissantes (au lieu de 24h) pour couvrir les week-ends (BOAMP publie samedi+dimanche, cron ne tourne que lun-ven). L'idempotence INSERT garantit pas de doublon sur jours déjà traités.
+
+**(2) Dedup — hash composite SHA-256**
+
+Source : `src/lib/sourcing/dedup.ts` + spec §3.4.
+
+- Hash = `SHA-256(buyer_norm | title_norm[:100] | deadline_date)`
+- Normalisation = `lower + NFD diacritiques retirés + espaces compressés/retirés` (gère espaces fines U+202F + U+00A0)
+- `deadline` tronqué au jour calendaire ISO `YYYY-MM-DD` (heure non signifiante cross-plateforme)
+- `deadline IS NULL` → segment vide (AO sans deadline restent dé-doublonnables sur buyer+title seuls)
+- À hash identique : **première occurrence conservée** dans le batch (ordre d'entrée stable), doublons écartés écrivent `audit_log.dedup_skip`
+- Dedup intra-batch en V1 ; **cross-batch cross-plateforme** géré par UNIQUE `(organization_id, external_ref, platform_id)` + `onConflictDoUpdate` (idempotence cron)
+
+**(3) Scoring V1 (règles, sans IA)**
+
+Source : `src/lib/sourcing/scoring.ts` + spec §3.6. Barème entier additif, clamp [0, 100] :
+
+| Composant | Bonus | Règle |
+|---|---|---|
+| **Base** | +50 | Tout AO ayant passé le filter part de 50 |
+| **Exact match** | +20 | UNE expression `profile.keywords.exact` trouvée dans le `title` (1 hit suffit, non cumulable) |
+| **Positif** | +10 par hit | Cumulable — un titre matchant 3 mots-clés `keywords.positive` récolte +30 |
+| **CPV exact** | +15 | AU MOINS un code CPV du tender listé *exactement* dans `profile.cpv_codes` (pas de préfixe — c'est `filter.ts` qui gère le préfixe) |
+
+Plafond pratique : 1 exact + 3 positifs + CPV exact = 50+20+30+15 = 115 → clamp 100. Scoring IA Haiku 4.5 (spec §3.6 `score_final = (score_rules + score_ai) / 2`) **reporté à une PR dédiée** (dépend `ai_prompts` table + branche audit `ai_runs`). En V1, `scoreTender()` retourne le score règles seul. Sortie `number.int()` cohérente avec audit log `tender_select.score`. La BDD stocke `numeric(5,2)`.
+
+**(4) Persistence — `tenders` + `tender_events`**
+
+- Table `sourcing.tenders` : insertion via `insertTender()` avec `onConflictDoUpdate` sur UNIQUE `(organization_id, external_ref, platform_id)` — UPDATE `raw_data` + `updated_at` + `score` si re-source idempotent.
+- Table `sourcing.tender_events` : table d'audit applicatif (pas le `audit_logs` IMMUTABLE), trace `event_type` (`sourced`, `selected`, `excluded`, `deferred`, `reported`, `dispatched`, etc.) + `data` JSONB libre. RLS via EXISTS sur `tenders.organization_id`.
+- **Erreur unitaire ne stoppe pas le batch** : un AO qui plante à `normalize` ou `insert` est comptabilisé `errors[]` mais batch continue (robustesse cron quotidien). Un AO BOAMP mal formé ne doit pas faire tomber 999 autres.
+- **Erreur connecteur stoppe le profil** : si `fetchSinceLastRun` jette (rate-limit, schéma cassé), on remonte — la route cron caller intercepte et continue avec profil suivant.
+- Trace côté `console.log` structuré (logs Vercel/Datadog) ; pas de table `sourcing_runs` en V1 (cf. `cron_run_log` table créée mig. 0046 pour observabilité minimale).
+
+**(5) Cron 6h30 lun-ven**
+
+- `app/api/cron/sourcing-run/route.ts` (Vercel Cron, protégé par Bearer `CRON_SECRET`)
+- Lit `search_profiles` actifs (1+ par org), itère sur chaque profil, exécute pipeline complet, log `cron_run_log` (durée, volumes, errors).
+- Cible Lot 5+Lot 11 bench Vercel chromium-min (Q4) : si POC OK <50s + <500Mo → cron Vercel, sinon Fly.io. **Smoke test obligatoire lundi 7h post-bascule** (cf. R12 §7).
 
 #### Module B — Cotraitance Tandem
 
@@ -267,22 +323,39 @@ Cf. §4.6 (décisions Q6 superadmin scénario C hybride).
 9. **Module G — Intégrations (2 jours)** — Odoo + Brevo + Notifications.
 10. **Module H — Admin + Superadmin (5 jours)** — en dernier, dépend de tout (users, billing 0115, branding).
 
-### 2.5 Tables Sourcing sans RLS écrite — à confirmer/écrire au portage
+### 2.5 État RLS Sourcing — point précis post-Lot 1.7
 
-D'après le catalogue Drizzle §8.6 :
+> **Correction factuelle vs v1** : la v1 du handoff listait `tender_briefs`, `shortlist_criteria`, `dossier_dispatches` comme « sans RLS » — c'est **faux**. Ces 3 tables ont leurs policies dans les migrations qui les créent (0022, 0027, 0038 respectivement). En revanche, `bureaux_etudes` (créée mig. 0011) manquait dans l'inventaire v1 et était bien sans RLS — fixé Lot 1.7.
 
-- `sourcing.companies` (créée mig. 0011) — non RLS-isée dans 0018.
-- `sourcing.cotraitant_shares` + `cotraitant_share_items` (créées mig. 0014).
-- `sourcing.shortlist_criteria` (créée mig. 0027).
-- `sourcing.tender_briefs` (créée mig. 0022).
-- `sourcing.tender_be_cotraitants` (créée mig. 0037).
-- `sourcing.dossier_dispatches` (créée mig. 0038).
-- `sourcing.library_item_index` (créée mig. 0041).
-- `sourcing.cron_run_log` (créée mig. 0046) — service_role uniquement (déclaré JSDoc, à acter en policy SQL).
-- `sourcing.buyers` (créée mig. 0048).
-- Tables superadmin (mig. 0019) — RLS posée dans 0019 mais non auditée par catalogue Lot 0a.
+**État actuel post-merge Lot 1.7 (PR #123 mergée 2026-06-08 — migration `0051_rls_fix_companies_cotraitant_shares_be.sql`)** :
 
-**Action portage** : écrire les policies manquantes EN MÊME TEMPS que le portage du loader pour ne pas reproduire la dette.
+| Table | Migration RLS | Statut post-Lot 1.7 | Pattern |
+|---|---|---|---|
+| `companies` | **0051** (Lot 1.7) | ✅ ENABLE + tenant_isolation | ENABLE seul (pas FORCE, cf. zone orange ci-dessous) |
+| `bureaux_etudes` | **0051** (Lot 1.7) | ✅ ENABLE + tenant_isolation | idem (oubli historique — pas dans v1 handoff, ajouté Lot 1.7) |
+| `cotraitant_shares` + `cotraitant_share_items` | **0051** (Lot 1.7) | ✅ ENABLE + tenant_isolation + flow public token | items hérite via EXISTS sur share_id |
+| `tender_briefs` | 0022 (création) | ✅ RLS posée à la création | tenant_isolation FORCE |
+| `shortlist_criteria` | 0027 (création) | ✅ RLS posée à la création | tenant_isolation FORCE |
+| `dossier_dispatches` | 0038 (création) | ✅ RLS posée à la création | tenant_isolation FORCE |
+| `tender_be_cotraitants` | 0037 (création) | ✅ RLS posée à la création | tenant_isolation FORCE |
+| `library_item_index` | 0041 (création) | ✅ RLS posée à la création | tenant_isolation FORCE |
+| `cron_run_log` | 0046 (création) | ⚠️ Service_role only déclaré JSDoc, **à acter en policy SQL explicite** | À traiter Lot 1.7-bis |
+| `buyers` | 0048 (création) | ✅ RLS posée à la création | tenant_isolation FORCE |
+| Tables superadmin (9) | 0019 | ⚠️ RLS posée mais non auditée par catalogue Lot 0a | À auditer Lot 2 |
+
+**Choix Lot 1.7 — ENABLE seul (pas FORCE)** : décision pragmatique zone orange. Les Server Actions Sourcing tapent la BDD via Drizzle/postgres-js avec le rôle `postgres` (DATABASE_URL pooler). Si on pose FORCE RLS sur companies/bureaux_etudes/cotraitant_shares sans avoir d'abord wrap les call sites dans `withTenantContext()`, on régresse en prod (cf. bug fix PR #86 28 mai 2026 `fetchArchitectsPage`). Voir détail JSDoc dans `0051_rls_fix_companies_cotraitant_shares_be.sql` (l.17-54).
+
+**Lot 1.7-bis (post wrap call sites) — à faire avant 1er juillet kickoff Sébastien** :
+
+1. **FORCE ROW LEVEL SECURITY** sur les 3+1 tables fixées Lot 1.7 (CC-1 Camille préservé en CI déjà vert)
+2. **Helper SQL `public.current_user_org_id()`** créé en alias vers `current_organization_id()` actuel (recommandation `gates/REVIEW_SUIVI_ACT_PATTERN_RLS_LOT17.md` §2.1 — évite ~3-4h de rework portage juillet)
+3. **Naming `<table>_<action>`** : splitter `tenant_isolation FOR ALL` en 4 policies `_select/_insert/_update/_delete` par table (cohérence pattern monorepo `0104_act_schema_init.sql`)
+4. **`cotraitant_shares` token public** : restreindre la policy `public_token_read` au flow service_role bypass + `SECURITY DEFINER` function (pattern `0044_cr_public_links.sql` monorepo) plutôt qu'à une policy `anon` directe — Sébastien refuserait au merge monorepo (cf. review §4)
+5. **`cron_run_log`** : acter policy SQL explicite (`USING (false)` pour authenticated, service_role bypass uniquement)
+
+**Effort Lot 1.7-bis** : ~1h sur migration `0052_rls_force_helper_alias_naming.sql` + ajustement tests pgTAP 13-14-15.
+
+**Action portage juillet** : les policies RLS Sourcing sont à 90% écrites. Lot 7+ porte les 13+2 fichiers `tests/rls/XX_*.sql` tels quels modulo renommage schema `sourcing.*` (cf. §5.2).
 
 ### 2.6 Helpers SQL à harmoniser
 
@@ -453,26 +526,54 @@ Lot 12   25 juillet      Post-mortem
 - ❌ Lot 5 cron + bench Vercel 12-14 juillet = trop tard → **POC livré AVANT 25 juin**
 - ❌ Lots 7+8+9+10 concentrés 15-17 juillet = stress et bugs → **étalé**
 
-### 4.4 Q6 Superadmin (Point 6 CR visio) — Scénario C hybride
+### 4.4 Q6 Superadmin (Point 6 CR visio) — Scénario C hybride détaillé
 
-| Table | Stratégie | Justification |
+**Principe** : éviter le tout-fusion (collisions naming + duplication backoffice) ET le tout-cloisonnement (3 menus Formations séparés pour le même user). Le scénario C arbitre **table par table** selon la dimension cross-module ou métier-spécifique.
+
+#### Tables FUSION (3) — schema `public.*` + colonne `module`
+
+| Table monorepo cible | Origine Sourcing | Colonne discriminante | Justification fusion | RLS post-fusion |
+|---|---|---|---|---|
+| `public.formations` | `formations` (Sourcing : 17 guides) | `module text[]` (ex: `['sourcing']`, `['suivi','act']`, `['sourcing','suivi','act']`) | Cross-module naturel — onboarding utilisateur unique cross-produit. Un user pack Suite voit ses 3 jeux de guides au même endroit. | `(module && current_user_modules()) OR is_superadmin()` — helper SQL `current_user_modules()` à créer dans `common/`, dérive depuis `organization_billing_lifecycle.modules_actifs` |
+| `public.news_items` + `public.user_news_reads` | `news_items` + `user_news_reads` Sourcing | `module text[]` sur news_items | Centre de notifications unifié — un user voit la news edifio sans avoir à switch de module. `user_news_reads` non discriminé (clé `user_id + news_item_id`). | Idem (filtre module sur news_items, héritage user_news_reads via FK) |
+| `public.support_tickets` | `support_tickets` Sourcing | `module text` (scalaire, pas array — un ticket = 1 module) | Un seul backoffice support à monitorer par AlyoS. Le ticket porte le module au moment de l'ouverture, immuable. | `(module = ANY(current_user_modules())) OR support_role()` |
+
+**Migration fusion** : `0NNNN_merge_superadmin_tables.sql` côté monorepo (Sébastien) :
+1. ALTER TABLE `public.formations` ADD COLUMN `module text[] NOT NULL DEFAULT ARRAY['suivi','act']` (les formations Suivi+ACT existantes restent visibles à leur audience actuelle)
+2. INSERT des 17 formations Sourcing avec `module = ARRAY['sourcing']`
+3. Idem `news_items` + `support_tickets`
+4. Helper SQL `public.current_user_modules() RETURNS text[]` qui lit `organization_billing_lifecycle.modules_actifs` JSONB → text[]
+5. Réécriture des policies RLS des 3 tables avec le filtre `module && current_user_modules()`
+
+#### Tables CLOISONNEMENT (4) — schema `sourcing.*`
+
+| Table | Justification cloisonnement |
+|---|---|
+| `sourcing.roadmap_items` | Roadmap métier 100 % spécifique — le sourcing veut afficher « bench cron Vercel », le suivi « migration MOE phase 4 ». Aucun chevauchement sémantique. |
+| `sourcing.guided_tests` + `sourcing.guided_test_submissions` | Parcours guidé spécifique au flow AO/cotraitance/dossier. Pas de réutilisation possible côté Suivi+ACT. |
+| `sourcing.pitch_blocks` | Pitch produit edifio Sourcing (slides) — réécrit par module quand le périmètre commercial change. |
+| `sourcing.market_study_blocks` | Étude de marché BTP Sourcing — données chiffrées + sources spécifiques. |
+
+**Migration cloisonnement** : `0NNNN_sourcing_superadmin_split.sql` côté monorepo (Sébastien) :
+1. CREATE SCHEMA `sourcing` IF NOT EXISTS
+2. CREATE TABLE `sourcing.roadmap_items` (LIKE `public.roadmap_items` INCLUDING ALL) puis INSERT depuis backup Sourcing → pas de collision avec `public.roadmap_items` monorepo qui reste isolé Suivi+ACT
+3. Idem pour les 3 autres tables cloisonnées
+
+#### Tables À ARBITRER (2) — décision Sébastien d'ici 11 juin
+
+| Table | Hypothèse Steve | Justification |
 |---|---|---|
-| `formations` | **Fusion** (`public.formations` + col `module text[]`) | Cross-module naturel |
-| `news_items` + `user_news_reads` | **Fusion** avec `module text[]` sur news_items | Centre de notifications unifié |
-| `support_tickets` | **Fusion** avec colonne `module text` | Un seul backoffice support |
-| `roadmap_items` | **Cloisonnement** (`sourcing.roadmap_items`) | Roadmap métier différente par module |
-| `guided_tests` + `guided_test_submissions` | **Cloisonnement** (`sourcing.guided_tests`) | Spécifique parcours Sourcing |
-| `pitch_blocks` | **Cloisonnement** | Spécifique métier |
-| `market_study_blocks` | **Cloisonnement** | Spécifique métier |
-| `app_content` | À arbitrer (probable cloisonnement) | Clés métier 'pitch_pdf_url' etc. |
-| `user_notifications` | À arbitrer (probable fusion avec notifications) | Vérifier collision avec module commune `common/notifications/` |
+| `app_content` | **Cloisonnement** probable (`sourcing.app_content`) | Clés métier `'pitch_pdf_url'`, `'onboarding_video_url'` etc. — risque de collision si fusion sur la même clé entre modules. |
+| `user_notifications` | **Fusion** probable avec `public.notifications` | Vérifier d'abord l'existence et la signature de `public.notifications` côté monorepo. Si présente : fusion avec col `module` (1 inbox cross-module pour l'user) ; si absente : créer ou cloisonner. |
 
-**Conséquence migration** :
-- 3 tables fusionnées → migration `0NNNN_merge_superadmin_tables.sql` avec backfill `module='sourcing'`.
-- RLS sur tables fusionnées : `(module = ANY(array_intersect_with_user_modules())) OR is_superadmin()`. Helper SQL à créer dans `common/`.
-- 4 tables cloisonnées → migration habituelle schema `sourcing` (cf. catalogue Drizzle §5).
+**Action Sébastien (en cours)** : inventaire des tables monorepo (existence réelle de `support_tickets`, `formations`, `notifications`, `news_items` côté Suivi+ACT) **d'ici 11 juin** — sans ça impossible de finaliser la migration de fusion. Si une table Sourcing fusionne avec une absente côté monorepo, c'est une CREATE TABLE pure (pas de merge).
 
-**Action Sébastien (en cours)** : inventaire des tables monorepo (existence réelle de `support_tickets` et `formations` côté Suivi+ACT) — d'ici 11 juin.
+#### Récap impact migration
+
+- **3 tables fusionnées** → 1 migration `0NNNN_merge_superadmin_tables.sql` avec backfill `module='sourcing'` + helper `current_user_modules()` partagé `common/`
+- **4 tables cloisonnées** → 1 migration `0NNNN_sourcing_superadmin_split.sql` (schema `sourcing.*`)
+- **2 tables à arbitrer** → décision d'ici 11 juin Sébastien
+- **0 perte de donnée** dans tous les cas (backfill ou copie)
 
 ---
 
@@ -505,7 +606,7 @@ Lot 12   25 juillet      Post-mortem
 - Tests routes API → portage conjoint avec les routes (Lot 5+6+7).
 - **Cible** : 100% des 1218 tests verts après portage = critère de bascule J0.
 
-### 5.2 Couverture pgTAP RLS (13 fichiers, `test:rls`)
+### 5.2 Couverture pgTAP RLS (16 fichiers total dont 15 testant, `test:rls`)
 
 | Fichier | Périmètre | Importance |
 |---|---|---|
@@ -522,10 +623,13 @@ Lot 12   25 juillet      Post-mortem
 | `10_audit_a16.sql` | Action a16 = `tender_select` correctement loggée | Élevée |
 | `11_shortlist_criteria_tender_briefs.sql` | RLS shortlist_criteria + tender_briefs | Moyenne |
 | `12_tender_briefs_constraints.sql` | Contraintes `is_active` 1 brief / AO | Moyenne |
+| `13_companies_isolation.sql` | RLS companies isolation cross-tenant + INSERT force org_id (Lot 1.7) | Critique multi-tenant |
+| `14_cotraitant_shares_isolation.sql` | RLS cotraitant_shares + flow public token + items hérite share_id (Lot 1.7) | Critique flow public |
+| `15_bureaux_etudes_isolation.sql` | RLS bureaux_etudes isolation cross-tenant (Lot 1.7) | Critique multi-tenant |
 
-**Total = 12 policies forced × ~50 assertions = ~600 assertions pgTAP.** Toutes vertes au 5 juin 2026.
+**Total post-Lot 1.7 = ~15 policies × ~50 assertions = ~750 assertions pgTAP.** Toutes vertes au 8 juin 2026 (cf. `gates/RECETTE_RLS_LOT17_3_TABLES.md` 24 scénarios cadrés P0/P1).
 
-**Portage Lot 7+** : ces 13 fichiers SQL sont **portables tels quels** modulo renommage schema `sourcing.*` (cf. catalogue §8). Le harness `pg_prove --ext .sql tests/rls/` est trivial à reproduire dans le monorepo.
+**Portage Lot 7+** : ces 15+1 fichiers SQL sont **portables tels quels** modulo renommage schema `sourcing.*` (cf. catalogue §8). Le harness `pg_prove --ext .sql tests/rls/` est trivial à reproduire dans le monorepo.
 
 ### 5.3 Tests E2E Playwright (8 specs)
 
@@ -544,118 +648,17 @@ Lot 12   25 juillet      Post-mortem
 
 **Portage post-bascule** : conserver les 8 specs telles quelles modulo adaptation chemins (`/sourcing/` reste).
 
-### 5.4 Migrations Drizzle 0000-0049 documentées
+### 5.4 Migrations Drizzle 0000-0051 — récap
 
-50 migrations numérotées séquentiellement. Liste consolidée :
+51 migrations Drizzle séquentielles dans `src/db/migrations/0000_init.sql` → `0051_rls_fix_companies_cotraitant_shares_be.sql` (Lot 1.7). Journal d'application : `src/db/migrations/meta/_journal.json`. Voir le détail directement dans le repo plutôt que dupliquer ici.
 
-| # | Migration | Domaine |
-|---|---|---|
-| 0000 | `init.sql` | enum `subscription_tier`, ext `pg_trgm`, helpers |
-| 0001 | `schema_v1.sql` | 21 tables base (organizations, users, memberships, tenders, architects, ai_*, audit_logs, brevo_messages, odoo_opportunities, notifications, etc.) |
-| 0002 | `rls.sql` | **19 FORCE RLS + 20 policies + triggers** (foundation multi-tenant) |
-| 0003 | `fk_supabase.sql` | FK vers `auth.users` |
-| 0004 | `tender_deferral.sql` | colonne `deferred_until` + index partiel |
-| 0005-0006 | `tandem_engine.sql` + `tandem_rls.sql` | Tandem complet + RLS |
-| 0007 | `abnormal_ares.sql` | Fix migration historique (incident pooler PgBouncer) |
-| 0008 | `chief_the_order.sql` | Réordonnancement post-incident |
-| 0009 | `rls_messaging.sql` | message_templates + organization_profiles + RLS admin restrictives |
-| 0010 | `architect_budget_concours.sql` | Champs concours archi |
-| 0011 | `be_companies.sql` | bureaux_etudes + companies |
-| 0012 | `selectionmode_cr.sql` | enum `selection_mode` (CR mode) |
-| 0013 | `tender_excluded.sql` | colonne `excluded_at` |
-| 0014 | `cotraitant_sharing.sql` | cotraitant_shares + items |
-| 0015 | `cotraitant_library.sql` | presentation_library 20 kinds |
-| 0016 | `be_documents.sql` | be_documents + 12 kinds |
-| 0017 | `architect_annual_revenue.sql` | revenue_n1/n2/n3 archi |
-| 0018 | `rls_cotraitants_be.sql` | RLS 4 tables cotraitants + BE |
-| 0019 | `superadmin_module.sql` | 9 tables superadmin + RLS |
-| 0020 | `tenders_department.sql` | colonne `department` |
-| 0021 | `audit_action_library_dce.sql` | enum action +2 valeurs |
-| 0022 | `tender_briefs.sql` | tender_briefs + IA Sonnet 4.6 |
-| 0023 | `add_siret.sql` | architects.siret + bureaux_etudes.siret |
-| 0024 | `platform_prive.sql` | enum platform `prive` |
-| 0025 | `search_profiles_multi.sql` | is_default + display_order multi-profils |
-| 0026 | `platform_prive_seed.sql` | Seed plateforme privée |
-| 0027 | `shortlist_criteria.sql` | Critères shortlist paramétrables |
-| 0028 | `fix_current_organization_id.sql` | Patch helper (typage) |
-| 0029 | `tender_notice_type.sql` | colonne `notice_type` |
-| 0030 | `formations_slug_content.sql` | Pivot 2026-05-29 (slug + content_md inline) |
-| 0031 | `tender_is_exclusive.sql` | Drapeau exclusivité |
-| 0032 | `org_branding.sql` | logo_url + primary_color + font_family |
-| 0033 | `architects_dc1_fields.sql` | address + legal_representative + signature_city |
-| 0034 | `org_profiles_dc2_fields.sql` | DC2 complet organization_profiles |
-| 0035 | `be_dc2_fields.sql` | DC2 complet bureaux_etudes |
-| 0036 | `response_files_architect_id.sql` | FK nullable multi-archi Tandem |
-| 0037 | `tender_be_cotraitants.sql` | N-N tenders ↔ BE |
-| 0038 | `dossier_dispatches.sql` | Envoi ZIP signed URL |
-| 0039 | `normalize_dc2_architect_id.sql` | Normalisation FK |
-| 0040 | `legal_form_field.sql` | Forme juridique DC1 |
-| 0041 | `library_item_index.sql` | Indexation IA Haiku |
-| 0042 | `seed_library_index_prompt.sql` | Seed prompt `library_index` |
-| 0043 | `drop_legacy_logo_url.sql` | Cleanup colonne dépréciée |
-| 0044 | `dossier_dispatches_cancellable.sql` | Soft cancel cancelled_at |
-| 0045 | `user_notifications_seen.sql` | architect_notifications_seen_at |
-| 0046 | `cron_run_log.sql` | Cron observability |
-| 0047 | `revenue_buyer_address_matching_keywords.sql` | Multi-colonnes consolidation |
-| 0048 | `buyers_directory.sql` | Annuaire acheteurs |
-| 0049 | `trial_billing.sql` | **Stripe MVP Option C — À JETER (cf. §3.9)** |
-
-**Plan de renumérotation Sourcing 0138+** (cf. brief migration §5.4) :
-- 0138 → init enums sourcing + schema sourcing
-- 0139 → 19 tables base sourcing.*
-- 0140 → 27+13 policies RLS
-- 0141 → tables superadmin scénario C (fusion + cloison)
-- 0142 → seeds (platforms, ai_prompts, formations 17 guides)
-- 0143+ → reste des dettes Sourcing fusionnées (0010-0048 condensés)
-- ❌ 0049 jeté
+**Renumérotation portage** : 0138+ côté monorepo (cf. brief migration §5.4). Plan de fusion : 0138 init enums + schema `sourcing` / 0139 tables base / 0140 RLS (27+13 policies + helpers) / 0141 superadmin scénario C fusion+cloison (cf. §4.4) / 0142 seeds (platforms, ai_prompts, 17 formations) / 0143+ dettes condensées 0010-0048. **0049 (Stripe MVP Option C) jeté** — adoption modèle 0115 monorepo (cf. §3.9 + Q6 visio B-en-2-temps).
 
 ---
 
-## 6. Sub-agents équipe Sourcing
+## 6. Comptes externes / providers tiers
 
-> Documentés dans `.claude/agents/*.md`. Tous invoquables côté monorepo en copiant les fichiers `.md` dans le `.claude/agents/` du repo `alyos-suivi-chantier`.
-
-### 6.1 Sub-agents disponibles
-
-| Agent | Rôle | Périmètre | Outils |
-|---|---|---|---|
-| **Alex** (`dev`) | Développeur senior full-stack | Code applicatif, tests, migrations BDD, doc technique. **Pas Git, pas système.** | Read, Edit, Write, Glob, Grep, Bash |
-| **Yann** (`ps_operator`) | Opérations Windows / PowerShell | Git (commit + push), déploiement, scripts ops PowerShell. **Pas de code applicatif.** | Bash (PowerShell), Read, Glob |
-| **Hugo** (`reviewer`) | Reviewer interne | Relit chaque PR avant merge, audit sécurité + correctness + robustesse | Read, Glob, Grep |
-| **Camille** (`qa`) | QA / recette | Vérifie tests verts (vitest + Playwright + pgTAP), audit recette systematic | Read, Glob, Grep, Bash |
-| **dev_tandem** | Variante dev pour le module Tandem | Spécifique cotraitance (JWT, opposition tokens, multi-archi) | Read, Edit, Write, Glob, Grep, Bash |
-| **suivi_act_reviewer** | Reviewer posture Suivi+ACT | Filtre chaque PR portable AVANT soumission Sébastien. 8 garde-fous, 10 arbitrages Q1-Q10. | Read, Glob, Grep |
-
-### 6.2 Comment les invoquer côté monorepo
-
-**Au kickoff 1er juillet matin** :
-
-1. Copier `.claude/agents/{dev,ps_operator,reviewer,qa,dev_tandem}.md` du repo `edifio-sourcing` vers `.claude/agents/` du repo `alyos-suivi-chantier`.
-2. Adapter le prompt système de `dev.md` pour pointer vers la nouvelle racine projet et le contexte CLAUDE.md du monorepo (différent du Sourcing-only).
-3. Le sub-agent `suivi_act_reviewer` n'a PAS besoin d'être copié côté monorepo — il est conçu pour vivre côté Sourcing et filtrer les PR partantes.
-
-**Pendant la migration** :
-- Sébastien peut invoquer **Alex** sur le repo monorepo pour les ports de modules (copie du sub-agent dev).
-- Hugo / Camille peuvent être invoqués indépendamment pour review/qa.
-- Yann reste côté Sourcing pour gérer les commits sur les 2 repos.
-
-### 6.3 Sub-agent `suivi_act_reviewer` (déjà installé)
-
-Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migration): sub-agent suivi_act_reviewer + claude.md update`).
-
-**Rôle** : appliquer 8 garde-fous + 10 arbitrages Q1-Q10 + 12 bugs historiques à éviter — décrit en détail dans `.claude/agents/suivi_act_reviewer.md` (~250 lignes).
-
-**Workflow** : chaque PR Sourcing portable (i.e. qui touche du code à migrer le 18 juillet) doit passer la review `suivi_act_reviewer` AVANT d'être soumise à Sébastien. Sébastien arbitre les éventuels écarts en zone orange (CTO) ou rouge (Board).
-
-**Exemples reviews effectuées** :
-- PR #116 (refactor async createSupabaseServerClient) — APPROUVÉ AVEC 1 NETTOYAGE (cf. `gates/REVIEW_SUIVI_ACT_PR116.md`)
-- À venir : chaque PR Lot 2 et suivants.
-
----
-
-## 7. Comptes externes / providers tiers
-
-### 7.1 Supabase
+### 6.1 Supabase
 
 | Projet | Région | Plan | Ref ID | Action migration |
 |---|---|---|---|---|
@@ -666,7 +669,7 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 
 **Post-bascule** : décision Q1 = projet Suivi+ACT Paris devient l'unique référence. Le projet Sourcing Frankfurt est mis en read-only puis décommissionné (économie 25 €/mois).
 
-### 7.2 Vercel
+### 6.2 Vercel
 
 | Projet | Plan | Action migration |
 |---|---|---|
@@ -675,7 +678,7 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 
 **Pré-bascule J-7 + J-1** : `vercel env pull` via `export-vercel-env.ps1 -ProjectName "edifio-sourcing"` pour sauvegarder les ENV Sourcing.
 
-### 7.3 Domaines + DNS
+### 6.3 Domaines + DNS
 
 - **Registrar** : **OVH** (compte AlyoS, géré par Steve).
 - **Domaine** : `edifio.fr` (zone DNS OVH).
@@ -685,7 +688,7 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 
 **MEMORY** : consignes DNS par clic exact dans le panel OVH (cf. `feedback_dns_consignes.md`).
 
-### 7.4 Anthropic API
+### 6.4 Anthropic API
 
 - **Clé** : `ANTHROPIC_API_KEY` (compte AlyoS).
 - **Modèles utilisés** : Sonnet 4.6 (analyse RC PDF natif, brief AO) + Haiku 4.5 (indexation biblio).
@@ -693,7 +696,7 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 - **SDK** : Sourcing `@anthropic-ai/sdk@0.98` vs monorepo `@anthropic-ai/sdk@0.32` → **bump SDK côté monorepo** ou downgrade Sourcing (à arbitrer Lot 6, recommandation : bump monorepo).
 - **Action portage** : intégration avec wrapper `common/ai/` du monorepo (retry + audit + ratelimit Upstash).
 
-### 7.5 Brevo
+### 6.5 Brevo
 
 - **Clé** : `BREVO_API_KEY`.
 - **Sender** : `BREVO_SENDER_EMAIL` + `BREVO_SENDER_NAME="edifio Sourcing"` → à actualiser post-bascule en « edifio Suite ».
@@ -701,7 +704,7 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 - **Coût** : ~25 €/mois.
 - **Action portage** : adoption du module `common/email/` monorepo. Templates `tutoiement TU vs VOUS` (Gate 4) conservés via `lib/brevo/template-picker.ts`.
 
-### 7.6 Resend
+### 6.6 Resend
 
 - **Clé** : `RESEND_API_KEY`.
 - **Sender** : `RESEND_SENDER_EMAIL`.
@@ -709,7 +712,7 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 - **Coût** : 0-20 €/mois selon volume.
 - **Action portage** : conservation OU fusion avec Brevo via module `common/email/` (Sébastien arbitre Lot 6).
 
-### 7.7 Fly.io worker Playwright
+### 6.7 Fly.io worker Playwright
 
 - **Org** : Fly.io EU (compte AlyoS).
 - **Worker** : image Docker dédiée (hors du repo Sourcing) qui reçoit `POST /v1/scrape` et lance Playwright headless sur les 6 plateformes régionales (PLACE, francmarches, mp_info, etc.).
@@ -719,43 +722,27 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
   - Si POC OK (<50s + <500Mo) → cron Vercel + décommissionnement Fly.io.
   - Si POC KO → conserver Fly.io, migration de l'org Fly vers org commune Suivi+ACT (ou maintien dédié — Sébastien arbitre).
 
-### 7.8 Pappers API
+### 6.8 Pappers API
 
 - **Clé** : `PAPPERS_API_KEY`.
 - **Usage** : enrichissement Sirene/SIRET sur saisie architecte / BE / cotraitant.
 - **Coût** : pay-per-call, consommation à la demande.
 - **Action portage** : conservation telle quelle (lib `lib/pappers/*` portable).
 
-### 7.9 Stripe
+### 6.9 Stripe
 
 - **Compte** : SAS edifio (SIREN 105 534 515) — différent d'AlyoS Ingénierie.
 - **Statut Sourcing actuel** : MVP minimal Option C (migration 0049), à jeter (cf. §3.9).
 - **Statut monorepo** : schémas BDD prêts (migration 0115 `organization_billing_lifecycle`), mais Checkout + webhooks « reste à faire » (Sprint 9.E).
 - **Action portage Q6 visio = B-en-2-temps acté Steve** (cf. §4.2).
 
-### 7.10 Upstash Redis (monorepo only)
+### 6.10 Upstash Redis (monorepo only)
 
 - **Plan** : `@upstash/redis` + `@upstash/ratelimit`.
 - **Usage monorepo** : cache + ratelimit anti-abus sur Server Actions sensibles.
 - **Action portage** : réutiliser pour les Server Actions Sourcing sensibles (ex. `/api/cron/sourcing-run` ratelimit, `/api/admin/users` invitation, `/api/archi/[token]/respond` réponse cotraitant).
 
-### 7.11 Total infra mensuelle
-
-**Audit 5 juin 2026** :
-- Supabase Sourcing : 25 € → 0 € post-bascule
-- Vercel Sourcing : 20 € → 0 € post-bascule
-- Brevo : 25 € (conservé)
-- Resend : 0-20 € (conservé ou fusionné)
-- Anthropic : 0,14 € audit semaine (conservé)
-- Fly.io : 10-15 € → potentiellement 0 € si Q4 = Vercel
-- Pappers : à la demande
-- Stripe : 0 € (commission 1,4 % + 0,25 €/transaction CB EU)
-- Upstash : (à porter sur usage Sourcing)
-
-**Total Sourcing pré-bascule** : ~86-121 €/mois (AlyoS + PROTECT MVP).
-**Total post-bascule estimé** : économie nette ~45-60 €/mois (Supabase + Vercel Sourcing décommissionnés ; Fly.io éventuellement coupé).
-
-### 7.12 1Password — coffres référencés
+### 6.11 1Password — coffres référencés
 
 | Coffre | Contenu critique |
 |---|---|
@@ -774,11 +761,11 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 
 ---
 
-## 8. Risques migration
+## 7. Risques migration
 
-> Inventaire consolidé des risques techniques majeurs. Pour chaque risque : probabilité, impact, mitigation actuelle.
+> Inventaire consolidé des risques techniques majeurs. Pour chaque risque : probabilité, impact, mitigation actuelle. Audits sources : `gates/REVIEW_HUGO_PR121_RISQUES_SECU.md` (sécurité), `gates/RECETTE_PROTECT_OPENING_ADR014.md` (vuln CC-2 fixée), `gates/REVIEW_SUIVI_ACT_PR121.md` (review Sébastien).
 
-### 8.1 Risques résolus par Lot 1 / 1.5 (filet déjà tendu)
+### 7.1 Risques résolus par Lot 1 / 1.5 / 1.6 / 1.7 (filet déjà tendu)
 
 | Risque | Statut | Mitigation |
 |---|---|---|
@@ -787,13 +774,15 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 | **Codemod `params` Promise échoué silencieusement** | ✅ Résolu | Recette S3 OK : 18 fichiers `params: Promise<…>` + 7 `searchParams: Promise<…>` validés manuellement. Aucun `params: {` synchrone résiduel. |
 | **`useFormState` orphelin React 19** | ✅ Résolu | S4 OK : aucun import / call, juste 1 commentaire JSDoc résiduel ProfileForm.tsx ligne 98. |
 | **Backup BDD prod foiré (pooler PgBouncer)** | ✅ Mitigé | Scripts ops PR #117 refusent PGPORT=6543 et PGUSER `postgres.*`. Direct connection forcée. |
+| **3 tables Sourcing sans RLS (companies / bureaux_etudes / cotraitant_shares)** | ✅ Résolu | Lot 1.7 mergé (PR #123). Migration `0051_rls_fix_companies_cotraitant_shares_be.sql` + 3 nouveaux tests pgTAP 13-14-15 verts. Audit Camille `gates/RECETTE_PROTECT_OPENING_ADR014.md` confirme vuln CC-2 fixée. |
+| **Vuln `getRequiredOrgId` (ADR-014 cleanup)** | ✅ Résolu | Lot 1.6 mergé (PR #122). Refactor `isAuthorizedEmail` + fix vuln élévation org_id. |
 
-### 8.2 Risques actifs — phase de portage Lot 2-10
+### 7.2 Risques actifs — phase de portage Lot 2-10
 
 | # | Risque | Probabilité | Impact | Mitigation actuelle | Action restante |
 |---|---|---|---|---|---|
 | R1 | **Refonte Drizzle → supabase-js casse silencieusement** | Élevée | Très élevé | Tests vitest portés + tests E2E sur flows critiques (compile ZIP, login multi-tenant, cotraitance archi) | Chaque loader réécrit Lot 2 doit avoir son test vitest passant AVANT merge. Garde-fou : Camille (qa). |
-| R2 | **Bug RLS lors fusion schémas** (collision policies, organization_id mal scopé) | Moyenne | Très élevé | Suite pgTAP exhaustive existante (13 fichiers, ~600 assertions) | Porter pgTAP intégralement Lot 7. Test cross-tenant AlyoS ⊥ PROTECT obligatoire. |
+| R2 | **Bug RLS lors fusion schémas** (collision policies, organization_id mal scopé) | Moyenne | Très élevé | Suite pgTAP exhaustive existante (15 fichiers testant + 1 helpers, ~750 assertions post-Lot 1.7) | Porter pgTAP intégralement Lot 7. Test cross-tenant AlyoS ⊥ PROTECT obligatoire. |
 | R3 | **Cron `sourcing-run` plante après bascule Fly.io → cron Vercel** | Moyenne | Élevé | POC chromium-min `spike/cron-vercel-chromium` livrable AVANT 25 juin | Si POC KO → conserver Fly.io (plan B). Smoke test obligatoire J0 + monitoring 7 jours suivants. |
 | R4 | **Cron sourcing 60% échec semaine 29 mai – 5 juin (incident historique)** | Faible mais résiduel | Élevé | Probablement résolu par migrations 0047/0048 du 5 juin | Confirmer monitoring continu + résoudre formellement AVANT 18 juillet. **Bloqueur potentiel de bascule.** |
 | R5 | **Stripe transition Sourcing 0049 → 0115 perd des dates trial** | Faible | Moyen | Script de migration explicite à écrire Lot 6 + validation manuelle | Validation : AlyoS active conservée, PROTECT trial avec bonne date de fin. **Cas test à écrire.** |
@@ -803,25 +792,77 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 | R9 | **Suivi+ACT freeze partiel pendant Lots 2-5** | Élevée (intentionnelle) | Faible | Concertation calendrier amont (CR visio §5) | Communication équipe Sébastien en amont. |
 | R10 | **Coût IA explose pendant tests** | Faible | Faible | Limite ENV dev (Anthropic dev key avec quota) | Check `ai_runs.cost_usd` quotidien Lot 6. Audit hebdo semaine 1-14 juillet. |
 
-### 8.3 Risques migration BDD inter-région (Q1 + Q2)
+### 7.3 Risques migration BDD inter-région (Q1 + Q2)
 
 | Risque | Probabilité | Impact | Mitigation |
 |---|---|---|---|
 | **pg_dump → pg_restore Frankfurt → Paris** : downtime 1-3 h selon volume | Élevée (intentionnelle) | Moyen | Mesurer durée pg_dump complet sur backup J-7 (11 juillet) pour calibrer la fenêtre J0. |
 | **Encodage UTF-8 sur restore** : caractères français dans données accentués | Faible | Élevé (corruption) | Tester restore vers projet Supabase staging avant J0. Validation : SELECT échantillon sur 5 tables avec caractères français. |
-| **FK auth.users cross-projet** : les FK Sourcing vers `auth.users.id` Frankfurt ne fonctionneront plus après migration Paris (UUIDs différents) | Élevée | Très élevé | **Plan d'action obligatoire** : mapping UUIDs Frankfurt → Paris à écrire en script. Migration utilisateurs Supabase Auth via API (export `auth.users` + recreate dans projet Paris en conservant les UUIDs si possible). |
-| **Storage Frankfurt → Paris** : 4 buckets à migrer (company_library, response_files, tender_documents, app-assets) | Moyenne | Élevé | Script `backup-supabase-storage.ps1` + script inverse à coder. Validation : SELECT random 10 fichiers post-restore. |
+| **Storage Frankfurt → Paris** : 4 buckets à migrer | Moyenne | Élevé | Voir §7.3.1 ci-dessous + procédure §8.3. Risque R13 timing 3h cf. §7.6. |
 
-### 8.4 Risques sécurité (post-incident 21/05)
+#### 7.3.1 R-FK — Réécriture des FK `auth.users.id` (risque le plus subtil)
+
+**Risque** : les FK Sourcing vers `auth.users.id` Frankfurt ne fonctionneront plus après migration Paris si les UUIDs ne sont pas préservés. Probabilité **Élevée**, impact **Très élevé** (tout casse).
+
+**Stratégie principale — préserver les UUIDs via Auth API** :
+
+Supabase expose `auth.admin.createUser({ id: <uuid_existant>, email, email_confirm: true, ... })` qui permet de créer un user en imposant un UUID custom. C'est le chemin propre :
+
+```typescript
+// Pseudo-code script `scripts/migration/migrate-auth-users.ts` à coder Lot 2
+const sourcingUsers = await supabaseFrankfurt.auth.admin.listUsers();
+for (const user of sourcingUsers.data.users) {
+  await supabaseParis.auth.admin.createUser({
+    id: user.id,                           // ← préservation UUID
+    email: user.email,
+    email_confirm: true,
+    user_metadata: user.user_metadata,
+    app_metadata: user.app_metadata,
+    // password : utiliser flow reset_password ou import hash bcrypt si supporté
+  });
+}
+```
+
+**Test J-14 obligatoire (avant 4 juillet)** :
+1. Créer 1 user test via Auth API sur un projet Supabase Paris staging avec un UUID imposé.
+2. Vérifier `SELECT id FROM auth.users WHERE email = 'test@…'` retourne bien l'UUID imposé.
+3. Si KO : Supabase a changé le contrat → bascule sur Plan B.
+
+**Plan B — mapping ancien_uuid → nouveau_uuid + UPDATE bulk** :
+
+Si la préservation d'UUID échoue, créer une table de mapping et faire un UPDATE bulk sur TOUTES les FK avant `pg_restore` final :
+
+```sql
+-- 1. Tabler les nouveaux UUIDs créés par Supabase Paris
+CREATE TEMP TABLE auth_uuid_mapping (old_uuid uuid PRIMARY KEY, new_uuid uuid NOT NULL);
+-- ... INSERT depuis le résultat de l'import Paris (1 ligne par user) ...
+
+-- 2. UPDATE bulk sur TOUTES les tables Sourcing qui FK vers auth.users
+UPDATE sourcing.memberships m SET user_id = mapping.new_uuid
+  FROM auth_uuid_mapping mapping WHERE m.user_id = mapping.old_uuid;
+UPDATE sourcing.tender_events SET user_id = mapping.new_uuid FROM auth_uuid_mapping mapping WHERE user_id = mapping.old_uuid;
+UPDATE sourcing.audit_logs SET actor_user_id = mapping.new_uuid FROM auth_uuid_mapping mapping WHERE actor_user_id = mapping.old_uuid;
+-- ... idem pour notifications.user_id, ai_runs.triggered_by, etc. ...
+```
+
+**Tables Sourcing avec FK vers `auth.users.id` à patcher** (audit Lot 2) : `memberships.user_id`, `audit_logs.actor_user_id`, `notifications.user_id`, `tender_events.user_id`, `ai_runs.triggered_by`, plus toutes les `*_created_by` / `*_updated_by` si présentes. **À inventorier exhaustivement Lot 2 par `grep references "auth.users"` sur `src/db/schema/`.**
+
+**Important** : exécuter l'UPDATE bulk AVANT `pg_restore` final, pas après — sinon les contraintes FK rejetteront le restore.
+
+### 7.4 Risques sécurité (post-incident 21/05)
 
 | Risque | Statut | Mitigation |
 |---|---|---|
 | **Secrets non rotés** (password BDD prod, API keys) | 🟡 Reporté post-MVP | Rotation prévue avant mise en service réelle. Cf. §3.8. |
-| **`.env.production.backup` en clair sur disque** | ✅ Mitigé | Script `export-vercel-env.ps1` affiche bandeau sécurité + propose `age` encryption. Hugo a recommandé option `-Encrypt` automatique avant J-7. |
+| **`.env.production.backup` en clair sur disque** | ✅ Mitigé | Script `export-vercel-env.ps1` `-Encrypt age` automatique avant J-7 (Hugo finding fixé PR #119). |
 | **Hardening `migrate.ts` masking erreurs postgres-js** | 🟡 À faire avant mise en service réelle | Documenté MEMORY `followup_post_mvp_security_rotations.md`. |
 | **Audit log 5 ans corruption** | ✅ Mitigé | Triggers `reject_audit_mutation` IMMUTABLE actifs. **À reposer SQL natif intact côté monorepo** — sinon perte garantie 5 ans. |
 
-### 8.5 Risques DNS / continuité de service
+**Correction factuelle vs v1 (audit Hugo `gates/REVIEW_HUGO_PR121_RISQUES_SECU.md`)** : la liste « tables sans RLS » v1 contenait 3 erreurs (`tender_briefs`, `shortlist_criteria`, `dossier_dispatches` ont en réalité des RLS dès leur migration de création — 0022/0027/0038) et **1 oubli** (`bureaux_etudes`, fixé Lot 1.7 mig. 0051). Cf. §2.5 pour l'inventaire corrigé.
+
+**Correction factuelle Anthropic SDK** : la mention « bump SDK monorepo 0.32 → 0.98 ou downgrade Sourcing » (§6.4) est sur-évaluée. Audit Hugo `gates/REVIEW_HUGO_PR121_RISQUES_SECU.md` : **aucune feature 0.98-only utilisée dans le code Sourcing** (pas d'`extended_thinking`, pas de `parallel_tool_use` natif côté SDK). Garder ou downgrader OK indifféremment. Recommandation simplifiée : adopter la version du monorepo au portage (downgrade Sourcing si version monorepo ≥ 0.32, sinon upgrade monorepo). Pas de blocker.
+
+### 7.5 Risques DNS / continuité de service
 
 | Risque | Probabilité | Impact | Mitigation |
 |---|---|---|---|
@@ -829,13 +870,25 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 | **Rollback DNS après bascule** | Moyenne | Élevé | Procédure documentée `scripts/migration/README.md` §Rollback. 5-30 min selon TTL. |
 | **Smoke tests J0 fail → décision rollback** | Possible | Très élevé | Critères de rollback explicites : ZIP non généré OU login impossible OU données absentes. Décision par Steve à 10h30. |
 
+### 7.6 Risques additionnels R11-R15 (review Sébastien `gates/REVIEW_SUIVI_ACT_PR121.md`)
+
+5 risques opérationnels remontés par Sébastien suite à la review PR #121 — à traiter explicitement dans le plan de bascule :
+
+| # | Risque | Probabilité | Impact | Fenêtre | Mitigation |
+|---|---|---|---|---|---|
+| **R11** | **Cookie SSO `.edifio.fr` durant bascule 9h-9h35** : les sessions actives sur l'ancien projet Vercel deviennent invalides après bascule DNS (cookie scopé `.edifio.fr` partagé entre projets) — l'user se retrouve « logout » côté nouveau projet sans réauth automatique. | Élevée | Moyen | Bascule 9h-9h35 | Pré-bascule : `COOKIE_DOMAIN=.edifio.fr` validé côté monorepo identique à Sourcing. Forcer logout préalable (R14). Communication user « reconnectez-vous » dans le mail 11h. Tester pendant smoke P1/P2. |
+| **R12** | **Cron 6h30 du lundi 19/7 KO = AlyoS aveugle lundi** : si le cron Vercel ne tourne pas ou échoue silencieusement après bascule, AlyoS n'a pas son flux AO du jour à 7h lundi matin. **🔴 CRITIQUE COMMERCIAL** — AlyoS perd la valeur perçue principale du produit dès le 1er jour post-bascule. | Moyenne | Très élevé (commercial) | Lundi 20/7 7h00 | **Smoke test lundi 7h obligatoire** : Steve vérifie manuellement à 7h00 que `/sourcing/ao-du-jour` charge avec ≥1 AO Frais du jour. Si KO : déclenchement manuel `/api/cron/sourcing-run` avec `CRON_SECRET` + escalade Sébastien. Backup plan : importer le dump du dimanche 19/7 cron si POC Vercel KO. |
+| **R13** | **Storage 4 buckets timing déborde 3h** : la migration des 4 buckets (cf. §8.3) peut prendre 2-4 h selon volume, ce qui dépasse la fenêtre 8h-11h prévue. | Moyenne | Élevé | J0 9h-12h | **Mesurer le volume J-7** (11/7) par bucket via `aws s3 ls --summarize` ou équivalent Supabase Storage API. Si total > 5 Go → pré-migrer les buckets immuables (`app-assets`, `bibliotheque`) en J-3 (mercredi soir 15/7), garder pour J0 uniquement les buckets actifs (`dossier-zip`, `dossier-pieces`). Détail procédure §8.3. |
+| **R14** | **Sessions Supabase actives pendant migration** : si des users sont connectés au moment de la bascule, leur session JWT pointe encore vers le projet Frankfurt. Risque de comportement incohérent post-bascule. | Faible | Moyen | J0 8h-9h | **Forcer logout préalable** : Sébastien lance `supabase auth admin sign-out-all` (ou équivalent) à 8h05 simultanément avec le freeze écritures. Mail user envoyé à 18h J-1 prévient du logout forcé. |
+| **R15** | **Webhook Brevo HMAC** : le secret HMAC `/api/webhooks/brevo` est scope projet Vercel. Post-bascule, le webhook Brevo continue de pinger l'ancienne URL Vercel (ou retombe sur la nouvelle via DNS) mais avec un secret HMAC potentiellement différent côté monorepo. | Moyenne | Moyen | J0 9h-11h | **Re-vérifier le secret HMAC** côté monorepo Vercel post-bascule : `BREVO_WEBHOOK_HMAC_SECRET` doit être identique entre l'ancien Sourcing et le nouveau monorepo, OU mise à jour côté Brevo Dashboard pour pointer vers le nouveau secret. Smoke test : envoyer 1 email Brevo manuellement à 10h00, vérifier la trace `brevo_messages.events` JSONB s'incrémente. |
+
 ---
 
-## 9. Procédure de bascule J0
+## 8. Procédure de bascule J0
 
 > Référence opérationnelle : `scripts/migration/README.md` (152 lignes, livré PR #117) pour les commandes PowerShell exactes. Ce qui suit est la **séquence consolidée J-7 → J0 → J+7**.
 
-### 9.1 J-7 (samedi 11 juillet 2026) — Répétition générale
+### 8.1 J-7 (samedi 11 juillet 2026) — Répétition générale
 
 **Objectif** : valider toute la chaîne backup + restore + smoke en conditions réelles avant J0.
 
@@ -855,7 +908,7 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 - ✅ Durée pg_dump <60 min
 - Si KO sur l'un → décaler bascule à un samedi ultérieur, Sébastien arbitre.
 
-### 9.2 J-1 (vendredi 17 juillet 2026 soir) — Backup officiel + freeze
+### 8.2 J-1 (vendredi 17 juillet 2026 soir) — Backup officiel + freeze
 
 | Heure | Action | Acteur |
 |---|---|---|
@@ -866,23 +919,46 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 | 19h00 | Validation finale branche `feat/sourcing-merge` côté monorepo : merge sur `main` + déploiement production Vercel | Sébastien |
 | 19h30 | Smoke test final sur URL Vercel monorepo (pas encore sur sourcing.edifio.fr) | Steve + Sébastien |
 
-### 9.3 J0 (samedi 18 juillet 2026, 8h-11h) — Bascule effective
+### 8.3 J0 (samedi 18 juillet 2026, 8h-11h) — Bascule effective
 
 | Heure | Action | Acteur | Critère succès |
 |---|---|---|---|
 | **08h00** | Annonce démarrage bascule dans Slack équipe | Steve | — |
-| **08h05** | Freeze écritures `sourcing.edifio.fr` (mode read-only via env var + banner UI) | Sébastien | Banner visible sur le repo Sourcing |
-| **08h15** | Dump-restore final BDD Sourcing → BDD Suivi+ACT Paris (si Q1 = Option A séparée → ce step nul si BDD partagée déjà en place depuis Lot 2) | Steve | `pg_restore` exit 0, tables `sourcing.*` présentes |
+| **08h05** | Freeze écritures `sourcing.edifio.fr` (mode read-only via env var + banner UI) + **logout forcé toutes sessions actives** (R14) | Sébastien | Banner visible + `auth.sessions` vidé |
+| **08h15** | Dump-restore final BDD Sourcing → BDD Suivi+ACT Paris + **UPDATE bulk auth_uuid_mapping si Plan B FK** (cf. §7.3.1) | Steve | `pg_restore` exit 0, tables `sourcing.*` présentes, FK vers `auth.users` valides |
 | **08h30** | Application des migrations Sourcing 0138-0144 sur projet Suivi+ACT (Sébastien applique en Studio manuel selon Q8) | Sébastien | Toutes migrations OK, RLS actif `\dn` shows `sourcing` schema |
-| **08h45** | Re-seed des plateformes + ai_prompts + formations 17 guides | Sébastien | `SELECT count(*) FROM sourcing.platforms = 5`, idem ai_prompts, formations |
+| **08h45** | Re-seed des plateformes + ai_prompts + formations 17 guides | Sébastien | `SELECT count(*) FROM sourcing.platforms = 5`, idem ai_prompts, formations 17 lignes (cf. §9.7) |
+| **08h00-09h00** | **Migration Storage 4 buckets** (parallèle des steps BDD, cf. §8.3.1) | Steve | Voir détail §8.3.1 — total <60 min visé |
 | **09h00** | **Bascule DNS Vercel** — `sourcing.edifio.fr` repointé vers projet `alyos-suivi-chantier` | Steve (OVH panel par clic exact) | `dig CNAME sourcing.edifio.fr` retourne la nouvelle URL |
-| **09h05-09h35** | Propagation DNS (TTL 300s → propagation rapide) | — | `curl -sI https://sourcing.edifio.fr` retourne du HTML monorepo |
-| **09h30** | Smoke tests utilisateurs (Steve + un membre PROTECT volontaire) | Steve + utilisateur PROTECT | 5 parcours verts (cf. §9.4) |
-| **10h30** | Décision GO/NO-GO continuation OU rollback | Steve | Si GO → poursuite ; si NO-GO → §9.5 |
+| **09h05-09h35** | Propagation DNS (TTL 300s → propagation rapide). **Vérif R15 webhook Brevo HMAC** : ping manuel 10h00 + check `brevo_messages.events` incrémenté | — | `curl -sI https://sourcing.edifio.fr` retourne du HTML monorepo |
+| **09h30** | Smoke tests utilisateurs (Steve + un membre PROTECT volontaire) | Steve + utilisateur PROTECT | 5 parcours verts (cf. §8.4) |
+| **10h30** | Décision GO/NO-GO continuation OU rollback | Steve | Si GO → poursuite ; si NO-GO → §8.5 |
 | **10h45** | Décommissionnement deploy Vercel `edifio-sourcing` (URL vercel.app inactive) | Sébastien | Statut "removed" sur dashboard Vercel |
-| **11h00** | Communication clients (AlyoS + PROTECT + observateurs) : « migration réussie, aucune action nécessaire » | Steve | Email Resend envoyé |
+| **11h00** | Communication clients (AlyoS + PROTECT + observateurs) : « migration réussie, reconnectez-vous » (R11 cookie SSO) | Steve | Email Resend envoyé |
 
-### 9.4 Smoke tests obligatoires J0 (5 parcours, 30 min)
+#### 8.3.1 Step Storage — migration des 4 buckets (détail R13)
+
+**Buckets à migrer** (déclarations dans `src/lib/storage/buckets.ts`) :
+
+| Bucket | Privé/Public | Volume estimé | Stratégie J0 | Acteur |
+|---|---|---|---|---|
+| `app-assets` | Public read | <100 Mo (logos org branding) | **Pré-migrer J-3** (mercredi 15/7 soir) — immuable, pas de risque de drift | Steve |
+| `bibliotheque` | Privé | 500 Mo - 2 Go (presentation_library — kbis, fiches, CV, références) | **Pré-migrer J-3** — quasi-immuable, dernière sync vérifiée J-1 17h | Steve |
+| `dossier-zip` | Privé | 200 Mo - 1 Go (response_files compilés) | **J0 8h00** (parallèle bascule BDD) | Steve |
+| `dossier-pieces` | Privé | 1-3 Go (tender_documents RC + DCE) | **J0 8h00** (parallèle bascule BDD) | Steve |
+
+**Méthode** : script `scripts/migration/backup-supabase-storage.ps1` (PR #117, livré) pour le DUMP côté Frankfurt + script inverse `restore-supabase-storage.ps1` **à coder Lot 2** pour le RESTORE côté Paris. API REST Supabase Storage (`SUPABASE_SERVICE_ROLE_KEY` obligatoire des deux côtés).
+
+**Estimation temps** : ~30 min par bucket selon volume (mesure J-7 obligatoire pour calibrer — cf. R13). Si total >60 min, la pré-migration J-3 des 2 buckets immuables (`app-assets` + `bibliotheque`) ramène la fenêtre J0 à ~30 min pour les 2 buckets actifs (`dossier-zip` + `dossier-pieces`).
+
+**Validation post-restore** :
+1. `SELECT COUNT(*) FROM storage.objects WHERE bucket_id = ?` côté Paris == côté Frankfurt
+2. SELECT random 10 fichiers par bucket, comparer SHA-256 ou size
+3. Pour les buckets privés, vérifier les signed URLs fonctionnent (`createSignedUrl({ expiresIn: 60 })` retourne 200)
+
+**⚠️ Risque résiduel R13** : si la mesure J-7 révèle un volume `dossier-pieces` >3 Go, retomber sur la pré-migration partielle (J-3 + sync delta J0). Décision à 11h le J-7 par Steve.
+
+### 8.4 Smoke tests obligatoires J0 (5 parcours, 30 min)
 
 | Parcours | Détail | Critère succès |
 |---|---|---|
@@ -892,9 +968,11 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 | **P4 — Page publique cotraitant** | Ouvrir lien `/archi/[token]` envoyé à un architecte de test (JWT signing OK) | Page charge, formulaire visible, signature JWT OK |
 | **P5 — Page billing superadmin** | Login superadmin → `/sourcing/superadmin/organizations/{id}/billing` | Page accessible, trial_status correct pour AlyoS + PROTECT |
 
-**Critères rollback** : si l'un de ces 5 parcours fail à 10h30 → rollback obligatoire (§9.5).
+**Critères rollback** : si l'un de ces 5 parcours fail à 10h30 → rollback obligatoire (§8.5).
 
-### 9.5 Plan de rollback (si bascule échoue à 10h30)
+**Smoke test J+2 critique (R12)** : lundi 20/7 7h00 — Steve vérifie manuellement `/sourcing/ao-du-jour` charge avec ≥1 AO récent (date publication ≤ 24h). Si KO : déclenchement manuel `/api/cron/sourcing-run` + escalade Sébastien.
+
+### 8.5 Plan de rollback (si bascule échoue à 10h30)
 
 **Critère de déclenchement** : ≥1 smoke test critique fail (ZIP non généré, login impossible, données absentes, JWT public KO).
 
@@ -911,9 +989,9 @@ Installé côté Sourcing depuis le 2026-06-07 (cf. commit `9886890 docs(migrati
 | 9 | Post-mortem express équipe Sourcing + Sébastien | Lundi 20 juillet | Tous |
 | 10 | Retentative bascule samedi 25 juillet (ou samedi suivant) | J+7 | Tous |
 
-**Délai de retour à la normale** : 5-30 min selon TTL DNS (TTL 300s réduit cf. §9.2).
+**Délai de retour à la normale** : 5-30 min selon TTL DNS (TTL 300s réduit cf. §8.2).
 
-### 9.6 J+7 (samedi 25 juillet 2026) — Post-mortem
+### 8.6 J+7 (samedi 25 juillet 2026) — Post-mortem
 
 Cf. CR visio Point 5 :
 - Documentation décisions migration (ADR-015 « Migration Sourcing → monorepo edifio »)
@@ -924,9 +1002,9 @@ Cf. CR visio Point 5 :
 
 ---
 
-## 10. Annexes
+## 9. Annexes
 
-### 10.1 Documents référencés (lecture complémentaire)
+### 9.1 Documents référencés (lecture complémentaire)
 
 | Document | Localisation | Description |
 |---|---|---|
@@ -939,7 +1017,7 @@ Cf. CR visio Point 5 :
 | **DEPLOY** | `docs/DEPLOY.md` | Procédure de déploiement actuelle Vercel. À adapter post-bascule pour monorepo. |
 | **Variables Mustache CERFA** | `docs/variables_mustache_dc1_dc2.doc` | 33 balises Mustache DC1 + DC2 documentées. À conserver à l'identique post-swap docxtemplater. |
 
-### 10.2 Scripts ops migration (PR #117)
+### 9.2 Scripts ops migration (PR #117)
 
 | Script | Localisation | Description |
 |---|---|---|
@@ -949,18 +1027,21 @@ Cf. CR visio Point 5 :
 | `export-vercel-env.ps1` | `scripts/migration/` | `vercel env pull` preview + production. Bandeau sécurité. Recommandation `age` encryption. |
 | `backup-supabase-storage.ps1` | `scripts/migration/` | Backup 4 buckets via API REST. SERVICE_ROLE_KEY obligatoire. |
 
-### 10.3 Gates / reviews / recettes Lot 1 + 1.5
+### 9.3 Gates / reviews / recettes Lot 1 / 1.5 / 1.6 / 1.7
 
 | Document | Type | Verdict |
 |---|---|---|
-| `gates/RECETTE_PR_115_116_LOT1_LOT15.md` | Recette Camille (QA) | 8 scénarios S1-S6 OK, 0 bloquant, 1 N/A (S7 E2E délégué CI). 1218/1218 vitest verts. |
-| `gates/REVIEW_HUGO_PR117.md` | Review reviewer | APPROUVÉ SOUS RÉSERVE. 0 bloquant sécurité, 2 à corriger avant J-7 (Get-StorageObjects scope + option `-Encrypt age`), 3 suggestions. |
-| `gates/REVIEW_SUIVI_ACT_PR116.md` | Review suivi_act_reviewer | CHANGEMENT REQUIS (mineur, cosmétique) — 1 ligne `UnsafeUnwrappedCookies` inutilisée à supprimer (fait dans PR #118). Match pattern monorepo OK avec 2 écarts notés Lot 2 (rename + COOKIE_DOMAIN). |
-| `gates/AUDIT_ETAT_SALVE_U.md` | Audit (contexte historique) | Pré-Lot 1. État baseline avant upgrade. |
-| `gates/RECETTE_SALVE_U_apprentissage_ecartement.md` | Recette (contexte historique) | Pré-Lot 1. |
-| `gates/REVIEW_GRILLE_SALVE_U.md` | Review (contexte historique) | Pré-Lot 1. |
+| `gates/RECETTE_PR_115_116_LOT1_LOT15.md` | Recette Camille (QA) | 8 scénarios S1-S6 OK, 0 bloquant. 1218/1218 vitest verts. |
+| `gates/REVIEW_HUGO_PR117.md` | Review reviewer | APPROUVÉ SOUS RÉSERVE. 0 bloquant sécurité, 2 à corriger avant J-7 (fix `-Encrypt age` mergé PR #119). |
+| `gates/REVIEW_HUGO_PR121_RISQUES_SECU.md` | Audit reviewer (sécurité) | Source des **corrections factuelles §7.4** : R3 v1 mentions 3 tables erronées sur RLS + 1 oubli (`bureaux_etudes`) ; R4 v1 Anthropic SDK 0.98 sur-évalué. Vuln `getRequiredOrgId` flagée → fixée Lot 1.6 PR #122. |
+| `gates/RECETTE_PROTECT_OPENING_ADR014.md` | Recette Camille (QA) ADR-014 | **Vuln CC-2 fixée** : `current_organization_id()` retournait NULL côté flow public cotraitant — fixé Lot 1.7 mig. 0051 policy `public_token_read` séparée. |
+| `gates/REVIEW_SUIVI_ACT_PR116.md` | Review suivi_act_reviewer | CHANGEMENT REQUIS (mineur). UnsafeUnwrappedCookies inutilisée supprimée PR #118. |
+| `gates/REVIEW_SUIVI_ACT_PR121.md` | Review suivi_act_reviewer (review du présent handoff) | CHANGEMENT REQUIS — source du rework v2 (le présent document). |
+| `gates/REVIEW_SUIVI_ACT_PATTERN_RLS_LOT17.md` | Review suivi_act_reviewer (pattern RLS Lot 1.7) | 🟠 ORANGE — 3/5 dimensions à adapter avant push (helper SQL, naming, cotraitant_shares anon). Adressé Lot 1.7-bis post wrap call sites. |
+| `gates/RECETTE_RLS_LOT17_3_TABLES.md` | Recette Camille (QA) Lot 1.7 | 24 scénarios cadrés (10 pgTAP + 5 Playwright + 4 régression + 5 CC). PR #123 mergée tests 13-14-15 verts. |
+| `gates/AUDIT_PRE_RLS_LOT17.md` | Audit reviewer pré-implémentation Lot 1.7 | Identifie le pattern `postgres BYPASSRLS` → décision ENABLE seul (pas FORCE) Lot 1.7, FORCE reporté Lot 1.7-bis. |
 
-### 10.4 Variables d'environnement complètes Sourcing
+### 9.4 Variables d'environnement complètes Sourcing
 
 ```env
 # Supabase
@@ -1011,7 +1092,7 @@ STRIPE_WEBHOOK_SECRET=
 E2E_TEST_ROUTES_ENABLED=             # =1 active /api/test/seed-session (CI only)
 ```
 
-### 10.5 Buckets Supabase Storage (4 buckets, à migrer)
+### 9.5 Buckets Supabase Storage (4 buckets, à migrer — cf. §8.3.1)
 
 | Bucket | Privé/Public | RLS scope | Contenu |
 |---|---|---|---|
@@ -1022,7 +1103,7 @@ E2E_TEST_ROUTES_ENABLED=             # =1 active /api/test/seed-session (CI only
 
 À fusionner ou réutiliser tels quels selon la politique du module `common/storage/` monorepo.
 
-### 10.6 ADR Sourcing référencés
+### 9.6 ADR Sourcing référencés
 
 | ADR | Date | Sujet |
 |---|---|---|
@@ -1032,24 +1113,33 @@ E2E_TEST_ROUTES_ENABLED=             # =1 active /api/test/seed-session (CI only
 | ADR-014 | 5 juin 2026 | Levée du filtre `@alyosingenierie.fr` du middleware → ouverture multi-tenant (PROTECT) |
 | ADR-015 | À écrire 25 juillet 2026 | Migration Sourcing → monorepo edifio (post-mortem) |
 
-### 10.7 Documentation utilisateur (17 guides intégrés)
+### 9.7 Documentation utilisateur (17 guides intégrés)
 
-17 guides intégrés dans l'app sous `/sourcing/formation/[slug]`, table `formations` :
+17 guides intégrés dans l'app sous `/sourcing/profil/formations/[slug]`, table `formations`. Source de vérité : `src/db/seed/formations-content-fixture.ts` (17 entrées, ~917 lignes markdown total).
 
-1. Prendre en main edifio Sourcing en 10 minutes
-2. Traiter sa file « AO du jour »
-3. Répondre en cotraitance avec un architecte
-4. Gérer les contacts et le coffre documentaire BET
-5. Choisir ton mode de réponse à un AO
-6-13. *(autres — liste complète à extraire de `seed-formations.ts`)*
-14. Debug sourcing
-15. Fiches métiers : utiliser le matching auto
-16. Références : matching auto via tableau Excel + fiches A4
-17. CV : sélection auto des intervenants par mots-clés
+| # | Slug | Titre |
+|---|---|---|
+| 1 | `prise-en-main` | Prendre en main edifio Sourcing en 10 minutes |
+| 2 | `ao-du-jour` | Traiter sa file « AO du jour » |
+| 3 | `cotraitance` | Répondre en cotraitance avec un architecte |
+| 4 | `contacts-coffre-bet` | Gérer les contacts et le coffre documentaire BET |
+| 5 | `modes-de-reponse` | Choisir ton mode de réponse à un AO |
+| 6 | `analyse-rc-pieces` | Analyser le RC et compléter ton dossier |
+| 7 | `dc1-dc2-pouvoir-zip` | Préparer DC1, DC2, Pouvoir et compiler le ZIP final |
+| 8 | `diffusion-dossier-archi` | Valider et envoyer le dossier à l'architecte |
+| 9 | `indexation-ia-biblio` | Indexer ta bibliothèque entreprise avec Claude IA |
+| 10 | `expirations-biblio` | Surveiller les expirations d'attestations dans ta bibliothèque |
+| 11 | `export-csv-ao-du-jour` | Exporter les AO du jour au format Excel pour ton tableau Veille_AO |
+| 12 | `pilotage-admin-observabilite` | Piloter l'activité depuis les dashboards admin |
+| 13 | `cerfa-docx-templates` | Personnaliser les CERFA DC1/DC2 avec tes propres modèles Word |
+| 14 | `debug-sourcing-zero-inserted` | Diagnostiquer un sourcing à 0 inserted |
+| 15 | `fiches-metiers-matching-auto` | Fiches métiers : utiliser le matching auto |
+| 16 | `references-matching-auto` | Références : matching auto via tableau Excel + fiches A4 |
+| 17 | `cv-matching-auto` | CV : sélection auto des intervenants par mots-clés |
 
-**Portage** : telles quelles (markdown rendu HTML, pur contenu). Seed à porter Lot 10.
+**Portage** : telles quelles (markdown rendu HTML, pur contenu — `slug`, `title`, `summary`, `content_md`, `module`). Seed à porter Lot 10 dans la migration `0NNNN_seed_formations.sql` côté monorepo. Si Q6 superadmin fusion `formations` choisie (cf. §4.4), inclure `module = ARRAY['sourcing']` au moment du backfill.
 
-### 10.8 Entité juridique éditrice
+### 9.8 Entité juridique éditrice
 
 **SAS edifio**
 - SIREN 105 534 515
@@ -1059,7 +1149,7 @@ E2E_TEST_ROUTES_ENABLED=             # =1 active /api/test/seed-session (CI only
 
 Stripe Checkout doit facturer au nom de **SAS edifio** (pas AlyoS Ingénierie). Brevo + Resend senders à actualiser post-bascule en « edifio Suite » ou « edifio Sourcing ».
 
-### 10.9 Contacts équipe
+### 9.9 Contacts équipe
 
 | Personne | Rôle | Email |
 |---|---|---|
@@ -1072,4 +1162,4 @@ Stripe Checkout doit facturer au nom de **SAS edifio** (pas AlyoS Ingénierie). 
 
 ---
 
-*FIN HANDOFF v1 — 10 sections + 9 annexes couvertes. Lecture obligatoire Sébastien avant kickoff 1er juillet 2026.*
+*FIN HANDOFF v2 — 9 sections + 9 annexes couvertes (v1 = 10 sections, §6 Sub-agents supprimé, §7.11 Total infra supprimé, §5.4 condensé, §2.1 Sourcing engine détaillé, §2.5 RLS corrigé post-Lot 1.7, §4.4 Q6 superadmin détaillé, §7.3 R-FK détaillé + test J-14, §7.6 R11-R15 ajouté, §8.3.1 Storage 4 buckets détaillé, §9.7 17 guides listés). Lecture obligatoire Sébastien avant kickoff 1er juillet 2026. Date version : 2026-06-09.*
