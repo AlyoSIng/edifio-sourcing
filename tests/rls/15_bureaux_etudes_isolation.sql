@@ -2,18 +2,19 @@
 -- pgTAP 15_bureaux_etudes_isolation -- edifio Sourcing
 -- ----------------------------------------------------------------------------
 -- Cross-tenant `bureaux_etudes` : annuaire des bureaux d'etudes techniques
--- partenaires. Verifie le fix de la dette securite pre-existante (migration
--- 0051, flag Hugo PR #121, audit gates/AUDIT_SECU_FINAL_MAIN_260608.md).
+-- partenaires. Verifie l'etat post-Lot 1.7-bis (migration 0052) :
+--   - FORCE ROW LEVEL SECURITY (CC-1 Camille)
+--   - Naming policies <table>_<action>
 --
--- Pattern identique a 13_companies_isolation.sql : meme structure de table,
--- meme decision RLS (ENABLE + tenant_isolation + admin_write/update).
+-- Pattern identique a 13_companies_isolation.sql (meme structure / decisions RLS).
 --
--- Plan : 1 setup + 1 current_org + 1 select cross + 1 insert ok + 1 insert
---        cross-tenant + 1 viewer block + 1 update cross-tenant = 7 assertions.
+-- Plan : 1 setup + 1 force_rls + 4 policy_naming + 1 current_org + 1 select
+--        + 1 insert ok + 1 insert cross-tenant + 1 viewer block + 1 update
+--        cross-tenant = 12 assertions.
 -- ============================================================================
 
 BEGIN;
-SELECT plan(7);
+SELECT plan(12);
 
 -- ---- Setup --------------------------------------------------------------
 
@@ -49,6 +50,33 @@ ON CONFLICT (id) DO NOTHING;
 
 SELECT ok(true, 'Setup OrgA + OrgB + bureaux_etudes cross-tenant pose');
 
+-- ---- Lot 1.7-bis : FORCE RLS + naming ----------------------------------
+
+-- Assertion : FORCE RLS active sur bureaux_etudes (CC-1 Camille)
+SELECT is(
+  (SELECT relforcerowsecurity FROM pg_class WHERE relname = 'bureaux_etudes'),
+  true,
+  'bureaux_etudes FORCE RLS (relforcerowsecurity = true)'
+);
+
+-- Assertion : policies renommees <table>_<action>
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bureaux_etudes' AND policyname = 'bureaux_etudes_select'),
+  'policy bureaux_etudes_select existe (naming Lot 1.7-bis)'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bureaux_etudes' AND policyname = 'bureaux_etudes_insert'),
+  'policy bureaux_etudes_insert existe (naming Lot 1.7-bis)'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bureaux_etudes' AND policyname = 'bureaux_etudes_update'),
+  'policy bureaux_etudes_update existe (naming Lot 1.7-bis)'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'bureaux_etudes' AND policyname = 'bureaux_etudes_delete'),
+  'policy bureaux_etudes_delete existe (naming Lot 1.7-bis)'
+);
+
 -- ---- Bascule sur role applicatif + JWT OrgA admin -----------------------
 
 SET LOCAL ROLE test_authenticated;
@@ -60,30 +88,30 @@ SELECT set_config(
   true
 );
 
--- Assertion 1 : current_organization_id() = OrgA
+-- Assertion : current_organization_id() = OrgA
 SELECT is(
   current_organization_id(),
   '00000000-0000-0000-0000-00000000000a'::uuid,
   'current_organization_id() retourne OrgA depuis le JWT'
 );
 
--- Assertion 2 : SELECT cross-tenant -> 1 seule ligne visible (OrgA)
+-- Assertion : SELECT cross-tenant -> 1 seule ligne visible (OrgA)
 SELECT is(
   (SELECT count(*)::int FROM bureaux_etudes
    WHERE id IN ('aa153333-0000-0000-0000-000000000001'::uuid,
                 'bb153333-0000-0000-0000-000000000001'::uuid)),
   1,
-  'bureaux_etudes : Alice (OrgA) ne voit que sa ligne, pas OrgB'
+  'bureaux_etudes : Alice (OrgA) ne voit que sa ligne, pas OrgB (policy bureaux_etudes_select)'
 );
 
--- Assertion 3 : INSERT dans son org -> OK
+-- Assertion : INSERT dans son org -> OK
 SELECT lives_ok(
   $$INSERT INTO bureaux_etudes (id, organization_id, cabinet)
     VALUES ('aa153333-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000000a', 'BE Gamma OrgA')$$,
   'bureaux_etudes : Alice (admin OrgA) peut INSERT dans sa propre org'
 );
 
--- Assertion 4 : INSERT dans une autre org -> rejet
+-- Assertion : INSERT dans une autre org -> rejet
 SELECT throws_ok(
   $$INSERT INTO bureaux_etudes (id, organization_id, cabinet)
     VALUES ('aa153333-0000-0000-0000-000000000003', '00000000-0000-0000-0000-00000000000b', 'BE Cross-Tenant')$$,
@@ -92,7 +120,7 @@ SELECT throws_ok(
   'bureaux_etudes : Alice (OrgA) NE PEUT PAS INSERT une ligne dans OrgB'
 );
 
--- Assertion 5 : viewer ne peut pas INSERT
+-- Assertion : viewer ne peut pas INSERT
 SELECT set_config(
   'request.jwt.claims',
   '{"sub":"11111111-1111-1111-1111-1111111111a1","app_metadata":{"organization_id":"00000000-0000-0000-0000-00000000000a","role":"viewer"}}',
@@ -103,10 +131,10 @@ SELECT throws_ok(
     VALUES ('aa153333-0000-0000-0000-000000000004', '00000000-0000-0000-0000-00000000000a', 'BE Viewer-Block')$$,
   '42501',
   NULL,
-  'bureaux_etudes : viewer OrgA NE PEUT PAS INSERT (admin_write RESTRICTIVE role check)'
+  'bureaux_etudes : viewer OrgA NE PEUT PAS INSERT (bureaux_etudes_insert role check)'
 );
 
--- Assertion 6 : UPDATE cross-tenant -> 0 row affected
+-- Assertion : UPDATE cross-tenant -> 0 row affected
 SELECT set_config(
   'request.jwt.claims',
   '{"sub":"11111111-1111-1111-1111-1111111111a1","app_metadata":{"organization_id":"00000000-0000-0000-0000-00000000000a","role":"admin"}}',
@@ -120,7 +148,7 @@ WITH upd AS (
 SELECT is(
   (SELECT count(*)::int FROM upd),
   0,
-  'bureaux_etudes : Alice (OrgA) UPDATE sur ligne OrgB renvoie 0 row (RLS USING bloque)'
+  'bureaux_etudes : Alice (OrgA) UPDATE sur ligne OrgB renvoie 0 row (bureaux_etudes_update USING bloque)'
 );
 
 SELECT * FROM finish();

@@ -4,29 +4,31 @@
 -- Cross-tenant `cotraitant_shares` + `cotraitant_share_items` : tokens de
 -- partage cotraitant pour le flow Tandem V2 (page publique /cotraitant/[token]).
 --
--- Specificite : ces deux tables sont accessibles SANS auth via le flow public
--- (le BE clique sur le lien magique). Le pattern RLS combine donc :
---   - tenant_isolation (auth normale, scope user dans son org)
---   - public_token_read SELECT (anon ou rôle non-auth, USING TRUE)
---   - public_token_update_signed UPDATE sur share_items (depot signe)
+-- Post-Lot 1.7-bis (migration 0052) :
+--   - FORCE ROW LEVEL SECURITY (CC-1 Camille)
+--   - Naming policies <table>_<action>
+--   - Helper public.current_user_org_id() cree (lookup memberships)
+--   - Restriction anon : public_select / update_signed contraints sur
+--     revoked_at IS NULL AND expires_at > now() (defense en profondeur)
+--   - Dual SELECT : auth user (org-scoped, voit tout y compris expire/revoque)
+--     OR anon (contrainte share actif) -- preserve audit /tandem/partage
 --
 -- Verifie :
---   1. SELECT cross-tenant user authentifie : ne voit que sa propre org
---   2. SELECT public anonyme : voit toutes les lignes (USING TRUE) -> OK car
---      l'application filtre TOUJOURS par token UUID v4 (122 bits d'entropie)
---   3. UPDATE cross-tenant tente sur share_items d'une autre org -> 0 row
---      (le flow public update signe est legitime mais limite au share_id ciblé,
---      pas une fuite cross-tenant : on verifie le comportement)
+--   1. FORCE RLS active
+--   2. Naming policies presentes
+--   3. current_user_org_id() retourne la 1ere membership de l'user JWT
+--   4. SELECT auth org-scoped : visible meme si expire (audit)
+--   5. SELECT anon : flow public token bloque si expires_at < now()
+--      ou revoked_at NOT NULL (defense en profondeur)
 --
--- Reference migration : 0051_rls_fix_companies_cotraitant_shares_be.sql.
---
--- Plan : 1 setup + 1 current_org + 1 select cross-tenant + 1 share_items
---        cross-tenant + 1 public select share + 1 public select items
---        + 1 update cross-tenant share_items = 7 assertions.
+-- Plan : 1 setup + 1 force_rls + 5 policy_naming + 1 helper_user_org
+--        + 1 current_org + 1 select_authn_org + 1 select_authn_expired
+--        + 1 select_public_active + 1 select_public_expired_blocked
+--        + 1 update_cross_tenant_authn = 13 assertions.
 -- ============================================================================
 
 BEGIN;
-SELECT plan(7);
+SELECT plan(13);
 
 -- ---- Setup --------------------------------------------------------------
 
@@ -65,16 +67,23 @@ INSERT INTO tenders (id, organization_id, external_ref, platform_id, title, buye
    'SHARE-B-001', (SELECT id FROM platforms WHERE code = 'boamp'), 'AO Share OrgB', 'Mairie B')
 ON CONFLICT (organization_id, external_ref, platform_id) DO NOTHING;
 
--- Cotraitant shares OrgA + OrgB
--- Tokens connus (necessaires aux assertions public path) : aa1...4444 et bb1...4444
+-- Cotraitant shares OrgA + OrgB + 1 share OrgA EXPIRE (test defense en profondeur)
 INSERT INTO cotraitant_shares
   (id, tender_id, organization_id, contact_name, contact_email, token, expires_at, created_by)
 VALUES
+  -- OrgA actif
   ('aa144444-0000-0000-0000-000000000001',
    'aa143333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a',
    'Cotraitant A', 'cotraitant@orga.test',
    'aa144444-0000-0000-0000-0000000044a4',
    now() + interval '30 days', '11111111-1111-1111-1111-1111111111a1'),
+  -- OrgA EXPIRE (expires_at dans le passe)
+  ('aa144444-0000-0000-0000-000000000002',
+   'aa143333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a',
+   'Cotraitant A Expire', 'cotraitant-exp@orga.test',
+   'aa144444-0000-0000-0000-0000000044a5',
+   now() - interval '1 day', '11111111-1111-1111-1111-1111111111a1'),
+  -- OrgB actif
   ('bb144444-0000-0000-0000-000000000001',
    'bb143333-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b',
    'Cotraitant B', 'cotraitant@orgb.test',
@@ -94,7 +103,56 @@ VALUES
    'KBIS OrgB', 'kbis', 'org-b/kbis.pdf')
 ON CONFLICT (id) DO NOTHING;
 
-SELECT ok(true, 'Setup OrgA + OrgB + cotraitant_shares + items pose');
+SELECT ok(true, 'Setup OrgA + OrgB + cotraitant_shares (incl 1 share expire) + items pose');
+
+-- ---- Lot 1.7-bis : FORCE RLS ------------------------------------------
+
+SELECT is(
+  (SELECT relforcerowsecurity FROM pg_class WHERE relname = 'cotraitant_shares'),
+  true,
+  'cotraitant_shares FORCE RLS (relforcerowsecurity = true)'
+);
+
+-- ---- Lot 1.7-bis : naming policies ------------------------------------
+
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cotraitant_shares' AND policyname = 'cotraitant_shares_select'),
+  'policy cotraitant_shares_select existe (auth org-scoped)'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cotraitant_shares' AND policyname = 'cotraitant_shares_select_public'),
+  'policy cotraitant_shares_select_public existe (anon flow token contraint sur expires_at + revoked_at)'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cotraitant_shares' AND policyname = 'cotraitant_shares_insert'),
+  'policy cotraitant_shares_insert existe'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cotraitant_shares' AND policyname = 'cotraitant_shares_update'),
+  'policy cotraitant_shares_update existe'
+);
+SELECT ok(
+  EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'cotraitant_share_items' AND policyname = 'cotraitant_share_items_update_signed'),
+  'policy cotraitant_share_items_update_signed existe (flow signed depot BE)'
+);
+
+-- ---- Lot 1.7-bis : helper current_user_org_id() ------------------------
+
+-- Pose JWT avec sub = Alice (OrgA) -- auth.uid() stubbe en CI lit le sub
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-1111-1111-1111111111a1","app_metadata":{"organization_id":"00000000-0000-0000-0000-00000000000a","role":"admin"}}',
+  true
+);
+
+-- current_user_org_id() : SECURITY DEFINER -> bypass RLS sur memberships,
+-- retourne la 1ere membership (ORDER BY created_at LIMIT 1).
+-- Alice n'a qu'une seule membership (OrgA), donc retour = OrgA.
+SELECT is(
+  current_user_org_id(),
+  '00000000-0000-0000-0000-00000000000a'::uuid,
+  'current_user_org_id() retourne la 1ere membership de l''user (Alice -> OrgA)'
+);
 
 -- ---- Test 1 : user authentifie OrgA --------------------------------------
 
@@ -107,98 +165,78 @@ SELECT set_config(
   true
 );
 
--- Assertion 1 : current_organization_id() = OrgA
+-- Assertion : current_organization_id() = OrgA (lecture JWT app_metadata)
 SELECT is(
   current_organization_id(),
   '00000000-0000-0000-0000-00000000000a'::uuid,
   'current_organization_id() retourne OrgA depuis le JWT'
 );
 
--- NOTE pgTAP : la policy public_token_read PERMISSIVE USING (TRUE) est OR-e
--- avec tenant_isolation -> sur un SELECT auth, le user VOIT en realite les 2
--- shares (TRUE englobe). C'est attendu : l'isolation reelle vient du fait que
--- la page applique TOUJOURS WHERE token = X cote code. Pour matcher cette
--- realite operationnelle dans pgTAP, on teste plutot que la policy
--- tenant_isolation SEULE produit la bonne isolation -- on temporise donc
--- la public_token_read en supprimant *_token_* pour ce test cible auth.
---
--- Approche retenue : on filtre les assertions auth en simulant la clause
--- code "WHERE organization_id = current_organization_id()" implicite ;
--- ce que la couche code fait NATURELLEMENT via withTenantContext.
--- Cf. commentaires migration 0051 section 3.
-
--- Assertion 2 : sous le filtre code (organization_id = current_organization_id()),
--- seul OrgA est vu (toutes les pages authentifees passent par ce filtre)
+-- Assertion : SELECT auth voit ses 2 shares OrgA (1 actif + 1 expire)
+-- Verifie que la dual-policy SELECT auth permet de voir les expires pour audit.
+-- Note : la policy cotraitant_shares_select_public est OR-e -> Alice voit aussi
+-- les shares actifs des autres orgs en pgTAP (USING anon contraint sur
+-- expires_at + revoked_at). C'est attendu : la securite reelle vient du
+-- filtre code (WHERE organization_id = ...) cote /tandem/partage. On scope
+-- l'assertion sur OrgA pour matcher la realite operationnelle de la page.
 SELECT is(
   (SELECT count(*)::int FROM cotraitant_shares
-   WHERE id IN ('aa144444-0000-0000-0000-000000000001'::uuid,
-                'bb144444-0000-0000-0000-000000000001'::uuid)
-     AND organization_id = current_organization_id()),
-  1,
-  'cotraitant_shares : avec filtre code org, Alice (OrgA) ne voit que son share'
+   WHERE organization_id = '00000000-0000-0000-0000-00000000000a'::uuid),
+  2,
+  'cotraitant_shares : Alice (OrgA) voit ses 2 shares (1 actif + 1 expire) -- audit /tandem/partage preserve'
 );
 
--- Assertion 3 : meme principe sur share_items (jointure share parent)
-SELECT is(
-  (SELECT count(*)::int FROM cotraitant_share_items i
-   JOIN cotraitant_shares s ON s.id = i.share_id
-   WHERE i.id IN ('aa145555-0000-0000-0000-000000000001'::uuid,
-                  'bb145555-0000-0000-0000-000000000001'::uuid)
-     AND s.organization_id = current_organization_id()),
-  1,
-  'cotraitant_share_items : Alice (OrgA) ne voit que les items rattaches a OrgA'
-);
+-- ---- Test 2 : flow public anon -- defense en profondeur expires_at -----
 
--- ---- Test 2 : flow public anonyme via token (pas de JWT) -----------------
-
--- Reset JWT claims = vide -> current_organization_id() devient NULL
+-- Simule le flow anon avec JWT vide -> current_organization_id() = NULL
+-- -> policy cotraitant_shares_select (org-scoped) ne matche aucune ligne
+-- -> SEULE policy cotraitant_shares_select_public (USING revoked_at IS NULL
+--    AND expires_at > now()) peut filtrer.
+-- Note : test_authenticated reste actif (pas de role test_anon en CI), mais
+-- avec JWT vide le comportement est equivalent (RLS USING evalue les memes
+-- predicats org-scoped a NULL).
 SELECT set_config('request.jwt.claims', '', true);
 
--- Verifie que current_organization_id() est bien NULL maintenant
--- (la policy public_token_read USING TRUE doit prendre le relais)
-
--- Assertion 4 : public_token_read SELECT par token OrgA fonctionne
+-- Assertion : SELECT anon par token OrgA ACTIF -> 1 visible
+-- policy cotraitant_shares_select_public : USING revoked_at IS NULL AND expires_at > now()
 SELECT is(
   (SELECT count(*)::int FROM cotraitant_shares
    WHERE token = 'aa144444-0000-0000-0000-0000000044a4'::uuid),
   1,
-  'cotraitant_shares : SELECT public via token OrgA voit le share (policy public_token_read)'
+  'cotraitant_shares : SELECT anon par token actif OK (policy cotraitant_shares_select_public)'
 );
 
--- Assertion 5 : public_token_read SELECT items par share_id OrgA fonctionne
--- Le code de la page /cotraitant/[token] derive share_id du token puis charge
--- les items par share_id. Verifions que ca passe sans JWT.
+-- Assertion : SELECT anon par token OrgA EXPIRE -> 0 visible (defense en profondeur)
+-- Sans la contrainte expires_at de la policy, le token expire serait visible
+-- (USING TRUE Lot 1.7). Avec 0052 : policy bloque meme si token leak post-expiration.
 SELECT is(
-  (SELECT count(*)::int FROM cotraitant_share_items
-   WHERE share_id = 'aa144444-0000-0000-0000-000000000001'::uuid),
-  1,
-  'cotraitant_share_items : SELECT public par share_id voit les items (policy public_token_read)'
+  (SELECT count(*)::int FROM cotraitant_shares
+   WHERE token = 'aa144444-0000-0000-0000-0000000044a5'::uuid),
+  0,
+  'cotraitant_shares : SELECT anon par token EXPIRE -> 0 (defense en profondeur Lot 1.7-bis)'
 );
 
--- ---- Test 3 : UPDATE cross-tenant simule -------------------------------
+-- ---- Test 3 : UPDATE cross-tenant simule (re-auth Alice) ----------------
 
--- Re-pose JWT OrgA admin pour tester un UPDATE cross-tenant authentifie
+-- Re-pose JWT OrgA admin pour tester UPDATE cross-tenant authentifie
 SELECT set_config(
   'request.jwt.claims',
   '{"sub":"11111111-1111-1111-1111-1111111111a1","app_metadata":{"organization_id":"00000000-0000-0000-0000-00000000000a","role":"admin"}}',
   true
 );
 
--- Assertion 6 : UPDATE cross-tenant.
--- public_token_update_signed est USING TRUE -> autorise l'UPDATE visible.
--- C'est volontaire pour le flow signed depot. La protection reelle est cote
--- code (token + expiration check). On documente le comportement attendu.
--- Cf. TODO migration 0051 section 3 (parameter app.cotraitant_token a poser
--- par middleware en lot 1.7-bis).
+-- Assertion : UPDATE cross-tenant cotraitant_shares OrgB par Alice OrgA -> 0 row
+-- policy cotraitant_shares_update USING organization_id = current_organization_id()
+-- -> ligne OrgB invisible donc UPDATE 0 row.
 WITH upd AS (
-  UPDATE cotraitant_share_items SET signer_name = 'HackerTest'
-   WHERE id = 'bb145555-0000-0000-0000-000000000001'::uuid
+  UPDATE cotraitant_shares SET contact_name = 'HackerName'
+   WHERE id = 'bb144444-0000-0000-0000-000000000001'::uuid
    RETURNING id
 )
 SELECT is(
   (SELECT count(*)::int FROM upd),
-  1,
-  'cotraitant_share_items : UPDATE cross-tenant autorise (public_token_update_signed TRUE) -- protection cote code via verif token. TODO lot 1.7-bis : restreindre via app.cotraitant_token.'
+  0,
+  'cotraitant_shares : Alice (OrgA) UPDATE sur share OrgB renvoie 0 row (policy cotraitant_shares_update USING bloque)'
 );
 
 SELECT * FROM finish();

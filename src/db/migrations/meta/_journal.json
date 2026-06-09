@@ -239,6 +239,13 @@
       "when": 1779731008000,
       "tag": "0051_rls_fix_companies_cotraitant_shares_be",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1779731009000,
+      "tag": "0052_rls_lot17_bis_force_helper_naming",
+      "breakpoints": true
     }
   ]
 }
