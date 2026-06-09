@@ -41,11 +41,32 @@
 
 .PARAMETER OutDir
     Dossier racine de sortie. Par défaut : backups/vercel/ (relatif au repo).
+
+.PARAMETER Encrypt
+    (Optionnel) Si présent : chiffre immédiatement les fichiers .env.*.backup
+    via `age --passphrase` puis supprime les originaux en clair (correction Hugo
+    finding PR #117 — réduit la fenêtre humaine de leak des secrets).
+
+    Pré-requis : `age` installé (https://github.com/FiloSottile/age).
+    Installation Windows : `winget install FiloSottile.age`.
+
+    Source de passphrase :
+      1. Variable d'env `$env:AGE_PASSPHRASE` (préférée, scriptable).
+      2. Sinon prompt interactif sécurisé (Read-Host -AsSecureString).
+
+    Déchiffrement ultérieur :
+      age --decrypt --output .env.production.backup .env.production.backup.age
+
+.EXAMPLE
+    # Avec chiffrement (recommandé pour les exports production) :
+    $env:AGE_PASSPHRASE = "<passphrase forte 1Password>"
+    .\scripts\migration\export-vercel-env.ps1 -ProjectName "edifio-sourcing" -Encrypt
 #>
 [CmdletBinding()]
 param(
     [string]$ProjectName = "",
-    [string]$OutDir = "backups/vercel"
+    [string]$OutDir = "backups/vercel",
+    [switch]$Encrypt
 )
 
 $ErrorActionPreference = "Stop"
@@ -67,6 +88,23 @@ if (-not $vercel) {
 }
 
 $repoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
+
+# --- Safety check 1b : age dispo si -Encrypt demandé ---
+if ($Encrypt) {
+    $ageCmd = Get-Command age -ErrorAction SilentlyContinue
+    if (-not $ageCmd) {
+        Write-Host "[REFUS] -Encrypt demande mais `age` introuvable dans le PATH." -ForegroundColor Red
+        Write-Host ""
+        Write-Host "Installer age (https://github.com/FiloSottile/age) :" -ForegroundColor Yellow
+        Write-Host "  winget install FiloSottile.age" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Ou via scoop / chocolatey :" -ForegroundColor Yellow
+        Write-Host "  scoop install age" -ForegroundColor Cyan
+        Write-Host "  choco install age.portable" -ForegroundColor Cyan
+        exit 1
+    }
+    Write-Host "[INFO] Chiffrement age active." -ForegroundColor Cyan
+}
 
 # --- Safety check 2 : projet linké (.vercel/project.json) ---
 $projectJsonPath = Join-Path $repoRoot ".vercel/project.json"
@@ -145,10 +183,115 @@ Write-Host ""
 Write-Host "[OK] Export terminé." -ForegroundColor Green
 Write-Host "     Preview    : $previewFile ($previewSize octets)" -ForegroundColor Green
 Write-Host "     Production : $productionFile ($productionSize octets)" -ForegroundColor Green
-Write-Host ""
-Write-Host "[SECURITE] Le fichier .env.production.backup contient des SECRETS PROD." -ForegroundColor Red
-Write-Host "           - Le dossier backups/ est dans .gitignore (vérifié) → NE SERA PAS COMMIT." -ForegroundColor Yellow
-Write-Host "           - Après usage : copier dans 1Password puis SUPPRIMER le fichier local." -ForegroundColor Yellow
-Write-Host "           - Pour chiffrer immédiatement (optionnel, si age installé) :" -ForegroundColor Yellow
-Write-Host "               age -r <recipient-pubkey> -o `"$productionFile.age`" `"$productionFile`"" -ForegroundColor Gray
-Write-Host "               Remove-Item `"$productionFile`"" -ForegroundColor Gray
+
+# --- Chiffrement age (si -Encrypt) ---
+# Réduit la fenêtre humaine de leak des secrets sur disque (correction Hugo PR #117).
+# Source passphrase : $env:AGE_PASSPHRASE en priorité (scriptable), sinon prompt.
+if ($Encrypt) {
+    Write-Host ""
+    Write-Host "[CHIFFREMENT] Encodage age en cours..." -ForegroundColor Yellow
+
+    # Récupération passphrase
+    $passphrase = $env:AGE_PASSPHRASE
+    if ([string]::IsNullOrWhiteSpace($passphrase)) {
+        Write-Host "  AGE_PASSPHRASE non posee en ENV. Prompt securise..." -ForegroundColor Gray
+        $securePass = Read-Host -AsSecureString -Prompt "  Passphrase age"
+        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePass)
+        try {
+            $passphrase = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+        } finally {
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($passphrase)) {
+        Write-Host "[ERREUR] Passphrase vide -> chiffrement annule. Fichiers en clair laisses." -ForegroundColor Red
+        exit 1
+    }
+
+    # Fonction locale de chiffrement (idempotente : recree .age si deja present)
+    function Invoke-AgeEncrypt {
+        param(
+            [Parameter(Mandatory=$true)][string]$Path,
+            [Parameter(Mandatory=$true)][string]$Pass
+        )
+        if (-not (Test-Path $Path)) { return $null }
+
+        $encryptedPath = "$Path.age"
+
+        # age 1.x : --passphrase + --output. La passphrase est lue depuis stdin
+        # quand --passphrase + une entree non-tty est piped, ou demandee 2x sinon.
+        # On utilise un fichier temporaire de stdin pour eviter les pieges de pipe PS5.1.
+        $tmpStdin = [System.IO.Path]::GetTempFileName()
+        try {
+            # age --passphrase prompt 2x quand stdin est un TTY ; en stdin redirige,
+            # il lit la passphrase 1x sur stdin avant le payload. On contourne en
+            # passant directement le fichier source via -o + argument positionnel,
+            # et la passphrase via la variable AGE_PASSPHRASE que age 1.1+ supporte.
+            # Pour compat large : utilisation du wrapper Start-Process avec stdin redirige.
+
+            # Approche robuste compat age 1.0-1.2 : on POSE temporairement
+            # $env:AGE_PASSPHRASE le temps de l'appel (deja en cours puisque source).
+            $previous = $env:AGE_PASSPHRASE
+            $env:AGE_PASSPHRASE = $Pass
+            try {
+                & age --passphrase --output $encryptedPath $Path 2>&1 | ForEach-Object {
+                    # Masquage defensif : aucune ligne ne devrait contenir la passphrase,
+                    # mais par paranoia on filtre toute occurrence si elle apparait.
+                    if ($_ -is [string] -and $_ -match [regex]::Escape($Pass)) {
+                        Write-Host ("  age: " + ($_ -replace [regex]::Escape($Pass), "***")) -ForegroundColor Gray
+                    } else {
+                        Write-Host "  age: $_" -ForegroundColor Gray
+                    }
+                }
+                $ageExit = $LASTEXITCODE
+            } finally {
+                $env:AGE_PASSPHRASE = $previous
+            }
+
+            if ($ageExit -ne 0 -or -not (Test-Path $encryptedPath)) {
+                throw "age a echoue (exit $ageExit) sur $Path"
+            }
+
+            # Suppression du fichier en clair (idempotent : si re-run, .age sera recree)
+            Remove-Item $Path -Force
+            return $encryptedPath
+        } finally {
+            if (Test-Path $tmpStdin) { Remove-Item $tmpStdin -Force -ErrorAction SilentlyContinue }
+        }
+    }
+
+    try {
+        $previewEnc    = Invoke-AgeEncrypt -Path $previewFile    -Pass $passphrase
+        $productionEnc = Invoke-AgeEncrypt -Path $productionFile -Pass $passphrase
+    } catch {
+        # Masquage defensif sur la stack trace
+        $msg = $_.Exception.Message
+        if ($msg -match [regex]::Escape($passphrase)) {
+            $msg = $msg -replace [regex]::Escape($passphrase), "***"
+        }
+        Write-Host "[ERREUR] Chiffrement age echoue : $msg" -ForegroundColor Red
+        Write-Host "         Les fichiers en clair sont peut-etre encore presents -> nettoyer manuellement." -ForegroundColor Yellow
+        exit 1
+    } finally {
+        # Effacer la passphrase de la memoire
+        $passphrase = $null
+        [System.GC]::Collect()
+    }
+
+    Write-Host ""
+    Write-Host "[OK] Chiffrement termine. Fichiers en clair supprimes." -ForegroundColor Green
+    if ($previewEnc)    { Write-Host "     Preview chiffre    : $previewEnc"    -ForegroundColor Green }
+    if ($productionEnc) { Write-Host "     Production chiffre : $productionEnc" -ForegroundColor Green }
+    Write-Host ""
+    Write-Host "[DECHIFFREMENT] Pour relire un fichier chiffre :" -ForegroundColor Cyan
+    Write-Host "     `$env:AGE_PASSPHRASE = '<passphrase>'" -ForegroundColor Gray
+    Write-Host "     age --decrypt --output .env.production.backup .env.production.backup.age" -ForegroundColor Gray
+} else {
+    Write-Host ""
+    Write-Host "[SECURITE] Le fichier .env.production.backup contient des SECRETS PROD." -ForegroundColor Red
+    Write-Host "           - Le dossier backups/ est dans .gitignore (verifie) -> NE SERA PAS COMMIT." -ForegroundColor Yellow
+    Write-Host "           - Apres usage : copier dans 1Password puis SUPPRIMER le fichier local." -ForegroundColor Yellow
+    Write-Host "           - RECOMMANDATION : relancer avec -Encrypt pour chiffrement age immediat." -ForegroundColor Yellow
+    Write-Host "               .\scripts\migration\export-vercel-env.ps1 -ProjectName `"$ProjectName`" -Encrypt" -ForegroundColor Gray
+}

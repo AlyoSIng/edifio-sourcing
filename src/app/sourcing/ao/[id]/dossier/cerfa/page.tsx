@@ -26,8 +26,6 @@ import { tenderEvents, tenders } from "@/db/schema/tenders";
 import { organizations } from "@/db/schema/organizations";
 import { organizationProfiles } from "@/db/schema/messaging";
 import { withTenantContext } from "@/lib/db/with-tenant-context";
-import { toUserProfile } from "@/lib/auth/types";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
@@ -76,8 +74,9 @@ export default async function CerfaPage(props: PageProps) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/dossier/cerfa`);
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous).
   // Résolution dynamique de l'org (Phase A multi-tenant).
   // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
   // plutôt que crash 500 de la page entière.

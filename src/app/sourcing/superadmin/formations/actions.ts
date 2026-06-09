@@ -9,10 +9,9 @@
  *   - `deleteFormationAction`   : supprime une formation
  *   - `reorderFormationsAction` : met à jour `displayOrder` en batch
  *
- * Triple garde d'authentification sur chaque action :
+ * Double garde d'authentification (ADR-014 retire la garde domaine) :
  *   1. Session Supabase valide
- *   2. Domaine autorisé (`isAuthorizedEmail`)
- *   3. Rôle superadmin (`isSuperAdmin`)
+ *   2. Rôle superadmin (`isSuperAdmin`)
  *
  * Source de vérité : `src/db/schema/superadmin.ts` table `formations`.
  */
@@ -23,7 +22,6 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { formations } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -36,7 +34,7 @@ async function requireSuperadmin(): Promise<{ userId: string } | { error: string
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Non authentifié." };
-  if (!isAuthorizedEmail(user.email)) return { error: "Domaine non autorisé." };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) return { error: "Accès réservé au superadmin." };
 

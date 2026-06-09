@@ -20,7 +20,6 @@ import { z } from "zod";
 
 import { db } from "@/db/client";
 import { organizations } from "@/db/schema/organizations";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server";
@@ -74,7 +73,7 @@ async function requireAdminUser(): Promise<AdminAuthResult> {
   } = await supabase.auth.getUser();
 
   if (!user) return { ok: false, error: "not_authenticated" };
-  if (!isAuthorizedEmail(user.email ?? "")) return { ok: false, error: "forbidden_domain" };
+  // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
 
   const profile = toUserProfile(user);
   if (!isAdmin(profile)) return { ok: false, error: "forbidden_role" };

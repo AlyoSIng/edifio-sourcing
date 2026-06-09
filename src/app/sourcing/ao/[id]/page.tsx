@@ -27,7 +27,6 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { BriefGenerator } from "@/app/sourcing/ao-du-jour/BriefGenerator";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { findBuyerByName } from "@/lib/buyers/upsert-buyer";
 
@@ -102,8 +101,11 @@ export default async function TenderDetailPage(props: { params: Promise<{ id: st
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}`);
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous,
+  // rôle admin pour l'édition buyer plus bas).
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
   // Résolution dynamique de l'org (Phase A multi-tenant).
   // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
   // plutôt que crash 500 de la page entière.

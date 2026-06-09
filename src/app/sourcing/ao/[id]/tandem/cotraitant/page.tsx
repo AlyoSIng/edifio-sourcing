@@ -19,7 +19,6 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { tenders } from "@/db/schema/tenders";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isAdmin, toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -52,8 +51,11 @@ export default async function TandemCotraitantPage(props: PageProps) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/sourcing/ao/${params.id}/tandem/cotraitant`);
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous,
+  // rôle admin pour les actions sensibles plus bas).
   const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
   // Résolution dynamique de l'org (Phase A multi-tenant).
   // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
   // plutôt que crash 500 de la page entière.

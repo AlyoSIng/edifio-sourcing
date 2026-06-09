@@ -16,7 +16,7 @@ Préparés par `ps_operator` (Yann) pour la bascule du **samedi 18 juillet 2026 
 |---|---|---|---|
 | `backup-sourcing-db.ps1` | Supabase Sourcing prod (Frankfurt eu-central-1) | Lecture seule (pg_dump) | `PGHOST` `PGPORT` `PGUSER` `PGDATABASE` `PGPASSWORD` |
 | `backup-suiviact-db.ps1` | Supabase Suivi+ACT prod (Paris eu-west-3) | Lecture seule (pg_dump) | `PGHOST` `PGPORT` `PGUSER` `PGDATABASE` `PGPASSWORD` |
-| `export-vercel-env.ps1` | Vercel (preview + production) | Lecture seule (vercel env pull) | aucune ENV — auth via `vercel login` |
+| `export-vercel-env.ps1` | Vercel (preview + production) | Lecture seule (vercel env pull) | aucune ENV — auth via `vercel login`. Option `-Encrypt` (age) → `$env:AGE_PASSPHRASE` recommandé. |
 | `backup-supabase-storage.ps1` | Supabase Storage (tous buckets) | Lecture seule (API REST) | `SUPABASE_URL` `SUPABASE_SERVICE_ROLE_KEY` |
 
 Tous les fichiers de sortie atterrissent dans `backups/` à la racine du repo.
@@ -51,7 +51,9 @@ $env:PGPASSWORD = "<depuis 1Password — projet Suivi+ACT>"
 
 # --- BACKUP 3 : Vercel ENV vars (preview + production) ---
 # Pré-requis : `vercel link` à faire une fois (linke ce repo au projet edifio-sourcing).
-.\scripts\migration\export-vercel-env.ps1 -ProjectName "edifio-sourcing"
+# Pré-requis -Encrypt : `winget install FiloSottile.age` une fois.
+$env:AGE_PASSPHRASE = "<passphrase forte 1Password — entree separee>"
+.\scripts\migration\export-vercel-env.ps1 -ProjectName "edifio-sourcing" -Encrypt
 
 # --- BACKUP 4 : Supabase Storage (Sourcing) ---
 $env:SUPABASE_URL              = "https://<sourcing-ref>.supabase.co"
@@ -108,6 +110,81 @@ projet edifio-sourcing).
 Le dossier `backups/` est dans `.gitignore` (vérifié — ligne 67), donc pas de
 risque de commit accidentel. Mais **le fichier reste lisible en clair sur le
 disque** → après usage, copier dans 1Password et supprimer.
+
+→ **En prod, utiliser systématiquement `-Encrypt`** (cf. section « Chiffrement
+des backups » ci-dessous).
+
+---
+
+## Chiffrement des backups (option `-Encrypt`)
+
+Depuis la review Hugo PR #117, `export-vercel-env.ps1` accepte un flag
+`-Encrypt` qui chiffre immédiatement les fichiers `.env.*.backup` via
+[`age`](https://github.com/FiloSottile/age) et **supprime les fichiers en clair**
+après chiffrement.
+
+### Pourquoi `-Encrypt` est recommandé en prod
+
+- `vercel env pull` écrit `.env.production.backup` en **clair sur disque**.
+- Même si `backups/` est gitignored, c'est une fenêtre de temps où les
+  secrets prod sont à portée de regard d'un malware, d'une indexation
+  Spotlight / Windows Search, ou d'un backup système automatique.
+- `-Encrypt` ferme cette fenêtre : le fichier en clair n'existe que le temps
+  strict d'un `age --passphrase --output …`, puis il est supprimé.
+
+### Installation d'`age` (une fois)
+
+```powershell
+# Méthode recommandée Windows :
+winget install FiloSottile.age
+
+# Alternatives :
+scoop install age
+choco install age.portable
+```
+
+Vérifier : `age --version` doit renvoyer une version `1.x`.
+
+### Utilisation
+
+```powershell
+# Poser la passphrase dans la session (préférée — scriptable, pas de prompt)
+$env:AGE_PASSPHRASE = "<passphrase forte depuis 1Password>"
+
+# Lancer l'export avec chiffrement
+.\scripts\migration\export-vercel-env.ps1 -ProjectName "edifio-sourcing" -Encrypt
+```
+
+Si `$env:AGE_PASSPHRASE` n'est pas posée, le script demande la passphrase via
+un prompt sécurisé (`Read-Host -AsSecureString`, masqué).
+
+Résultat : `.env.preview.backup.age` et `.env.production.backup.age` (les
+versions `.backup` en clair sont **supprimées** après chiffrement).
+
+### Procédure pour déchiffrer
+
+```powershell
+# Si la passphrase est en ENV :
+$env:AGE_PASSPHRASE = "<passphrase>"
+age --decrypt --output .env.production.backup .env.production.backup.age
+
+# Sinon, age prompt interactivement :
+age --decrypt --output .env.production.backup .env.production.backup.age
+# (saisir la passphrase au prompt)
+```
+
+Une fois le fichier déchiffré utilisé (re-import Vercel par exemple),
+**supprimer immédiatement** la version `.backup` en clair.
+
+### Posture sécurité
+
+- La passphrase n'est **jamais loggée** par le script (filtre regex défensif
+  sur la sortie `age` + masquage stack trace en cas d'erreur).
+- La passphrase est effacée de la mémoire après usage (`$null` + `GC.Collect()`).
+- Le wrapper `Invoke-AgeEncrypt` est **idempotent** : un re-run re-crée le
+  fichier `.age` proprement.
+- **Steve pose la passphrase dans SA session** PowerShell, jamais dans un
+  fichier (cf. MEMORY > `feedback_ops_prod_user_runs_migration.md`).
 
 ---
 

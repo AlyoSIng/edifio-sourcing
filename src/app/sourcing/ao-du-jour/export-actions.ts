@@ -13,7 +13,7 @@
  * et le mapping département → région.
  *
  * Sécurité :
- *  - Auth check (toUserProfile + isAuthorizedEmail)
+ *  - Auth check (toUserProfile) — ADR-014 retire la garde domaine
  *  - Filtre tenant strict (`organizationId = orgId`) sur toutes les requêtes
  *  - Pas de filtre profil (= tous les AO sourced de l'org)
  *  - Hard limit 500 lignes (au-delà : Excel rame, et MVP)
@@ -31,7 +31,6 @@ import { architectResponses } from "@/db/schema/selections";
 import { platforms } from "@/db/schema/config";
 import { tenders } from "@/db/schema/tenders";
 import { toUserProfile } from "@/lib/auth/types";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { buildAosDuJourCsv, type ExportAoRow } from "@/lib/sourcing/export-csv";
@@ -40,7 +39,7 @@ import { buildAosDuJourCsv, type ExportAoRow } from "@/lib/sourcing/export-csv";
 // Types de retour
 // ---------------------------------------------------------------------------
 
-export type ExportAosCsvError = "not_authenticated" | "forbidden_domain" | "internal_error";
+export type ExportAosCsvError = "not_authenticated" | "internal_error";
 
 export type ExportAosCsvResult =
   | { ok: true; csv: string; filename: string; rowCount: number }
@@ -80,10 +79,9 @@ export async function exportAosDuJourCsvAction(): Promise<ExportAosCsvResult> {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: "not_authenticated" };
+    // ADR-014 (2026-06-05) — garde domaine retirée : ouverture multi-tenant.
+    // Le tenant est strictement scopé par `getRequiredOrgId` + RLS BDD ci-dessous.
     const profile = toUserProfile(user);
-    if (!isAuthorizedEmail(profile.email)) {
-      return { ok: false, error: "forbidden_domain" };
-    }
     const orgId = await getRequiredOrgId(profile.id);
 
     // 2. Fetch tenders sourced + platform pour le libellé Source.

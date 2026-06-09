@@ -96,6 +96,68 @@ Write-Host "[INFO] Projet logique : $ProjectName" -ForegroundColor Cyan
 Write-Host "[INFO] URL Supabase   : $($env:SUPABASE_URL)" -ForegroundColor Cyan
 Write-Host ""
 
+# --- Fonction top-level (hors boucle) pour lister les objets d'un bucket ---
+# Paramètres explicites : aucune capture de closure sur $apiBase / $headers du
+# scope parent (correction Hugo finding PR #117). Tous les inputs sont passés
+# explicitement, ce qui rend la fonction réutilisable et testable.
+function Get-StorageObjects {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][string]$ApiBase,
+        [Parameter(Mandatory=$true)][hashtable]$Headers,
+        [Parameter(Mandatory=$true)][string]$BucketName,
+        [string]$Prefix = ""
+    )
+
+    $offset = 0
+    $limit = 1000
+    $allObjects = @()
+
+    while ($true) {
+        $body = @{
+            prefix = $Prefix
+            limit  = $limit
+            offset = $offset
+            sortBy = @{ column = "name"; order = "asc" }
+        } | ConvertTo-Json -Depth 5
+
+        try {
+            $page = Invoke-RestMethod `
+                -Uri "$ApiBase/object/list/$BucketName" `
+                -Method Post `
+                -Headers $Headers `
+                -ContentType "application/json" `
+                -Body $body
+        } catch {
+            Write-Host "[ERREUR] list/$BucketName (prefix=$Prefix, offset=$offset) : $($_.Exception.Message)" -ForegroundColor Red
+            return $allObjects
+        }
+
+        if (-not $page -or $page.Count -eq 0) { break }
+
+        foreach ($item in $page) {
+            # Heuristique Supabase : un "dossier" a un id=null
+            if ($null -eq $item.id) {
+                # C'est un sous-dossier : récurser (en passant explicitement ApiBase/Headers)
+                $subPrefix = if ([string]::IsNullOrEmpty($Prefix)) { $item.name } else { "$Prefix/$($item.name)" }
+                $allObjects += Get-StorageObjects -ApiBase $ApiBase -Headers $Headers -BucketName $BucketName -Prefix $subPrefix
+            } else {
+                # C'est un fichier
+                $fullKey = if ([string]::IsNullOrEmpty($Prefix)) { $item.name } else { "$Prefix/$($item.name)" }
+                $allObjects += [PSCustomObject]@{
+                    Key  = $fullKey
+                    Size = $item.metadata.size
+                }
+            }
+        }
+
+        if ($page.Count -lt $limit) { break }
+        $offset += $limit
+    }
+
+    return $allObjects
+}
+
 # --- Étape 1 : lister les buckets ---
 Write-Host "[1/3] Liste des buckets..." -ForegroundColor Yellow
 try {
@@ -134,63 +196,8 @@ foreach ($bucket in $targetBuckets) {
         New-Item -ItemType Directory -Path $bucketOutDir -Force | Out-Null
     }
 
-    # Fonction récursive pour lister tous les objets d'un préfixe
-    function Get-StorageObjects {
-        param(
-            [string]$BucketName,
-            [string]$Prefix = ""
-        )
-
-        $offset = 0
-        $limit = 1000
-        $allObjects = @()
-
-        while ($true) {
-            $body = @{
-                prefix = $Prefix
-                limit  = $limit
-                offset = $offset
-                sortBy = @{ column = "name"; order = "asc" }
-            } | ConvertTo-Json -Depth 5
-
-            try {
-                $page = Invoke-RestMethod `
-                    -Uri "$apiBase/object/list/$BucketName" `
-                    -Method Post `
-                    -Headers $headers `
-                    -ContentType "application/json" `
-                    -Body $body
-            } catch {
-                Write-Host "[ERREUR] list/$BucketName (prefix=$Prefix, offset=$offset) : $($_.Exception.Message)" -ForegroundColor Red
-                return $allObjects
-            }
-
-            if (-not $page -or $page.Count -eq 0) { break }
-
-            foreach ($item in $page) {
-                # Heuristique Supabase : un "dossier" a un id=null
-                if ($null -eq $item.id) {
-                    # C'est un sous-dossier : récurser
-                    $subPrefix = if ([string]::IsNullOrEmpty($Prefix)) { $item.name } else { "$Prefix/$($item.name)" }
-                    $allObjects += Get-StorageObjects -BucketName $BucketName -Prefix $subPrefix
-                } else {
-                    # C'est un fichier
-                    $fullKey = if ([string]::IsNullOrEmpty($Prefix)) { $item.name } else { "$Prefix/$($item.name)" }
-                    $allObjects += [PSCustomObject]@{
-                        Key  = $fullKey
-                        Size = $item.metadata.size
-                    }
-                }
-            }
-
-            if ($page.Count -lt $limit) { break }
-            $offset += $limit
-        }
-
-        return $allObjects
-    }
-
-    $objects = Get-StorageObjects -BucketName $bucketName -Prefix ""
+    # Appel de la fonction top-level (définie en haut du script) avec params explicites
+    $objects = Get-StorageObjects -ApiBase $apiBase -Headers $headers -BucketName $bucketName -Prefix ""
     Write-Host "      $($objects.Count) objet(s) trouvé(s)." -ForegroundColor Cyan
 
     if ($objects.Count -eq 0) { continue }

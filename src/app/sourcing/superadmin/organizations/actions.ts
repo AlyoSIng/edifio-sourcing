@@ -17,7 +17,6 @@ import { revalidatePath } from "next/cache";
 
 import { db } from "@/db/client";
 import { users, memberships } from "@/db/schema/users";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { PROVISIONAL_PASSWORD_TTL_HOURS } from "@/lib/auth/constants";
 import { computeProvisionalExpiresAt } from "@/lib/auth/password";
 import { generateProvisionalPassword } from "@/lib/auth/password-server";
@@ -118,12 +117,11 @@ export async function createOrgAction(
       error: "Les informations de l'administrateur initial sont obligatoires.",
     };
   }
-  if (!isAuthorizedEmail(adminEmail)) {
-    return {
-      ok: false,
-      error: "L'email de l'administrateur doit appartenir à @alyosingenierie.fr ou @edifio.fr.",
-    };
-  }
+  // ADR-014 (2026-06-05) — garde `isAuthorizedEmail(adminEmail)` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Le superadmin éditeur
+  // peut désormais provisionner un admin sur n'importe quel domaine ; la RLS
+  // BDD scope strictement ses accès à sa seule org via memberships, et les
+  // signups publics Supabase sont désactivés côté config.
 
   // ── Création de l'organisation ───────────────────────────────────────────────
   let org;

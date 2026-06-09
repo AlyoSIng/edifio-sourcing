@@ -34,9 +34,7 @@ export function ExportCsvButton({ className = "" }: { className?: string }) {
         const msg =
           result.error === "not_authenticated"
             ? "Session expirée — reconnectez-vous."
-            : result.error === "forbidden_domain"
-              ? "Accès refusé."
-              : "Erreur d'export — réessayez ou contactez l'administrateur.";
+            : "Erreur d'export — réessayez ou contactez l'administrateur.";
         window.alert(msg);
         return;
       }

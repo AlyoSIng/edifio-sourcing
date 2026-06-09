@@ -1,7 +1,7 @@
 /**
  * Page Superadmin — Formations — edifio Sourcing
  *
- * Server Component — triple garde (session + domaine + superadmin).
+ * Server Component — double garde (session + superadmin) — ADR-014 retire la garde domaine.
  * Liste toutes les formations triées par displayOrder ASC.
  *
  * Fonctionnalités :
@@ -18,7 +18,6 @@ import { asc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { formations } from "@/db/schema/superadmin";
 import type { Formation } from "@/db/schema/superadmin";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
 import { isSuperAdmin, toUserProfile } from "@/lib/auth/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -55,10 +54,7 @@ export default async function SuperadminFormationsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/superadmin/formations");
 
-  // Garde 2 — domaine
-  if (!isAuthorizedEmail(user.email)) redirect("/forbidden");
-
-  // Garde 3 — superadmin
+  // Garde 2 — superadmin (ADR-014 : garde domaine retirée)
   const profile = toUserProfile(user);
   if (!isSuperAdmin(profile)) redirect("/sourcing/ao-du-jour?error=forbidden");
 

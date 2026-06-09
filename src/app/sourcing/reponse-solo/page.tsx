@@ -4,8 +4,6 @@ import { redirect } from "next/navigation";
 import { ErrorBanner } from "@/app/sourcing/ao-du-jour/ErrorBanner";
 import { PipelineKeywordBar } from "@/app/sourcing/_shared/PipelineKeywordBar";
 import { TenderSummaryCard } from "@/app/sourcing/_shared/TenderSummaryCard";
-import { isAuthorizedEmail } from "@/lib/auth/domain";
-import { toUserProfile } from "@/lib/auth/types";
 import { getRequiredOrgId } from "@/lib/auth/get-required-org-id";
 import { ALYOS_ORG_ID } from "@/lib/constants/organization";
 import { db } from "@/db/client";
@@ -35,8 +33,9 @@ export default async function ReponseSoloPage(props: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sourcing/reponse-solo");
-  const profile = toUserProfile(user);
-  if (!isAuthorizedEmail(profile.email)) redirect("/forbidden");
+  // ADR-014 (2026-06-05) — garde domaine `isAuthorizedEmail` retirée :
+  // ouverture multi-tenant (PROTECT + orgs futures). Les autres gardes
+  // restent (auth ci-dessus, tenant via `getRequiredOrgId` + RLS ci-dessous).
   // Résolution dynamique de l'org (Phase A multi-tenant).
   // Try/catch propre : si la requête memberships échoue, fallback sur ALYOS_ORG_ID
   // plutôt que crash 500 de la page entière.
