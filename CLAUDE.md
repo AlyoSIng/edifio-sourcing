@@ -125,9 +125,13 @@ et les opérations système via deux sub-agents :
 8. **`ps_operator`** : connecter le repo à Vercel (compte AlyoS), preview deploy
    sur la branche `feat/sourcing-mvp`. URL preview servira aux premiers tests.
 
-## ⚠️ Migration vers le monorepo `alyos-suivi-chantier` (juillet 2026)
+## ⚠️ Migration vers le monorepo `alyos-suivi-chantier` (ACCÉLÉRÉE — juin 2026)
 
-Une migration de `edifio-sourcing` vers le monorepo `alyos-suivi-chantier` (Suivi + ACT) est planifiée pour le **samedi 18 juillet 2026**.
+Une migration de `edifio-sourcing` vers le monorepo `alyos-suivi-chantier` (Suivi + ACT) est
+en cours. **Visio cadrage du 10/06 : bascule AVANCÉE au week-end du 13-14 juin 2026**
+(initialement 18 juillet) — cf. arbitrages A1-A8 dans `docs/VISIO_CADRAGE_MIGRATION_BRIEF_260610.md`
+et plan compressé dans `DECISIONS.md` 2026-06-10. **GEL des migrations Drizzle et des features
+Sourcing effectif depuis le 10/06** (hotfix only).
 
 ### Sub-agent reviewer obligatoire
 
@@ -142,13 +146,13 @@ Pendant toute la durée de la migration (à partir du 8 juin 2026), **toute PR c
 | Q1 | BDD partagée ou séparée | ✅ Partagée, projet Supabase unique |
 | Q2 | ORM | ✅ supabase-js direct (pas Drizzle dans le monorepo final) |
 | Q3 | Billing model | ✅ Adopter le modèle 0115 (drop 0049 Sourcing) |
-| Q4 | Cron sourcing : Fly.io ou Vercel | ⚖️ Bench à faire Lot 5 |
-| Q5 | Calendrier bascule | ✅ Samedi 18 juillet 2026, 8h-11h |
-| Q6 | Pack groupé Suivi + ACT + Sourcing | ⚖️ Décision Sébastien |
+| Q4 | Cron sourcing : Fly.io ou Vercel | ✅ Bench éclair Alex (A1, visio 10/06) ; non concluant → Fly.io conservé |
+| Q5 | Calendrier bascule | ✅ **AVANCÉ : dimanche 14 juin 2026, 8h-11h** (visio 10/06, A8) |
+| Q6 | Pack groupé Suivi + ACT + Sourcing | ✅ Modules séparés + rabais multi-modules (visio 10/06, A2) |
 | Q7 | Vitest | ✅ Introduire avec la migration |
-| Q8 | Workflow migrations BDD | ✅ Garder manuel (Sébastien applique) |
-| Q9 | (cf. Q4) | ⚖️ Bench |
-| Q10 | Planning | ✅ Visio cadrage 8-14 juin → kickoff 1er juillet → bascule 18 juillet → post-mortem 25 juillet |
+| Q8 | Workflow migrations BDD | ✅ Garder manuel (Sébastien applique) — gel migrations Sourcing depuis le 10/06 (A4) |
+| Q9 | (cf. Q4) | ✅ cf. Q4 |
+| Q10 | Planning | ✅ **COMPRESSÉ** : Lots 2-7 les 11-12/06 → recette + GO/NO-GO sam 13/06 → bascule dim 14/06 → post-mortem semaine du 16/06 |
 
 ### Brief de migration
 

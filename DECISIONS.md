@@ -2,6 +2,72 @@
 
 ---
 
+## 2026-06-10 — Visio cadrage migration : arbitrages A1-A8 + ACCÉLÉRATION bascule au week-end du 13-14/06
+
+**Contexte** — Visio cadrage Steve × Sébastien (planifiée Q10 semaine 8-14/06). Support :
+`docs/VISIO_CADRAGE_MIGRATION_BRIEF_260610.md` (décisions reportées dedans).
+
+**Arbitrages actés** :
+
+| # | Sujet | Décision |
+|---|---|---|
+| A1 | Bench cron Fly.io/Vercel | Alex, dès que possible, bench rapide. Non concluant → **Fly.io conservé** |
+| A2 | Pack commercial | Modules séparés + rabais multi-modules |
+| A3 | CI e2e monorepo | Porter le pattern **Supabase local éphémère** + garde anti-prod |
+| A4 | Gel migrations Sourcing | **GEL IMMÉDIAT (10/06)** — plus aucune migration Drizzle. Portage schéma : dump schema-only re-numéroté convention monorepo |
+| A5 | Données prod | Équipe Sourcing écrit la transposition billing 0049→0115 (trial PROTECT préservé). Comm PROTECT après bascule |
+| A6 | Accès | Sébastien : lecture Supabase prod Sourcing. Sourcing : branches `migration/sourcing-*` sur monorepo, double review (suivi_act_reviewer + Sébastien) |
+| A7 | Périmètre | Validé — dettes Lot 2 / rotations secrets / Stripe restent post-bascule |
+| A8 | **CALENDRIER** | **ACCÉLÉRATION : bascule avant lundi 15/06** (week-end 13-14/06). Le planning kickoff 1/07 → bascule 18/07 est obsolète |
+
+**Plan compressé proposé (sous réserve GO/NO-GO samedi 13/06)** :
+
+- **Mer 10/06 (soir)** : gel migrations+features effectif (hotfix only), fin chantier CI e2e local,
+  dump schema-only re-numéroté, clone monorepo + lecture conventions, décision bench A1
+- **Jeu 11/06** : Lot 2 (Drizzle→supabase-js, LE risque principal) + Lot 4 (renommage imports)
+  + Lot 6 (script billing) en parallèle sur branche `migration/sourcing-*`
+- **Ven 12/06** : Lots 3 (exceljs/docx) + 5 (routes) + 7 (tests+pgTAP), reviews croisées au fil
+  de l'eau, préprod monorepo montée (schéma + données de test), recette Camille
+- **Sam 13/06** : recette croisée complète + runbook figé + **GO/NO-GO**
+- **Dim 14/06 (8h-11h)** : bascule — gel prod, dump données, import projet Supabase partagé
+  (y c. auth.users avec hashes), deploy, DNS `sourcing.edifio.fr`, smoke, comm PROTECT
+
+**Risques assumés** : compression 5 semaines → 4 jours. Tenable car vélocité constatée
+(Lot 1 : 2h réelles vs 22h estimées) MAIS conditionné à : accès monorepo immédiat,
+dispo Sébastien jeudi→dimanche (reviews + application schéma Q8), zéro surprise majeure
+au Lot 2. **Le NO-GO de samedi ramène au plan du 18/07 sans dégât** (la prod Sourcing
+actuelle continue de tourner, aucune action destructive avant dimanche).
+
+---
+
+## 2026-06-10 — INCIDENT P0 : CI e2e seedait la PROD (compte superadmin au password public)
+
+**Détection** — Investigation Camille (qa) post-bascule : le job `ci-e2e` de `ci.yml` utilisait
+les secrets GitHub non préfixés (= prod) avec `E2E_TEST_ROUTES_ENABLED=1` → chaque push main
+re-seedait la prod avec 7 comptes fixtures dont `e2e-test+multiorg-superadmin@edifio.fr`
+(`user_metadata.role=superadmin`, password `MULTI_ORG_PASSWORD` hardcodé multi-org-seed.ts:63).
+Cause racine : aucun projet Supabase preview n'existe — la CI avait été pointée sur la prod.
+
+**Décisions actées** :
+
+1. **Garde par cible, pas par flag** : tout client admin E2E passe par `assertNotProdUrl()`
+   (`src/lib/e2e/anti-prod-guard.ts`, throw si l'URL contient le project ref prod). Posé dans
+   `multi-org-seed.ts` + `e2e/helpers/password.ts` (réserve review Hugo). Doublé d'un check
+   anti-prod shell dans le step de vérification du job ci-e2e. Commit `3be50bb`.
+2. **CI e2e sur stack Supabase locale éphémère** (décision Steve 10/06) : `supabase start`
+   dans le runner + migrations Drizzle au boot + clés locales. Plus AUCUN secret distant
+   pour le job e2e. Chantier Alex en cours. En attendant : job rouge fail-closed (voulu).
+3. **Purge prod** (Steve, ~13h40) : 7 users e2e supprimés via Supabase Auth + 3 orgs fixtures
+   (`...a01`/`...b01`/`...c01`) DELETE avec cascade FK (validée par Camille). Le doublon org
+   AlyoS constaté pendant la bascule est résolu par la même purge.
+4. **GitHub secrets** : `SUPABASE_SERVICE_ROLE_KEY` (prod) et `SUPABASE_PROJECT_REF` à
+   supprimer des secrets Actions (plus consommés). Rotation service_role prod ajoutée au
+   backlog rotations post-MVP (avec l'incident password du 21/05).
+
+**Note d'incident complète** : `notes-de-suivi/CC_260610_1340_INCIDENT_E2E_PROD.md`.
+
+---
+
 ## 2026-06-10 — Bascule prod 0050-0053 + déblocage build Vercel + fix multi-tenant Steve
 
 **Contexte** — Application en prod (Supabase `loogmtltwkhvczdiurqs`, région eu-west-1) des

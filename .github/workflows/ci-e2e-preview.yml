@@ -210,13 +210,23 @@ jobs:
 
       # Sanity-check des secrets — un fail explicite vaut mieux qu'un crash
       # opaque dans les helpers Supabase.
-      - name: Verify required secrets are set
+      - name: Verify required secrets are set (and not prod)
         run: |
           set -e
           [ -n "$NEXT_PUBLIC_SUPABASE_URL" ] || { echo "::error::secret PREVIEW_SUPABASE_URL manquant"; exit 1; }
           [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] || { echo "::error::secret PREVIEW_SUPABASE_ANON_KEY manquant"; exit 1; }
           [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::secret PREVIEW_SUPABASE_SERVICE_ROLE_KEY manquant"; exit 1; }
-          echo "OK — Supabase preview secrets disponibles"
+          # Check anti-prod (incident 2026-06-10, suggestion review Hugo) : même si les
+          # secrets s'appellent PREVIEW_*, refuser si leur VALEUR cible le projet prod.
+          # Project ref aligné avec src/lib/e2e/anti-prod-guard.ts. Lowercase pour le glob.
+          SUPABASE_URL_LC="$(printf '%s' "$NEXT_PUBLIC_SUPABASE_URL" | tr '[:upper:]' '[:lower:]')"
+          case "$SUPABASE_URL_LC" in
+            *loogmtltwkhvczdiurqs*)
+              echo "::error::REFUS — PREVIEW_SUPABASE_URL cible le projet Supabase PROD. Les E2E seedent la BDD et ne doivent JAMAIS pointer la prod (incident 2026-06-10, cf. DECISIONS.md)."
+              exit 1
+              ;;
+          esac
+          echo "OK — Supabase preview secrets disponibles, cible non-prod"
 
       - name: Run E2E against Vercel preview
         env:
