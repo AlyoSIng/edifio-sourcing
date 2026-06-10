@@ -2,6 +2,73 @@
 
 ---
 
+## 2026-06-10 — Bascule prod 0050-0053 + déblocage build Vercel + fix multi-tenant Steve
+
+**Contexte** — Application en prod (Supabase `loogmtltwkhvczdiurqs`, région eu-west-1) des
+4 migrations Salve U + RLS lot 1.7 + éradication bombe cotraitant, puis remédiation d'une
+cascade de bugs Next.js 15 qui bloquait TOUS les builds Vercel depuis 1+ jour, puis fix
+d'un bug seed (membership manquant pour `steissier@alyosingenierie.fr`).
+
+**Décisions actées** :
+
+1. **Apply PROD via psql Docker `postgres:17` Session Pooler** — méthode officielle pour
+   les ops PROD à partir de cette date. Direct connection 5432 est cassée sur Docker Windows
+   (Supabase a basculé en IPv6-only en fin 2024). Le Session Pooler `aws-0-eu-west-1.pooler.supabase.com:5432`
+   avec user `postgres.<project-ref>` reste IPv4 et fonctionne. Documenté dans la note
+   `notes-de-suivi/CC_260610_0855_BASCULE_PROD.md`.
+
+2. **Pattern fix `params`/`searchParams` Next.js 15** — pour tous les Server Components
+   migrant Next.js 14 → 15, utiliser :
+   ```ts
+   export default async function Page({
+     params: paramsPromise,
+   }: {
+     params: Promise<{ id: string }>;
+   }) {
+     const params = await paramsPromise;
+     // ... params.id partout inchangé
+   }
+   ```
+   Pourquoi : changement minimal (1 rename + 1 await), zéro impact sur le code body qui
+   utilise `params.id` ou `searchParams.page`. Adopté en hotfix 9307a4c et 3794091, à
+   reprendre lors du portage monorepo.
+
+3. **Migration journal `__drizzle_migrations` PROD pas mis à jour** — décision pragmatique :
+   les 4 migrations 0050-0053 sont appliquées en PROD (vérifié B/C/D/E), mais le journal
+   Drizzle est encore à 33 entries (n'a pas reçu les 4 hashes attendus). Non bloquant pour
+   l'app. À traiter dans une PR de housekeeping (task #99 pending). Risque connu : si
+   `drizzle-kit migrate` est lancé sur PROD avant que le journal soit aligné, il retentera
+   les 4 migrations (et plantera sur les CREATE FUNCTION non-idempotents 0053). Mitigation :
+   ne pas lancer `drizzle-kit migrate` sur PROD jusqu'à fix.
+
+4. **Membership Steve INSERT manuel** — `steissier@alyosingenierie.fr` (UUID
+   `5b1a1a7d-dd8c-4ca9-9389-dcb49cf2fedc`) n'avait JAMAIS de ligne dans `memberships`
+   en PROD. Ses 2 collègues (`assistante@`, `bim@`) y sont depuis le 29/05 sur l'org
+   `11111111-1111-1111-1111-111111111111` (« AlyoS Ingenierie » sans accent). Ajouté
+   en role `admin` (cohérent avec `assistante@`). Bug de seed initial à investiguer
+   post-mortem.
+
+5. **Doublon org AlyoS à résoudre** — `00000000-0000-0000-0000-000000000a01` (« AlyoS Ingénierie »
+   avec accent, contenant les e2e-test users créés ce matin par CI) coexiste avec
+   `11111111-1111-1111-1111-111111111111` (« AlyoS Ingenierie » sans accent, contenant
+   les vrais users). À fusionner dans une PR housekeeping. Décision provisoire : laisser
+   tel quel car l'app filtre par membership, donc pas de conflit fonctionnel.
+
+6. **URL prod confirmée** — `sourcing.edifio.fr` (pas `sourcing.alyosingenierie.fr` qui
+   est le libellé obsolète dans `docs/CHEAT_SHEET_BASCULE.md`). À aligner.
+
+**Hashes commits** :
+- `9307a4c` — `fix(auth): tighten searchParams type for Next.js 15 strict`
+- `3794091` — `fix(routes): make params and searchParams Promise<> for Next.js 15`
+
+**Status final** — sourcing.edifio.fr live avec UI Salve U (6 motifs structurés), build
+Vercel `3794091` Ready en Production, multi-tenant validé bout en bout (Steve admin
+AlyoS), bombe `cotraitant_shares_select_public` éradiquée.
+
+**Note de suivi détaillée** : `notes-de-suivi/CC_260610_0855_BASCULE_PROD.md`.
+
+---
+
 ## 2026-06-09 — Migration 0053 éradication bombe à retardement `cotraitant_shares_select_public`
 
 **Contexte** — Audit Hugo MEGA-FINAL + recommandation Sébastien (suivi_act_reviewer) :
