@@ -89,10 +89,17 @@ jobs:
       NEXT_PUBLIC_APP_ENV: preview
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
       ALLOWED_EMAIL_DOMAIN: alyosingenierie.fr
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      # SÉCURITÉ — secrets PREVIEW_* OBLIGATOIRES ici (incident 2026-06-10) :
+      # les secrets non préfixés (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      # pointent le projet Supabase PROD. Ce job pose E2E_TEST_ROUTES_ENABLED=1 et
+      # seede la BDD via l'admin SDK (e2e/fixtures/multi-org-seed.ts) — il a créé
+      # des comptes fixtures (dont un superadmin au password public) EN PROD le
+      # 10/06 06:52. Noms de secrets alignés sur ci-e2e-preview.yml. Défense en
+      # profondeur côté code : assertNotProdUrl() (src/lib/e2e/anti-prod-guard.ts).
+      # NB : SUPABASE_PROJECT_REF (ref PROD, consommé par aucun code E2E) retiré.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PREVIEW_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PREVIEW_SUPABASE_SERVICE_ROLE_KEY }}
       # Resend — exposé au build prod (`pnpm build && pnpm start` côté
       # Playwright webServer en CI). Le serveur lit ces vars au runtime
       # quand le flow forgot-password / invite admin déclenche un envoi.
@@ -133,13 +140,25 @@ jobs:
         run: pnpm exec playwright install-deps chromium
 
       # Vérifie que les secrets sont disponibles — un fail clair vaut mieux
-      # qu'une cascade d'erreurs Supabase incompréhensibles.
-      - name: Verify Supabase secrets are set
+      # qu'une cascade d'erreurs Supabase incompréhensibles. Vérifie AUSSI que
+      # l'URL ne cible pas le projet PROD (incident 2026-06-10) : ce job seede
+      # la BDD, il ne doit JAMAIS parler à la prod.
+      - name: Verify Supabase secrets are set (and not prod)
         run: |
           set -e
-          [ -n "$NEXT_PUBLIC_SUPABASE_URL" ] || { echo "::error::secret NEXT_PUBLIC_SUPABASE_URL manquant"; exit 1; }
-          [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] || { echo "::error::secret NEXT_PUBLIC_SUPABASE_ANON_KEY manquant"; exit 1; }
-          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::secret SUPABASE_SERVICE_ROLE_KEY manquant"; exit 1; }
+          [ -n "$NEXT_PUBLIC_SUPABASE_URL" ] || { echo "::error::secret PREVIEW_SUPABASE_URL manquant"; exit 1; }
+          [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] || { echo "::error::secret PREVIEW_SUPABASE_ANON_KEY manquant"; exit 1; }
+          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::secret PREVIEW_SUPABASE_SERVICE_ROLE_KEY manquant"; exit 1; }
+          # Project ref PROD — doit rester aligné avec src/lib/e2e/anti-prod-guard.ts.
+          # Comparaison en lowercase (review Hugo : case glob sensible à la casse par défaut).
+          SUPABASE_URL_LC="$(printf '%s' "$NEXT_PUBLIC_SUPABASE_URL" | tr '[:upper:]' '[:lower:]')"
+          case "$SUPABASE_URL_LC" in
+            *loogmtltwkhvczdiurqs*)
+              echo "::error::REFUS — NEXT_PUBLIC_SUPABASE_URL cible le projet Supabase PROD. Le job ci-e2e seede la BDD et ne doit JAMAIS pointer la prod (incident 2026-06-10, cf. DECISIONS.md)."
+              exit 1
+              ;;
+          esac
+          echo "OK — Supabase preview secrets disponibles, cible non-prod"
 
       - name: Run E2E middleware tests
         run: pnpm test:e2e

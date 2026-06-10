@@ -15,8 +15,11 @@
  * **Sécurité — service_role uniquement en preview/dev** : la clé service_role
  * BYPASSE la RLS. Elle est utilisée ici parce qu'on **prépare** l'environnement
  * de test, pas parce qu'on simule l'usage applicatif. Aucun chemin applicatif
- * ne doit l'utiliser. La fixture refuse de tourner si l'env ne mentionne pas
- * explicitement `E2E_TEST_ROUTES_ENABLED=1` (anti-prod safety).
+ * ne doit l'utiliser. Deux gardes avant toute création :
+ *   1. `assertNotProdUrl()` — refuse toute URL ciblant le projet Supabase PROD
+ *      (garde DURE par cible, ajoutée suite à l'incident 2026-06-10 où le job
+ *      `ci-e2e` a seedé la prod via les secrets non préfixés — cf. DECISIONS.md) ;
+ *   2. `E2E_TEST_ROUTES_ENABLED=1` requis (opt-in explicite par flag).
  *
  * **Idempotence** : tous les seeds sont des `INSERT ... ON CONFLICT DO NOTHING`
  * ou des upserts par identifiant déterministe. Lancer la fixture deux fois ne
@@ -29,6 +32,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { UserMetadata } from "../../src/lib/auth/types";
+import { assertNotProdUrl } from "../../src/lib/e2e/anti-prod-guard";
 
 // ─── Identifiants déterministes ──────────────────────────────────────────────
 
@@ -59,7 +63,15 @@ export const MULTI_ORG_USERS = {
   ORPHAN: "e2e-test+multiorg-orphan@external.com",
 } as const;
 
-/** Mot de passe durable pour tous les users multi-org (must_change_password=false). */
+/**
+ * Mot de passe durable pour tous les users multi-org (must_change_password=false).
+ *
+ * ATTENTION : ce mot de passe est PUBLIC (committé dans le repo, visible de
+ * quiconque lit le code). Il ne protège RIEN — y compris le compte fixture
+ * `superadmin`. Le seed ne doit donc JAMAIS cibler un environnement réel :
+ * l'enforcement est la garde `assertNotProdUrl()` dans `createAdminClient()`
+ * (incident 2026-06-10 : fixtures seedées en prod — cf. DECISIONS.md).
+ */
 export const MULTI_ORG_PASSWORD = "MultiOrg-E2E-2026!";
 
 // ─── Service-role client (admin BYPASSRLS) ───────────────────────────────────
@@ -73,6 +85,11 @@ function createAdminClient(): SupabaseClient {
         "Vérifier `.env.local` (dev) ou les secrets GitHub Actions (CI).",
     );
   }
+  // Garde DURE anti-prod par CIBLE (incident 2026-06-10) : le flag
+  // E2E_TEST_ROUTES_ENABLED ci-dessous ne vérifie PAS où pointe l'URL — la CI
+  // le posait à 1 tout en pointant la prod via les secrets non préfixés.
+  // Cette garde refuse le project ref PROD quel que soit l'état des flags.
+  assertNotProdUrl(url);
   if (process.env.E2E_TEST_ROUTES_ENABLED !== "1") {
     throw new Error(
       "Multi-org seed : E2E_TEST_ROUTES_ENABLED=1 requis. Anti-prod safety : refuser de " +

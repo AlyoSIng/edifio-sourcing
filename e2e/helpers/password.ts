@@ -16,6 +16,7 @@ import {
 import { computeProvisionalExpiresAt } from "../../src/lib/auth/password";
 import { generateProvisionalPassword } from "../../src/lib/auth/password-server";
 import type { UserMetadata } from "../../src/lib/auth/types";
+import { assertNotProdUrl } from "../../src/lib/e2e/anti-prod-guard";
 
 function createAdmin(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,6 +26,9 @@ function createAdmin(): SupabaseClient {
       "Tests E2E auth-password : NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY manquant.",
     );
   }
+  // Garde anti-prod (incident 2026-06-10, review Hugo) : ce client fait des
+  // ecritures admin (createUser/deleteUser) — ne doit JAMAIS cibler la prod.
+  assertNotProdUrl(url);
   return createClient(url, serviceRole, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
