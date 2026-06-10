@@ -38,7 +38,12 @@ interface SearchParams {
   implantation?: string;
 }
 
-export default async function BureauEtudesPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function BureauEtudesPage({
+  searchParams: searchParamsPromise,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const searchParams = await searchParamsPromise;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
