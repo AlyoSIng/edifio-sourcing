@@ -52,7 +52,7 @@ BEGIN
   RAISE NOTICE 'A.1 OK : 4 hashes 0050-0053 presents dans drizzle.__drizzle_migrations';
 
   -- Compteur global : la prod a 33 entrees pre-bascule + 4 = 37 minimum.
-  -- (PAS 54 : le journal prod n'a jamais recu les entrees 0033-0049, appliquees
+  -- (PAS 54 : le journal prod ne contient pas les entrees 0033-0049, appliquees
   -- manuellement via psql sans sync journal -- cf. DECISIONS.md 2026-06-10.)
   SELECT COUNT(*) INTO c FROM drizzle.__drizzle_migrations;
   IF c < 37 THEN
@@ -143,28 +143,26 @@ END $$;
 \echo '-- D. Functions SECURITY DEFINER (0052 + 0053) --'
 DO $$
 DECLARE
+  -- Signatures alignees sur 0053 FINAL (2026-06-10) : mark_cotraitant_share_item_signed
+  -- prend 5 params (token, item_id, storage_path, signer_name, filename).
+  -- Resolution via to_regprocedure() (types only, insensible aux noms de
+  -- parametres — pg_get_function_identity_arguments renvoie les noms, ce qui
+  -- rendait la comparaison textuelle initiale toujours fausse).
   expected_funcs text[] := ARRAY[
     'current_user_org_id()',
     'get_cotraitant_share_by_token(uuid)',
     'get_cotraitant_share_items_by_token(uuid)',
     'get_cotraitant_item_original_path(uuid,uuid)',
-    'mark_cotraitant_share_item_signed(uuid,text)'
+    'mark_cotraitant_share_item_signed(uuid,uuid,text,text,text)'
   ];
   missing text;
   not_definer text;
 BEGIN
-  -- Verifier presence
+  -- Verifier presence (to_regprocedure renvoie NULL si aucune fonction ne
+  -- matche le nom qualifie + types)
   FOR missing IN
-    SELECT unnest(expected_funcs)
-    EXCEPT
-    SELECT p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
-      FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-     WHERE n.nspname = 'public'
-       AND p.proname IN ('current_user_org_id', 'get_cotraitant_share_by_token',
-                         'get_cotraitant_share_items_by_token',
-                         'get_cotraitant_item_original_path',
-                         'mark_cotraitant_share_item_signed')
+    SELECT f FROM unnest(expected_funcs) AS f
+    WHERE to_regprocedure('public.' || f) IS NULL
   LOOP
     RAISE EXCEPTION 'D.1 KO : fonction manquante public.%', missing;
   END LOOP;
@@ -196,15 +194,21 @@ DECLARE
   c int;
   forbidden text;
 BEGIN
-  -- E.1 : au moins 16 policies sur les 4 tables
+  -- E.1 : au moins 13 policies sur les 4 tables (4+4+4+1).
+  -- Attente initiale de 16 perimee : 0053 FINAL droppe les policies publiques
+  -- de cotraitant_share_items (remplacees par les fonctions SECURITY DEFINER),
+  -- la table garde 1 seule policy (acces authenticated tenant).
+  -- Distribution validee en dry-run Docker ET en prod le 2026-06-10.
+  -- NB : commentaires sans apostrophe — le splitter SQL Editor Supabase casse
+  -- sur apostrophe non appariee dans les commentaires des blocs dollar-quotes.
   SELECT COUNT(*) INTO c
     FROM pg_policies
    WHERE schemaname = 'public'
      AND tablename IN ('companies', 'bureaux_etudes', 'cotraitant_shares', 'cotraitant_share_items');
-  IF c < 16 THEN
-    RAISE EXCEPTION 'E.1 KO : au moins 16 policies attendues sur 4 tables, trouve : %', c;
+  IF c < 13 THEN
+    RAISE EXCEPTION 'E.1 KO : au moins 13 policies attendues sur 4 tables (4+4+4+1), trouve : %', c;
   END IF;
-  RAISE NOTICE 'E.1 OK : % policies presentes sur les 4 tables (>= 16)', c;
+  RAISE NOTICE 'E.1 OK : % policies presentes sur les 4 tables (>= 13)', c;
 
   -- E.2 : aucune policy publique "select_public" ou "public_token_*"
   --       (eradiquees par 0053 — toute relecture cotraitant passe par helpers
