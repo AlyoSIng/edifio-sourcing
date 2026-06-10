@@ -28,16 +28,18 @@
 -- Note : drizzle.__drizzle_migrations n'a PAS de colonne 'tag' (convention
 -- journal v7 : uniquement id / hash / created_at). On verifie donc la presence
 -- des 4 hashes SHA256 calcules sur le contenu UTF-8 des fichiers SQL.
--- Hashes generes par apply-migrations-0050-0053.ps1 (meme algorithme).
+-- Hashes recalcules le 2026-06-10 via readMigrationFiles (drizzle-orm/migrator)
+-- == sha256sum des fichiers. Les hashes initiaux (apply-migrations-*.ps1)
+-- etaient perimes : les fichiers 0050-0052 ont ete modifies apres generation.
 -- ----------------------------------------------------------------------------
 \echo '-- A. Migrations Drizzle journal --'
 DO $$
 DECLARE
   c int;
   expected_hashes text[] := ARRAY[
-    'e509aed6197320c9b07648ae70de6c82905771d4a2c4a01978df02c3d83d7c5a',  -- 0050
-    '5f694bc709b863dcc0fb1a62663836783b57581b13a1186d2683aff6995261b1',  -- 0051
-    '911b76f754b295ffd8b3dfd06a3ea337007409fa6adbb78434699f72ad2122f4',  -- 0052
+    'bcddeda60c487ef14a7a4780645690897111d6bca59bdbb82e736c9787a4a90b',  -- 0050
+    'e6ed743475c3148e219b82e963b33d71fd3ef2dc5461a2305a3dda07dfa4b26e',  -- 0051
+    '8f75f44ce6e83dc4d9d501c2bf3e68767a376f08814ea785b58e2b656e3c6165',  -- 0052
     '0f536f04b855f1b151378e96e908138dc061a3e788bf0338a984f28b904c393e'   -- 0053
   ];
 BEGIN
@@ -49,12 +51,14 @@ BEGIN
   END IF;
   RAISE NOTICE 'A.1 OK : 4 hashes 0050-0053 presents dans drizzle.__drizzle_migrations';
 
-  -- Compteur global : 54 fichiers (0000 -> 0053)
+  -- Compteur global : la prod a 33 entrees pre-bascule + 4 = 37 minimum.
+  -- (PAS 54 : le journal prod n'a jamais recu les entrees 0033-0049, appliquees
+  -- manuellement via psql sans sync journal -- cf. DECISIONS.md 2026-06-10.)
   SELECT COUNT(*) INTO c FROM drizzle.__drizzle_migrations;
-  IF c < 54 THEN
-    RAISE EXCEPTION 'A.2 KO : drizzle.__drizzle_migrations doit contenir au moins 54 entrees, trouve : %', c;
+  IF c < 37 THEN
+    RAISE EXCEPTION 'A.2 KO : drizzle.__drizzle_migrations doit contenir au moins 37 entrees, trouve : %', c;
   END IF;
-  RAISE NOTICE 'A.2 OK : drizzle.__drizzle_migrations contient % entrees (>= 54)', c;
+  RAISE NOTICE 'A.2 OK : drizzle.__drizzle_migrations contient % entrees (>= 37)', c;
 END $$;
 
 -- ----------------------------------------------------------------------------
