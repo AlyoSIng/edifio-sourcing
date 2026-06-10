@@ -32,9 +32,7 @@ const DEFAULT_NEXT = "/sourcing/ao-du-jour";
 export default async function AuthCallback({
   searchParams,
 }: {
-  searchParams:
-    | Promise<{ code?: string; error?: string; next?: string }>
-    | { code?: string; error?: string; next?: string };
+  searchParams: Promise<{ code?: string; error?: string; next?: string }>;
 }) {
   const params = await searchParams;
   const code = params.code;
