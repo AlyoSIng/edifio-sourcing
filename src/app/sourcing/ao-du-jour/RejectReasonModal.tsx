@@ -5,11 +5,11 @@
  * Steve 2026-06-08).
  *
  * Le motif n'est plus un simple texte libre : l'utilisateur choisit l'un des
- * 6 MOTIFS STRUCTURÉS (`REJECTION_REASONS`) via des radios, et peut compléter
+ * 7 MOTIFS STRUCTURÉS (`REJECTION_REASONS`) via des radios, et peut compléter
  * par un verbatim libre (optionnel, max 280 chars). Les motifs actionnables
- * (hors zone / budget / hors métier) alimentent les suggestions d'ajustement
- * du profil de recherche — le motif sert donc concrètement à affiner l'algo
- * (après validation admin).
+ * (hors zone / budget / hors métier / travaux hors MOE) alimentent les
+ * suggestions d'ajustement du profil de recherche — le motif sert donc
+ * concrètement à affiner l'algo (après validation admin).
  *
  * Distinction sémantique : « Écarter » ALIMENTE l'apprentissage. « Exclure »
  * reste neutre (autre bouton, tooltip dédié).
@@ -22,7 +22,7 @@
  *  - Escape ferme (onCancel) ; click outside backdrop ferme aussi.
  *
  * UX :
- *  - 6 radios (un motif obligatoire — le premier est pré-sélectionné)
+ *  - 7 radios (un motif obligatoire — le premier est pré-sélectionné)
  *  - textarea libre en complément + compteur `{n}/280` (rouge dès 250)
  *  - Bouton « Écarter » toujours actif (un motif est toujours choisi)
  */

@@ -145,7 +145,10 @@ function validateChange(
     }
     return { kind: "set_amount_min", value: Math.round(change.value) };
   }
-  if (change.kind === "add_negative_keywords" && reasonCode === "out_of_scope") {
+  if (
+    change.kind === "add_negative_keywords" &&
+    (reasonCode === "out_of_scope" || reasonCode === "not_moe_travaux")
+  ) {
     const values = change.values
       .map((v) => v.trim().toLowerCase())
       .filter((v) => v.length > 0 && v.length <= MAX_NEGATIVE_KEYWORD_LENGTH);
@@ -163,7 +166,7 @@ function validateChange(
  * Applique une suggestion validée par l'admin au profil par défaut de l'org.
  *
  * @param profileId UUID du profil cible (le profil par défaut affiché)
- * @param reasonCode Motif structuré actionnable (out_of_area / budget_too_low / out_of_scope)
+ * @param reasonCode Motif structuré actionnable (out_of_area / budget_too_low / out_of_scope / not_moe_travaux)
  * @param change    Changement à appliquer (revalidé côté serveur)
  * @param deps      Dépendances injectables (tests)
  */

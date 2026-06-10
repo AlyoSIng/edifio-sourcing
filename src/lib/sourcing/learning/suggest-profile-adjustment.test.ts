@@ -226,6 +226,70 @@ describe("computeSuggestions — out_of_scope", () => {
 });
 
 // ----------------------------------------------------------------------------
+// not_moe_travaux (Salve U — 7e motif, Steve 2026-06-10)
+// ----------------------------------------------------------------------------
+
+describe("computeSuggestions — not_moe_travaux", () => {
+  it("suggère hardcode « travaux » au seuil (3 events, indépendamment du verbatim)", () => {
+    const events: LearningEventLite[] = [
+      rejected({ reasonCode: "not_moe_travaux", verbatim: null }),
+      rejected({ reasonCode: "not_moe_travaux", verbatim: null }),
+      rejected({ reasonCode: "not_moe_travaux", verbatim: null }),
+    ];
+    const result = computeSuggestions(events, emptyProfile(), NOW);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.reasonCode).toBe("not_moe_travaux");
+    expect(result[0]?.count).toBe(SUGGESTION_THRESHOLD);
+    expect(result[0]?.suggestedChange).toEqual({
+      kind: "add_negative_keywords",
+      values: ["travaux"],
+    });
+  });
+
+  it("ignore le verbatim : aucun mot du verbatim ne remonte (hardcode pur)", () => {
+    const events: LearningEventLite[] = [
+      rejected({ reasonCode: "not_moe_travaux", verbatim: "Marché de fournitures bureau" }),
+      rejected({ reasonCode: "not_moe_travaux", verbatim: "Marché de fournitures bureau" }),
+      rejected({ reasonCode: "not_moe_travaux", verbatim: "Marché de fournitures bureau" }),
+    ];
+    const result = computeSuggestions(events, emptyProfile(), NOW);
+    expect(result).toHaveLength(1);
+    const change = result[0]?.suggestedChange;
+    expect(change).toEqual({ kind: "add_negative_keywords", values: ["travaux"] });
+    if (change?.kind === "add_negative_keywords") {
+      expect(change.values).not.toContain("fournitures");
+      expect(change.values).not.toContain("bureau");
+    }
+  });
+
+  it("ne suggère rien si « travaux » est déjà dans keywords.negative", () => {
+    const events: LearningEventLite[] = [
+      rejected({ reasonCode: "not_moe_travaux" }),
+      rejected({ reasonCode: "not_moe_travaux" }),
+      rejected({ reasonCode: "not_moe_travaux" }),
+    ];
+    const profile = emptyProfile({
+      keywords: { positive: [], negative: ["travaux"], exact: [] },
+    });
+    const result = computeSuggestions(events, profile, NOW);
+    expect(result).toEqual([]);
+  });
+
+  it("dédup insensible à la casse (« Travaux » déjà présent → pas de suggestion)", () => {
+    const events: LearningEventLite[] = [
+      rejected({ reasonCode: "not_moe_travaux" }),
+      rejected({ reasonCode: "not_moe_travaux" }),
+      rejected({ reasonCode: "not_moe_travaux" }),
+    ];
+    const profile = emptyProfile({
+      keywords: { positive: [], negative: ["Travaux"], exact: [] },
+    });
+    const result = computeSuggestions(events, profile, NOW);
+    expect(result).toEqual([]);
+  });
+});
+
+// ----------------------------------------------------------------------------
 // Motifs non actionnables
 // ----------------------------------------------------------------------------
 

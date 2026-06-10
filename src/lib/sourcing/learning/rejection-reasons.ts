@@ -3,7 +3,7 @@
  * (Salve U, Steve 2026-06-08, branche feat/learning-ecartement).
  *
  * Quand l'utilisateur écarte un AO via « Écarter » (`rejectTenderAction`), il
- * choisit l'un de ces 6 motifs. Les motifs `actionable: true` alimentent le
+ * choisit l'un de ces 7 motifs. Les motifs `actionable: true` alimentent le
  * calcul de suggestions d'ajustement du profil de recherche
  * (`computeSuggestions`) — human-in-the-loop : la suggestion est toujours
  * validée par un admin, jamais d'auto-modification opaque.
@@ -13,13 +13,18 @@
  *  - « Exclure » (excludeTenderAction)            → reste NEUTRE, zéro effet algo.
  *
  * Mapping motif → critère profil (cf. brief Salve U) :
- *  | Motif (label FR)        | code               | cible profil          | actionable |
- *  | Hors zone géographique  | out_of_area        | geoZones[]            | OUI        |
- *  | Budget / CA trop faible | budget_too_low     | amountMin             | OUI        |
- *  | Hors métier / compétence| out_of_scope       | keywords.negative[]   | OUI        |
- *  | Délai trop court        | deadline_too_short | —                     | non        |
- *  | Concurrence trop forte  | too_competitive    | —                     | non        |
- *  | Autre                   | other              | —                     | non        |
+ *  | Motif (label FR)                    | code               | cible profil          | actionable |
+ *  | Hors zone géographique              | out_of_area        | geoZones[]            | OUI        |
+ *  | Budget / CA trop faible             | budget_too_low     | amountMin             | OUI        |
+ *  | Hors métier / compétence            | out_of_scope       | keywords.negative[]   | OUI        |
+ *  | Travaux, pas mission MOE            | not_moe_travaux    | keywords.negative[]   | OUI        |
+ *  | Délai trop court                    | deadline_too_short | —                     | non        |
+ *  | Concurrence trop forte              | too_competitive    | —                     | non        |
+ *  | Autre                               | other              | —                     | non        |
+ *
+ * Cas particulier `not_moe_travaux` : le mot-clé suggéré (« travaux ») est
+ * INTRINSÈQUE au motif lui-même (l'utilisateur dit explicitement « cet AO est
+ * un marché travaux »), pas extrait du verbatim — cf. `computeSuggestions`.
  */
 
 /** Cible du profil de recherche modifiée par une suggestion actionnable. */
@@ -41,7 +46,7 @@ export interface RejectionReason {
 }
 
 /**
- * Les 6 motifs structurés (ordre = ordre d'affichage des radios dans la modale).
+ * Les 7 motifs structurés (ordre = ordre d'affichage des radios dans la modale).
  * `as const` pour dériver `RejectionReasonCode` du tableau (single source of truth).
  */
 export const REJECTION_REASONS = [
@@ -60,6 +65,12 @@ export const REJECTION_REASONS = [
   {
     code: "out_of_scope",
     label: "Hors métier / compétence",
+    actionable: true,
+    target: "keywordsNegative",
+  },
+  {
+    code: "not_moe_travaux",
+    label: "Réalisation de travaux, pas dans mission de Maîtrise d'Œuvre",
     actionable: true,
     target: "keywordsNegative",
   },
@@ -83,7 +94,7 @@ export const REJECTION_REASONS = [
   },
 ] as const satisfies readonly RejectionReason[];
 
-/** Union littérale des 6 codes de motif. */
+/** Union littérale des 7 codes de motif. */
 export type RejectionReasonCode = (typeof REJECTION_REASONS)[number]["code"];
 
 /** Set des codes valides — validation rapide côté server action. */

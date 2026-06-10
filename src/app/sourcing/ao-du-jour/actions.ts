@@ -429,7 +429,7 @@ export async function deferTenderAction(
 /**
  * Rejette (« Écarter ») un AO. Le statut passe à `dropped`. Le motif est
  * désormais STRUCTURÉ (Salve U — apprentissage par écartement) :
- *  - `reasonCode` : l'un des 6 motifs de `REJECTION_REASONS` (radio obligatoire
+ *  - `reasonCode` : l'un des 7 motifs de `REJECTION_REASONS` (radio obligatoire
  *    côté UI). Les motifs actionnables alimentent les suggestions d'ajustement
  *    du profil de recherche.
  *  - `verbatim`   : texte libre optionnel (max 280 chars), en complément.

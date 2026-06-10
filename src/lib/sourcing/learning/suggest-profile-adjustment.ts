@@ -15,13 +15,17 @@
  *    génère une suggestion.
  *
  * Cible par motif :
- *  - out_of_area    → départements (payload.geo_zone) les + fréquents parmi les
- *                     écartés ET présents dans `profile.geoZones` → suggère retrait.
- *  - budget_too_low → max des montants écartés (payload.amount) → suggère
- *                     amountMin = max + marge (10 %, arrondi).
- *  - out_of_scope   → mots récurrents extraits du verbatim → suggère ajout en
- *                     keywords.negative (prudent : on PROPOSE les termes, l'admin
- *                     décide). Pas d'auto-add.
+ *  - out_of_area     → départements (payload.geo_zone) les + fréquents parmi les
+ *                      écartés ET présents dans `profile.geoZones` → suggère retrait.
+ *  - budget_too_low  → max des montants écartés (payload.amount) → suggère
+ *                      amountMin = max + marge (10 %, arrondi).
+ *  - out_of_scope    → mots récurrents extraits du verbatim → suggère ajout en
+ *                      keywords.negative (prudent : on PROPOSE les termes, l'admin
+ *                      décide). Pas d'auto-add.
+ *  - not_moe_travaux → mot-clé HARDCODÉ « travaux » (intrinsèque au motif :
+ *                      l'utilisateur dit explicitement « cet AO est un marché
+ *                      travaux, pas un marché MOE »). Pas d'extraction verbatim.
+ *                      Skippé si déjà présent dans keywords.negative.
  *
  * Distinction sémantique : alimenté UNIQUEMENT par « Écarter ». « Exclure » ne
  * produit aucun event `learning_events` (zéro effet algo).
@@ -298,6 +302,20 @@ export function computeSuggestions(
         count,
         description: `${count} AO écartés pour « hors métier ». Termes récurrents : ${terms.join(", ")}. Les ajouter aux mots-clés négatifs ?`,
         suggestedChange: { kind: "add_negative_keywords", values: terms },
+      });
+    } else if (reasonCode === "not_moe_travaux") {
+      // Mot-clé HARDCODÉ intrinsèque au motif : l'utilisateur signale que l'AO
+      // est un marché travaux, pas une mission MOE. Le terme « travaux » est
+      // donc proposé directement, indépendamment du verbatim. Skip si déjà
+      // présent dans le profil (rien de neuf à suggérer).
+      const existingNegative = new Set(profile.keywords.negative.map((k) => k.toLowerCase()));
+      if (existingNegative.has("travaux")) continue;
+      suggestions.push({
+        reasonCode,
+        label,
+        count,
+        description: `${count} AO écartés car marché travaux (hors mission MOE). Ajouter « travaux » aux mots-clés négatifs du profil ?`,
+        suggestedChange: { kind: "add_negative_keywords", values: ["travaux"] },
       });
     }
   }

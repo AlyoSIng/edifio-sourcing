@@ -280,6 +280,21 @@ describe("applyProfileSuggestionAction", () => {
     expect(kw.negative).toEqual(["informatique", "logiciel"]);
   });
 
+  it("not_moe_travaux : ajoute « travaux » aux mots-clés négatifs (Salve U 7e motif)", async () => {
+    const { db, capture } = buildFakeDb(DEFAULT_PROFILE);
+    const res = await applyProfileSuggestionAction(
+      PROFILE_ID,
+      "not_moe_travaux",
+      { kind: "add_negative_keywords", values: ["travaux"] },
+      { db, authClient: fakeAuthClient(adminUser()) },
+    );
+    expect(res).toEqual({ ok: true });
+    const kw = capture.profileUpdates[0]?.keywords as {
+      negative: string[];
+    };
+    expect(kw.negative).toEqual(["informatique", "travaux"]);
+  });
+
   it("invalid_input si départements tous mal formés", async () => {
     const { db } = buildFakeDb(DEFAULT_PROFILE);
     const res = await applyProfileSuggestionAction(
