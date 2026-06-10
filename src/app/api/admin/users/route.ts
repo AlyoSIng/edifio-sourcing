@@ -160,8 +160,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       // Best-effort rollback — si le deleteUser rate, on log mais on renvoie
       // tout de même 500 (l'admin doit voir l'erreur, pas un 201 trompeur).
+      // Nota (backport revue Hugo 2026-06-10) : supabase-js retourne l'erreur
+      // dans `error` SANS throw — on checke les deux canaux (retour + exception
+      // réseau) pour ne pas rater un rollback échoué silencieux.
       try {
-        await admin.auth.admin.deleteUser(created.user.id);
+        const { error: deleteErr } = await admin.auth.admin.deleteUser(created.user.id);
+        if (deleteErr) throw new Error(deleteErr.message);
       } catch (rollbackErr) {
         console.error("[admin/users:db:fail-hardfail:rollback-failed]", {
           user_id: created.user.id,

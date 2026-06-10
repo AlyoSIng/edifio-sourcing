@@ -225,10 +225,12 @@ export async function createOrgAction(
     // Rollback 1/2 — compte Supabase Auth (cascade public.users + memberships).
     // Nota : supabase-js retourne l'erreur dans `error` SANS throw — on checke
     // les deux canaux (retour + exception réseau) pour ne rien rater.
+    let userRollbackOk = true;
     try {
       const { error: deleteErr } = await adminClient.auth.admin.deleteUser(created.user.id);
       if (deleteErr) throw new Error(deleteErr.message);
     } catch (rollbackErr) {
+      userRollbackOk = false;
       console.error("[createOrgAction:db:fail-hardfail:rollback-user-failed]", {
         user_id: created.user.id,
         email: adminEmail,
@@ -237,13 +239,26 @@ export async function createOrgAction(
     }
 
     // Rollback 2/2 — organisation créée en début d'action.
+    let orgRollbackOk = true;
     try {
       await db.delete(organizations).where(eq(organizations.id, org.id));
     } catch (rollbackErr) {
+      orgRollbackOk = false;
       console.error("[createOrgAction:db:fail-hardfail:rollback-org-failed]", {
         org_id: org.id,
         message: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
       });
+    }
+
+    // Revue Hugo 2026-06-10 (mineur 1) : ne pas affirmer « annulés » si un
+    // rollback a échoué — un retry naïf donnerait une org dupliquée et/ou un
+    // « compte existe déjà ». Message dégradé → le superadmin checke les logs.
+    if (!userRollbackOk || !orgRollbackOk) {
+      return {
+        ok: false,
+        error:
+          "Création BDD impossible (users/memberships). Annulation partielle — vérifier les logs serveur avant de réessayer.",
+      };
     }
 
     return {

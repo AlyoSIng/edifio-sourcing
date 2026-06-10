@@ -8,7 +8,9 @@
  *       1. rollback compte Supabase Auth (deleteUser)
  *       2. rollback organisation (db.delete(organizations))
  *       3. retour { ok: false } explicite + email d'invitation JAMAIS envoyé
- *   - Résilience : un rollback qui rate ne fait pas throw l'action
+ *   - Résilience : un rollback qui rate ne fait pas throw l'action,
+ *     et le message retourné est dégradé (« Annulation partielle »)
+ *   - Succès partiel : email d'invitation en échec → ok:true, aucun rollback
  *
  * Stratégie : mocks de @/db/client (chain fluent Drizzle simulée),
  * @/lib/supabase/server (server + admin clients), @/lib/auth/types,
@@ -259,6 +261,10 @@ describe("createOrgAction — HARDFAIL rollback (post-mortem 2026-06-10)", () =>
     const result = await createOrgAction(validFormData());
 
     expect(result.ok).toBe(false);
+    // Revue Hugo 2026-06-10 (mineur 1) : rollback partiel → on ne PRÉTEND PAS
+    // que tout a été annulé (un retry naïf dupliquerait l'org).
+    expect(result.error).toContain("Annulation partielle");
+    expect(result.error).not.toContain("annulés");
     // Le rollback org est tout de même tenté
     expect(deleteCalls).toEqual([organizations]);
     // L'échec du rollback user est tracé (alertable en prod)
@@ -281,6 +287,7 @@ describe("createOrgAction — HARDFAIL rollback (post-mortem 2026-06-10)", () =>
     const result = await createOrgAction(validFormData());
 
     expect(result.ok).toBe(false);
+    expect(result.error).toContain("Annulation partielle");
     expect(errorSpy).toHaveBeenCalledWith(
       "[createOrgAction:db:fail-hardfail:rollback-user-failed]",
       expect.objectContaining({ message: "User not allowed" }),
@@ -298,10 +305,42 @@ describe("createOrgAction — HARDFAIL rollback (post-mortem 2026-06-10)", () =>
     const result = await createOrgAction(validFormData());
 
     expect(result.ok).toBe(false);
+    expect(result.error).toContain("Annulation partielle");
     expect(errorSpy).toHaveBeenCalledWith(
       "[createOrgAction:db:fail-hardfail:rollback-org-failed]",
       expect.objectContaining({ org_id: ORG_ID }),
     );
+
+    errorSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// Échec email d'invitation — succès partiel (revue Hugo 2026-06-10, mineur 2)
+// ============================================================================
+
+describe("createOrgAction — sendWelcomeEmail en échec (succès partiel)", () => {
+  it("si l'email throw après inserts OK : retour ok:true, log, et AUCUN rollback", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    sendWelcomeEmailMock.mockReset().mockRejectedValue(new Error("resend down"));
+
+    const result = await createOrgAction(validFormData());
+
+    // Comportement réel (actions.ts, bloc « Envoi email d'invitation ») :
+    // succès partiel — org + users + membership créés, seul l'email a foiré.
+    // Le retour est { ok: true } SANS champ error : le superadmin régénère le
+    // provisoire depuis la liste users de l'organisation.
+    expect(result).toEqual({ ok: true });
+
+    // Les 2 inserts ont bien eu lieu, et rien n'est annulé
+    expect(insertCalls).toHaveLength(2);
+    expect(deleteUserMock).not.toHaveBeenCalled();
+    expect(deleteCalls).toHaveLength(0);
+
+    // L'échec email est tracé côté serveur
+    expect(errorSpy).toHaveBeenCalledWith("[createOrgAction:email:fail]", {
+      email: "admin@atelier-test.fr",
+    });
 
     errorSpy.mockRestore();
   });
