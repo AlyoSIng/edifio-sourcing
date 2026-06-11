@@ -1,0 +1,72 @@
+# [ARCHIVE] edifio Sourcing — Repository archivé
+
+> **Ce repository a été migré le 14 juin 2026** vers le monorepo
+> `AlyoSIng/alyos-suivi-chantier` qui regroupe désormais **edifio Suivi**,
+> **edifio ACT** et **edifio Sourcing** sous un seul projet GitHub, un seul
+> projet Vercel et une seule base Supabase.
+>
+> **Pour contribuer ou suivre le développement** :
+> https://github.com/AlyoSIng/alyos-suivi-chantier
+
+---
+
+## Pourquoi cette consolidation ?
+
+Les trois modules `edifio Suivi`, `edifio ACT` et `edifio Sourcing` partagent
+désormais une base utilisateurs, une base organisations et une logique de
+facturation unifiée. Le monorepo permet de mutualiser le schéma Postgres
+(projet Supabase unique Paris), de réduire les coûts ops (un seul projet
+Vercel, un seul pipeline CI), et d'éviter la duplication de code transverse
+(auth, RLS, billing, theming).
+
+Décision validée par la visio cadrage migration du **10 juin 2026** (cf.
+arbitrages A1 à A8 — voir lien plus bas).
+
+---
+
+## Et le code historique ?
+
+Ce repo reste accessible en **lecture seule** pour la traçabilité des
+décisions, des incidents et des migrations antérieures à la bascule.
+
+- Les branches actives ont été **gelées au commit `<COMMIT_SHA_GEL>`**.
+- Plus aucun déploiement, plus aucune CI, plus aucune écriture.
+- Le projet Vercel `edifio-sourcing` est en **pause** (préservé au cas où un
+  rollback serait nécessaire dans la fenêtre J+7 post-bascule).
+
+> **Besoin de reprendre une feature historique non portée ?** Voir la
+> procédure dans le runbook de bascule (lien plus bas) — section "Reprendre
+> une feature historique post-bascule".
+
+---
+
+## Liens utiles
+
+- **Monorepo cible** : https://github.com/AlyoSIng/alyos-suivi-chantier
+- **Brief de migration** : [docs/brief_migration_sourcing_to_monorepo.md](docs/brief_migration_sourcing_to_monorepo.md)
+- **Runbook de bascule** : [docs/RUNBOOK_BASCULE_MONOREPO_140626.md](docs/RUNBOOK_BASCULE_MONOREPO_140626.md)
+- **Cleanup post-bascule** : [docs/CLEANUP_EDIFIO_SOURCING_POSTBASCULE.md](docs/CLEANUP_EDIFIO_SOURCING_POSTBASCULE.md)
+- **Visio cadrage** : [docs/VISIO_CADRAGE_MIGRATION_BRIEF_260610.md](docs/VISIO_CADRAGE_MIGRATION_BRIEF_260610.md)
+- **Post-mortem bascule** : `docs/POST_MORTEM_BASCULE_140626.md` (à publier semaine du 16/06)
+- **ADR clés** :
+  - ADR-013 ORM Drizzle : `specs/adr_013_orm_drizzle.md`
+  - ADR-014 Ouverture multi-tenant : `specs/adr_014_*.md`
+
+---
+
+## Statut technique au gel
+
+- **Stack** : Next.js 14 App Router, TypeScript, Tailwind, Supabase Frankfurt,
+  Vercel EU, Drizzle ORM 0.39, Playwright sur Fly.io EU.
+- **Dernière prod active** : 14 juin 2026, ~10h00 (bascule DNS effectuée à 10h30).
+- **Commit de gel** : `<COMMIT_SHA_GEL>`
+- **Branch protection** : `main` verrouillée (`lock_branch: true`).
+- **CI Actions** : déplacée vers `.github/workflows-archived/` (désactivée).
+- **Secrets GitHub** : purgés (cf. cleanup étape 4).
+
+---
+
+**AlyoS Ingénierie** — Outil interne archivé le **2026-06-14**.
+
+*Pour toute question ou besoin d'accès en écriture exceptionnel (hotfix
+rollback, audit forensic), contacter Steve TEISSIER ou Sophie (CTO).*
