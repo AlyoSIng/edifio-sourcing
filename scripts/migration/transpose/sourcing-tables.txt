@@ -1,0 +1,54 @@
+# Liste canonique des 49 tables de donnees Sourcing transposees public.* -> sourcing.*
+# Source de verite : alyos-suivi-chantier/app/db/migrations/0129_sourcing_schema.sql (ordre de dependance).
+# Utilisee par 01-export-source.ps1 (counts) et 02-transform.ps1 (rewrite + TRUNCATE).
+# Les tables identity (users, memberships, organizations) sont VOLONTAIREMENT absentes
+# (traitees par 03-identity-and-billing.sql).
+ai_prompts
+app_content
+architect_specialties
+platforms
+platform_credentials
+cron_run_log
+faq_items
+formations
+guided_tests
+guided_test_submissions
+news_items
+user_news_reads
+user_notifications
+notifications
+support_tickets
+organization_profiles
+message_templates
+search_profiles
+shortlist_criteria
+buyers
+audit_logs
+architects
+architect_opposition_tokens
+bureaux_etudes
+be_documents
+companies
+cotraitants
+presentation_library
+tenders
+tender_lots
+tender_documents
+tender_events
+selections
+learning_events
+match_proposals
+architect_tokens
+architect_responses
+brevo_messages
+odoo_opportunities
+dossier_dispatches
+ai_runs
+tender_briefs
+library_item_index
+response_files
+cotraitant_documents
+cotraitant_shares
+cotraitant_share_items
+tender_cotraitants
+tender_be_cotraitants
