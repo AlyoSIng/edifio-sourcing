@@ -85,26 +85,41 @@ jobs:
   e2e:
     name: ci-e2e
     runs-on: ubuntu-latest
+    # `supabase start` télécharge ~6-8 images Docker au premier boot (~2-3 min,
+    # pas de cache d'images entre runs sur les runners hosted) + build Next
+    # (~1 min) + suite Playwright. 30 min = marge large sans job zombie.
+    timeout-minutes: 30
     env:
       NEXT_PUBLIC_APP_ENV: preview
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
       ALLOWED_EMAIL_DOMAIN: alyosingenierie.fr
-      # SÉCURITÉ — secrets PREVIEW_* OBLIGATOIRES ici (incident 2026-06-10) :
-      # les secrets non préfixés (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-      # pointent le projet Supabase PROD. Ce job pose E2E_TEST_ROUTES_ENABLED=1 et
-      # seede la BDD via l'admin SDK (e2e/fixtures/multi-org-seed.ts) — il a créé
-      # des comptes fixtures (dont un superadmin au password public) EN PROD le
-      # 10/06 06:52. Noms de secrets alignés sur ci-e2e-preview.yml. Défense en
-      # profondeur côté code : assertNotProdUrl() (src/lib/e2e/anti-prod-guard.ts).
-      # NB : SUPABASE_PROJECT_REF (ref PROD, consommé par aucun code E2E) retiré.
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.PREVIEW_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PREVIEW_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PREVIEW_SUPABASE_SERVICE_ROLE_KEY }}
-      # Resend — exposé au build prod (`pnpm build && pnpm start` côté
-      # Playwright webServer en CI). Le serveur lit ces vars au runtime
-      # quand le flow forgot-password / invite admin déclenche un envoi.
-      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-      RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
+      # ------------------------------------------------------------------
+      # Stack Supabase LOCALE éphémère dans le runner (décision A3, visio
+      # cadrage 10/06) : AUCUN secret GitHub requis. L'incident 2026-06-10
+      # (fixtures seedées en PROD via secrets mal câblés) devient
+      # structurellement impossible : la cible est 127.0.0.1, détruite avec
+      # le runner. URL + ports figés par supabase/config.toml (committé).
+      # Les clés ANON / SERVICE_ROLE locales sont les clés de démo PUBLIQUES
+      # du CLI, exportées par le step « Export Supabase local keys ».
+      # Défense en profondeur conservée : assertNotProdUrl()
+      # (src/lib/e2e/anti-prod-guard.ts) + step « Anti-prod guard » ci-dessous.
+      # ------------------------------------------------------------------
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      # Connexion directe Postgres locale (port 54322, cf. supabase/config.toml).
+      # Lue par : src/db/migrate.ts (mode URL), pnpm db:seed, le webServer
+      # Playwright (`pnpm build && pnpm start`) pour les pages métier BDD, et
+      # les specs `test.skip(!hasDatabase)` — qui ne se skippent donc PLUS.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # Resend — valeurs FACTICES : aucune spec n'asserte un envoi réussi.
+      # forgot-password absorbe l'erreur (succès apparent anti-énumération,
+      # cf. src/lib/email/resend.ts) et les specs multi-org acceptent
+      # explicitement « Resend KO en CI » (s5, s8, s13).
+      RESEND_API_KEY: re_fake_local_e2e_key
+      RESEND_FROM_EMAIL: no-reply@alyosingenierie.fr
+      # CRON_SECRET factice : les specs cron ne testent que les chemins 401
+      # (bearer absent / incorrect — cf. tandem.spec §4, s6, s14), jamais un
+      # run réel. Valeur publique mais ne protège que le serveur du runner.
+      CRON_SECRET: e2e-local-cron-secret-not-a-real-secret
       # Ouvre la route /api/test/seed-session — la triple-gate refuse
       # silencieusement (404) en production même si cette var est posée par
       # erreur (cf. src/app/api/test/seed-session/route.ts).
@@ -120,6 +135,78 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # ------------------------------------------------------------------
+      # Stack Supabase locale : Postgres 15 + GoTrue + PostgREST + Kong.
+      # Studio / inbucket / realtime / storage / edge_runtime / analytics
+      # sont désactivés dans supabase/config.toml (exclusion déclarative,
+      # robuste aux renommages de containers entre versions CLI — ex.
+      # inbucket → mailpit — contrairement aux flags `supabase start -x`).
+      # ------------------------------------------------------------------
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Boot attendu : ~2-3 min (pull des images Docker).
+      - name: Start local Supabase stack
+        run: supabase start
+
+      # Récupère les clés de démo locales (PUBLIQUES — pas des secrets) et les
+      # exporte pour les steps suivants : helpers admin SDK côté runner
+      # (e2e/helpers/password.ts, e2e/fixtures/multi-org-seed.ts) + webServer
+      # Next (middleware, seed-session, server actions service_role).
+      - name: Export Supabase local keys
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env | grep -E '^(ANON_KEY|SERVICE_ROLE_KEY)=')"
+          if [ -z "${ANON_KEY:-}" ] || [ -z "${SERVICE_ROLE_KEY:-}" ]; then
+            echo "::error::ANON_KEY / SERVICE_ROLE_KEY introuvables dans 'supabase status -o env'. Clés disponibles :"
+            supabase status -o env | cut -d= -f1
+            exit 1
+          fi
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+
+      # Garde anti-prod conservée en défense en profondeur (incident
+      # 2026-06-10) : plus de secrets PREVIEW_* à vérifier, mais on refuse
+      # toujours (1) toute URL contenant le project ref PROD — à garder
+      # aligné avec src/lib/e2e/anti-prod-guard.ts — et (2) toute cible
+      # Supabase non locale. Comparaison lowercase (case glob sensible à la
+      # casse par défaut — review Hugo).
+      - name: Anti-prod guard (defense in depth)
+        run: |
+          set -e
+          for URL in "$NEXT_PUBLIC_SUPABASE_URL" "$DATABASE_URL"; do
+            URL_LC="$(printf '%s' "$URL" | tr '[:upper:]' '[:lower:]')"
+            case "$URL_LC" in
+              *loogmtltwkhvczdiurqs*)
+                echo "::error::REFUS — une URL cible le projet Supabase PROD. Le job ci-e2e seede la BDD et ne doit JAMAIS pointer la prod (incident 2026-06-10, cf. DECISIONS.md)."
+                exit 1
+                ;;
+            esac
+          done
+          case "$NEXT_PUBLIC_SUPABASE_URL" in
+            http://127.0.0.1:* | http://localhost:*) ;;
+            *)
+              echo "::error::REFUS — NEXT_PUBLIC_SUPABASE_URL n'est pas la stack locale (attendu http://127.0.0.1:54321)."
+              exit 1
+              ;;
+          esac
+          echo "OK — cible Supabase locale, non-prod"
+
+      # Schéma : migrator custom (extensions + une TX par migration, cf.
+      # src/db/migrate.ts — DATABASE_URL suffit, mode URL). auth.users /
+      # auth.uid() / auth.jwt() existent NATIVEMENT sur la stack locale
+      # (parité prod — pas besoin du stub auth de db-rls.yml).
+      - name: Run migrations
+        run: pnpm db:migrate
+
+      # Baseline dev/CI (2 orgs, profils de recherche actifs, tenders
+      # `sourced`, ai_prompts...) : sans elle, les specs BDD (tender-actions,
+      # ao-du-jour, admin-profil) tournent sur une base vide → EmptyState /
+      # skip. Idempotent (UUID stables + ON CONFLICT DO NOTHING).
+      - name: Seed baseline dataset
+        run: pnpm db:seed
 
       # Cache des binaires Chromium (~150 MB) — clé par version Playwright.
       - name: Cache Playwright browsers
@@ -139,28 +226,9 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
 
-      # Vérifie que les secrets sont disponibles — un fail clair vaut mieux
-      # qu'une cascade d'erreurs Supabase incompréhensibles. Vérifie AUSSI que
-      # l'URL ne cible pas le projet PROD (incident 2026-06-10) : ce job seede
-      # la BDD, il ne doit JAMAIS parler à la prod.
-      - name: Verify Supabase secrets are set (and not prod)
-        run: |
-          set -e
-          [ -n "$NEXT_PUBLIC_SUPABASE_URL" ] || { echo "::error::secret PREVIEW_SUPABASE_URL manquant"; exit 1; }
-          [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] || { echo "::error::secret PREVIEW_SUPABASE_ANON_KEY manquant"; exit 1; }
-          [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] || { echo "::error::secret PREVIEW_SUPABASE_SERVICE_ROLE_KEY manquant"; exit 1; }
-          # Project ref PROD — doit rester aligné avec src/lib/e2e/anti-prod-guard.ts.
-          # Comparaison en lowercase (review Hugo : case glob sensible à la casse par défaut).
-          SUPABASE_URL_LC="$(printf '%s' "$NEXT_PUBLIC_SUPABASE_URL" | tr '[:upper:]' '[:lower:]')"
-          case "$SUPABASE_URL_LC" in
-            *loogmtltwkhvczdiurqs*)
-              echo "::error::REFUS — NEXT_PUBLIC_SUPABASE_URL cible le projet Supabase PROD. Le job ci-e2e seede la BDD et ne doit JAMAIS pointer la prod (incident 2026-06-10, cf. DECISIONS.md)."
-              exit 1
-              ;;
-          esac
-          echo "OK — Supabase preview secrets disponibles, cible non-prod"
-
-      - name: Run E2E middleware tests
+      # Périmètre élargi vs ancien job : avec DATABASE_URL + seed, les specs
+      # métier BDD tournent désormais en plus de middleware/auth.
+      - name: Run E2E tests (local Supabase stack)
         run: pnpm test:e2e
 
       # En cas d'échec, on uploade le rapport HTML + traces Playwright pour

@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-06-11 — CI e2e basculée sur stack Supabase locale éphémère (clôture A3 / incident 10/06)
+
+**Agent** : Alex (dev). **Authoring 100 % statique** (Docker inaccessible aux agents) —
+le 1er run GitHub Actions sert de test, accepté par Steve.
+
+**Livré** :
+
+1. `supabase/config.toml` committé (minimal, zéro secret) : Postgres 15 (parité prod),
+   ports par défaut 54321/54322, **désactivés** : studio, inbucket, realtime, storage,
+   edge_runtime, analytics, db.pooler (aucun usage par l'app ni les specs e2e — Storage
+   contourné par design « bucket absent en CI », Realtime = TODO Phase 2, pas d'Edge
+   Function dans le repo). `[auth.rate_limit] sign_in_sign_ups=1000` (défaut 30/5 min
+   trop bas pour la suite Playwright qui signe une session par spec depuis 127.0.0.1).
+2. Job `e2e` de `ci.yml` réécrit : `supabase/setup-cli@v1` + `supabase start` (~2-3 min
+   de pull d'images) → clés anon/service_role locales (démo publiques) exportées via
+   `supabase status -o env` → `GITHUB_ENV` → `pnpm db:migrate` (mode DATABASE_URL,
+   `postgresql://postgres:postgres@127.0.0.1:54322/postgres`) → `pnpm db:seed` (baseline :
+   les specs `test.skip(!hasDatabase)` tournent désormais) → Playwright. **Plus AUCUN
+   secret GitHub requis** ; secrets PREVIEW_* abandonnés (jamais créés).
+3. Garde anti-prod conservée et durcie (défense en profondeur, incident 10/06) : refus
+   du project ref prod dans `NEXT_PUBLIC_SUPABASE_URL` **et** `DATABASE_URL` + refus de
+   toute cible non-locale (`127.0.0.1`/`localhost` only). `assertNotProdUrl()` côté code
+   inchangée.
+4. Resend/CRON_SECRET en valeurs factices (specs tolèrent « Resend KO en CI » ; crons
+   testés uniquement en 401).
+
+**À valider au 1er run CI** (non testable statiquement) : compat clés `config.toml` avec
+le CLI `latest`, insert stub `auth.users (id, email)` du seed sur la vraie table GoTrue,
+durée totale du job (< timeout 30 min).
+
+---
+
 ## 2026-06-10 — Visio cadrage migration : arbitrages A1-A8 + ACCÉLÉRATION bascule au week-end du 13-14/06
 
 **Contexte** — Visio cadrage Steve × Sébastien (planifiée Q10 semaine 8-14/06). Support :

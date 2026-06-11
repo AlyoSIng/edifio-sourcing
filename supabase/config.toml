@@ -1,0 +1,87 @@
+# =============================================================================
+# Config Supabase CLI — stack LOCALE éphémère pour le job `ci-e2e` (ci.yml)
+# Décision A3 — visio cadrage migration 10/06/2026 (plus de projet Supabase
+# preview : la CI monte une stack locale dans le runner, AUCUN secret requis).
+#
+# AUCUN secret dans ce fichier : les clés anon / service_role locales sont les
+# clés de démo PUBLIQUES du CLI Supabase (dérivées de son JWT secret de démo),
+# récupérées au runtime via `supabase status -o env`.
+#
+# Services désactivés ici plutôt que via `supabase start -x ...` : les noms de
+# containers ont changé entre versions du CLI (ex. inbucket → mailpit), alors
+# que les sections de config restent stables. Exclusion déclarative = robuste.
+# =============================================================================
+
+project_id = "edifio-sourcing"
+
+[api]
+enabled = true
+# Port du gateway (Kong) — NEXT_PUBLIC_SUPABASE_URL = http://127.0.0.1:54321.
+port = 54321
+# Schémas exposés par PostgREST (les helpers E2E font .from()/.rpc() sur public).
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+# Port Postgres direct — DATABASE_URL = postgresql://postgres:postgres@127.0.0.1:54322/postgres.
+port = 54322
+shadow_port = 54320
+# Aligné prod Supabase (Postgres 15 — cf. db-rls.yml + scripts/db-dry-run.ps1).
+# Les migrations passent par `pnpm db:migrate` (migrator custom src/db/migrate.ts),
+# PAS par `supabase db push` : le dossier supabase/migrations reste vide.
+major_version = 15
+
+[db.pooler]
+# Pas de pooler en local : connexion directe 54322 (drizzle / postgres-js).
+enabled = false
+
+[realtime]
+# Aucun usage Realtime dans src/ (TODO Phase 2 uniquement) — désactivé.
+enabled = false
+
+[studio]
+# Inutile en CI headless.
+enabled = false
+
+[inbucket]
+# Serveur de mails de test : inutile — GoTrue n'envoie aucun mail (users E2E
+# créés via admin SDK avec email confirmé) et les mails applicatifs partent
+# par Resend (valeurs factices tolérées par les specs, « Resend KO en CI »).
+enabled = false
+
+[storage]
+# Les specs E2E contournent volontairement Storage (« bucket absent en CI »,
+# cf. e2e/multi-org/s13-tandem-v2-flow.spec.ts) — désactivé.
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+# Login email + mot de passe (parité prod). Pas de confirmation en local :
+# les users E2E sont créés via l'admin SDK avec email_confirm=true.
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+
+[auth.rate_limit]
+# Défaut local : 30 sign-ins / 5 min / IP — trop bas pour la suite Playwright
+# (chaque spec pose une session via /api/test/seed-session → signInWithPassword
+# server-side, toutes depuis 127.0.0.1). On relâche largement en local.
+sign_in_sign_ups = 1000
+token_refresh = 1000
+
+[edge_runtime]
+# Aucune Edge Function dans le repo (les crons sont des routes Next /api/cron/*).
+enabled = false
+
+[analytics]
+# Logflare + vector : lourds et inutiles en CI.
+enabled = false
