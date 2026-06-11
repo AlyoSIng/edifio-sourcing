@@ -120,6 +120,9 @@ ls backups\*-prod-2026-06-13-*.dump
 
 ### P4. ENV Vercel monorepo complètes
 
+> Source de vérité : `docs/VARS_ENV_VERCEL_MONOREPO_DIFF.md` (44 vars détaillées,
+> diff statique Sourcing ↔ monorepo au 11/06).
+
 ```powershell
 # Exporter et diff les ENV du projet standalone vs monorepo
 .\scripts\migration\export-vercel-env.ps1   # ⏳ adapter pour lister les 2 projets
@@ -128,11 +131,42 @@ ls backups\*-prod-2026-06-13-*.dump
 Checklist minimale à confirmer posées sur le projet Vercel monorepo (Production) :
 
 - [ ] `ANTHROPIC_API_KEY`, `BREVO_API_KEY`, `RESEND_API_KEY`
-- [ ] `ODOO_URL` / `ODOO_DB` / `ODOO_USER` / `ODOO_API_KEY`
+- [ ] ~~`ODOO_URL` / `ODOO_DB` / `ODOO_USER` / `ODOO_API_KEY` / `ODOO_SYNC_ENABLED`~~ — **REPORTÉ POST-BASCULE** (Q4 acté visio 10/06 + CHECKLIST_SECRETS_VENDREDI bloc C). Ne PAS poser dimanche.
 - [ ] `CRON_SECRET` (⚠️ valeur du monorepo, PAS celle du standalone — noter laquelle gagne ⏳)
-- [ ] `R12_MONITORING_RECIPIENT`
-- [ ] Secrets worker Fly.io (URL + token de déclenchement) ⏳
 - [ ] Variables Supabase = projet monorepo (URL, anon, service_role) — **PAS** `loogmtltwkhvczdiurqs`
+
+**Vars engine sourcing — ajoutées par le portage des lots ENGINE A-D (mergé 11/06) :**
+
+- [ ] `SCRAPER_BASE_URL` — URL du worker Fly.io (ex. `https://edifio-playwright-worker.fly.dev`). Lue par `client.ts` (déclencheur) ET par les tests. Sans elle : `ScraperUnavailableError` levée mais fire-and-forget swallow → cron continue, pipeline BOAMP seul.
+- [ ] `SCRAPER_TRIGGER_SECRET` — Bearer partagé worker ↔ déclencheur ↔ webhook (contrat **symétrique** : le webhook `scraper-done` utilise le **même** secret). Sans elle : `verifyScraperWebhookAuth` fail-closed → 401 à tout appel webhook.
+- [ ] `BOAMP_BASE_URL` — **optionnelle**, override de l'endpoint Opendatasoft v2.1 (utile en staging). Si absente : fallback vers `https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records`. **NE PAS poser en prod** sauf changement de contrat Opendatasoft.
+- [ ] `R12_MONITORING_RECIPIENT` — destinataire alerte si `sourcing-run` ne tourne pas (fallback hardcodé `sebastien@edifio.fr`).
+
+> ⚠️ **`SCRAPER_WEBHOOK_SECRET` mentionné dans le brief Steve n'existe PAS** dans le code mergé. Le webhook `scraper-done` du monorepo utilise `SCRAPER_TRIGGER_SECRET` (contrat symétrique avec le déclencheur). Une variante HMAC `SCRAPER_WEBHOOK_SECRET` séparée est un **TODO post-MVP** documenté dans `app/src/modules/sourcing/lib/engine/connectors/scraping/webhook-auth.ts` (pattern `brevo-webhook-hmac.ts`). Donc **rien à poser** sous ce nom dimanche.
+
+- [ ] Secrets worker Fly.io (URL + token de déclenchement) ⏳ — les **mêmes valeurs** que `SCRAPER_BASE_URL` / `SCRAPER_TRIGGER_SECRET` ci-dessus mais posés côté Fly app (`fly secrets set ...`). Cf. §8 du runbook (repointage worker).
+
+**Vars à VÉRIFIER (déjà présentes côté monorepo mais valeur peut diverger entre les 2 projets Vercel)** — Steve ouvre la page Settings → Environment Variables :
+
+- [ ] `BREVO_TEMPLATE_ID_ARCHITECT_{FOLLOWUP,SOLICITATION,DECLINE_ACKNOWLEDGMENT,DOSSIER_DIFFUSION}_{TU,VOUS}` — 7 IDs entiers (lookup dynamique template-picker, lecture seule)
+- [ ] `ARCHITECT_JWT_PRIVATE_KEY` / `ARCHITECT_JWT_PUBLIC_KEY` — PEM multi-lignes, copier intégralement (attention retours chariot)
+- [ ] `MATCHING_WEIGHTS_PROFILE`
+- [ ] `BREVO_SOURCING_API_KEY` / `BREVO_WEBHOOK_SECRET`
+- [ ] `RESEND_API_SOURCING_KEY` / `RESEND_FROM_EMAIL`
+- [ ] `PAPPERS_API_KEY`
+- [ ] `NEXT_PUBLIC_SITE_URL` = `https://sourcing.edifio.fr` côté Production monorepo
+
+### P4 bis. Vercel cron `vercel.json` — alerte 3 crons manquants
+
+Le `vercel.json` du monorepo déclare **6 crons** alors que **9 routes** existent
+(`tandem-followup`, `library-expiry-digest`, `dossier-zip-cleanup` n'ont pas
+de schedule). C'est l'ambiguïté n°6 du DIFF.
+
+- [ ] Décision vendredi : on accepte ce périmètre dégradé pour la bascule (les
+  3 crons attendront un PR post-bascule), OU on ajoute les 3 schedules à
+  `app/vercel.json` **avant** le deploy gel samedi 20h. Steve à arbitrer.
+- [ ] Si « on ajoute » : reprendre les schedules tels que dans `vercel.json`
+  standalone et les copier dans `app/vercel.json`. Ne PAS modifier les 6 schedules existants.
 
 ### P5. Test de plomberie connexions (15 min qui en sauvent 60 dimanche)
 
@@ -379,7 +413,26 @@ Le retrait côté standalone est fait depuis l'étape 1. Côté registrar, le CN
 (middleware `SOURCING_HOSTS` actif → rewrite `/sourcing`).
 **Si KO après 10 min** : Annexe A, cas R3 (revert domaine).
 
-### 7. Smoke prod (9h45-10h15) — checklist Camille, exécution Steve + équipe
+### 7. Smoke prod (9h45-10h30) — checklist Steve
+
+> **Procédure détaillée** : `docs/SMOKE_TESTS_POSTBASCULE.md` (10 sections,
+> ~45 min, commandes curl prêtes à coller avec critères PASS/FAIL).
+>
+> Le tableau ci-dessous est le **résumé exécutif** (17 tests à dérouler sur la
+> bascule, héritage des 12 tests historiques + 5 ajouts engine v1.1). La version
+> complète couvre en plus : engine cron `sourcing-run` (section 7 du SMOKE),
+> webhook `scraper-done` (section 8 du SMOKE), et la régression Suivi/ACT
+> (section 9).
+>
+> **Note de cohérence numérotation (audit Camille F-05)** : les sections 1 à 10
+> de `SMOKE_TESTS_POSTBASCULE.md` et les tests 7.1 à 7.17 du tableau ci-dessous
+> couvrent **le même périmètre fonctionnel**, vu à deux granularités :
+> - SMOKE doc = vue par **domaine fonctionnel** (sanity, auth, AO, Tandem,
+>   Dossier, Admin, Engine cron, Webhook, Régression, Logs).
+> - Runbook §7 = vue par **action unitaire** (chaque test = une commande curl
+>   ou une assertion, comptage 17/17 pour le critère de sortie).
+> Si un test 7.x KO dimanche : ouvrir la section correspondante du SMOKE doc
+> pour le détail diagnostic + critères PASS/FAIL.
 
 | # | Test | Attendu | OK |
 |---|---|---|---|
@@ -395,14 +448,24 @@ Le retrait côté standalone est fait depuis l'étape 1. Côté registrar, le CN
 | 7.10 | Vercel logs monorepo : `vercel logs --prod` | Aucune 500 pendant le smoke | ☐ |
 | 7.11 | Console navigateur | Aucune erreur bloquante | ☐ |
 | 7.12 | **Régression Suivi/ACT** : un user Suivi se connecte et ouvre un chantier | RAS (la bascule ne casse pas l'existant) | ☐ |
+| 7.13 | **Engine cron `sourcing-run`** : `curl -X POST -H "Authorization: Bearer $CRON_SECRET" .../api/cron/sourcing-run` | `200 { ok:true, totalProfiles>=1, ... }` + 1 row `sourcing.cron_run_log status='ok'` | ☐ |
+| 7.14 | **Auth cron** : même curl avec `Bearer WRONG` | `401 unauthorized` (fail-closed) | ☐ |
+| 7.15 | **Webhook `scraper-done`** : `curl -X POST ... -d '{"runId":"smoke-1","platform":"place","profileId":"<uuid>","orgId":"<uuid>","tenders":null,"durationMs":1000}'` | `200 { ok:true, inserted:0, skipped:0, errors:0 }` | ☐ |
+| 7.16 | **Auth webhook** : même curl avec `Bearer WRONG` | `401 unauthorized` | ☐ |
+| 7.17 | **Schéma Zod webhook** : curl sans `runId` ou `durationMs` | `400 { ok:false, error:"invalid_payload", issues:[...] }` | ☐ |
 
-**Critère de sortie** : 12/12. Un seul KO sécurité (7.5, 7.6, 7.8) = rollback immédiat (Annexe A, R3).
+**Critère de sortie** : 17/17. Un seul KO sécurité (7.5, 7.6, 7.8, 7.14, 7.16) = rollback immédiat (cf. `docs/ROLLBACK_BASCULE_140626.md`, cas R1).
 
 ### 8. Crons actifs (10h15-10h30) — Steve
 
-1. Dashboard Vercel → projet monorepo → onglet **Crons** : les 5 crons sourcing apparaissent
-   (`sourcing-run`, `sourcing-monitoring`, `tandem-followup`, `library-expiry-digest`,
-   `dossier-zip-cleanup`) en plus des 4 crons Suivi existants.
+1. Dashboard Vercel → projet monorepo → onglet **Crons** : **2 crons sourcing**
+   apparaissent (`sourcing-run`, `sourcing-monitoring`) en plus des 4 crons Suivi
+   existants — soit **6 crons au total** côté monorepo.
+   > ⚠ Cohérence P4 bis : `app/vercel.json` déclare 6 crons sur 9 routes possibles.
+   > Les 3 crons `tandem-followup`, `library-expiry-digest`, `dossier-zip-cleanup`
+   > NE sont PAS portés dans le monorepo dimanche (sauf si l'arbitrage P4 bis
+   > vendredi décide d'ajouter les schedules avant gel samedi 20h). Ce
+   > périmètre dégradé est ACCEPTÉ par défaut pour la bascule.
 2. Repointer le worker Fly.io vers la nouvelle BDD/URL ⏳ (secrets Fly à préparer vendredi) puis redémarrer :
    ```powershell
    fly secrets set SUPABASE_URL=<url-monorepo> SUPABASE_SERVICE_ROLE_KEY=<key-monorepo> -a <FLY-APP-SOURCING>
@@ -414,8 +477,9 @@ Le retrait côté standalone est fait depuis l'étape 1. Côté registrar, le CN
    # Attendu : { ok: true, ... }
    ```
 
-**Critère de sortie** : 5 crons listés + trigger manuel 200. Échéance réelle : `sourcing-run` lundi matin —
-**surveillance lundi 7h obligatoire** (insertion tenders > 0, sinon alerte R12).
+**Critère de sortie** : 2 crons sourcing listés (sur 6 crons monorepo) + trigger manuel 200.
+Échéance réelle : `sourcing-run` lundi matin — **surveillance lundi 7h obligatoire**
+(insertion tenders > 0, sinon alerte R12).
 
 ### 9. Communication post-bascule (10h30-10h45) — Steve
 
@@ -440,6 +504,15 @@ si §7 est 12/12.
 ---
 
 ## Annexe A — Rollback
+
+> **Documents complémentaires** :
+> - `docs/ROLLBACK_BASCULE_140626.md` — procédure détaillée pour les rollbacks
+>   **POST-bascule** (après le §6 / pendant le §7 smoke). Inclut R1 (à chaud
+>   dimanche), R2 (tardif J+1 à J+7), rejeu des écritures monorepo vers
+>   standalone, comm rollback.
+> - L'annexe ci-dessous (R1 à R4 historiques) reste la référence pour les
+>   échecs **AVANT bascule domaine** : §2 backup KO, §3 migrations KO, §4
+>   transposition KO, §5 assertions KO.
 
 ### Critères STOP (déclenchement immédiat, pas de négociation)
 
@@ -513,10 +586,21 @@ rollback simple — décision Board.
 5. Arbitrage `must_change_password` (cartographie ⚖️ point 2) — impacte le smoke 7.2 et l'onboarding PROTECT
 6. Option maintenance (retrait domaine vs Password Protection) + procédure TXT `_vercel` si teams différents
 7. Email exact admin PROTECT (assertion A3) + valeur `trial_ends_at` prod à recopier (assertion A6)
-8. `CRON_SECRET` : valeur monorepo confirmée + secrets P4 tous posés
+8. `CRON_SECRET` : valeur monorepo confirmée + secrets P4 tous posés (y compris les 3 vars engine `SCRAPER_BASE_URL`, `SCRAPER_TRIGGER_SECRET`, `R12_MONITORING_RECIPIENT`)
 9. Périmètre Storage (buckets bibliothèque / documents cotraitant) : transposer ou pas, et comment
+10. Arbitrage P4 bis : on accepte les 6 crons monorepo (perte de `tandem-followup`, `library-expiry-digest`, `dossier-zip-cleanup`) OU on patch `app/vercel.json` avant gel samedi 20h
+11. Pré-requis smoke `SMOKE_TESTS_POSTBASCULE.md` : préparer dans 1Password les UUIDs `<UUID org AlyoS monorepo>` et `<UUID profil AlyoS sourcing.search_profiles>` (lecture BDD post-transposition, < 30s)
+12. Présence physique de `docs/SMOKE_TESTS_POSTBASCULE.md` et `docs/ROLLBACK_BASCULE_140626.md` sur le poste de Steve (imprimer ou onglet dédié) — pas de lecture inter-session pendant l'incident
 
 ---
 
 **Runbook v1 rédigé le 10/06/2026 (Camille, qa). À figer le 12/06 soir. GO/NO-GO samedi 13/06.**
+**v1.1 amendé le 11/06/2026 (Alex, dev) — post-merge engine PR #6 :**
+- P4 enrichie avec les vars engine (`SCRAPER_BASE_URL`, `SCRAPER_TRIGGER_SECRET`, `BOAMP_BASE_URL`, `R12_MONITORING_RECIPIENT`)
+- alerte « SCRAPER_WEBHOOK_SECRET inexistant » (contrat symétrique avec SCRAPER_TRIGGER_SECRET)
+- P4 bis : 3 crons manquants dans `app/vercel.json` (`tandem-followup`, `library-expiry-digest`, `dossier-zip-cleanup`)
+- §7 smoke étendu de 12 → 17 tests (engine cron, auth cron, webhook, auth webhook, validation Zod), renvoi vers `docs/SMOKE_TESTS_POSTBASCULE.md`
+- Annexe A pointeur vers `docs/ROLLBACK_BASCULE_140626.md` (rollbacks post-bascule R1/R2)
+- Annexe C points 10-12 ajoutés (arbitrage crons + UUIDs smoke + documents physiquement sur le poste)
+
 **Document à ne plus modifier après l'étape 4 de dimanche (rollback uniquement).**

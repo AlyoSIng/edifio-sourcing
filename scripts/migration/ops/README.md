@@ -185,13 +185,18 @@ Pour `01-vercel-env-loader.ps1`. À créer localement par Steve (jamais commit �
 
 ```bash
 # .env.monorepo.production
-# Vars manquantes côté monorepo (cf. docs/VARS_ENV_VERCEL_MONOREPO_DIFF.md).
+# Vars manquantes côté monorepo (cf. docs/VARS_ENV_VERCEL_MONOREPO_DIFF.md
+# + docs/CHECKLIST_SECRETS_VENDREDI.md bloc A).
 # Encoder en UTF-8 LF (pas de CRLF, pas de BOM).
 # Première ligne `# DRY_RUN=true` => force le mode dry-run.
 
-COOKIE_DOMAIN=.edifio.fr
+SUPABASE_COOKIE_DOMAIN=.edifio.fr
 DATABASE_URL=postgres://...
-NEXT_PUBLIC_APP_ENV=production
+NEXT_PUBLIC_APP_URL=https://sourcing.edifio.fr
+SCRAPER_BASE_URL=https://edifio-sourcing-scraper.fly.dev
+SCRAPER_TRIGGER_SECRET=<bearer partagé worker Fly>
+# ⚠ Pas d'ODOO_* ici : reporté post-bascule (Q4 acté 12/06, cf. CHECKLIST_SECRETS bloc C).
+# ⚠ Pas de SCRAPER_WEBHOOK_SECRET : inexistant dans le code mergé (cf. CHECKLIST_SECRETS A5).
 # ... autres vars listées dans docs/VARS_ENV_VERCEL_MONOREPO_DIFF.md
 ```
 

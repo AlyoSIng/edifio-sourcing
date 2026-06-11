@@ -166,15 +166,17 @@ try {
 # =============================================================================
 # T4. /api/cron/sourcing-run avec Bearer CRON_SECRET
 # =============================================================================
-Write-Step "T4 : GET ${BaseUrl}${CronPath} (Bearer CRON_SECRET)"
+Write-Step "T4 : POST ${BaseUrl}${CronPath} (Bearer CRON_SECRET)"
 if (-not $env:CRON_SECRET -or $env:CRON_SECRET -eq "") {
     Add-Result "T4" "Cron sourcing-run" "WARN" "CRON_SECRET non pose dans la session - test saute"
     Write-Host "[WARN] `$env:CRON_SECRET non pose - poser puis re-run pour valider le cron."
 } else {
     try {
         $headers = @{ "Authorization" = "Bearer $env:CRON_SECRET" }
+        # Aligne sur la posture runbook + SMOKE_TESTS_POSTBASCULE : POST (la route
+        # accepte GET et POST mais la doc officialise POST pour eviter le faux positif).
         $r4 = Invoke-WebRequest -Uri "${BaseUrl}${CronPath}" `
-                                -Method GET `
+                                -Method POST `
                                 -Headers $headers `
                                 -TimeoutSec 60 `
                                 -UseBasicParsing

@@ -124,16 +124,20 @@ Quel que soit le chemin : **vérifier que `vercel link` pointe bien sur `alyos-s
 
 ## Bloc D — Récap fin de session
 
+> **Périmètre total documenté** : 5 (Bloc A à créer) + 24 (Bloc B à vérifier)
+> + 5 (Bloc C reportées Odoo) = **34 vars dans le périmètre du J-2**.
+> Recompte effectué le 12/06 dans le cadre de l'audit Camille (F-06).
+
 À la fin (≈ 30 min), tu dois avoir :
 - [ ] **5 vars créées** (Bloc A : `SUPABASE_COOKIE_DOMAIN`, `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, `SCRAPER_BASE_URL`, `SCRAPER_TRIGGER_SECRET`)
-- [ ] **24 vars vérifiées / corrigées** (Bloc B)
-- [ ] **0 var Odoo** posée (Bloc C — reporté)
+- [ ] **24 vars vérifiées / corrigées** (Bloc B : B1=8 + B2=3 + B3=2 + B4=3 + B5=8)
+- [ ] **0 var Odoo** posée (Bloc C — 5 vars reportées : `ODOO_URL`, `ODOO_DB`, `ODOO_USER`, `ODOO_API_KEY`, `ODOO_SYNC_ENABLED`)
 - [ ] Aucun `SCRAPER_WEBHOOK_SECRET` posé
 - [ ] Aucun `COOKIE_DOMAIN` (sans préfixe `SUPABASE_`) posé
 - [ ] Aucun `NEXT_PUBLIC_APP_ENV` posé
 
 Vérification finale :
-- [ ] Onglet Settings → Environment Variables du projet `alyos-suivi-chantier` montre ≈ **28 vars en Production**.
+- [ ] Onglet Settings → Environment Variables du projet `alyos-suivi-chantier` montre ≈ **29 vars en Production** (5 créées + 24 vérifiées). Si l'onglet en affiche moins, refaire le pointage Bloc B ; si plus, c'est probablement des vars Suivi/ACT pré-existantes — ne pas y toucher.
 - [ ] Redéployer Production une fois (sinon les nouvelles vars ne sont pas exposées au runtime) — ⚠ Pas avant que le merge PR #5 soit acté.
 
 ---
