@@ -7,6 +7,11 @@
 .env.development
 .env.preview
 .env.production
+# .env.monorepo.production : payload du loader 01-vercel-env-loader.ps1
+# (cf. scripts/migration/ops/README.md). NE JAMAIS commit — contient les
+# secrets prod cibles du monorepo (DATABASE_URL Paris, service_role,
+# ANTHROPIC_API_KEY, etc.). Steve le crée en local depuis 1Password.
+.env.monorepo*
 
 # --- PII architectes / bases nominatives (JAMAIS commit — cf. specs/rgpd_registre_architectes_DRAFT.md) ---
 # Source Odoo brute (~3805 cabinets, ~1900 emails, ~1750 noms dirigeants)
