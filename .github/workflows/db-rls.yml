@@ -108,6 +108,10 @@ jobs:
           PGPASSWORD: postgres
         run: |
           set -e
+          # Roles Supabase (anon/authenticated/service_role) -- 0048_buyers_directory
+          # (gap 0033-0049 journalise le 11/06) fait des GRANT vers authenticated.
+          # En prod Supabase ces roles existent nativement.
+          psql -h localhost -U postgres -d edifio_sourcing_test -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF; IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF; IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF; END \$\$;"
           psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE SCHEMA IF NOT EXISTS auth;"
           psql -h localhost -U postgres -d edifio_sourcing_test -c "CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY, email text);"
           # Stub `auth.jwt()` -- en prod Supabase Auth pose cette fonction qui
