@@ -130,18 +130,32 @@ if ($UseDocker) {
               "-f", "/s/03-identity-and-billing.sql",
               "-f", "/b/load-counts.gen.sql",
               "-f", "/b/sourcing-data.transformed.sql")
-    & docker @cliArgs *>&1 | Out-File -FilePath $logFile -Encoding utf8
+    # PIEGE PS 5.1 (vu au 1er run 11/06) : `*>&1 | Out-File` avec
+    # $ErrorActionPreference=Stop transforme chaque ligne stderr de psql
+    # (WARNING/NOTICE legitimes) en NativeCommandError FATALE qui tue le
+    # pipeline ET psql en plein vol. Fix : EA=Continue le temps de l'appel
+    # + stringification explicite des ErrorRecords avant Out-File.
+    $prevEA = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & docker @cliArgs 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $logFile -Encoding utf8
+    } finally {
+        $ErrorActionPreference = $prevEA
+    }
 } else {
     if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
         Write-Host "[ERREUR] psql introuvable. Relancer avec -UseDocker." -ForegroundColor Red
         exit 1
     }
     Push-Location $absOutDir   # \copy relatifs resolus dans backups/
+    $prevEA = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     try {
         & psql -h $env:PGHOST -p $env:PGPORT -U $env:PGUSER -d $env:PGDATABASE `
             --no-psqlrc --set=ON_ERROR_STOP=1 --single-transaction `
-            -f $identitySql -f $genSql -f $dataSql *>&1 | Out-File -FilePath $logFile -Encoding utf8
+            -f $identitySql -f $genSql -f $dataSql 2>&1 | ForEach-Object { "$_" } | Out-File -FilePath $logFile -Encoding utf8
     } finally {
+        $ErrorActionPreference = $prevEA
         Pop-Location
     }
 }

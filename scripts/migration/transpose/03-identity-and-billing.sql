@@ -104,9 +104,13 @@ DECLARE
   -- profiles.is_superadmin = true pour Steve. Allowlist explicite, alignee
   -- sur le precedent 0039 du monorepo. ARBITRAGE documente dans le README.
   superadmin_emails text[] := ARRAY['steissier@alyosingenierie.fr'];
-  -- Override optionnel de la date de trial PROTECT (NULL = on prend
-  -- trial_ends_at du CSV, qui EST la valeur prod 0049 exportee dimanche).
-  protect_trial_until_override timestamptz := NULL;
+  -- Override de la date de trial PROTECT.
+  -- CONSTAT export prod 11/06 (arbitrage C4 tranche de fait) : la prod 0049
+  -- n'a JAMAIS pose le trial en BDD (trial_started_at/trial_ends_at NULL,
+  -- subscription_status = none) - le trial 30 jours etait commercial, pas
+  -- une donnee. Valeur posee : onboarding PROTECT 07/06 + 30 jours = 07/07.
+  -- A CONFIRMER par Steve x Sebastien avant dimanche (sinon ajuster ici).
+  protect_trial_until_override timestamptz := '2026-07-07 09:28:33+00';
 
   r record;
   n int;
@@ -212,6 +216,16 @@ BEGIN
   RAISE NOTICE '(4) organizations upsertees : %', n;
 
   -- ===== (5) auth.users (dynamique : colonnes existantes uniquement) =====
+  -- DESACTIVATION TRIGGERS pour (5)-(7) — constat banc 11/06 : handle_new_user
+  -- (0001, AFTER INSERT ON auth.users) RAISE « organization_slug requis » pour
+  -- tout user sans ce champ dans raw_user_meta_data (il ne cree PAS de profile
+  -- provisoire, il BLOQUE). On importe les profiles nous-memes en (7), donc on
+  -- coupe les triggers le temps des inserts identity. set_config(..., true) =
+  -- portee transaction ; la phase donnees (02-transform) repose son propre
+  -- session_replication_role = replica de toute facon. Le trigger anti-
+  -- elevation profiles est egalement bypasse — import legitime service-level.
+  PERFORM set_config('session_replication_role', 'replica', true);
+
   FOR r IN
     SELECT * FROM (VALUES
       ('id',                     $q$s.id$q$),
@@ -312,6 +326,9 @@ BEGIN
         provisional_password_expires_at = EXCLUDED.provisional_password_expires_at;
   GET DIAGNOSTICS n = ROW_COUNT;
   RAISE NOTICE '(7) profiles upsertes : %', n;
+
+  -- Reactivation des triggers (fin de la fenetre identity (5)-(7)).
+  PERFORM set_config('session_replication_role', 'origin', true);
 
   -- ===== (8) Billing PROTECT : 0049 -> 0115 =====
   SELECT coalesce(protect_trial_until_override, s.trial_ends_at) INTO protect_trial

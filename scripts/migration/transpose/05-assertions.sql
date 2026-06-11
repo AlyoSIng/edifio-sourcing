@@ -223,11 +223,11 @@ BEGIN
   RAISE NOTICE 'A10 OK: zero fixture e2e';
 
   -- ===== A11. Fonctions cotraitant SECURITY DEFINER (0130) =====
-  SELECT count(*) INTO n FROM pg_proc p
-   WHERE p.proname IN ('get_cotraitant_share_by_token',
+  SELECT count(*) INTO n FROM pg_proc procs
+   WHERE procs.proname IN ('get_cotraitant_share_by_token',
                        'get_cotraitant_share_items_by_token',
                        'mark_cotraitant_share_item_signed')
-     AND p.prosecdef;
+     AND procs.prosecdef;
   IF n < 3 THEN
     RAISE EXCEPTION 'A11 KO: %/3 fonctions cotraitant SECURITY DEFINER presentes (0130 applique ?)', n;
   END IF;

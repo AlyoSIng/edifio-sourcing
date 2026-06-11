@@ -2,6 +2,26 @@
 
 ---
 
+## 2026-06-11 — Commit + push fixes CI (79df1cd) + outillage transposition Lot 2e (2564fd3)
+
+**Agent** : Yann (ps_operator). Deux commits poussés sur `main` (011c19f..2564fd3) :
+
+1. `79df1cd fix(ci): journal gap 0033-0049 + storage local stack + middleware-check adr-014`
+   (4 fichiers — cf. entrée Alex ci-dessous). Diff stagé relu intégralement : zéro secret.
+2. `2564fd3 chore(migration): outillage transposition donnees sourcing vers monorepo (lot 2e)`
+   (7 fichiers `scripts/migration/transpose/`). **Type `ops` demandé par le Board substitué
+   par `chore`** : `commitlint.config.js` n'étend que `@commitlint/config-conventional`
+   (types standards uniquement, `ops` rejeté par le hook ; `--no-verify` interdit).
+   Scope/sujet/body conservés à l'identique. Scan secrets : seul placeholder `<1Password>`,
+   garde anti-prod (`loogmtltwkhvczdiurqs` refusé en écriture) vérifiée présente dans 04.
+
+Exclusions respectées : `gates/AUDIT_*`, `.claude/worktrees/` non commités.
+Hooks verts : prettier (pre-commit), commitlint, ESLint full + typecheck (pre-push).
+Surveillance du run CI 27328955902 (`ci`) + 27328955903 (`ci-db-rls`) en cours — résultat
+dans la note de suivi du jour.
+
+---
+
 ## 2026-06-11 — 3 fixes CI post-bascule stack locale (run 27328106186)
 
 **Agent** : Alex (dev). Diagnostic du run rouge : la stack Supabase locale boote, les

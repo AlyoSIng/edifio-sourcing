@@ -33,9 +33,18 @@ CREATE TABLE IF NOT EXISTS auth.users (
   updated_at timestamptz DEFAULT now()
 );
 
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS $$ SELECT NULL::uuid; $$ LANGUAGE sql STABLE;
-CREATE OR REPLACE FUNCTION auth.role() RETURNS text AS $$ SELECT 'authenticated'::text; $$ LANGUAGE sql STABLE;
-CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$ SELECT '{}'::jsonb; $$ LANGUAGE sql STABLE;
+-- auth.uid()/jwt() lisent request.jwt.claims (comme le vrai GoTrue + le stub
+-- db-rls.yml) : permet les smokes RLS S13/S14 avec sessions simulees via
+-- SET request.jwt.claims. NULL si aucune session simulee.
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS
+  $$ SELECT (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid; $$
+  LANGUAGE sql STABLE;
+CREATE OR REPLACE FUNCTION auth.role() RETURNS text AS
+  $$ SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', 'authenticated'); $$
+  LANGUAGE sql STABLE;
+CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS
+  $$ SELECT NULLIF(current_setting('request.jwt.claims', true), '')::jsonb; $$
+  LANGUAGE sql STABLE;
 
 -- Schema storage (stub Storage API) — policies des migrations 0002, 0033, 0041,
 -- 0045, 0046, 0059, 0065, 0068b, 0079, 0092 ciblent storage.objects/buckets.
@@ -79,5 +88,18 @@ $$ LANGUAGE sql IMMUTABLE;
 
 GRANT USAGE ON SCHEMA auth, storage TO authenticated, anon, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA storage TO authenticated, anon, service_role;
+
+-- Default privileges du schema public — la PLATEFORME Supabase les pose a
+-- l'init du projet (hors migrations) : anon/authenticated/service_role ont
+-- GRANT sur tables/fonctions/sequences de public. Sans ce bloc, un banc
+-- vanilla refuse aux roles simules l'acces aux objets crees par les
+-- migrations (constat smoke S13 du 11/06 : permission denied organizations).
+GRANT USAGE ON SCHEMA public TO authenticated, anon, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated, anon, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated, anon, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, anon, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO authenticated, anon, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO authenticated, anon, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO authenticated, anon, service_role;
 
 SELECT 'STUBS SUPABASE OK' AS status;
