@@ -18,9 +18,10 @@
  *  - Pas de filtre profil (= tous les AO sourced de l'org)
  *  - Hard limit 500 lignes (au-delà : Excel rame, et MVP)
  *
- * Pas de génération xlsx natif : la lib (`sheetjs` / `exceljs`) n'est pas
- * installée. Si Steve demande un vrai .xlsx plus tard, ajouter la dépendance
- * et écrire un wrapper. Le CSV reste la version supportée.
+ * Pas de génération xlsx natif ici : `xlsx` (SheetJS) est désormais installé
+ * (Lot 3 migration, pour `references-table-filter`), mais cet export reste
+ * volontairement en CSV — version supportée, suffisante pour le tableau de
+ * veille. Si Steve demande un vrai .xlsx plus tard, écrire un wrapper.
  */
 
 import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";

@@ -1,12 +1,15 @@
 /**
  * Tests filterReferencesTableXlsx — Steve 2026-06-05 (chantier R).
  *
- * Stratégie : on fabrique un .xlsx en mémoire avec ExcelJS, on appelle la
+ * Stratégie : on fabrique un .xlsx en mémoire avec SheetJS, on appelle la
  * fonction, on relit le .xlsx résultant pour valider les lignes conservées.
+ *
+ * MIGRATION MONOREPO (Lot 3, 2026-06-11) : fixtures réécrites de `exceljs`
+ * vers `xlsx` (SheetJS) — mêmes scénarios, mêmes assertions.
  */
 
 import { describe, expect, it } from "vitest";
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 
 import { filterReferencesTableXlsx } from "./references-table-filter";
 
@@ -23,6 +26,18 @@ interface FixtureRow {
   keywords: string;
 }
 
+/** Sérialise un workbook SheetJS en Uint8Array (.xlsx). */
+function writeWorkbook(wb: XLSX.WorkBook): Uint8Array {
+  return new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer);
+}
+
+/** Construit un workbook 1 feuille « Références » depuis une matrice. */
+function buildWorkbook(aoa: unknown[][]): XLSX.WorkBook {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Références");
+  return wb;
+}
+
 /**
  * Construit un buffer .xlsx avec colonnes
  *   `Référence | Acheteur | Mots-clés | Montant`
@@ -35,26 +50,23 @@ async function buildFixtureXlsx(
   rows: FixtureRow[],
   headerOverride = "Mots-clés",
 ): Promise<Uint8Array> {
-  const wb = new ExcelJS.Workbook();
-  const sheet = wb.addWorksheet("Références");
-  sheet.addRow(["Référence", "Acheteur", headerOverride, "Montant"]);
-  for (const r of rows) {
-    sheet.addRow([r.ref, r.buyer, r.keywords, "100000"]);
-  }
-  const buf = await wb.xlsx.writeBuffer();
-  return new Uint8Array(buf);
+  const aoa: unknown[][] = [
+    ["Référence", "Acheteur", headerOverride, "Montant"],
+    ...rows.map((r) => [r.ref, r.buyer, r.keywords, "100000"]),
+  ];
+  return writeWorkbook(buildWorkbook(aoa));
 }
 
 /**
  * Construit un .xlsx sans colonne keywords pour tester le throw.
  */
 async function buildXlsxWithoutKeywordsColumn(): Promise<Uint8Array> {
-  const wb = new ExcelJS.Workbook();
-  const sheet = wb.addWorksheet("Références");
-  sheet.addRow(["Référence", "Acheteur", "Montant"]);
-  sheet.addRow(["R001", "Mairie X", "100000"]);
-  const buf = await wb.xlsx.writeBuffer();
-  return new Uint8Array(buf);
+  return writeWorkbook(
+    buildWorkbook([
+      ["Référence", "Acheteur", "Montant"],
+      ["R001", "Mairie X", "100000"],
+    ]),
+  );
 }
 
 /**
@@ -62,20 +74,17 @@ async function buildXlsxWithoutKeywordsColumn(): Promise<Uint8Array> {
  * comme tableaux de string pour assertion.
  */
 async function readBackRows(buffer: Uint8Array): Promise<string[][]> {
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer.buffer as ArrayBuffer);
-  const sheet = wb.worksheets[0];
+  const wb = XLSX.read(buffer, { type: "array" });
+  const sheetName = wb.SheetNames[0];
+  const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
   if (!sheet) return [];
-  const out: string[][] = [];
-  sheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return; // skip header
-    const cells: string[] = [];
-    row.eachCell({ includeEmpty: true }, (cell) => {
-      cells.push(String(cell.value ?? ""));
-    });
-    out.push(cells);
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    raw: false,
+    defval: "",
+    blankrows: false,
   });
-  return out;
+  return matrix.slice(1).map((row) => row.map((cell) => String(cell ?? "")));
 }
 
 // ---------------------------------------------------------------------------
@@ -187,13 +196,14 @@ describe("filterReferencesTableXlsx", () => {
   });
 
   it("ignore les lignes complètement vides", async () => {
-    const wb = new ExcelJS.Workbook();
-    const sheet = wb.addWorksheet("Références");
-    sheet.addRow(["Référence", "Acheteur", "Mots-clés"]);
-    sheet.addRow(["R001", "A", "patrimoine"]);
-    sheet.addRow([]); // ligne vide volontaire
-    sheet.addRow(["R002", "B", "patrimoine"]);
-    const buf = new Uint8Array(await wb.xlsx.writeBuffer());
+    const buf = writeWorkbook(
+      buildWorkbook([
+        ["Référence", "Acheteur", "Mots-clés"],
+        ["R001", "A", "patrimoine"],
+        [], // ligne vide volontaire
+        ["R002", "B", "patrimoine"],
+      ]),
+    );
 
     const result = await filterReferencesTableXlsx(buf, ["patrimoine"]);
 
