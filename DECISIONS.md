@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-06-11 — Lot 3 migration : exceljs → xlsx (SheetJS 0.20.3) + verdict moteur docx
+
+**Agent** : Alex (dev). Branche `feat/lot3-sheetjs-docx` (commits locaux, push Yann après review).
+Chantier migration acté (visio 10/06, A7) — hors gel features.
+
+1. **Inventaire exceljs** : 1 seul module réel — `src/lib/dossier/references-table-filter.ts`
+   (+ son test). `export-actions.ts` (export CSV AO du jour) ne citait exceljs qu'en
+   commentaire (pas d'import) → commentaire mis à jour, code intact.
+2. **Réécriture** `references-table-filter.ts` : `exceljs@4.4.0` → `xlsx@0.20.3`
+   (**même tarball CDN SheetJS que le monorepo** `alyos-suivi-chantier` — versions alignées
+   pour le portage tel quel en vague 2). Iso-fonctionnel : signature publique
+   `filterReferencesTableXlsx(Uint8Array, string[]|null) → Promise<FilterReferencesResult>`
+   inchangée, mêmes colonnes/sortie, mêmes messages d'erreur. Seule perte (assumée,
+   cosmétique) : en-tête de sortie plus en gras — SheetJS CE n'écrit pas les styles de
+   police. Test (11 scénarios) : fixtures refabriquées avec SheetJS, assertions identiques.
+3. **Verdict moteur docx Mustache maison** (`docx-fill.ts` + `cerfa-docx-generator.ts`) :
+   **PORTABLE TEL QUEL — non touché.** Zéro dépendance à exceljs/docxtemplater ; seule dep :
+   `fflate@^0.8.3` (zip pur JS, zéro dep transitive, ~8 Ko). ⚠️ `fflate` est ABSENT du
+   `package.json` du monorepo → **à ajouter en vague 2** (requis de toute façon par
+   `zip-compile.ts`, porté lui aussi). Le `docxtemplater`/`pizzip` du monorepo n'est pas
+   utilisé par nos modules ; pas de réécriture vers pizzip (refacto hors périmètre Lot 3).
+4. **Validations locales** : `tsc --noEmit` 0 erreur, vitest module 11/11, suite complète
+   84 fichiers / 1288 tests verts, `next lint` 0 warning, `next build` OK.
+
+---
+
 ## 2026-06-11 — Commit + push fixes CI (79df1cd) + outillage transposition Lot 2e (2564fd3)
 
 **Agent** : Yann (ps_operator). Deux commits poussés sur `main` (011c19f..2564fd3) :
