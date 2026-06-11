@@ -17,7 +17,7 @@
  *     matchantes). L'original n'est pas livré à l'acheteur.
  *
  * Hypothèses de format :
- *   - 1 feuille Excel à scanner (la première — `worksheets[0]`).
+ *   - 1 feuille Excel à scanner (la première — `SheetNames[0]`).
  *   - 1ère ligne = en-têtes des colonnes (texte).
  *   - Les lignes suivantes = données (1 ligne = 1 référence).
  *
@@ -26,10 +26,18 @@
  * inclure le fichier dans le ZIP plutôt que d'inclure un tableau vide).
  *
  * Module pur (pas de Storage / BDD). Testable avec Vitest en injectant un
- * buffer .xlsx fabriqué à la volée avec ExcelJS.
+ * buffer .xlsx fabriqué à la volée avec SheetJS.
+ *
+ * MIGRATION MONOREPO (Lot 3, 2026-06-11) : réécrit de `exceljs` vers
+ * `xlsx` (SheetJS 0.20.3, tarball CDN — même version que le monorepo
+ * alyos-suivi-chantier). Iso-fonctionnel, mêmes signatures publiques,
+ * mêmes colonnes/format de sortie. Seule perte (cosmétique) : l'en-tête
+ * du fichier de sortie n'est plus en gras — SheetJS Community Edition
+ * n'écrit pas les styles de police. Assumé : « les acheteurs lisent les
+ * données, pas le maquillage » (commentaire historique du module).
  */
 
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,31 +96,6 @@ function parseKeywordsCell(raw: string): string[] {
   return Array.from(new Set(tokens));
 }
 
-/**
- * Récupère la valeur texte d'une cellule ExcelJS, robuste aux objets riches
- * (formule, hyperlien, richText…).
- */
-function cellText(value: ExcelJS.CellValue): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  // RichText
-  if (typeof value === "object" && "richText" in value && Array.isArray(value.richText)) {
-    return value.richText.map((rt) => rt.text ?? "").join("");
-  }
-  // Formule
-  if (typeof value === "object" && "result" in value) {
-    return cellText(value.result as ExcelJS.CellValue);
-  }
-  // Hyperlien
-  if (typeof value === "object" && "text" in value) {
-    return cellText((value as { text: ExcelJS.CellValue }).text);
-  }
-  // Date
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return "";
-}
-
 // ---------------------------------------------------------------------------
 // Fonction principale
 // ---------------------------------------------------------------------------
@@ -145,10 +128,11 @@ export async function filterReferencesTableXlsx(
 
   const normalizedPositives = new Set(profilePositives.map(normalizeKeyword).filter(Boolean));
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(sourceXlsx.buffer as ArrayBuffer);
+  // `type: "array"` = ArrayBuffer / Uint8Array (compatible Node + Edge).
+  const workbook = XLSX.read(sourceXlsx, { type: "array" });
 
-  const sheet = workbook.worksheets[0];
+  const sheetName = workbook.SheetNames[0];
+  const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
   if (!sheet) {
     throw new Error(
       "[references-table-filter] Le fichier Excel ne contient aucune feuille. " +
@@ -156,20 +140,33 @@ export async function filterReferencesTableXlsx(
     );
   }
 
+  // Matrice de strings : `raw: false` rend le texte formaté des cellules
+  // (couvre formules → valeur cache, richText → concat, dates → formatées),
+  // `defval: ""` remplit les trous, `blankrows: false` saute les lignes
+  // complètement vides (iso comportement historique : non comptées dans
+  // totalRows). `dateNF` aligne les dates sur l'ISO court historique.
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    raw: false,
+    defval: "",
+    blankrows: false,
+    dateNF: "yyyy-mm-dd",
+  });
+
+  const headerRow = (matrix[0] ?? []).map((c) => String(c ?? ""));
+
   // -- Repérage de la colonne « Mots-clés » dans la 1ère ligne
-  const headerRow = sheet.getRow(1);
+  const targetNormalized = normalizeHeader("Mots-clés");
   let keywordsColIndex = -1;
   let keywordsColName = "";
-
-  const targetNormalized = normalizeHeader("Mots-clés");
-  headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    const text = cellText(cell.value).trim();
-    if (!text) return;
+  for (let c = 0; c < headerRow.length; c++) {
+    const text = headerRow[c]!.trim();
+    if (!text) continue;
     if (normalizeHeader(text) === targetNormalized) {
-      keywordsColIndex = colNumber;
+      keywordsColIndex = c;
       keywordsColName = text;
     }
-  });
+  }
 
   if (keywordsColIndex === -1) {
     throw new Error(
@@ -179,65 +176,31 @@ export async function filterReferencesTableXlsx(
     );
   }
 
-  // -- Création du workbook de sortie : on clone l'en-tête + les lignes
-  //    matchantes. On ne copie pas les styles complexes (graphes, images, …)
-  //    pour rester rapide ; les acheteurs lisent les données, pas le maquillage.
-  const outWorkbook = new ExcelJS.Workbook();
-  outWorkbook.creator = "edifio Sourcing";
-  outWorkbook.created = new Date(0); // timestamp neutre pour reproductibilité tests
-  const outSheet = outWorkbook.addWorksheet(sheet.name || "Références");
-
-  // Copie de l'en-tête (toutes les colonnes, pas seulement Mots-clés).
-  const headerValues: ExcelJS.CellValue[] = [];
-  let maxCol = 0;
-  headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-    if (colNumber > maxCol) maxCol = colNumber;
-  });
-  for (let c = 1; c <= maxCol; c++) {
-    headerValues[c] = cellText(headerRow.getCell(c).value);
-  }
-  // ExcelJS attend un array commençant à index 1 (la 1ère cellule est [1]).
-  // addRow accepte un Array où index 0 est ignoré si on passe un array-like.
-  // Pour éviter ambiguïté on construit un objet { 1: ..., 2: ..., ... }.
-  const headerRowData: Record<number, ExcelJS.CellValue> = {};
-  for (let c = 1; c <= maxCol; c++) headerRowData[c] = headerValues[c] ?? "";
-  const newHeader = outSheet.addRow([]);
-  for (let c = 1; c <= maxCol; c++) {
-    newHeader.getCell(c).value = headerValues[c] ?? "";
-  }
-  newHeader.font = { bold: true };
+  const maxCol = headerRow.length;
 
   // -- Itération sur les lignes de données et filtrage
+  //    (blankrows: false → les lignes vides sont déjà absentes de la matrice).
   let totalRows = 0;
   let keptRows = 0;
-  const lastRow = sheet.rowCount;
+  const keptData: string[][] = [];
 
-  for (let r = 2; r <= lastRow; r++) {
-    const row = sheet.getRow(r);
-    // Ligne complètement vide → on saute (mais on ne décompte pas dans totalRows)
-    const hasAnyValue = (() => {
-      let found = false;
-      row.eachCell({ includeEmpty: false }, () => {
-        found = true;
-      });
-      return found;
-    })();
-    if (!hasAnyValue) continue;
+  for (let r = 1; r < matrix.length; r++) {
+    const row = matrix[r] ?? [];
     totalRows++;
 
-    const keywordsCell = row.getCell(keywordsColIndex);
-    const rawKeywords = cellText(keywordsCell.value);
+    const rawKeywords = String(row[keywordsColIndex] ?? "");
     const cellKeywords = parseKeywordsCell(rawKeywords);
 
     const matches = cellKeywords.some((k) => normalizedPositives.has(k));
     if (!matches) continue;
     keptRows++;
 
-    // Recopie de la ligne complète.
-    const newRow = outSheet.addRow([]);
-    for (let c = 1; c <= maxCol; c++) {
-      newRow.getCell(c).value = cellText(row.getCell(c).value);
+    // Recopie de la ligne complète, en texte, padée à la largeur de l'en-tête.
+    const outRow: string[] = [];
+    for (let c = 0; c < maxCol; c++) {
+      outRow.push(String(row[c] ?? ""));
     }
+    keptData.push(outRow);
   }
 
   if (keptRows === 0) {
@@ -249,16 +212,32 @@ export async function filterReferencesTableXlsx(
     };
   }
 
-  // -- Largeurs de colonnes raisonnables (autofit léger).
-  for (let c = 1; c <= maxCol; c++) {
-    const col = outSheet.getColumn(c);
-    // Largeur basée sur la longueur de l'en-tête + un peu de marge,
-    // bornée [12, 60] pour éviter colonnes microscopiques ou démesurées.
-    const headerLen = String(headerValues[c] ?? "").length;
-    col.width = Math.max(12, Math.min(60, headerLen + 4));
-  }
+  // -- Workbook de sortie : en-tête + lignes matchantes, données texte
+  //    uniquement (pas de styles complexes — graphes, images… — pour rester
+  //    rapide ; les acheteurs lisent les données, pas le maquillage).
+  const outSheet = XLSX.utils.aoa_to_sheet([headerRow, ...keptData]);
 
-  const outBuffer = await outWorkbook.xlsx.writeBuffer();
+  // Largeurs de colonnes raisonnables (autofit léger) : longueur de
+  // l'en-tête + marge, bornée [12, 60] pour éviter colonnes microscopiques
+  // ou démesurées.
+  outSheet["!cols"] = headerRow.map((h) => ({
+    wch: Math.max(12, Math.min(60, h.length + 4)),
+  }));
+
+  const outWorkbook = XLSX.utils.book_new();
+  // Noms de feuille Excel : 31 caractères max — on tronque par sécurité.
+  XLSX.utils.book_append_sheet(outWorkbook, outSheet, (sheetName || "Références").slice(0, 31));
+  outWorkbook.Props = {
+    Author: "edifio Sourcing",
+    CreatedDate: new Date(0), // timestamp neutre pour reproductibilité tests
+  };
+
+  const outBuffer = XLSX.write(outWorkbook, {
+    type: "array",
+    bookType: "xlsx",
+    compression: true,
+  }) as ArrayBuffer;
+
   return {
     buffer: new Uint8Array(outBuffer),
     totalRows,
