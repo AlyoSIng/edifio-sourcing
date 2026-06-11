@@ -51,9 +51,19 @@ enabled = false
 enabled = false
 
 [storage]
-# Les specs E2E contournent volontairement Storage (« bucket absent en CI »,
-# cf. e2e/multi-org/s13-tandem-v2-flow.spec.ts) — désactivé.
-enabled = false
+# RÉACTIVÉ (fix CI 2026-06-11, run 27328106186) : la migration
+# `src/db/migrations/0032_org_branding.sql` INSERT le bucket `org-assets` dans
+# `storage.buckets`. Avec storage désactivé, l'image Postgres du CLI pose quand
+# même un schéma `storage` MINIMAL (le garde-fou « IF EXISTS schema storage »
+# de 0032 passe donc), mais storage-api ne lance jamais ses migrations
+# internes → `storage.buckets` n'a pas sa forme complète et le INSERT échoue
+# (`column "public" of relation "buckets" does not exist`). Réactiver le
+# service (coût boot ~+15 s) est plus robuste que conditionner la migration à
+# la présence de la colonne (qui ferait diverger silencieusement CI et prod).
+# NB : les specs E2E continuent de contourner les uploads Storage
+# (cf. e2e/multi-org/s13-tandem-v2-flow.spec.ts — seuls les chemins BDD sont
+# testés) ; seul le bucket `org-assets` de 0032 existe désormais en CI.
+enabled = true
 
 [auth]
 enabled = true

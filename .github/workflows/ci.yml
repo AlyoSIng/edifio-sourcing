@@ -66,21 +66,29 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
 
-  # Vérification BLOQUANTE de présence du middleware de domaine
-  # (cf. specs/middleware_domain_gate.md §5). Désactivation du middleware
-  # interdite per CLAUDE.md — ce job échoue si quelqu'un essaie.
+  # Vérification BLOQUANTE de présence du middleware racine et de ses gardes.
+  # ADR-014 (Board 2026-06-05, ouverture multi-tenant) : le filtre de domaine
+  # `@alyosingenierie.fr` (+ helper isAuthorizedEmail) a été RETIRÉ du
+  # middleware — les anciens greps rendaient ce job structurellement rouge.
+  # CLAUDE.md (Limites strictes) : TOUTES les autres gardes restent
+  # obligatoires — auth (getUser) + must_change_password + rôles
+  # admin / superadmin. Ce job échoue si l'une d'elles disparaît.
   middleware-check:
     name: ci-middleware-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify middleware presence + domain guard
+      - name: Verify middleware presence + auth/password/role guards (ADR-014)
         run: |
           set -e
           test -f src/middleware.ts || { echo "::error file=src/middleware.ts::middleware.ts MISSING — REJECTED"; exit 1; }
-          grep -q "@alyosingenierie.fr" src/middleware.ts || { echo "::error file=src/middleware.ts::domain check @alyosingenierie.fr MISSING"; exit 1; }
-          grep -q "isAuthorizedEmail" src/middleware.ts || { echo "::error file=src/middleware.ts::isAuthorizedEmail import MISSING"; exit 1; }
-          echo "✓ middleware présent + garde de domaine câblée"
+          grep -qF "supabase.auth.getUser()" src/middleware.ts || { echo "::error file=src/middleware.ts::auth guard supabase.auth.getUser() MISSING"; exit 1; }
+          grep -qF "mustChangePassword(profile)" src/middleware.ts || { echo "::error file=src/middleware.ts::must_change_password gate MISSING"; exit 1; }
+          grep -qF "isProvisionalPasswordExpired(profile)" src/middleware.ts || { echo "::error file=src/middleware.ts::provisional password expiry gate MISSING"; exit 1; }
+          grep -qF "isAdminRoute(pathname)" src/middleware.ts || { echo "::error file=src/middleware.ts::admin route gate MISSING"; exit 1; }
+          grep -qF "isSuperAdminRoute(pathname)" src/middleware.ts || { echo "::error file=src/middleware.ts::superadmin route gate MISSING"; exit 1; }
+          grep -qF "isSuperAdmin(profile)" src/middleware.ts || { echo "::error file=src/middleware.ts::superadmin role check MISSING"; exit 1; }
+          echo "✓ middleware présent + gardes auth / must_change_password / admin / superadmin câblées (ADR-014)"
 
   e2e:
     name: ci-e2e
@@ -137,9 +145,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # ------------------------------------------------------------------
-      # Stack Supabase locale : Postgres 15 + GoTrue + PostgREST + Kong.
-      # Studio / inbucket / realtime / storage / edge_runtime / analytics
-      # sont désactivés dans supabase/config.toml (exclusion déclarative,
+      # Stack Supabase locale : Postgres 15 + GoTrue + PostgREST + Kong
+      # + Storage (requis : la migration 0032 INSERT le bucket `org-assets`
+      # dans storage.buckets — sans storage-api, la table reste en forme
+      # minimale et le migrate échoue ; cf. supabase/config.toml [storage]).
+      # Studio / inbucket / realtime / edge_runtime / analytics restent
+      # désactivés dans supabase/config.toml (exclusion déclarative,
       # robuste aux renommages de containers entre versions CLI — ex.
       # inbucket → mailpit — contrairement aux flags `supabase start -x`).
       # ------------------------------------------------------------------

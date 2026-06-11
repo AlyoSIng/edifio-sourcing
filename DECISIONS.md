@@ -2,6 +2,49 @@
 
 ---
 
+## 2026-06-11 — 3 fixes CI post-bascule stack locale (run 27328106186)
+
+**Agent** : Alex (dev). Diagnostic du run rouge : la stack Supabase locale boote, les
+échecs sont en aval. Pas de commit (Yann). Validations locales : parse JSON/YAML,
+cohérence journal ↔ fichiers .sql (54 = 54), chaînes greppées présentes dans
+`src/middleware.ts`. Le 1er run CI reste le test final (Docker inaccessible en local).
+
+1. **`supabase/config.toml` : `[storage] enabled = true`** (option robuste retenue vs
+   migration conditionnelle, qui aurait divergé silencieusement de prod). Cause : storage
+   désactivé → storage-api ne joue jamais ses migrations internes → `storage.buckets`
+   reste en forme minimale (le schéma `storage` existe quand même, donc le garde-fou
+   `IF EXISTS schema storage` de `0032_org_branding.sql` passe) → le INSERT bucket
+   `org-assets` casse (`column "public" of relation "buckets" does not exist`). Coût
+   boot ~+15 s. Vérifié : aucune autre migration ne dépend d'un service désactivé
+   (storage référencé uniquement par 0032 ; realtime/vault : zéro occurrence).
+2. **Journal Drizzle : entrées 0033 → 0049 ajoutées** (idx 33-49, `when` intercalés
+   1779731007025 → 1779731007425 pas de 25 ms, entre 0032 et 0050 — même pattern que
+   l'intercalation 0050 du 10/06). Cause racine du `column "trial_started_at" does not
+   exist` au seed (ci-e2e + ci-db-rls) : ces 17 migrations ont été appliquées à la main
+   sur prod (workflow Q8) sans jamais être journalisées ; le migrate CI (piloté journal
+   via `readMigrationFiles`) ne les appliquait JAMAIS → schéma TS Drizzle ≠ BDD CI →
+   le tout premier `db.insert(organizations)` du seed casse (Drizzle liste TOUTES les
+   colonnes du schéma TS dans ses INSERT, dont `trial_started_at` de 0049). Invisible
+   avant le 10/06 : ci-e2e pointait le projet Supabase preview, migré à la main lui
+   aussi. Sans risque prod : `created_at` max du journal prod = 1779731010000 (0053,
+   cf. `scripts/prod_migration_0050_0053_drizzle_journal.sql`) > tous les `when`
+   intercalés → skip garanti par le migrator (`folderMillis <= lastAppliedTs`).
+   Ordre CI = ordre réel prod (0033-0049 puis 0050-0053). pgTAP : assertions positives
+   par table nommée uniquement, pas d'énumération exhaustive → tables du gap neutres.
+3. **`ci.yml` job `middleware-check` réaligné ADR-014** : les greps
+   `@alyosingenierie.fr` / `isAuthorizedEmail` (filtre domaine retiré par le Board
+   2026-06-05) rendaient le job structurellement rouge. Remplacés par 6 greps `-qF` sur
+   les gardes réelles et obligatoires (CLAUDE.md) : `supabase.auth.getUser()`,
+   `mustChangePassword(profile)`, `isProvisionalPasswordExpired(profile)`,
+   `isAdminRoute(pathname)`, `isSuperAdminRoute(pathname)`, `isSuperAdmin(profile)`.
+   Nom du check `ci-middleware-check` inchangé (branch protection).
+
+**Suivi optionnel (non bloquant)** : sync des hashes 0033-0049 dans
+`drizzle.__drizzle_migrations` prod (même pattern que le script 0050-0053) — purement
+cosmétique, le migrator ne compare que les timestamps.
+
+---
+
 ## 2026-06-11 — CI e2e basculée sur stack Supabase locale éphémère (clôture A3 / incident 10/06)
 
 **Agent** : Alex (dev). **Authoring 100 % statique** (Docker inaccessible aux agents) —

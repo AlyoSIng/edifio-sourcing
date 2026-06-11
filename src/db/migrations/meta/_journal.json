@@ -234,6 +234,125 @@
       "breakpoints": true
     },
     {
+      "idx": 33,
+      "version": "7",
+      "when": 1779731007025,
+      "tag": "0033_architects_dc1_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1779731007050,
+      "tag": "0034_org_profiles_dc2_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1779731007075,
+      "tag": "0035_be_dc2_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1779731007100,
+      "tag": "0036_response_files_architect_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1779731007125,
+      "tag": "0037_tender_be_cotraitants",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1779731007150,
+      "tag": "0038_dossier_dispatches",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1779731007175,
+      "tag": "0039_normalize_dc2_architect_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1779731007200,
+      "tag": "0040_legal_form_field",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1779731007225,
+      "tag": "0041_library_item_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1779731007250,
+      "tag": "0042_seed_library_index_prompt",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1779731007275,
+      "tag": "0043_drop_legacy_logo_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1779731007300,
+      "tag": "0044_dossier_dispatches_cancellable",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1779731007325,
+      "tag": "0045_user_notifications_seen",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1779731007350,
+      "tag": "0046_cron_run_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1779731007375,
+      "tag": "0047_revenue_buyer_address_matching_keywords",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1779731007400,
+      "tag": "0048_buyers_directory",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1779731007425,
+      "tag": "0049_trial_billing",
+      "breakpoints": true
+    },
+    {
       "idx": 50,
       "version": "7",
       "when": 1779731007500,
