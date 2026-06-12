@@ -179,6 +179,18 @@ côté Steve, dimanche matin, dans la fenêtre 8h30-8h45).
 **État au moment de ce pre-flight** : non vérifié côté `ps_operator` (pas
 d'accès BDD prod par sub-agent). Steve coche après exécution du bloc.
 
+**MAJ 12/06 ~21h00** : ces 3 migrations sont **mergées dans le repo monorepo**
+(PR #1, SHA `720bf5c`) mais **PAS encore appliquées en prod Supabase
+partagée**. La fenêtre canonique d'application reste l'étape 3 du runbook
+(dim 14/06 8h30-8h45, Sébastien manuel — convention Q8 visio 10/06). Mémo
+opérationnel détaillé (3 commandes psql + critères de succès individuels
++ critère global) rédigé en complément :
+`notes-de-suivi/CC_260612_PHASE2_MIGRATIONS_SUPABASE.md`.
+
+- [ ] **CHECK Steve / Sébastien dim 14/06 8h30-8h45** : application 0129 →
+  0130 → 0131 + 4 NOTICE PASS (un par migration + un global). Cf. mémo
+  ci-dessus pour le pas-à-pas exact.
+
 ### 2.3 PostgREST — schéma sourcing exposé ?
 
 ```
@@ -387,6 +399,44 @@ $env:CRON_SECRET = "<prod monorepo — 1Password>"
   Template dans `docs/COMM_INTERNE_BASCULE_140626.md`.
 - [ ] **B. Gel push** sur `main` `edifio-sourcing` ET `main` `alyos-suivi-chantier`
   pendant toute la fenêtre 8h00-11h00 (annonce Slack). Reprise après PASS smoke.
+
+  **Posture retenue : Slack + clics manuels GitHub** (pas d'appel
+  `gh api .../branches/main/protection PUT` — la syntaxe Branch Protection
+  Rules est lourde, intrusive, et l'objectif tient en 2 clics si l'annonce
+  Slack passe. La protection « bloquante » via `gh api` impose un payload
+  JSON complet de 12+ clés qui aurait pour effet de bord d'écraser une règle
+  existante de revue obligatoire si elle existe déjà côté monorepo).
+
+  **Pas-à-pas edifio-sourcing (Steve, samedi 13/06 soir)** :
+  1. `https://github.com/AlyoSIng/edifio-sourcing/settings/branches`
+  2. Si une rule `main` existe → bouton **Edit** → cocher **Lock branch**
+     (rend la branche read-only y compris pour les admins sauf override) →
+     **Save changes**.
+  3. Si aucune rule → bouton **Add classic branch protection rule** → champ
+     **Branch name pattern** = `main` → cocher uniquement **Lock branch** →
+     **Create**.
+
+  **Pas-à-pas alyos-suivi-chantier (Steve OU Sébastien, samedi 13/06 soir)** :
+  1. `https://github.com/AlyoSIng/alyos-suivi-chantier/settings/branches`
+  2. Idem ci-dessus — **NE PAS toucher** aux règles existantes de review
+     obligatoire (PR review, status checks) ; juste cocher **Lock branch**
+     en plus.
+
+  **Critère effectif** : `git push origin main` répond
+  `remote: Repository is locked` → gel actif.
+
+  **Désactivation post-bascule (dim 14/06 après PASS 17/17 smoke)** :
+  Refaire le même parcours et décocher **Lock branch** → **Save changes**.
+  Documenter dans `DECISIONS.md` l'heure de levée du gel pour le
+  post-mortem.
+
+  **Fallback Slack seul** : si Steve ne souhaite pas activer le lock
+  GitHub, annonce explicite `#tech-bascule-monorepo` :
+  > « GEL PUSH `main` actif 8h00-11h00 dim 14/06 sur `edifio-sourcing` ET
+  > `alyos-suivi-chantier`. Hotfix ? → ping Yann/Steve en MP. Reprise des
+  > merges à l'annonce de PASS 17/17 smoke. »
+  Discipline d'équipe seulement, pas de garde technique — convient si
+  effectif < 5 contributeurs actifs sur ces repos (cas AlyoS au 12/06).
 
 ### Bascule (dimanche 14/06 8h00 → 11h00)
 
