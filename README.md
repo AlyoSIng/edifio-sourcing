@@ -1,104 +1,72 @@
-# edifio Sourcing
+# [ARCHIVE] edifio Sourcing — Repository archivé
 
-> Outil interne **AlyoS Ingénierie** pour le sourcing automatique de marchés publics BTP.
-> Accès restreint au domaine email `@alyosingenierie.fr`.
+> **Ce repository a été migré le 14 juin 2026** vers le monorepo
+> `AlyoSIng/alyos-suivi-chantier` qui regroupe désormais **edifio Suivi**,
+> **edifio ACT** et **edifio Sourcing** sous un seul projet GitHub, un seul
+> projet Vercel et une seule base Supabase.
+>
+> **Pour contribuer ou suivre le développement** :
+> https://github.com/AlyoSIng/alyos-suivi-chantier
 
-## Statut
+---
 
-Phase 1 (Gates 1 à 5) validée par le Board le 2026-05-07.
-Pivot final acté le 2026-05-10 : repo dédié, 100 % AlyoS interne, déploiement Vercel.
+## Pourquoi cette consolidation ?
 
-Gate 6 (MVP fonctionnel) en cours — voir `gates/05_ARCHI/` et `CLAUDE.md`.
+Les trois modules `edifio Suivi`, `edifio ACT` et `edifio Sourcing` partagent
+désormais une base utilisateurs, une base organisations et une logique de
+facturation unifiée. Le monorepo permet de mutualiser le schéma Postgres
+(projet Supabase unique Paris), de réduire les coûts ops (un seul projet
+Vercel, un seul pipeline CI), et d'éviter la duplication de code transverse
+(auth, RLS, billing, theming).
 
-## Stack
+Décision validée par la visio cadrage migration du **10 juin 2026** (cf.
+arbitrages A1 à A8 — voir lien plus bas).
 
-- **Next.js 14** (App Router) · **TypeScript strict** · **Tailwind 3**
-- **Supabase EU** (Frankfurt) — Postgres + Auth magic-link + Storage + Edge Functions + Vault
-- **Vercel EU** — hébergement Web + API Routes
-- **Fly.io EU** — container Playwright (scraping plateformes AO)
-- **Anthropic** Claude Sonnet 4.6 + Haiku 4.5 — analyse RC, mémoires, scoring
-- **Brevo** + **Resend** — emails
-- **Odoo XML-RPC** — sync CRM client (adapter unique 17/18/19)
-- ORM **REPORTÉ** — spike Drizzle vs Prisma début Gate 6 (cf. `DECISIONS.md` arbitrage 3)
+---
 
-## Sources de vérité
+## Et le code historique ?
 
-| Dossier / fichier         | Contenu                                                          |
-| ------------------------- | ---------------------------------------------------------------- |
-| `CLAUDE.md`               | Règles projet, naming strict, décisions d'architecture           |
-| `DECISIONS.md`            | Log opposable des décisions techniques (qui, quand, pourquoi)    |
-| `specs/`                  | Spécifications fonctionnelles validées par le CTO                |
-| `design/`                 | Tokens DTCG, maquettes haute-fidélité, copy Brevo                |
-| `gates/`                  | PDFs validés Board (Gates 1 à 5)                                 |
-| `notes-de-suivi/`         | Comptes-rendus Cowork                                            |
-| `handoff/`                | Demandes de décision Cowork émises par les sub-agents            |
+Ce repo reste accessible en **lecture seule** pour la traçabilité des
+décisions, des incidents et des migrations antérieures à la bascule.
 
-## Démarrage local
+- Les branches actives ont été **gelées au commit `c544cec56c1773308bb81ed0b668a1d7d74e1f19`**.
+- Plus aucun déploiement, plus aucune CI, plus aucune écriture.
+- Le projet Vercel `edifio-sourcing` est en **pause** (préservé au cas où un
+  rollback serait nécessaire dans la fenêtre J+7 post-bascule).
 
-Prérequis : **Node ≥ 22.13** (pnpm 11 le requiert — cf. `.nvmrc`), **pnpm ≥ 11** (via Corepack : `corepack enable pnpm`).
+> **Besoin de reprendre une feature historique non portée ?** Voir la
+> procédure dans le runbook de bascule (lien plus bas) — section "Reprendre
+> une feature historique post-bascule".
 
-```bash
-cp .env.example .env.local      # remplir au minimum les variables [REQUIS G6]
-pnpm install
-pnpm dev                        # http://localhost:3000
-```
+---
 
-## Scripts
+## Liens utiles
 
-| Script               | Effet                                          |
-| -------------------- | ---------------------------------------------- |
-| `pnpm dev`           | Démarre Next.js en local (port 3000)           |
-| `pnpm build`         | Build de production                            |
-| `pnpm start`         | Sert le build de production                    |
-| `pnpm lint`          | ESLint (config `next/core-web-vitals`)         |
-| `pnpm typecheck`     | `tsc --noEmit`                                 |
-| `pnpm format`        | Prettier en mode écriture                      |
-| `pnpm format:check`  | Prettier en mode vérification                  |
+- **Monorepo cible** : https://github.com/AlyoSIng/alyos-suivi-chantier
+- **Brief de migration** : [docs/brief_migration_sourcing_to_monorepo.md](docs/brief_migration_sourcing_to_monorepo.md)
+- **Runbook de bascule** : [docs/RUNBOOK_BASCULE_MONOREPO_140626.md](docs/RUNBOOK_BASCULE_MONOREPO_140626.md)
+- **Cleanup post-bascule** : [docs/CLEANUP_EDIFIO_SOURCING_POSTBASCULE.md](docs/CLEANUP_EDIFIO_SOURCING_POSTBASCULE.md)
+- **Visio cadrage** : [docs/VISIO_CADRAGE_MIGRATION_BRIEF_260610.md](docs/VISIO_CADRAGE_MIGRATION_BRIEF_260610.md)
+- **Post-mortem bascule** : `docs/POST_MORTEM_BASCULE_140626.md` (à publier semaine du 16/06)
+- **ADR clés** :
+  - ADR-013 ORM Drizzle : `specs/adr_013_orm_drizzle.md`
+  - ADR-014 Ouverture multi-tenant : `specs/adr_014_*.md`
 
-## Conventions
+---
 
-- **Commits** : Conventional Commits obligatoires (validés par `commitlint` + hook husky).
-  Format : `type(scope?): description en minuscules`.
-- **Branches** : `main` + une branche `feat/<step>` par étape Gate 6.
-- **Code** en anglais, **commentaires et documentation** en français.
-- **Naming strict** :
-  - Marque : `edifio` (lowercase exclusivement, jamais EDIFIO / Edifio / Édifio)
-  - Produit : `edifio Sourcing` (composition « edifio + nom »)
-  - Éditeur : `AlyoS Ingénierie` (S majuscule final, pas Alyos)
+## Statut technique au gel
 
-## CI/CD
+- **Stack** : Next.js 14 App Router, TypeScript, Tailwind, Supabase Frankfurt,
+  Vercel EU, Drizzle ORM 0.39, Playwright sur Fly.io EU.
+- **Dernière prod active** : 14 juin 2026, ~10h00 (bascule DNS effectuée à 10h30).
+- **Commit de gel** : `c544cec56c1773308bb81ed0b668a1d7d74e1f19`
+- **Branch protection** : `main` verrouillée (`lock_branch: true`).
+- **CI Actions** : déplacée vers `.github/workflows-archived/` (désactivée).
+- **Secrets GitHub** : purgés (cf. cleanup étape 4).
 
-Pipeline GitHub Actions (`.github/workflows/ci.yml`) déclenché sur **PR vers `main`** et **push direct `main`** (squash merges).
+---
 
-| Job | Vérification |
-| --- | --- |
-| `ci-lint` | ESLint (`next/core-web-vitals` + `next/typescript`) |
-| `ci-typecheck` | `tsc --noEmit` (strict + `noUncheckedIndexedAccess`) |
-| `ci-test` | Vitest unit + coverage (seuil 90 % sur `src/lib/auth/**`) |
-| `ci-middleware-check` | **BLOQUANT** — présence `src/middleware.ts` + grep `@alyosingenierie.fr` + grep `isAuthorizedEmail` (cf. `specs/middleware_domain_gate.md` §5) |
-| `ci-e2e` | **BLOQUANT** — 7 tests Playwright matrice middleware C2-C12 (cf. spec §4) |
-| `ci-build` | `next build` (Validation du bundle production) |
+**AlyoS Ingénierie** — Outil interne archivé le **2026-06-14**.
 
-**Branch protection `main`** : merge bloqué tant que tous les jobs ne sont pas verts. Pas de push direct main, pas de force-push.
-
-### Vercel
-
-Le repo est connecté à Vercel (compte AlyoS Ingénierie). Chaque PR déclenche un **preview deploy** automatique à l'URL `https://edifio-sourcing-git-<branch>-<hash>.vercel.app`. Le middleware `@alyosingenierie.fr` est actif sur ce preview dès l'ouverture — exposition publique safe.
-
-Variables d'environnement (scope **`Preview` + `Development`** ; **`Production` reste vide jusqu'à Gate 9**) :
-
-- `NEXT_PUBLIC_APP_ENV=preview`
-- `ALLOWED_EMAIL_DOMAIN=alyosingenierie.fr`
-- `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (projet `edifio-sourcing-preview`)
-- `SUPABASE_SERVICE_ROLE_KEY` (marquée **Sensitive**)
-- `SUPABASE_PROJECT_REF`
-- `NEXT_PUBLIC_SITE_URL` laissé vide → `VERCEL_URL` auto-utilisée (cf. `src/lib/site-url.ts`)
-
-**Production deploy** : `vercel --prod` est dans le `deny` de Claude Code — toute mise en prod passe par OK Board explicite (Gate 9).
-
-## Sécurité
-
-- Aucun secret commité (`.env.local` gitignored — `.env.example` est le template). En CI : GitHub Secrets.
-- Middleware Next.js sur `@alyosingenierie.fr` actif sur **toutes les routes protégées** (étape 2 Gate 6, vérifié par `ci-middleware-check` et `ci-e2e`).
-- RLS Postgres `FORCE` sur 100 % des tables multi-tenant (politique standard cf. `gates/05_ARCHI/`).
-- 12 actions sensibles auditées, log immutable rétention 5 ans.
+*Pour toute question ou besoin d'accès en écriture exceptionnel (hotfix
+rollback, audit forensic), contacter Steve TEISSIER ou Sophie (CTO).*
