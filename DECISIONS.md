@@ -2,6 +2,47 @@
 
 ---
 
+## 2026-06-13 — Cleanup phase 1 : README archive + préservation legacy (post-bascule monorepo)
+
+**Agent** : Yann (ps_operator). Branche `main`. Commit `20154ba` pushé sur `origin/main`.
+Phase 1 du cleanup acté hier (`8ba7f88`) — exécutée le jour de la bascule (13/06, DNS
+`sourcing.edifio.fr` repointé vers le monorepo `alyos-suivi-chantier`).
+
+1. **Substitution README** : `docs/README.md.archive` (template préparé hier) → `README.md`
+   racine. Placeholder `<COMMIT_SHA_GEL>` substitué par le SHA réel du dernier commit main
+   pré-archive : **`c544cec56c1773308bb81ed0b668a1d7d74e1f19`** (`c544cec docs(bascule):
+   memo migrations 0129-0131 prod + check preflight + gel push`). Deux occurrences
+   substituées (bloc « Et le code historique ? » + bloc « Statut technique au gel »).
+2. **Préservation legacy** : ancien `README.md` (138 lignes, doc projet Gate 6) copié à
+   l'identique en `README.legacy.md` racine, pour traçabilité et accès lecture des
+   conventions/commandes historiques.
+3. **Périmètre strictement respecté** : `git add` ciblé sur les 2 fichiers uniquement.
+   7 modifs non-stagées + 11 untracked du working tree (runbooks bascule, smoke tests,
+   notes de suivi, .bak scripts ops) **NON embarquées** — restent en WIP local.
+4. **Pas touché** :
+   - GitHub Settings : pas d'archive auto, pas de branch protection ajustée (rollback
+     safety Steve garde l'option, à traiter en J+7).
+   - Vercel projet `edifio-sourcing` standalone : reste **actif** (rollback safety J+7).
+   - CI Actions : pas déplacée vers `.github/workflows-archived/` (le README archive le
+     mentionne pour J+7, mais l'action est différée).
+   - Secrets GitHub : non purgés (J+7).
+5. **Hooks verts sans `--no-verify`** : lint-staged (prettier --check) au pre-commit,
+   ESLint full + typecheck au pre-push. Conventional Commits lowercase strict respecté.
+
+**Effets** : repo `AlyoSIng/edifio-sourcing` affiche désormais la notice d'archive sur la
+page GitHub (rendu README sur l'onglet « Code »). L'ancien contenu reste consultable via
+`README.legacy.md`. Aucune perte d'historique git.
+
+**Reversible** : `git revert 20154ba` restaure l'état pré-bascule en 1 commit. SHA de gel
+documenté dans le README archive pour navigation directe vers le snapshot.
+
+**Prochaine étape (J+7, ~21/06 si stable)** : cleanup complet — archive button GitHub,
+branch protection lock_branch, pause projet Vercel standalone, purge secrets GitHub
+Actions, déplacement workflows vers `workflows-archived/`. Demande Cowork séparée à
+émettre la semaine du 16/06 après post-mortem bascule.
+
+---
+
 ## 2026-06-11 — Lot 3 migration : exceljs → xlsx (SheetJS 0.20.3) + verdict moteur docx
 
 **Agent** : Alex (dev). Branche `feat/lot3-sheetjs-docx` (commits locaux, push Yann après review).
