@@ -189,6 +189,29 @@ function parseCredentials(raw: unknown): ScrapeRequest["credentials"] | undefine
   };
 }
 
+/**
+ * Credentials de plateforme depuis l'ENVIRONNEMENT du worker (secrets Fly), en
+ * REPLI quand le payload ne les fournit pas.
+ *
+ * Fix 2026-07-07 : le monorepo (`triggerScrapeJob`) n'envoie PAS de
+ * `credentials` dans le body → PLACE, qui exige un login (cf. `place.ts`),
+ * échouait systématiquement sur « PLACE credentials required » alors que le
+ * worker porte bien `PLACE_USERNAME` / `PLACE_PASSWORD` en secrets Fly (jamais
+ * lus jusqu'ici). On les injecte ici. Retourne `undefined` si la plateforme
+ * n'exige pas d'auth ou si les secrets sont absents (fail-soft — le scraper
+ * lèvera alors son erreur explicite).
+ */
+function envCredentialsFor(platform: ScrapingPlatform): ScrapeRequest["credentials"] | undefined {
+  if (platform === "place") {
+    const username = process.env.PLACE_USERNAME;
+    const password = process.env.PLACE_PASSWORD;
+    if (username && username.length > 0 && password && password.length > 0) {
+      return { username, password };
+    }
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Logique de scraping en background
 // ---------------------------------------------------------------------------
@@ -300,7 +323,9 @@ app.post<{ Body: ScrapeBodyRaw }>("/v1/scrape", async (request, reply) => {
     webhookUrl: body.webhookUrl,
     lastRunAt: body.lastRunAt,
     profileFilters: parseProfileFilters(body.profileFilters),
-    credentials: parseCredentials(body.credentials),
+    // Repli sur les secrets Fly du worker (PLACE_USERNAME/PASSWORD) quand le
+    // payload ne porte pas de credentials — cas nominal du cron monorepo.
+    credentials: parseCredentials(body.credentials) ?? envCredentialsFor(body.platform),
   };
 
   const runId = randomUUID();
