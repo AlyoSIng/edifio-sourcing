@@ -53,6 +53,11 @@ const SUPABASE_SERVICE_ROLE_KEY = readEnv("SUPABASE_SERVICE_ROLE_KEY", { require
 const SCRAPER_TRIGGER_SECRET = readEnv("SCRAPER_TRIGGER_SECRET", { required: true });
 // WEBHOOK_TARGET_URL : URL Vercel par défaut si non fourni dans le corps de la requête
 readEnv("WEBHOOK_TARGET_URL", { required: false });
+// Browserbase : navigateur distant pour le scraper marches-publics.info (anti-bot).
+// Non requis (fail-soft) : si absent, le scraper mp_info log un warn et retourne [].
+// Les autres plateformes gardent le browser Playwright local.
+readEnv("BROWSERBASE_API_KEY", { required: false });
+readEnv("BROWSERBASE_PROJECT_ID", { required: false });
 
 // ---------------------------------------------------------------------------
 // Instance Playwright partagée
