@@ -1,281 +1,438 @@
 /**
- * Scraper Marchés Publics Info — www.marches-publics.info
+ * Scraper Marchés Publics Info — www.marches-publics.info (plateforme AWS-Achat)
  *
- * Scraping non-authentifié de la liste des appels d'offres récents.
+ * ┌─────────────────────────────────────────────────────────────────────────┐
+ * │ Ce site est protégé par un anti-bot qui renvoie un captcha 403 aux IP     │
+ * │ datacenter classiques (dont Fly.io). On pilote donc un navigateur DISTANT │
+ * │ Browserbase (https://browserbase.com) via CDP : ses IP passent l'anti-bot.│
+ * │ Le paramètre `browser` (Playwright local) de la signature est IGNORÉ.     │
+ * └─────────────────────────────────────────────────────────────────────────┘
  *
- * Hypothèses sur la structure du site (à ajuster si le site évolue) :
- *  - Page de liste   : https://www.marches-publics.info/
- *  - Filtre date     : paramètre GET `date_from` ou `datePublication`
- *  - Résultats       : tableau `.avis tbody tr`, `.avis-row`, `[class*='avis']`, `article`
- *  - Référence AO    : extrait du slug d'URL /avis/<REF> ou /marche/<REF>
- *  - Pagination      : lien ou bouton contenant le texte "Suivant" / numéros de page
+ * Moteur de recherche (constaté en découverte réelle le 2026-07-07) :
+ *  - Formulaire POST `#formRech` action="/Annonces/lister" (jQuery + Bootstrap).
+ *  - Type d'annonce = radio `IDE` : EC (En cours), A (Expirés), AAA (Attributions),
+ *    DE (Données essentielles). On coche **EC = appels d'offres en cours**.
+ *  - Mot-clé = input `#motCle` (name `txtLibre`). Sémantique **ET / phrase** :
+ *    « maîtrise d'oeuvre » (76 avis) est plus restrictif que « maîtrise » (346).
+ *    → On BOUCLE par mot-clé (union) plutôt que de tout coller (ET → 0 résultat).
+ *  - Trop de résultats ⇒ le site refuse d'afficher la liste (« Veuillez préciser
+ *    votre recherche ») et ne rend AUCUN bloc. Un mot-clé discriminant (une phrase
+ *    métier) passe sous le seuil ; un mot trop générique est ignoré (warn).
+ *  - Résultats server-rendered en blocs `div#entity` (id dupliqué, volontaire).
+ *  - Pagination via GET `/Annonces/lister?pager_s=N` (l'état de recherche est en
+ *    session serveur, conservé pour la durée de la session Browserbase).
  *
- * Tous les sélecteurs sont entourés de try/catch — si le site change, le scraper
- * dégrade gracieusement (champ absent = undefined) plutôt que de planter.
+ * Champs d'un bloc résultat :
+ *  - `.affiche_date_avis` → « Publié le JJ/MM/AA | Date limite : le JJ/MM/AA à HHhMM »
+ *  - `h2.h2-avis`         → organisme acheteur (+ code postal entre parenthèses)
+ *  - `.ref-acheteur`      → « [réf. XXX] »
+ *  - `#titre_box` (texte) → objet de l'avis
+ *  - a « Consulter l'avis » → URL de la fiche (relative /Annonces/MPI-pub-*.htm)
+ *  - a « DCE » / « RC »     → liens dossier de consultation / règlement
+ *
+ * Toute extraction est défensive : un site qui change dégrade en champ absent,
+ * il ne plante jamais le worker.
  */
 
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Browser } from "playwright";
+import { chromium } from "playwright";
 import type { ScrapedTenderRecord, ScrapeRequest } from "./types.js";
 
 const BASE_URL = "https://www.marches-publics.info";
-const SEARCH_URL = `${BASE_URL}/`;
+const SEARCH_URL = `${BASE_URL}/Annonces/lister`;
+
+/** projectId Browserbase par défaut (ce n'est pas un secret, juste un identifiant). */
+const DEFAULT_BROWSERBASE_PROJECT_ID = "c3dd9f26-0605-4c27-a5a1-836ecc5bf644";
 
 /** Timeout par navigation de page (ms) */
-const PAGE_TIMEOUT_MS = 30_000;
-/** Nombre maximum de pages de résultats à parcourir (garde-fou) */
-const MAX_PAGES = 20;
-/** Timeout global du scraping complet (ms) */
-const GLOBAL_TIMEOUT_MS = 90_000;
-
-/** User-agent réaliste pour éviter les blocages de base */
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const PAGE_TIMEOUT_MS = 45_000;
+/** Nombre maximum de pages de résultats parcourues par mot-clé (garde-fou) */
+const MAX_PAGES = 10;
+/** Nombre maximum de mots-clés traités par run (borne le temps / coût session) */
+const MAX_KEYWORDS = 8;
+/** Timeout global du scraping complet (ms) — Browserbase facture à la session */
+const GLOBAL_TIMEOUT_MS = 240_000;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers Browserbase
 // ---------------------------------------------------------------------------
 
-/**
- * Pause aléatoire entre 100 et 300 ms pour imiter un comportement humain
- * et éviter le rate-limiting côté serveur.
- */
-function jitter(): Promise<void> {
-  const ms = 100 + Math.floor(Math.random() * 200);
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface BrowserbaseSession {
+  id: string;
+  connectUrl: string;
 }
 
 /**
- * Extrait le slug de référence depuis une URL de fiche AO.
- * Ex: "/avis/REF-123" → "REF-123"
- * Ex: "/marche/REF-123/" → "REF-123"
+ * Crée une session Browserbase via l'API REST.
+ * Tente d'abord avec proxies résidentiels (plan payant) ; retombe sans proxy
+ * (plan free) si l'API renvoie 402. Les IP Browserbase (même sans proxy)
+ * passent l'anti-bot de marches-publics.info à date.
  */
-function extractRefFromUrl(url: string): string {
-  const clean = url.replace(/\/$/, "");
-  const parts = clean.split("/");
-  return parts[parts.length - 1] ?? url;
-}
+async function createBrowserbaseSession(
+  apiKey: string,
+  projectId: string,
+): Promise<BrowserbaseSession> {
+  const attempts: Array<Record<string, unknown>> = [
+    { projectId, proxies: true },
+    { projectId },
+  ];
 
-/**
- * Tente d'extraire un code CPV (8 chiffres) depuis une chaîne de texte.
- * Retourne un tableau de codes uniques ou undefined si rien trouvé.
- */
-function extractCpvCodes(text: string): string[] | undefined {
-  const matches = text.match(/\b\d{8}\b/g);
-  if (!matches || matches.length === 0) return undefined;
-  return [...new Set(matches)];
-}
-
-/**
- * Tente de parser une date en format FR ("JJ/MM/AAAA") ou ISO vers ISO 8601.
- * Retourne undefined si le format n'est pas reconnu.
- */
-function parseDate(raw: string): string | undefined {
-  if (!raw) return undefined;
-  const trimmed = raw.trim();
-  // Format ISO déjà correct
-  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-    return trimmed.substring(0, 10);
+  let lastError = "";
+  for (const body of attempts) {
+    const res = await fetch("https://api.browserbase.com/v1/sessions", {
+      method: "POST",
+      headers: { "X-BB-API-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (res.status === 201) {
+      const json = (await res.json()) as BrowserbaseSession;
+      console.info(
+        `[marchespublicsinfo] session Browserbase ${json.id} créée (proxies=${Boolean(body["proxies"])})`,
+      );
+      return json;
+    }
+    lastError = `HTTP ${res.status} ${(await res.text()).slice(0, 160)}`;
+    // 402 = proxies non inclus dans le plan → on tente la variante sans proxy.
+    if (res.status !== 402) break;
   }
-  // Format FR : JJ/MM/AAAA
-  const frMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if (frMatch) {
-    const d = frMatch[1] ?? "";
-    const m = frMatch[2] ?? "";
-    const y = frMatch[3] ?? "";
-    return `${y}-${m}-${d}`;
-  }
-  return undefined;
+  throw new Error(`création session Browserbase impossible: ${lastError}`);
 }
 
-// ---------------------------------------------------------------------------
-// Extraction d'une fiche AO individuelle
-// ---------------------------------------------------------------------------
-
 /**
- * Extrait les données d'une fiche AO depuis sa page de détail.
- * Toutes les extractions sont protégées — un échec partiel n'est pas fatal.
+ * Libère explicitement une session Browserbase (best-effort).
+ * `browser.close()` suffit en général, mais on force le REQUEST_RELEASE pour
+ * ne pas laisser filer une session facturée en cas de fermeture partielle.
  */
-async function extractTenderDetail(
-  page: Page,
-  href: string,
-): Promise<Partial<ScrapedTenderRecord>> {
-  const detail: Partial<ScrapedTenderRecord> = {};
-
+async function releaseBrowserbaseSession(
+  apiKey: string,
+  projectId: string,
+  sessionId: string,
+): Promise<void> {
   try {
-    const target = href.startsWith("http") ? href : `${BASE_URL}${href}`;
-    await page.goto(target, {
-      waitUntil: "domcontentloaded",
-      timeout: PAGE_TIMEOUT_MS,
+    await fetch(`https://api.browserbase.com/v1/sessions/${sessionId}`, {
+      method: "POST",
+      headers: { "X-BB-API-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, status: "REQUEST_RELEASE" }),
+      signal: AbortSignal.timeout(15_000),
     });
   } catch (err) {
-    console.warn("[marchespublicsinfo] navigation fiche échouée:", href, err);
-    return detail;
+    console.warn("[marchespublicsinfo] release session échoué (ignoré):", err);
   }
-
-  // Titre
-  try {
-    const h1 = await page.$eval(
-      "h1, h2.title, .ao-title, [class*='titre'], [class*='objet']",
-      (el) => el.textContent?.trim() ?? "",
-    );
-    if (h1) detail.title = h1;
-  } catch {
-    // champ optionnel
-  }
-
-  // Acheteur / organisme
-  try {
-    const buyerText = await page.$eval(
-      "[class*='acheteur'], [class*='organisme'], [data-label*='Acheteur'], [data-label*='Organisme']",
-      (el) => el.textContent?.trim() ?? "",
-    );
-    if (buyerText) detail.buyer = buyerText;
-  } catch {
-    // champ optionnel
-  }
-
-  // Date limite de remise des offres
-  try {
-    const deadlineText = await page.$eval(
-      "[class*='date-limite'], [class*='deadline'], [data-label*='Date limite'], [data-label*='Clôture']",
-      (el) => el.textContent?.trim() ?? "",
-    );
-    if (deadlineText) detail.deadline = parseDate(deadlineText);
-  } catch {
-    // champ optionnel
-  }
-
-  // Procédure
-  try {
-    const procText = await page.$eval(
-      "[class*='procedure'], [data-label*='Procédure'], [data-label*='Type']",
-      (el) => el.textContent?.trim() ?? "",
-    );
-    if (procText) detail.procedure = procText;
-  } catch {
-    // champ optionnel
-  }
-
-  // Description
-  try {
-    const descText = await page.$eval(
-      "[class*='description'], [class*='objet'], .ao-description, .ao-objet",
-      (el) => el.textContent?.trim() ?? "",
-    );
-    if (descText) detail.description = descText.substring(0, 500);
-  } catch {
-    // champ optionnel
-  }
-
-  // CPV — rechercher des patterns numérique 8 chiffres dans le texte complet
-  try {
-    const bodyText = await page.$eval("body", (el) => el.textContent ?? "");
-    const cpv = extractCpvCodes(bodyText);
-    if (cpv) detail.cpv = cpv;
-  } catch {
-    // champ optionnel
-  }
-
-  // URL DCE (lien vers dossier de consultation)
-  try {
-    const dceHref = await page.$eval(
-      "a[href*='dce'], a[href*='DCE'], a[class*='dce'], a[class*='telecharger']",
-      (el) => (el as HTMLAnchorElement).href ?? "",
-    );
-    if (dceHref) detail.dceUrl = dceHref;
-  } catch {
-    // champ optionnel
-  }
-
-  return detail;
-}
-
-// ---------------------------------------------------------------------------
-// Extraction de la liste des AOs (page de résultats)
-// ---------------------------------------------------------------------------
-
-interface ListItem {
-  href: string;
-  titleText?: string;
-  buyerText?: string;
-  deadlineText?: string;
 }
 
 /**
- * Extrait les éléments de liste présents sur la page courante.
- * Stratégie dégradée : plusieurs tentatives de sélecteurs.
+ * Ouvre une session Browserbase, connecte Playwright en CDP, exécute `fn`,
+ * puis ferme proprement (browser + release session). Toute la logique de
+ * scraping vit dans `fn`.
  */
-async function extractListItems(page: Page): Promise<ListItem[]> {
-  const items: ListItem[] = [];
-
+async function withBrowserbaseSession<T>(
+  apiKey: string,
+  projectId: string,
+  fn: (browser: Browser) => Promise<T>,
+): Promise<T> {
+  const session = await createBrowserbaseSession(apiKey, projectId);
+  const browser = await chromium.connectOverCDP(session.connectUrl);
   try {
-    const rows = await page.$$(
-      "table.avis tbody tr, .avis-row, [class*='avis'] li, [class*='avis'] article, article[class*='avis']",
-    );
-
-    for (const row of rows) {
-      try {
-        // Lien vers la fiche détail
-        const linkEl = await row.$("a[href*='/avis/'], a[href*='/marche/']");
-        if (!linkEl) continue;
-
-        const href = await linkEl.getAttribute("href");
-        if (!href) continue;
-
-        const titleText = await row
-          .$eval(
-            "h2, h3, [class*='titre'], [class*='title'], [class*='objet']",
-            (el) => el.textContent?.trim() ?? "",
-          )
-          .catch(() => undefined);
-
-        const buyerText = await row
-          .$eval("[class*='acheteur'], [class*='organisme']", (el) => el.textContent?.trim() ?? "")
-          .catch(() => undefined);
-
-        const deadlineText = await row
-          .$eval(
-            "[class*='date'], [class*='echeance'], [class*='limite']",
-            (el) => el.textContent?.trim() ?? "",
-          )
-          .catch(() => undefined);
-
-        items.push({ href, titleText, buyerText, deadlineText });
-      } catch (err) {
-        console.warn("[marchespublicsinfo] extraction ligne échouée:", err);
-      }
+    return await fn(browser);
+  } finally {
+    try {
+      await browser.close();
+    } catch (err) {
+      console.warn("[marchespublicsinfo] fermeture browser échouée (ignoré):", err);
     }
-  } catch (err) {
-    console.warn("[marchespublicsinfo] extraction liste échouée:", err);
+    await releaseBrowserbaseSession(apiKey, projectId, session.id);
   }
-
-  return items;
 }
 
 // ---------------------------------------------------------------------------
-// Pagination
+// Helpers de parsing
 // ---------------------------------------------------------------------------
 
 /**
- * Tente de cliquer sur le lien "page suivante".
- * Retourne true si la navigation a eu lieu, false si on est à la dernière page.
+ * Parse une date FR « JJ/MM/AA » ou « JJ/MM/AAAA », avec heure optionnelle
+ * (« à HHhMM »), vers ISO 8601. Année sur 2 chiffres → 20AA.
+ * Retourne undefined si le format n'est pas reconnu.
  */
-async function goToNextPage(page: Page): Promise<boolean> {
-  try {
-    const nextLink = await page.$(
-      "a[rel='next'], a[aria-label*='suivant' i], a[class*='next'], a:has-text('Suivant'), a:has-text('suivant'), [class*='pagination'] a:last-child",
-    );
-    if (!nextLink) return false;
-
-    const href = await nextLink.getAttribute("href");
-    if (!href) return false;
-
-    await nextLink.click();
-    await page.waitForLoadState("domcontentloaded", { timeout: PAGE_TIMEOUT_MS });
-    return true;
-  } catch {
-    return false;
+function parseFrenchDate(day: string, month: string, year: string, time?: string): string | undefined {
+  if (!day || !month || !year) return undefined;
+  const yyyy = year.length === 2 ? `20${year}` : year;
+  const iso = `${yyyy}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return undefined;
+  if (time) {
+    const t = time.match(/(\d{1,2})h(\d{2})/);
+    if (t && t[1] && t[2]) {
+      return `${iso}T${t[1].padStart(2, "0")}:${t[2]}:00`;
+    }
   }
+  return iso;
+}
+
+/** Extrait « Publié le JJ/MM/AA » d'une ligne de date. */
+function parsePublicationDate(dateRow: string): string | undefined {
+  const m = dateRow.match(/Publié le\s+(\d{2})\/(\d{2})\/(\d{2,4})/i);
+  if (!m) return undefined;
+  return parseFrenchDate(m[1] ?? "", m[2] ?? "", m[3] ?? "");
+}
+
+/** Extrait « Date limite : le JJ/MM/AA à HHhMM » d'une ligne de date. */
+function parseDeadline(dateRow: string): string | undefined {
+  const m = dateRow.match(/Date limite\s*:\s*le\s+(\d{2})\/(\d{2})\/(\d{2,4})(?:\s*à\s*(\d{1,2}h\d{2}))?/i);
+  if (!m) return undefined;
+  return parseFrenchDate(m[1] ?? "", m[2] ?? "", m[3] ?? "", m[4]);
+}
+
+/**
+ * Extrait la référence lisible « [réf. XXX] » → « XXX ».
+ * Utilisée en fallback ; l'externalRef stable reste le slug de la fiche.
+ */
+function cleanRef(rawRef: string): string | undefined {
+  const m = rawRef.match(/\[réf\.\s*([^\]]+)\]/i);
+  return m && m[1] ? m[1].trim() : undefined;
+}
+
+/**
+ * Déduit un externalRef stable et unique depuis l'URL de la fiche.
+ * Ex : « /Annonces/MPI-pub-2026181995.htm » → « MPI-pub-2026181995 ».
+ */
+function refFromFicheUrl(href: string): string | undefined {
+  const m = href.match(/\/([A-Za-z0-9-]+)\.htm(?:\?|#|$)/);
+  return m && m[1] ? m[1] : undefined;
+}
+
+/** Absolutise une URL relative du site. */
+function toAbsoluteUrl(href: string): string {
+  if (/^https?:\/\//i.test(href)) return href;
+  return `${BASE_URL}${href.startsWith("/") ? "" : "/"}${href}`;
+}
+
+/** Date ISO (YYYY-MM-DD) minimale à conserver, dérivée de lastRunAt. */
+function floorDate(iso: string): string {
+  return iso.substring(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// Extraction des blocs résultat (exécutée dans le contexte page)
+// ---------------------------------------------------------------------------
+
+/** Enregistrement brut extrait du DOM (avant normalisation Node). */
+interface RawResult {
+  dateRow: string;
+  buyer: string;
+  ref: string;
+  objet: string;
+  ficheHref: string | null;
+  dceHref: string | null;
+}
+
+/**
+ * Extrait les blocs `div#entity` de la page courante.
+ * `page` est un objet Playwright ; l'évaluation se fait côté navigateur.
+ */
+async function extractResultsOnPage(page: import("playwright").Page): Promise<RawResult[]> {
+  try {
+    return await page.evaluate(() => {
+      const blocks = Array.from(document.querySelectorAll("div#entity"));
+      const norm = (s: string | null | undefined) => (s || "").replace(/\s+/g, " ").trim();
+      return blocks.map((el) => {
+        const q = (sel: string) => el.querySelector(sel);
+        const anchors = Array.from(el.querySelectorAll("a[href]"));
+        const consulter = anchors.find((a) => /consulter/i.test(a.textContent || ""));
+        const dce = anchors.find((a) => /^\s*DCE\s*$/i.test(a.textContent || ""));
+
+        // Objet : texte de #titre_box moins la référence et les tags [Marché ...]
+        const titreBox = q("#titre_box");
+        let objet = "";
+        if (titreBox) {
+          objet = norm(titreBox.textContent)
+            .replace(/\[réf\.[^\]]*\]/gi, "")
+            .replace(/\[Marché[^\]]*\]?/gi, "")
+            .trim();
+        }
+
+        return {
+          dateRow: norm(q(".affiche_date_avis")?.textContent),
+          buyer: norm(q("h2.h2-avis")?.textContent),
+          ref: norm(q(".ref-acheteur")?.textContent),
+          objet: objet.slice(0, 400),
+          ficheHref: consulter ? consulter.getAttribute("href") : null,
+          dceHref: dce ? dce.getAttribute("href") : null,
+        } as RawResult;
+      });
+    });
+  } catch (err) {
+    console.warn("[marchespublicsinfo] extraction blocs échouée:", err);
+    return [];
+  }
+}
+
+/**
+ * Numéro de la dernière page de résultats, lu dans la pagination
+ * (« 1 2 3 4 5 … 8 » → 8). Retourne 1 si pas de pagination.
+ */
+async function extractLastPage(page: import("playwright").Page): Promise<number> {
+  try {
+    const nums = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll("a[href*='pager_s']"))
+        .map((a) => {
+          const m = (a.getAttribute("href") || "").match(/pager_s=(\d+)/);
+          return m && m[1] ? Number(m[1]) : NaN;
+        })
+        .filter((n) => Number.isFinite(n) && n > 1);
+    });
+    return nums.length ? Math.max(...nums) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * Charge une page de résultats (GET `?pager_s=N`) et en extrait les blocs.
+ * Le rendu de ce site est intermittent (un même pager_s renvoie parfois 0 bloc,
+ * parfois la page pleine) → on réessaie une fois sur page vide.
+ */
+async function extractPageWithRetry(
+  page: import("playwright").Page,
+  pageNum: number,
+): Promise<RawResult[]> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await page.goto(`${SEARCH_URL}?pager_s=${pageNum}`, {
+        waitUntil: "networkidle",
+        timeout: PAGE_TIMEOUT_MS,
+      });
+      // Attend qu'au moins un bloc soit rendu ; sinon lève et on réessaie.
+      await page.waitForSelector("div#entity", { timeout: 12_000 });
+      return await extractResultsOnPage(page);
+    } catch {
+      // page vide (fin de résultats ou rendu transitoire) — on retente une fois
+    }
+  }
+  return [];
+}
+
+// ---------------------------------------------------------------------------
+// Normalisation d'un résultat brut → ScrapedTenderRecord
+// ---------------------------------------------------------------------------
+
+function toRecord(raw: RawResult): ScrapedTenderRecord | null {
+  const ficheHref = raw.ficheHref;
+  if (!ficheHref) return null; // sans fiche, l'AO n'est pas exploitable
+
+  const sourceUrl = toAbsoluteUrl(ficheHref);
+  const externalRef = refFromFicheUrl(ficheHref) ?? cleanRef(raw.ref) ?? sourceUrl;
+
+  const record: ScrapedTenderRecord = {
+    externalRef,
+    title: raw.objet || "(sans objet)",
+    buyer: raw.buyer || "(acheteur inconnu)",
+    sourceUrl,
+  };
+
+  const deadline = parseDeadline(raw.dateRow);
+  if (deadline) record.deadline = deadline;
+
+  if (raw.dceHref) record.dceUrl = toAbsoluteUrl(raw.dceHref);
+
+  const humanRef = cleanRef(raw.ref);
+  if (humanRef) record.description = `Réf. acheteur : ${humanRef}`;
+
+  return record;
+}
+
+// ---------------------------------------------------------------------------
+// Recherche pour un mot-clé (POST + pagination)
+// ---------------------------------------------------------------------------
+
+/**
+ * Lance une recherche « En cours » pour un mot-clé, parcourt les pages de
+ * résultats et retourne les enregistrements bruts. Défensif : ne jette pas.
+ */
+async function searchKeyword(
+  page: import("playwright").Page,
+  keyword: string,
+  floorIso: string,
+  deadlineMs: number,
+): Promise<RawResult[]> {
+  const collected: RawResult[] = [];
+
+  try {
+    // 1. Repartir d'un état serveur propre : la recherche est mémorisée en
+    //    session (cookie). Sans purge, le formulaire ne se réaffiche pas
+    //    correctement entre deux mots-clés (#sub invisible). On vide les cookies
+    //    → GET /Annonces/lister renvoie un formulaire vierge, comme au 1er appel.
+    await page.context().clearCookies().catch(() => undefined);
+    await page.goto(SEARCH_URL, { waitUntil: "networkidle", timeout: PAGE_TIMEOUT_MS });
+    await page.waitForSelector("#sub", { state: "visible", timeout: PAGE_TIMEOUT_MS });
+
+    // 2. Cocher « En cours » + saisir le mot-clé.
+    await page.check("#typeEC").catch(() => undefined);
+    await page.fill("#motCle", "").catch(() => undefined);
+    await page.fill("#motCle", keyword).catch(() => undefined);
+
+    // 3. Soumettre (POST /Annonces/lister).
+    await Promise.all([
+      page.waitForLoadState("networkidle", { timeout: PAGE_TIMEOUT_MS }),
+      page.click("#sub"),
+    ]);
+  } catch (err) {
+    console.warn(`[marchespublicsinfo] recherche "${keyword}" — échec soumission:`, err);
+    return collected;
+  }
+
+  // 4. Le site refuse-t-il d'afficher (trop de résultats) ?
+  const bodyText = await page.evaluate(() => document.body?.innerText ?? "").catch(() => "");
+  if (/Veuillez préciser/i.test(bodyText)) {
+    console.warn(
+      `[marchespublicsinfo] mot-clé "${keyword}" trop générique (le site demande de préciser) — ignoré`,
+    );
+    return collected;
+  }
+
+  // 5. Page 1 (déjà rendue par le POST).
+  collected.push(...(await extractResultsOnPage(page)));
+  console.info(`[marchespublicsinfo] "${keyword}" page 1 — ${collected.length} blocs`);
+
+  // 6. Pagination : on parcourt SÉQUENTIELLEMENT 2..dernière page (bornée par
+  //    MAX_PAGES). La pagination affichée est tronquée (« 1 2 3 4 5 … 8 ») donc
+  //    on itère tous les numéros, pas seulement ceux listés. Le 1er bloc de
+  //    chaque page est un avis épinglé récurrent → le dédoublonnage par
+  //    externalRef en amont l'absorbe. On ne s'arrête PAS sur une page vide
+  //    (rendu intermittent : une page suivante peut encore contenir des avis).
+  const lastPage = Math.min(await extractLastPage(page), MAX_PAGES);
+  for (let pageNum = 2; pageNum <= lastPage; pageNum++) {
+    if (Date.now() >= deadlineMs) {
+      console.warn("[marchespublicsinfo] timeout global atteint pendant la pagination");
+      break;
+    }
+    const pageResults = await extractPageWithRetry(page, pageNum);
+    collected.push(...pageResults);
+    console.info(`[marchespublicsinfo] "${keyword}" page ${pageNum}/${lastPage} — +${pageResults.length} blocs`);
+  }
+
+  // Filtre incrémental : on ne garde que les avis publiés depuis lastRunAt.
+  // Un avis à date de publication non parseable est conservé (prudence).
+  return collected.filter((r) => {
+    const pub = parsePublicationDate(r.dateRow);
+    return !pub || pub >= floorIso;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sélection des mots-clés discriminants
+// ---------------------------------------------------------------------------
+
+/**
+ * Prépare la liste de mots-clés à rechercher : nettoie, dédoublonne, cap à
+ * MAX_KEYWORDS. Le moteur fait un ET/phrase, donc chaque entrée doit rester
+ * une expression discriminante (idéalement une phrase métier courte).
+ */
+function selectKeywords(keywords: string[] | undefined): string[] {
+  if (!keywords || keywords.length === 0) return [];
+  const cleaned = keywords
+    .map((k) => k.trim())
+    .filter((k) => k.length >= 3);
+  return [...new Set(cleaned)].slice(0, MAX_KEYWORDS);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,125 +440,75 @@ async function goToNextPage(page: Page): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
- * Scrappe les appels d'offres récents sur Marchés Publics Info.
+ * Scrappe les appels d'offres en cours sur marches-publics.info via Browserbase.
+ *
+ * Le paramètre `browser` (Playwright local du worker) est volontairement ignoré :
+ * ce site nécessite un navigateur distant Browserbase pour passer l'anti-bot.
  *
  * @param req - Paramètres du job (profil, filtres, date plancher)
- * @param browser - Instance Playwright partagée (gérée par le worker)
- * @returns Liste des AOs collectés (peut être vide si aucun résultat)
+ * @param _browser - Instance Playwright locale (IGNORÉE — voir en-tête de fichier)
+ * @returns Liste des AOs collectés (vide si secret absent ou aucun résultat)
  */
 export async function scrapeMarChesPublicsInfo(
   req: ScrapeRequest,
-  browser: Browser,
+  _browser: Browser,
 ): Promise<ScrapedTenderRecord[]> {
-  const tenders: ScrapedTenderRecord[] = [];
-  let context: BrowserContext | null = null;
+  const apiKey = process.env.BROWSERBASE_API_KEY;
+  const projectId = process.env.BROWSERBASE_PROJECT_ID ?? DEFAULT_BROWSERBASE_PROJECT_ID;
 
-  // Timeout global : on annule tout si dépassé
-  const deadline = Date.now() + GLOBAL_TIMEOUT_MS;
-
-  try {
-    context = await browser.newContext({
-      userAgent: USER_AGENT,
-      locale: "fr-FR",
-      timezoneId: "Europe/Paris",
-    });
-    const page = await context.newPage();
-
-    // Construction de l'URL de recherche avec filtre date
-    const lastRunDate = req.lastRunAt.substring(0, 10); // YYYY-MM-DD
-    const searchParams = new URLSearchParams({
-      date_from: lastRunDate,
-      datePublication: lastRunDate,
-    });
-
-    // Mots-clés de recherche du profil
-    if (req.profileFilters.keywords && req.profileFilters.keywords.length > 0) {
-      searchParams.set("q", req.profileFilters.keywords.join(" "));
-    }
-
-    const startUrl = `${SEARCH_URL}?${searchParams.toString()}`;
-
-    console.info(`[marchespublicsinfo] navigation vers ${startUrl}`);
-    try {
-      await page.goto(startUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: PAGE_TIMEOUT_MS,
-      });
-    } catch (err) {
-      console.error("[marchespublicsinfo] échec navigation page initiale:", err);
-      return [];
-    }
-
-    // Parcours des pages de résultats
-    for (let pageIndex = 0; pageIndex < MAX_PAGES; pageIndex++) {
-      if (Date.now() >= deadline) {
-        console.warn("[marchespublicsinfo] timeout global atteint à la page", pageIndex);
-        break;
-      }
-
-      const items = await extractListItems(page);
-      console.info(`[marchespublicsinfo] page ${pageIndex + 1} — ${items.length} éléments`);
-
-      if (items.length === 0) break;
-
-      // Extraction des détails pour chaque AO
-      const detailPage = await context.newPage();
-      for (const item of items) {
-        if (Date.now() >= deadline) break;
-
-        try {
-          const externalRef = extractRefFromUrl(item.href);
-          const sourceUrl = item.href.startsWith("http") ? item.href : `${BASE_URL}${item.href}`;
-
-          // Données de la liste (fallback si la fiche détail échoue)
-          const listData: Partial<ScrapedTenderRecord> = {
-            title: item.titleText,
-            buyer: item.buyerText,
-            deadline: item.deadlineText ? parseDate(item.deadlineText) : undefined,
-          };
-
-          // Enrichissement depuis la fiche détail
-          const detail = await extractTenderDetail(detailPage, item.href);
-
-          const record: ScrapedTenderRecord = {
-            externalRef,
-            title: detail.title ?? listData.title ?? "(sans titre)",
-            buyer: detail.buyer ?? listData.buyer ?? "(acheteur inconnu)",
-            cpv: detail.cpv,
-            amount: detail.amount,
-            deadline: detail.deadline ?? listData.deadline,
-            questionsDeadline: detail.questionsDeadline,
-            dceUrl: detail.dceUrl,
-            sourceUrl,
-            procedure: detail.procedure,
-            description: detail.description,
-          };
-
-          tenders.push(record);
-          await jitter();
-        } catch (err) {
-          console.warn("[marchespublicsinfo] extraction AO échouée:", item.href, err);
-          // Continuer avec le suivant
-        }
-      }
-      await detailPage.close();
-
-      // Tenter d'aller à la page suivante
-      const hasNext = await goToNextPage(page);
-      if (!hasNext) break;
-
-      await jitter();
-    }
-  } finally {
-    if (context) {
-      try {
-        await context.close();
-      } catch (err) {
-        console.warn("[marchespublicsinfo] erreur fermeture context:", err);
-      }
-    }
+  // Fail-soft : sans clé Browserbase, on ne casse pas le worker.
+  if (!apiKey) {
+    console.warn(
+      "[marchespublicsinfo] BROWSERBASE_API_KEY absent — scraper désactivé, retour []",
+    );
+    return [];
   }
 
-  console.info(`[marchespublicsinfo] scraping terminé — ${tenders.length} AOs collectés`);
+  const keywords = selectKeywords(req.profileFilters.keywords);
+  if (keywords.length === 0) {
+    console.warn(
+      "[marchespublicsinfo] aucun mot-clé discriminant dans le profil — retour [] (le moteur refuse une recherche non ciblée)",
+    );
+    return [];
+  }
+
+  const floorIso = floorDate(req.lastRunAt);
+  const globalDeadlineMs = Date.now() + GLOBAL_TIMEOUT_MS;
+  // Dédoublonnage inter-mots-clés par externalRef (union des recherches).
+  const byRef = new Map<string, ScrapedTenderRecord>();
+
+  try {
+    await withBrowserbaseSession(apiKey, projectId, async (browser) => {
+      const context = browser.contexts()[0] ?? (await browser.newContext());
+      // Shim `__name` : le worker tourne via tsx/esbuild (keepNames), qui enveloppe
+      // les fonctions nommées de nos callbacks page.evaluate() dans un helper
+      // `__name(...)` inexistant côté navigateur → ReferenceError. On injecte un
+      // no-op idempotent avant chaque navigation. (source string = non transpilée)
+      await context.addInitScript(
+        "window.__name = window.__name || function (fn) { return fn; };",
+      );
+      const page = context.pages()[0] ?? (await context.newPage());
+
+      for (const keyword of keywords) {
+        if (Date.now() >= globalDeadlineMs) {
+          console.warn("[marchespublicsinfo] timeout global atteint — arrêt des mots-clés restants");
+          break;
+        }
+        const raws = await searchKeyword(page, keyword, floorIso, globalDeadlineMs);
+        for (const raw of raws) {
+          const record = toRecord(raw);
+          if (record && !byRef.has(record.externalRef)) {
+            byRef.set(record.externalRef, record);
+          }
+        }
+      }
+    });
+  } catch (err) {
+    // Une erreur Browserbase (session, réseau, anti-bot) ne doit pas casser le worker.
+    console.error("[marchespublicsinfo] erreur fatale scraping (retour partiel):", err);
+  }
+
+  const tenders = [...byRef.values()];
+  console.info(`[marchespublicsinfo] scraping terminé — ${tenders.length} AOs uniques collectés`);
   return tenders;
 }
